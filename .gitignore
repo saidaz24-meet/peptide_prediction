@@ -1,0 +1,43 @@
+# python
+backend/.venv
+__pycache__/
+*.pyc
+
+# data
+backend/Uniprot_KB/Output/
+backend/Tango/
+backend/Jpred/
+backend/*.xlsx
+backend/*.csv
+
+# node
+ui/.next
+ui/node_modules
+
+# environment files
+.env
+.env.local
+.env.*.local
+backend/.env
+ui/.env.local
+
+# system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# data files (keep only small example files)
+*.xlsx
+*.csv
+*.tsv
+!*example*.xlsx
+!*example*.csv
+!*example*.tsv
+
+# logs
+*.log
+*.log.*

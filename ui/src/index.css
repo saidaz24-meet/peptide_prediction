@@ -1,0 +1,149 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Peptide Visual Lab Design System - Professional Scientific Aesthetic */
+
+@layer base {
+  :root {
+    /* Base colors - Clean lab aesthetic */
+    --background: 0 0% 99%;
+    --foreground: 220 13% 18%;
+    
+    /* Cards and surfaces */
+    --card: 0 0% 100%;
+    --card-foreground: 220 13% 18%;
+    
+    /* Interactive elements */
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 13% 18%;
+    
+    /* Brand colors - Scientific purple */
+    --primary: 258 90% 66%;
+    --primary-foreground: 0 0% 100%;
+    
+    /* Secondary - Neutral gray */
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 220 13% 18%;
+    
+    /* Muted elements */
+    --muted: 220 14% 96%;
+    --muted-foreground: 220 8.9% 46.1%;
+    
+    /* Accent - Scientific blue for helix */
+    --accent: 211 96% 68%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Status colors */
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    /* Scientific theme colors */
+    --chameleon-positive: 258 90% 66%;
+    --chameleon-negative: 220 8.9% 46.1%;
+    --helix: 211 96% 68%;
+    --helix-foreground: 0 0% 100%;
+    
+    /* Borders and inputs */
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 258 90% 66%;
+    
+    /* Spacing and shape */
+    --radius: 0.75rem;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(258 90% 66%), hsl(258 90% 76%));
+    --gradient-surface: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 14% 98%));
+    
+    /* Shadows */
+    --shadow-soft: 0 2px 8px -2px hsl(220 13% 18% / 0.08);
+    --shadow-medium: 0 4px 16px -4px hsl(220 13% 18% / 0.12);
+    --shadow-strong: 0 8px 32px -8px hsl(220 13% 18% / 0.16);
+
+    --sidebar-background: 0 0% 98%;
+
+    --sidebar-foreground: 240 5.3% 26.1%;
+
+    --sidebar-primary: 240 5.9% 10%;
+
+    --sidebar-primary-foreground: 0 0% 98%;
+
+    --sidebar-accent: 240 4.8% 95.9%;
+
+    --sidebar-accent-foreground: 240 5.9% 10%;
+
+    --sidebar-border: 220 13% 91%;
+
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+
+  .dark {
+    /* Dark mode - Professional lab in low light */
+    --background: 220 27% 8%;
+    --foreground: 220 14% 96%;
+    
+    --card: 220 27% 10%;
+    --card-foreground: 220 14% 96%;
+    
+    --popover: 220 27% 10%;
+    --popover-foreground: 220 14% 96%;
+    
+    --primary: 258 90% 66%;
+    --primary-foreground: 0 0% 100%;
+    
+    --secondary: 220 27% 16%;
+    --secondary-foreground: 220 14% 96%;
+    
+    --muted: 220 27% 16%;
+    --muted-foreground: 220 8.9% 46.1%;
+    
+    --accent: 211 96% 68%;
+    --accent-foreground: 0 0% 100%;
+    
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 142 71% 45%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    
+    --chameleon-positive: 258 90% 66%;
+    --chameleon-negative: 220 8.9% 46.1%;
+    --helix: 211 96% 68%;
+    --helix-foreground: 0 0% 100%;
+    
+    --border: 220 27% 16%;
+    --input: 220 27% 16%;
+    --ring: 258 90% 66%;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(258 90% 66%), hsl(258 90% 76%));
+    --gradient-surface: linear-gradient(180deg, hsl(220 27% 10%), hsl(220 27% 12%));
+    
+    --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
+    --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
+    --shadow-strong: 0 8px 32px -8px hsl(0 0% 0% / 0.5);
+    --sidebar-background: 240 5.9% 10%;
+    --sidebar-foreground: 240 4.8% 95.9%;
+    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 240 3.7% 15.9%;
+    --sidebar-accent-foreground: 240 4.8% 95.9%;
+    --sidebar-border: 240 3.7% 15.9%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+  }
+}
