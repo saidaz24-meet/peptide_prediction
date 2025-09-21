@@ -56,6 +56,15 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
         icon: HelixIcon,
         color: helixIsHigher ? 'text-green-600' : 'text-blue-600',
       });
+    } else if (peptide.ffHelixPercent === undefined) {
+      evidenceItems.push({
+        property: 'FF-Helix Content',
+        value: 'Not available',
+        comparison: 'No helix structure data available',
+        difference: '',
+        icon: Minus,
+        color: 'text-muted-foreground',
+      });
     }
   }
 
@@ -74,15 +83,15 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
   // Chameleon prediction evidence
   const chameleonEvidence = {
     property: 'Chameleon Prediction',
-    value: peptide.chameleonPrediction === 1 ? 'Positive' : peptide.chameleonPrediction === -1 ? 'Negative' : 'Uncertain',
+    value: peptide.chameleonPrediction === 1 ? 'Positive' : peptide.chameleonPrediction === -1 ? 'Negative' : 'Not available',
     comparison: peptide.chameleonPrediction === 1 
       ? 'Predicted to be membrane-active'
       : peptide.chameleonPrediction === -1
       ? 'Predicted to be non-membrane-active'
-      : 'Uncertain membrane activity',
+      : 'No chameleon prediction available',
     difference: '',
     icon: peptide.chameleonPrediction === 1 ? CheckCircle : peptide.chameleonPrediction === -1 ? XCircle : Minus,
-    color: peptide.chameleonPrediction === 1 ? 'text-chameleon-positive' : peptide.chameleonPrediction === -1 ? 'text-muted-foreground' : 'text-amber-600',
+    color: peptide.chameleonPrediction === 1 ? 'text-chameleon-positive' : peptide.chameleonPrediction === -1 ? 'text-muted-foreground' : 'text-muted-foreground',
   };
 
   return (

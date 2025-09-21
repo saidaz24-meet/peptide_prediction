@@ -11,6 +11,13 @@ import { useDatasetStore } from '@/stores/datasetStore';
 import { uploadCSV } from '@/lib/api';
 import { useNavigate } from 'react-router-dom';
 import Papa from 'papaparse';
+import AppFooter from "@/components/AppFooter";
+// at the top
+import { UploadDropzone } from "@/components/UploadDropzone";
+
+
+// QC
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 const steps = [
   { id: 'upload', title: 'Upload File', icon: UploadIcon },
@@ -18,9 +25,31 @@ const steps = [
   { id: 'mapping', title: 'Map Columns', icon: CheckCircle },
 ];
 
+// QC helpers — minimal and safe
+const AA20 = new Set('ACDEFGHIKLMNPQRSTVWY'.split(''));
+function isValidSeq(s: string) {
+  if (!s) return false;
+  if (!/^[A-Za-z]+$/.test(s)) return false;
+  for (const ch of s.toUpperCase()) if (!AA20.has(ch)) return false;
+  return true;
+}
+function exportCsv(filename: string, rows: any[]) {
+  if (!rows?.length) return;
+  const csv = Papa.unparse(rows);
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function Upload() {
   const [currentStep, setCurrentStep] = useState(0);
   const [localFile, setLocalFile] = useState<File | null>(null);
+  // QC state (only affects preview UI)
+  const [qc, setQc] = useState<null | { rejectedCount: number; download: () => void }>(null);
 
   // your store API:
   const { rawData, isLoading, setRawPreview, ingestBackendRows } = useDatasetStore();
@@ -31,9 +60,12 @@ export default function Upload() {
   async function handleAnalyze() {
     if (!localFile) return;
     try {
-      const { rows } = await uploadCSV(localFile);   // FastAPI /api/upload-csv
-      ingestBackendRows(rows);                       // map + compute stats
-      navigate('/results');                          // show dashboard
+      const response = await uploadCSV(localFile);   // FastAPI /api/upload-csv
+      const { rows, meta } = response as any;
+      // keep your existing ingestion path
+      // @ts-ignore (in case your store signature expects (rows, meta))
+      ingestBackendRows(rows, meta);
+      navigate('/results');
     } catch (e: any) {
       alert(e.message || 'Upload failed');
     }
@@ -42,13 +74,13 @@ export default function Upload() {
   // preview parser for step 1 -> 2
   function handleLocalPreview(file: File) {
     setLocalFile(file);
+    setQc(null); // reset QC banner on new file
     const name = file.name.toLowerCase();
-    const isTSV = name.endsWith(".tsv");
-    const isXLSX = name.endsWith(".xlsx") || name.endsWith(".xls");
-  
+    const isTSV = name.endsWith('.tsv');
+    const isXLSX = name.endsWith('.xlsx') || name.endsWith('.xls');
+
     if (isXLSX) {
       // Optional: skip client preview for Excel; backend will read it fine.
-      // You can show a simple banner instead of parsing.
       setRawPreview({
         fileName: file.name,
         headers: [],
@@ -58,35 +90,77 @@ export default function Upload() {
       setCurrentStep(1);
       return;
     }
-  
+
     // CSV/TSV preview with Papa
     Papa.parse(file, {
       header: true,
-      skipEmptyLines: "greedy",
-      delimiter: isTSV ? "\t" : undefined, // undefined lets Papa auto-detect for CSV; force tab for TSV
+      skipEmptyLines: 'greedy',
+      delimiter: isTSV ? '\t' : undefined, // undefined lets Papa auto-detect for CSV; force tab for TSV
       complete: (res) => {
         const rowsObj = (res.data as any[]).filter(Boolean);
         const headers =
           res.meta.fields && res.meta.fields.length
             ? res.meta.fields
-            : rowsObj.length ? Object.keys(rowsObj[0]) : [];
+            : rowsObj.length
+            ? Object.keys(rowsObj[0])
+            : [];
+
+        // ------- QC: split valid vs rejected by basic AA20 check on a likely sequence field -------
+        const pickSeq = (r: any) =>
+          r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? '';
+        const valid: any[] = [];
+        const rejected: any[] = [];
+        for (const r of rowsObj) {
+          const seq = String(pickSeq(r) ?? '');
+          if (isValidSeq(seq)) valid.push(r);
+          else rejected.push(r);
+        }
+        // ------------------------------------------------------------------------------------------
+
         try {
           // support both signatures of setRawPreview
           // @ts-ignore
-          if (setRawPreview.length >= 3) setRawPreview(file.name, headers, rowsObj.slice(0, 200));
+          if (setRawPreview.length >= 3)
+            setRawPreview({
+              fileName: file.name,
+              headers,
+              rows: valid.slice(0, 200),
+              rowCount: valid.length,
+            });
+            
           else
             // @ts-ignore
-            setRawPreview({ fileName: file.name, headers, rows: rowsObj.slice(0, 200), rowCount: rowsObj.length });
+            setRawPreview({
+              fileName: file.name,
+              headers,
+              rows: valid.slice(0, 200),
+              rowCount: valid.length,
+            });
         } catch {
           // @ts-ignore
-          setRawPreview({ fileName: file.name, headers, rows: rowsObj.slice(0, 200), rowCount: rowsObj.length });
+          setRawPreview({
+            fileName: file.name,
+            headers,
+            rows: valid.slice(0, 200),
+            rowCount: valid.length,
+          });
         }
+
+        // Set QC banner if any rejections (non-blocking, preview-only)
+        if (rejected.length > 0) {
+          setQc({
+            rejectedCount: rejected.length,
+            download: () => exportCsv('rejected_rows.csv', rejected),
+          });
+        } else {
+          setQc(null);
+        }
+
         setCurrentStep(1);
       },
       error: (err) => alert(`Failed to read file: ${err.message}`),
     });
   }
-  
 
   return (
     <div className="min-h-screen bg-gradient-surface">
@@ -134,25 +208,32 @@ export default function Upload() {
             <CardContent className="p-6">
               {currentStep === 0 && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Choose a UniProt CSV file</label>
-                    <input
-                      type="file"
-                      accept=".csv,.tsv,.txt,.xlsx"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) handleLocalPreview(f);
-                      }}
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      We only parse a small preview locally for mapping; full analysis runs on the backend.
-                    </p>
-                  </div>
+                
+                <UploadDropzone
+                  onFileProcessed={() => {
+                    // If a CSV was dropped, preview is already set by handleLocalPreview-equivalent.
+                    // If XLS/XLSX was dropped, dropzone sets a minimal preview shell.
+                    setCurrentStep(1);
+                  }}
+                />
+
                 </motion.div>
               )}
 
               {currentStep === 1 && rawData && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
+                  {/* QC banner (subtle, optional) */}
+                  {qc && qc.rejectedCount > 0 && (
+                    <Alert>
+                      <AlertDescription className="flex items-center justify-between">
+                        <span>Filtered out {qc.rejectedCount} invalid rows for preview.</span>
+                        <Button variant="outline" size="sm" onClick={qc.download}>
+                          Download rejected_rows.csv
+                        </Button>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-lg font-semibold">Data Preview</h3>
@@ -190,6 +271,9 @@ export default function Upload() {
               )}
             </CardContent>
           </Card>
+
+          <AppFooter />
+
         </motion.div>
       </div>
     </div>

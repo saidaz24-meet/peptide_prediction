@@ -1,49 +1,128 @@
-This project predicts helical or secondary structure switch peptides with potential to form fibrils out of a Uniprot database. The calculations relays on two secondary structure prediction tools: Tango, which run automatically from the code, and Jpred, whose input and output analysis are generated automatically, but the actual run should be performed separately.
+# Peptide Visual Lab (DESY — Meytal Landau Group)
 
-The code runs through the main.py but several pre-determined variables should be revied and changed according to the user specific needs.
+Interactive web app for exploring peptide properties and fibril-forming predictions.
+Designed for **internal use** at DESY (Meytal Landau group).  
+Developed with guidance from **Aleksandr Golubev**.
 
-Python packaged in use:
+> **Private**: no public deployment intended. Use within the lab only.
 
-pandas
-numpy
-os
-subprocess
-warnings
+---
 
-Before running the code, there is a need to check and re-define if neccesary the global parameters in:
+## Purpose
 
-main.py:
+- Upload peptide datasets from UniProt (TSV/CSV/XLSX)
+- Compute biophysical features (Hydrophobicity, Charge, Hydrophobic Moment μH)
+- Integrate **Tango (SSW)** and **JPred** results (when local outputs are provided)
+- Visualize cohorts, rank candidates, and export reports/shortlists
 
-LANDAU_LAB_PEPTIDES_FILEPATH = Path to file comtaining the Landu-lab peptide database
-JPRED_INPUT_FILEPATH = filepath to Jpred directory (will contain automatically generated Jpred input and should containd Jpred prediction results)
-MIN_H_CONTENT = minimal percentage of helical secondary structure prediction in order to be predicted as a helical peptide. Change only if you want to limit the secondary structure prediction to a certain percentage from the whole sequence.
-MIN_SSW_B_CONTENT = minimal percentage of beta secondary structure prediction in order to be predicted as a secondary structure switch peptide. Change only if you want to limit the secondary structure prediction to a certain percentage from the whole sequence.
-MIN_SSW_H_CONTENT = minimal percentage of helical secondary structure prediction in order to be predicted as a secondary structure switch peptide. Change only if you want to limit the secondary structure prediction to a certain percentage from the whole sequence.
-RUN_ONLY_DATABASE = To run a specific database rather than automatically gathering files from directory add to the list the filepath to that specific database.
-JOB_RUN = name of a directory where all databases to run will be.
-tango.py:
+---
 
-TANGO_RUN_FILEPATH = Path to the directory where the 'Tango_run.bat' file exists.
-TANGO_BAT_FILEPATH = Path to the file 'Tango_run.bat'
-TANGO_DIRECTORY_PATH = Path to the Tango directory where input file, run file and results are saved.
-TANGO_RESULT_DIRECTORY = Full path to tango result directory.
-KEY = Column name in the database describing the unique identity of each column.
+## Key Features
 
-jpred.py:
+- **Flexible upload**: TSV/CSV/XLSX; optional column mapping
+- **Upload QC**: invalid sequences reported, download *rejected_rows.csv*
+- **Provenance pill**: JPred/Tango **ON/OFF** + hit counts
+- **Six core metrics**:
+  1. Chameleon prediction (SSW)
+  2. Helix segments (JPred)
+  3. Charge
+  4. Hydrophobicity
+  5. Hydrophobic moment (μH)
+  6. FF-Helix (derived flag)
+- **Visualizations**
+  - Hydrophobicity distribution
+  - Hydrophobicity vs μH scatter
+  - Chameleon distribution & cohort radar
+  - **Sliding-window profiles** (H & μH) with helix overlays
+- **Smart ranking**: sliders for metric weights + **Top-N shortlist** (CSV)
+- **Per-peptide deep dive**: segment track, metrics, interpretations
+- **Exports**: CSV export; **PDF Report** (one-click)
+- **Cloud (optional)**: Save/Load datasets via **Firebase Auth + Firestore**
 
-JPRED_INPUT_FILEPATH = Path to directory where Jpred output are saved. Change only if it is not in the project directory.
-JPRED_OUTPUT_DIRECTORY_ENDING = ending of the directory generated automatically from the Jpred predictor. Change only if manually changeing the Jpred result automatically generated.
-DO NOT CHANGE THESE PARAMETERS:
+---
 
-JPRED_PREDICTION_FILE_ENDING = Ending of the file containing the Jpred prediction result.
-JPRED_PREDICTION_TITLE = Saved word to the line describing the secondary structure prediction of Jpred in the result file.
-JPRED_PREDICTION_CONF_TITLE = Saved word to the line describing the confidance score of the secondary structure prediction of Jpred in the result file.
+## How It Works
 
-auxiliary.py:
+1. **Backend** (`backend/` – FastAPI)
+   - Accepts UniProt exports (TSV/CSV/XLSX)
+   - Normalizes headers; derives `Length` if missing
+   - Computes **Charge**, **Hydrophobicity**, **μH** (sequence-based)
+   - If local results present and enabled:
+     - **JPred** → `Helix fragments (Jpred)`, `Helix score (Jpred)`
+     - **Tango** → `SSW prediction`, `SSW score`
+   - Computes **FF flags** from cohort thresholds
+2. **Frontend** (`ui/` – React + Vite + shadcn/ui + Recharts)
+   - Upload → Preview → **Analyze** (calls backend)
+   - Optional **column mapping**
+   - Renders dashboards, detail pages, and exports
 
-PATH = Path to the project directory.
-MINIMAL_PEPTIDE_LENGTH = The minimal peptide length
-MIN_LENGTH = Minimal length of residues in a sequence that needs to have secondary structure prediction in order to be predicted as such.
-MAX_GAP = Maximal number of residues that do not have secondary structure prediction in the middle of a fragments that have a secondary structure predition.
-MIN_JPRED_SCORE = Minimal average confidance score for residues to be predicted as helical by Jpred.
-MIN_TANGO_SCORE = Minimal average confidance score for residues to be predicted as secondary structure switch (helix or beta) by Tango.
+---
+
+## JPred / Tango Integration
+
+**No online calls.** The app reads **local output files** produced by colleagues.
+
+- Place result files here:
+  - `backend/Jpred/` — JPred outputs
+  - `backend/Tango/` — Tango outputs
+- Enable at runtime:
+  ```bash
+  export USE_JPRED=1
+  export USE_TANGO=1
+Start backend in the same shell (see below).
+The Results page shows non-empty helix segments and SSW predictions when files match your Entry/Accession IDs.
+
+If columns remain “Not available”: files are missing or filenames don’t match IDs.
+
+Local Development
+Backend
+bash
+Copy code
+cd backend
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+# Optional (local results enabled):
+export USE_JPRED=1
+export USE_TANGO=1
+uvicorn server:app --reload --port 8000
+Notes
+
+Requires: fastapi, uvicorn, pandas, numpy, openpyxl
+
+If you hit np.Inf error, change to np.inf or pin numpy<2.
+
+Frontend
+bash
+Copy code
+cd ui
+npm install
+echo "VITE_API_BASE_URL=http://127.0.0.1:8000" > .env.local
+# (optional Firebase)
+cat <<EOF >> .env.local
+VITE_FB_API_KEY=...
+VITE_FB_AUTH_DOMAIN=...
+VITE_FB_PROJECT_ID=...
+VITE_FB_STORAGE_BUCKET=...
+VITE_FB_MSG_SENDER=...
+VITE_FB_APP_ID=...
+EOF
+
+npm run dev
+# open http://localhost:5173
+File Formats
+Recommended columns: Entry/Accession, Sequence (required), Length (optional)
+
+The backend derives Length from Sequence when absent.
+
+Computed fields (Hydrophobicity, Charge, μH, FF flags) are added server-side.
+
+Privacy & Scope
+Internal tool for DESY (Meytal Landau group)
+
+No public deployment; datasets may be confidential
+
+Firebase access is limited to lab accounts (if enabled)
+
+## Acknowledgements
+Algorithmic approach and backend code provided by Aleksandr Golubev

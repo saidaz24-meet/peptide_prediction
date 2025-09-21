@@ -20,6 +20,9 @@ ui/node_modules
 .env.*.local
 backend/.env
 ui/.env.local
+!.env.example
+!backend/.env.example
+!ui/.env.example
 
 # system files
 .DS_Store

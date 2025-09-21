@@ -19,7 +19,7 @@ export async function uploadCSV(file: File) {
   const fd = new FormData();
   fd.append("file", file);
   const res = await fetch(`${API_BASE}/api/upload-csv`, { method: "POST", body: fd, mode: "cors" });
-  return (await handleResponse(res)) as { rows: any[] };
+  return (await handleResponse(res)) as { rows: any[], meta?: any };
 }
 
 export async function predictOne(sequence: string, entry?: string) {

@@ -36,6 +36,12 @@ export function Legend() {
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
+                <span className="text-sm">Chameleon Not Available</span>
+                <Badge variant="outline">
+                  Not available
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
                 <span className="text-sm">Helix Segments</span>
                 <div className="w-4 h-4 rounded bg-helix"></div>
               </div>

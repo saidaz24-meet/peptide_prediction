@@ -42,9 +42,37 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: (info) => (
-          <span className="font-mono text-sm">{info.getValue()}</span>
-        ),
+        cell: (info) => {
+          const id = String(info.getValue());
+          const uni = `https://www.uniprot.org/uniprotkb/${id}/entry`;
+          const af = `https://alphafold.ebi.ac.uk/entry/${id}`;
+          return (
+            <div className="flex items-center gap-2">
+              <a
+                href={uni}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono text-sm text-blue-600 hover:underline"
+                onClick={(e) => e.stopPropagation()}
+                title="Open UniProt entry"
+              >
+                {id}
+              </a>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-6 px-2"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.open(af, '_blank', 'noopener,noreferrer');
+                }}
+                title="Open AlphaFold entry"
+              >
+                AlphaFold
+              </Button>
+            </div>
+          );
+        },
       }),
       columnHelper.accessor('species', {
         header: 'Species',
@@ -127,7 +155,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           } else {
             return (
               <Badge variant="outline">
-                Uncertain
+                Not available
               </Badge>
             );
           }
@@ -139,7 +167,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           const value = info.getValue();
           return (
             <span className="font-mono">
-              {value !== undefined ? `${value.toFixed(1)}%` : '-'}
+              {value !== undefined ? `${value.toFixed(1)}%` : 'Not available'}
             </span>
           );
         },
@@ -151,7 +179,10 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate(`/peptides/${info.row.original.id}`)}
+            onClick={(e) => {
+              e.stopPropagation();
+              navigate(`/peptides/${info.row.original.id}`);
+            }}
           >
             <Eye className="w-4 h-4" />
           </Button>

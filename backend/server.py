@@ -27,12 +27,22 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+print(f"[BOOT] USE_JPRED={USE_JPRED} • USE_TANGO={USE_TANGO}")
+
+
 @app.get("/api/health")
 def health():
     return {"ok": True}
 
 # ---------- Helpers ----------
+AA20 = set(list("ACDEFGHIKLMNPQRSTVWY"))
 
+def sanitize_seq(s: str) -> str:
+    s = (s or "").upper()
+    s = re.sub(r"[^A-Z]", "", s)        # drop spaces, digits, etc.
+    # keep 20 canonical AAs; convert ambiguous to closest if you want
+    s = "".join([ch for ch in s if ch in AA20])
+    return s
 # Accept many UniProt header variants and collapse to canonical keys
 HEADER_SYNONYMS: Dict[str, List[str]] = {
     "entry": [
@@ -136,7 +146,18 @@ def _to_segments(val):
 def calc_biochem(df: pd.DataFrame):
     charges, hydros, uh_full, uh_helix, uh_beta = [], [], [], [], []
     for _, r in df.iterrows():
-        seq = auxiliary.get_corrected_sequence(str(r["Sequence"]))
+        seq_raw = str(r["Sequence"])
+        seq = sanitize_seq(seq_raw) or auxiliary.get_corrected_sequence(seq_raw)
+        if not seq:
+            # mark invalids so the UI can show 'Not available' instead of 0.00
+            charges.append(float("nan"))
+            hydros.append(float("nan"))
+            uh_full.append(float("nan"))
+            uh_helix.append(float("nan"))
+            uh_beta.append(float("nan"))
+            continue
+
+
         charges.append(biochemCalculation.total_charge(seq))
         hydros.append(biochemCalculation.hydrophobicity(seq))
         uh_full.append(biochemCalculation.hydrophobic_moment(seq))
@@ -213,11 +234,25 @@ async def upload_csv(file: UploadFile = File(...)):
             tango.filter_by_avg_diff(df, "Uploaded", {"Uploaded": {}})
         except Exception: pass
 
+
+
+    jpred_hits = int((df["Helix fragments (Jpred)"] != -1).sum()) if "Helix fragments (Jpred)" in df.columns else 0
+    ssw_hits   = int((df["SSW prediction"] != -1).sum())           if "SSW prediction" in df.columns else 0
+    print(f"[UPLOAD] rows={len(df)} • JPred segments found for {jpred_hits} rows • SSW preds for {ssw_hits} rows")
+
+
     # Compute biochemical features and flags
     calc_biochem(df)
     apply_ff_flags(df)
 
-    return {"rows": json.loads(df.to_json(orient="records"))}
+    return {
+    "rows": json.loads(df.to_json(orient="records")),
+    "meta": {
+        "use_jpred": USE_JPRED, "use_tango": USE_TANGO,
+        "jpred_rows": jpred_hits, "ssw_rows": ssw_hits,
+        "valid_seq_rows": int(df["Sequence"].notna().sum())
+    }
+    }
 
 @app.post("/api/predict")
 async def predict(sequence: str = Form(...), entry: Optional[str] = Form(None)):

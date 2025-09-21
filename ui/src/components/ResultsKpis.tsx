@@ -49,7 +49,7 @@ export function ResultsKpis({ stats }: ResultsKpisProps) {
     },
     {
       title: 'Avg FF-Helix',
-      value: `${stats.meanFFHelixPercent.toFixed(1)}%`,
+      value: stats.meanFFHelixPercent > 0 ? `${stats.meanFFHelixPercent.toFixed(1)}%` : 'Not available',
       icon: BarChart3,
       color: 'text-helix',
       bgColor: 'bg-helix/10',

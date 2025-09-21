@@ -1,9 +1,8 @@
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion } from 'framer-motion';
-import { Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react';
+import { Upload, FileText, CheckCircle } from 'lucide-react';
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -21,138 +20,121 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const { setRawData, setError } = useDatasetStore();
 
-  const processFile = useCallback(async (file: File) => {
-    setIsProcessing(true);
-    setUploadProgress(0);
-    setError(null);
+  const processFile = useCallback(
+    async (file: File) => {
+      setIsProcessing(true);
+      setUploadProgress(0);
+      setError(null);
 
-    try {
-      const fileExtension = file.name.split('.').pop()?.toLowerCase();
-      
-      if (fileExtension === 'csv') {
-        // Process CSV file
-        setUploadProgress(25);
-        
-        Papa.parse(file, {
-          header: false,
-          skipEmptyLines: true,
-          complete: (results) => {
-            setUploadProgress(75);
-            
-            if (results.errors.length > 0) {
-              setError(`CSV parsing error: ${results.errors[0].message}`);
+      try {
+        const ext = file.name.split('.').pop()?.toLowerCase();
+
+        // --- CSV preview locally ---
+        if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
+          setUploadProgress(25);
+
+          const isTSV = ext === 'tsv';
+          Papa.parse(file, {
+            header: true,
+            skipEmptyLines: 'greedy',
+            delimiter: isTSV ? '\t' : undefined,
+            complete: (res) => {
+              setUploadProgress(75);
+
+              if (res.errors?.length) {
+                setError(`CSV parsing error: ${res.errors[0].message}`);
+                setIsProcessing(false);
+                return;
+              }
+
+              const rows = (res.data as any[]).filter(Boolean);
+              const headers =
+                (res.meta.fields && res.meta.fields.length
+                  ? res.meta.fields
+                  : rows.length
+                  ? Object.keys(rows[0])
+                  : []) as string[];
+
+              const parsed: ParsedCSVData = {
+                headers,
+                rows,
+                fileName: file.name,
+                rowCount: rows.length,
+              };
+
+              setRawData(parsed);
+              setUploadProgress(100);
+              toast.success(`Loaded ${rows.length} preview rows`);
+
+              setTimeout(() => {
+                setIsProcessing(false);
+                onFileProcessed();
+              }, 400);
+            },
+            error: (err) => {
+              setError(`Failed to parse CSV: ${err.message}`);
               setIsProcessing(false);
-              return;
-            }
-
-            const data = results.data as string[][];
-            if (data.length < 2) {
-              setError('CSV file must contain at least a header row and one data row');
-              setIsProcessing(false);
-              return;
-            }
-
-            const headers = data[0];
-            const rows = data.slice(1).map(row => {
-              const rowObj: Record<string, any> = {};
-              headers.forEach((header, index) => {
-                rowObj[header] = row[index] || '';
-              });
-              return rowObj;
-            });
-
-            const parsedData: ParsedCSVData = {
-              headers,
-              rows,
-              fileName: file.name,
-              rowCount: rows.length,
-            };
-
-            setRawData(parsedData);
-            setUploadProgress(100);
-            toast.success(`Successfully loaded ${rows.length} rows`);
-            
-            setTimeout(() => {
-              setIsProcessing(false);
-              onFileProcessed();
-            }, 500);
-          },
-          error: (error) => {
-            setError(`Failed to parse CSV: ${error.message}`);
-            setIsProcessing(false);
-          }
-        });
-      } else if (fileExtension === 'xlsx' || fileExtension === 'xls') {
-        // Process Excel file
-        setUploadProgress(25);
-        
-        const arrayBuffer = await file.arrayBuffer();
-        setUploadProgress(50);
-        
-        const workbook = XLSX.read(arrayBuffer, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
-        
-        setUploadProgress(75);
-        
-        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
-        
-        if (jsonData.length < 2) {
-          setError('Excel file must contain at least a header row and one data row');
-          setIsProcessing(false);
+            },
+          });
           return;
         }
 
-        const headers = jsonData[0];
-        const rows = jsonData.slice(1).map(row => {
-          const rowObj: Record<string, any> = {};
-          headers.forEach((header, index) => {
-            rowObj[header] = row[index] || '';
-          });
-          return rowObj;
-        });
+        // --- XLS/XLSX: skip client parsing; let backend handle it ---
+        if (ext === 'xlsx' || ext === 'xls') {
+          // Provide a minimal preview shell so the UI flow continues.
+          const parsed: ParsedCSVData = {
+            headers: [],
+            rows: [],
+            fileName: file.name,
+            rowCount: 0,
+          };
+          setRawData(parsed);
+          setUploadProgress(100);
+          toast(
+            'Excel detected. Preview is skipped; full parsing will run on the backend during Analyze.',
+            { icon: 'ℹ️' }
+          );
+          setTimeout(() => {
+            setIsProcessing(false);
+            onFileProcessed();
+          }, 300);
+          return;
+        }
 
-        const parsedData: ParsedCSVData = {
-          headers,
-          rows,
-          fileName: file.name,
-          rowCount: rows.length,
-        };
-
-        setRawData(parsedData);
-        setUploadProgress(100);
-        toast.success(`Successfully loaded ${rows.length} rows from Excel`);
-        
-        setTimeout(() => {
-          setIsProcessing(false);
-          onFileProcessed();
-        }, 500);
-      } else {
-        setError('Unsupported file format. Please upload a CSV or Excel file.');
+        setError('Unsupported file format. Please upload CSV/TSV or Excel.');
+        setIsProcessing(false);
+      } catch (err) {
+        setError(
+          `Error processing file: ${
+            err instanceof Error ? err.message : 'Unknown error'
+          }`
+        );
         setIsProcessing(false);
       }
-    } catch (error) {
-      setError(`Error processing file: ${error instanceof Error ? error.message : 'Unknown error'}`);
-      setIsProcessing(false);
-    }
-  }, [setRawData, setError, onFileProcessed]);
-
-  const onDrop = useCallback((acceptedFiles: File[]) => {
-    if (acceptedFiles.length > 0) {
-      processFile(acceptedFiles[0]);
-    }
-  }, [processFile]);
-
-  const { getRootProps, getInputProps, isDragActive, isDragReject } = useDropzone({
-    onDrop,
-    accept: {
-      'text/csv': ['.csv'],
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx'],
-      'application/vnd.ms-excel': ['.xls'],
     },
-    multiple: false,
-    disabled: isProcessing,
-  });
+    [setRawData, setError, onFileProcessed]
+  );
+
+  const onDrop = useCallback(
+    (accepted: File[]) => {
+      if (accepted.length > 0) processFile(accepted[0]);
+    },
+    [processFile]
+  );
+
+  const { getRootProps, getInputProps, isDragActive, isDragReject } =
+    useDropzone({
+      onDrop,
+      accept: {
+        'text/csv': ['.csv', '.tsv', '.txt'],
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': [
+          '.xlsx',
+        ],
+        'application/vnd.ms-excel': ['.xls'],
+      },
+      multiple: false,
+      disabled: isProcessing,
+    });
 
   return (
     <div className="space-y-6">
@@ -163,13 +145,11 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
       >
         <Card
           {...getRootProps()}
-          className={`
-            relative overflow-hidden cursor-pointer transition-all duration-200 border-2 border-dashed
+          className={`relative overflow-hidden cursor-pointer transition-all duration-200 border-2 border-dashed
             ${isDragActive && !isDragReject ? 'border-primary bg-primary/5' : ''}
             ${isDragReject ? 'border-destructive bg-destructive/5' : ''}
             ${!isDragActive ? 'border-border hover:border-primary/50 hover:bg-muted/30' : ''}
-            ${isProcessing ? 'pointer-events-none opacity-60' : ''}
-          `}
+            ${isProcessing ? 'pointer-events-none opacity-60' : ''}`}
         >
           <input {...getInputProps()} />
           <CardContent className="flex flex-col items-center justify-center py-12 px-6 text-center">
@@ -180,44 +160,44 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
               }}
               transition={{
                 scale: { duration: 0.2 },
-                rotate: { duration: 2, repeat: isProcessing ? Infinity : 0, ease: 'linear' }
+                rotate: {
+                  duration: 2,
+                  repeat: isProcessing ? Infinity : 0,
+                  ease: 'linear',
+                },
               }}
               className="mb-4"
             >
-              {isProcessing ? (
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <div
+                className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                  isDragActive || isProcessing ? 'bg-primary/10' : 'bg-muted'
+                }`}
+              >
+                {(isDragActive || isProcessing) ? (
                   <Upload className="w-8 h-8 text-primary" />
-                </div>
-              ) : isDragActive ? (
-                <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Upload className="w-8 h-8 text-primary" />
-                </div>
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                ) : (
                   <FileText className="w-8 h-8 text-muted-foreground" />
-                </div>
-              )}
+                )}
+              </div>
             </motion.div>
 
             <h3 className="text-xl font-semibold mb-2">
-              {isProcessing 
-                ? 'Processing your file...' 
-                : isDragActive 
-                ? 'Drop your file here' 
-                : 'Upload Peptide Dataset'
-              }
+              {isProcessing
+                ? 'Processing your file…'
+                : isDragActive
+                ? 'Drop your file here'
+                : 'Upload Peptide Dataset'}
             </h3>
-            
+
             <p className="text-muted-foreground mb-4 max-w-sm">
-              {isProcessing 
-                ? 'Please wait while we parse your data'
-                : 'Drag and drop your CSV or Excel file here, or click to browse'
-              }
+              {isProcessing
+                ? 'Please wait while we prepare your data'
+                : 'Drag & drop your CSV/TSV or Excel file here, or click to browse'}
             </p>
 
             {!isProcessing && (
               <div className="text-sm text-muted-foreground">
-                <p>Supported formats: CSV, XLSX, XLS</p>
+                <p>Supported formats: CSV, TSV, XLSX, XLS</p>
                 <p>Maximum file size: 50MB</p>
               </div>
             )}
@@ -234,38 +214,61 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
         </Card>
       </motion.div>
 
-      {/* Success/Error States */}
       {uploadProgress === 100 && !isProcessing && (
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
+        <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <Alert className="border-success bg-success/5">
             <CheckCircle className="h-4 w-4 text-success" />
             <AlertDescription className="text-success">
-              File uploaded successfully! Ready to proceed to the next step.
+              File ready! Proceed to the next step.
             </AlertDescription>
           </Alert>
         </motion.div>
       )}
 
-      {/* Example Files */}
-      <div className="text-center">
-        <p className="text-sm text-muted-foreground mb-3">
-          Don't have a file? Try our example dataset:
-        </p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => {
-            // This would load an example dataset
-            toast('Example dataset loading feature coming soon', { icon: 'ℹ️' });
-          }}
-        >
-          <FileText className="w-4 h-4 mr-2" />
-          Load Example Dataset
-        </Button>
-      </div>
+
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={async () => {
+          try {
+            const res = await fetch("/example/peptide_data.csv");
+            const text = await res.text();
+
+            Papa.parse(text, {
+              header: true,
+              skipEmptyLines: "greedy",
+              complete: (parsed) => {
+                const rows = (parsed.data as any[]).filter(Boolean);
+                const headers =
+                  parsed.meta.fields && parsed.meta.fields.length
+                    ? parsed.meta.fields
+                    : rows.length
+                    ? Object.keys(rows[0])
+                    : [];
+
+                setRawData({
+                  fileName: "peptide_data.csv",
+                  headers,
+                  rows: rows.slice(0, 200),
+                  rowCount: rows.length,
+                } as any);
+
+                toast.success(`Loaded example dataset (${rows.length} rows)`);
+                onFileProcessed(); // jump to Preview step
+              },
+              error: (err) => {
+                toast.error(`Failed to load example dataset: ${err.message}`);
+              },
+            });
+          } catch (err: any) {
+            toast.error("Could not fetch example dataset");
+          }
+        }}
+      >
+        <FileText className="w-4 h-4 mr-2" />
+        Load Example Dataset
+      </Button>
+
     </div>
   );
 }

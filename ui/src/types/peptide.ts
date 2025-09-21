@@ -70,3 +70,10 @@ export type PeptideRow = {
   "FF-Secondary structure switch": number;    // 1 or -1
   "Helix fragments (Jpred)"?: Array<[number, number]> | any[];
 };
+
+export type DatasetMetadata = {
+  use_jpred?: boolean;
+  jpred_rows?: number;
+  use_tango?: boolean;
+  ssw_rows?: number;
+};
