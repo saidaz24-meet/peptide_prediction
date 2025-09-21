@@ -1,4 +1,4 @@
-# Peptide Visual Lab (DESY — Meytal Landau Group)
+# Peptide Visual Lab (DESY — Landau Group)
 
 Interactive web app for exploring peptide properties and fibril-forming predictions.
 Designed for **internal use** at DESY (Meytal Landau group).  
@@ -118,11 +118,12 @@ The backend derives Length from Sequence when absent.
 Computed fields (Hydrophobicity, Charge, μH, FF flags) are added server-side.
 
 Privacy & Scope
-Internal tool for DESY (Meytal Landau group)
+Internal tool for DESY (Proffessor Landau's group)
 
 No public deployment; datasets may be confidential
 
 Firebase access is limited to lab accounts (if enabled)
 
 ## Acknowledgements
-Algorithmic approach and backend code provided by Aleksandr Golubev
+Algorithmic approach and backend code provided by Dr. Aleksandr Golubev
+Design & DataBase - Said Azaizah
