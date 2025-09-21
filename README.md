@@ -1,8 +1,8 @@
 # Peptide Visual Lab (DESY — Landau Group)
 
 Interactive web app for exploring peptide properties and fibril-forming predictions.
-Designed for **internal use** at DESY (Meytal Landau group).  
-Developed with guidance from **Aleksandr Golubev**.
+Designed for **internal use** at DESY (Proffessor Meytal Landau's group).  
+Developed with guidance from **Dr. Aleksandr Golubev**.
 
 > **Private**: no public deployment intended. Use within the lab only.
 
@@ -126,4 +126,5 @@ Firebase access is limited to lab accounts (if enabled)
 
 ## Acknowledgements
 Algorithmic approach and backend code provided by Dr. Aleksandr Golubev
+
 Design & DataBase - Said Azaizah
