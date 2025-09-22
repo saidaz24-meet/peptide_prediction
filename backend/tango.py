@@ -16,17 +16,13 @@ KEY = "Entry"
 
 def create_tango_input(database: pd.DataFrame, existed_tango_results: set):
     """
-    This function creates Tango input file (.bat) containing all the proteins in the given database.
-    This function takes into account all proteins that have previous Tango result, and dont run them again.
-    The Tango input file is saved automatically to TANGO_BAT_FILEPATH in the TANGO_DIRECTORY_PATH
-    Shortcuts referred in the function:
-        cter - status of the C-terminus of the peptide. amidated Y, free N
-        mter - status of the N-terminus of the peptide. acetylated A, succinilated S and free N
-        ionic - ionic strength in M
-        temp - in kelvin
-    :param database:
-    :param existed_tango_results:
-    :return: Nothing. creates the input file in the TANGO_BAT_FILEPATH in the TANGO_DIRECTORY_PATH
+    Create Tango input file for Mac/Linux (non-interactive).
+    Instead of writing a .bat script, this writes a plain input file
+    that Tango can consume with './tango < Tango_input.txt'.
+
+    Parameters:
+        database (pd.DataFrame): your peptides DataFrame
+        existed_tango_results (set): IDs already calculated, skip them
     """
     cter = '"N"'
     nter = '"N"'
@@ -34,20 +30,25 @@ def create_tango_input(database: pd.DataFrame, existed_tango_results: set):
     temp = '"298"'
     ionic = '"0.1"'
     tf = '"0"'
-    executable_name = "./tango"
     brac = '"'
 
-    if os.path.isfile(TANGO_BAT_FILEPATH):
-        os.remove(TANGO_BAT_FILEPATH)
-    tango_input_file = open(TANGO_BAT_FILEPATH, "a")
-    for _, row in database.iterrows():
-        # TODO: change to address Ntr and Ctr modification if exists and if we want to address them
-        if not pd.isna(row["Sequence"]):
-            if row[KEY] not in existed_tango_results:
-                sequence = auxiliary.get_corrected_sequence(row["Sequence"])
-                tango_input_file.write("{} {} nt={} ct={} ph={} te={} io={} tf={} seq={}\n".format(
-                    executable_name, row[KEY], cter, nter, ph, temp, ionic, tf, brac + sequence + brac))
-    tango_input_file.close()
+    # Input file path (Mac/Linux friendly)
+    TANGO_INPUT_FILEPATH = os.path.join(TANGO_DIRECTORY_PATH, "Tango_input.txt")
+
+    # Delete if exists
+    if os.path.isfile(TANGO_INPUT_FILEPATH):
+        os.remove(TANGO_INPUT_FILEPATH)
+
+    with open(TANGO_INPUT_FILEPATH, "a") as tango_input_file:
+        for _, row in database.iterrows():
+            if not pd.isna(row["Sequence"]):
+                if row[KEY] not in existed_tango_results:
+                    sequence = auxiliary.get_corrected_sequence(row["Sequence"])
+                    tango_input_file.write(
+                        f"{row[KEY]} nt={nter} ct={cter} ph={ph} te={temp} io={ionic} tf={tf} seq={brac}{sequence}{brac}\n"
+                    )
+    print(f"[DEBUG] Saving Tango_input.txt at {TANGO_BAT_FILEPATH}")
+
 
 
 def __get_peptide_tango_result(filepath: str) -> dict:
@@ -134,15 +135,63 @@ def __analyse_tango_results(peptide_tango_results: dict) -> dict:
 
 def process_tango_output(database: pd.DataFrame):
     """
-    This function process and analyse the Tango prediction results to the given database
-
-    :param database: Database to work on.
-    :return: Changes the database directly
+    Process Tango prediction results and insert them into the given database.
+    Supports both per-sequence files (legacy) and Tango_output.txt (batch mode).
     """
+
+    output_file = os.path.join(TANGO_DIRECTORY_PATH, "Tango_output.txt")
+
+    if os.path.exists(output_file):
+        print(f"[DEBUG] Found Tango_output.txt at {output_file}")
+        try:
+            # Adjust delimiter depending on Tango's output format
+            df_out = pd.read_csv(output_file, sep="\t", comment="#")
+            print("[DEBUG] Tango output head:")
+            print(df_out.head())
+
+            # Prepare containers
+            tango_result_by_residue = []
+            tango_result_score = []
+            tango_diff = []
+            tango_helix_percentage = []
+            tango_beta_percentage = []
+
+            # Match results back to your database
+            for _, row in database.iterrows():
+                entry = row[KEY]
+                match = df_out[df_out["Name"] == entry] if "Name" in df_out.columns else None
+                if match is not None and not match.empty:
+                    # Map fields (adjust depending on Tango’s actual column names)
+                    tango_result_by_residue.append(match.get("SSW_residues", ["-"]).iloc[0])
+                    tango_result_score.append(match.get("SSW", [0]).iloc[0])
+                    tango_diff.append(match.get("Helix-Beta_diff", [0]).iloc[0])
+                    tango_helix_percentage.append(match.get("Helix_percent", [0]).iloc[0])
+                    tango_beta_percentage.append(match.get("Beta_percent", [0]).iloc[0])
+                else:
+                    # Fallback if no match found
+                    tango_result_by_residue.append("-")
+                    tango_result_score.append(-1)
+                    tango_diff.append(0)
+                    tango_helix_percentage.append(0)
+                    tango_beta_percentage.append(0)
+
+            # Insert results into database
+            database["SSW fragments"] = tango_result_by_residue
+            database["SSW score"] = tango_result_score
+            database["SSW diff"] = tango_diff
+            database["SSW helix percentage"] = tango_helix_percentage
+            database["SSW beta percentage"] = tango_beta_percentage
+
+            print("[DEBUG] process_tango_output completed using Tango_output.txt")
+            return
+        except Exception as e:
+            print(f"[WARN] Could not parse Tango_output.txt: {e}, falling back to per-sequence files")
+
+    # --- Legacy per-sequence path (your existing logic) ---
     database_entries = database[KEY].tolist()
-    print(database_entries)
+    print("[DEBUG] Falling back to per-sequence parsing")
     database_tango_results_dict = __get_database_tango_results(database_entries)
-    print('Process tango output  - checkpoint 1 is finished')
+    print('[DEBUG] Process tango output  - checkpoint 1 finished')
 
     tango_result_by_residue = []
     tango_result_score = []
@@ -150,28 +199,23 @@ def process_tango_output(database: pd.DataFrame):
     tango_helix_percentage = []
     tango_beta_percentage = []
 
-    """ Analyse Tango result for each peptide """
     for _, row in database.iterrows():
-
         peptide_tango_results = database_tango_results_dict.get(row[KEY])
-
         result_dict = __analyse_tango_results(peptide_tango_results)
         tango_result_by_residue.append(result_dict["SSW_residues"])
         tango_result_score.append(result_dict["SSW_avg_score"])
         tango_diff.append(result_dict["Helix_and_beta_diff"])
         tango_helix_percentage.append(result_dict["Helix_percentage"])
         tango_beta_percentage.append(result_dict["Beta_percentage"])
-    
-    print('Process tango output  - checkpoint 2 is finished')
 
-    """ Insert results into the database """
     database["SSW fragments"] = tango_result_by_residue
     database["SSW score"] = tango_result_score
     database["SSW diff"] = tango_diff
     database["SSW helix percentage"] = tango_helix_percentage
     database["SSW beta percentage"] = tango_beta_percentage
 
-    print('Process tango output  - checkpoint 3 is finished')
+    print('[DEBUG] Process tango output  - checkpoint 3 finished (legacy mode)')
+
 
 
 def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_result_dict: dict):
@@ -197,15 +241,22 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
 
 
 def run_tango():
-    """
-    This function runs the Tango prediction tool on the input file saved in TANGO_RUN_DIRECTORY.
-    :return: Nothing
-    """
-    # TODO: print the stdout to a file and not to the run terminal
-    permission = subprocess.Popen("chmod 777 Tango_run.bat", cwd=TANGO_RUN_FILEPATH, shell=True)
-    stdout, stderr = permission.communicate()
-    p = subprocess.Popen("./Tango_run.bat", cwd=TANGO_RUN_FILEPATH, shell=True)
-    stdout, stderr = p.communicate()
+    input_file = os.path.join(TANGO_DIRECTORY_PATH, "Tango_input.txt")
+    output_file = os.path.join(TANGO_DIRECTORY_PATH, "Tango_output.txt")
+
+    cmd = f'echo "Y" | ./tango < "{input_file}" > "{output_file}"'
+    print(f"[DEBUG] Running Tango with command: {cmd}")
+    process = subprocess.Popen(cmd, cwd=TANGO_DIRECTORY_PATH, shell=True)
+    process.communicate()
+
+    if process.returncode != 0:
+        raise RuntimeError("Tango execution failed. Check Tango installation and input file.")
+
+    if not os.path.exists(output_file):
+        raise RuntimeError("Tango_output.txt not created. Check Tango binary output.")
+    print(f"[DEBUG] Tango finished, output at {output_file}")
+
+
 
 
 def get_all_existed_tango_results_entries() -> set:

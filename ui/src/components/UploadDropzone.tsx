@@ -10,6 +10,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDatasetStore } from '@/stores/datasetStore';
 import { ParsedCSVData } from '@/types/peptide';
 import { toast } from 'react-hot-toast';
+import * as XLSX from "xlsx";
+
 
 interface UploadDropzoneProps {
   onFileProcessed: () => void;
@@ -231,43 +233,51 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
         size="sm"
         onClick={async () => {
           try {
-            const res = await fetch("/example/peptide_data.csv");
-            const text = await res.text();
+            // fetch the xlsx file from public
+            const resp = await fetch("/Final_Staphylococcus_2023_new.xlsx");
+            const buffer = await resp.arrayBuffer();
 
-            Papa.parse(text, {
-              header: true,
-              skipEmptyLines: "greedy",
-              complete: (parsed) => {
-                const rows = (parsed.data as any[]).filter(Boolean);
-                const headers =
-                  parsed.meta.fields && parsed.meta.fields.length
-                    ? parsed.meta.fields
-                    : rows.length
-                    ? Object.keys(rows[0])
-                    : [];
+            // parse with xlsx
+            const workbook = XLSX.read(buffer, { type: "array" });
+            const firstSheetName = workbook.SheetNames[0];
+            const worksheet = workbook.Sheets[firstSheetName];
+            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
 
-                setRawData({
-                  fileName: "peptide_data.csv",
-                  headers,
-                  rows: rows.slice(0, 200),
-                  rowCount: rows.length,
-                } as any);
+            if (jsonData.length < 2) {
+              toast.error("Example file has no rows");
+              return;
+            }
 
-                toast.success(`Loaded example dataset (${rows.length} rows)`);
-                onFileProcessed(); // jump to Preview step
-              },
-              error: (err) => {
-                toast.error(`Failed to load example dataset: ${err.message}`);
-              },
+            const headers = jsonData[0];
+            const rows = jsonData.slice(1).map(row => {
+              const rowObj: Record<string, any> = {};
+              headers.forEach((header, i) => {
+                rowObj[header] = row[i] || "";
+              });
+              return rowObj;
             });
-          } catch (err: any) {
-            toast.error("Could not fetch example dataset");
+
+            setRawData({
+              headers,
+              rows,
+              fileName: "peptide_data_example.xlsx",
+              rowCount: rows.length,
+            });
+
+            toast.success(`Loaded ${rows.length} example rows from XLSX`);
+
+            onFileProcessed();
+
+          } catch (err) {
+            toast.error("Failed to load example dataset");
+            console.error(err);
           }
         }}
       >
         <FileText className="w-4 h-4 mr-2" />
         Load Example Dataset
       </Button>
+
 
     </div>
   );

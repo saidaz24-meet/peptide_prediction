@@ -7,11 +7,32 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import auxiliary, biochemCalculation, jpred, tango
 
-# Turn these on AFTER you copy result folders into backend/Tango and backend/Jpred
-USE_TANGO = bool(int(os.getenv("USE_TANGO", "0")))
-USE_JPRED  = bool(int(os.getenv("USE_JPRED", "0")))
+from dotenv import load_dotenv
+# Explicitly point to backend/.env
+dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
+load_dotenv(dotenv_path)
+
+USE_JPRED = os.getenv("USE_JPRED", "0") == "1"
+USE_TANGO = os.getenv("USE_TANGO", "0") == "1"
 
 app = FastAPI(title="Peptide Prediction Service")
+
+
+# --- Example dataset config ---
+EXAMPLE_PATH = os.path.join(os.path.dirname(__file__), "data", "Final_Staphylococcus_2023_new.xlsx")
+
+# columns that mean “we already have results” so don’t recompute
+JPRED_COLS = ["Helix fragments (Jpred)", "Helix score (Jpred)"]
+TANGO_COLS = ["SSW prediction", "SSW score"]
+BIOCHEM_COLS = ["Charge", "Hydrophobicity", "Full length uH"]
+
+def has_any(df: pd.DataFrame, cols: list[str]) -> bool:
+    return any(c in df.columns for c in cols)
+
+def has_all(df: pd.DataFrame, cols: list[str]) -> bool:
+    return all(c in df.columns for c in cols)
+
+
 
 # CORS for local dev (Vite on :5173)
 app.add_middleware(
@@ -28,6 +49,81 @@ app.add_middleware(
 )
 
 print(f"[BOOT] USE_JPRED={USE_JPRED} • USE_TANGO={USE_TANGO}")
+
+
+
+@app.get("/api/example")
+def load_example(recalc: int = 0):
+    """
+    Serve the presentation dataset with JPred/Tango already computed.
+    By default (recalc=0) we DO NOT recompute biochem/JPred/Tango.
+    Set recalc=1 if you explicitly want to recompute locally.
+    """
+    if not os.path.exists(EXAMPLE_PATH):
+        raise HTTPException(status_code=404, detail=f"Example file not found at {EXAMPLE_PATH}")
+
+    try:
+        df = pd.read_excel(EXAMPLE_PATH)  # needs openpyxl
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed reading example xlsx: {e}")
+
+    # Normalize essential columns but DO NOT drop precomputed fields
+    try:
+        df = normalize_cols(df)  # your existing helper: maps Entry/Sequence/Length
+    except HTTPException:
+        # for legacy sheets, derive Length if missing
+        if "Sequence" in df.columns and "Length" not in df.columns:
+            df["Length"] = df["Sequence"].astype(str).str.len()
+
+    # Decide what to compute based on what's already present
+    already_has_biochem = has_all(df, BIOCHEM_COLS)
+    already_has_jpred  = has_any(df, JPRED_COLS)
+    already_has_tango  = has_any(df, TANGO_COLS)
+
+    # Recompute only if asked (recalc=1) or missing
+    if recalc or not already_has_biochem:
+        ensure_cols(df)     # creates missing cols with -1
+        calc_biochem(df)    # computes Charge, Hydrophobicity, uH
+    else:
+        # ensure numeric types for charts
+        for c in BIOCHEM_COLS:
+            if c in df.columns:
+                df[c] = pd.to_numeric(df[c], errors="coerce")
+
+    if recalc or (USE_JPRED and not already_has_jpred):
+        try:
+            jpred.process_jpred_output(df, "Example")
+        except Exception as e:
+            print(f"[WARN] JPred parse failed (example): {e}")
+
+    if recalc or (USE_TANGO and not already_has_tango):
+        try:
+            # whichever Tango flow you use; if you switched to run_and_attach, call that
+            if hasattr(tango, "run_and_attach"):
+                tango.run_and_attach(df)
+            else:
+                tango.process_tango_output(df)
+                tango.filter_by_avg_diff(df, "Example", {"Example": {}})
+        except Exception as e:
+            print(f"[WARN] Tango parse failed (example): {e}")
+
+    # Always compute final FF flags on the DataFrame we’re returning
+    ensure_cols(df)
+    ff_flags(df)
+
+    # build meta so the UI can show provenance pills
+    meta = {
+        "use_jpred": USE_JPRED or already_has_jpred,
+        "use_tango": USE_TANGO or already_has_tango,
+        "jpred_rows": int((df.get("Helix fragments (Jpred)", pd.Series([-1]*len(df))) != -1).sum()),
+        "ssw_rows":   int((df.get("SSW prediction", pd.Series([-1]*len(df))) != -1).sum()),
+        "valid_seq_rows": int(df["Sequence"].notna().sum())
+    }
+    print(f"[EXAMPLE] rows={len(df)} • JPred rows={meta['jpred_rows']} • Tango rows={meta['ssw_rows']} • recalc={recalc}")
+
+    return {"rows": json.loads(df.to_json(orient="records")), "meta": meta}
+
+
 
 
 @app.get("/api/health")
@@ -229,10 +325,14 @@ async def upload_csv(file: UploadFile = File(...)):
         try: jpred.process_jpred_output(df, "Uploaded")
         except Exception: pass
     if USE_TANGO:
-        try:
-            tango.process_tango_output(df)
-            tango.filter_by_avg_diff(df, "Uploaded", {"Uploaded": {}})
-        except Exception: pass
+        import tango
+        print("[DEBUG] Starting Tango run…")
+        existing = tango.get_all_existed_tango_results_entries()
+        tango.create_tango_input(df, existing)
+        tango.run_tango()
+        tango.process_tango_output(df)
+        print("[DEBUG] Tango finished.")
+
 
 
 

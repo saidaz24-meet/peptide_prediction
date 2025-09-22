@@ -16,6 +16,9 @@ import AppFooter from "@/components/AppFooter";
 import { UploadDropzone } from "@/components/UploadDropzone";
 
 
+import { fetchExampleDataset } from "@/lib/api";
+import { toast } from "sonner"; // or your toast lib
+
 // QC
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
@@ -43,6 +46,28 @@ function exportCsv(filename: string, rows: any[]) {
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export function LoadExampleButton() {
+  const navigate = useNavigate();
+  const { ingestBackendRows } = useDatasetStore();
+
+  const onClick = async () => {
+    try {
+      const { rows, meta } = await fetchExampleDataset(0); // 0 = no recompute
+      ingestBackendRows(rows, meta);   // your existing mapper
+      toast.success("Loaded example dataset");
+      navigate("/results");
+    } catch (e: any) {
+      toast.error(`Failed to load example: ${e.message || e}`);
+    }
+  };
+
+  return (
+    <Button variant="secondary" onClick={onClick}>
+      Load example data
+    </Button>
+  );
 }
 
 export default function Upload() {

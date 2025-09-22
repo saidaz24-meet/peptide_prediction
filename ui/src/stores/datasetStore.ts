@@ -8,9 +8,9 @@ import type {
   DatasetMetadata,
 } from '../types/peptide';
 
-// --- SMART RANKING (weights + scorer) ---
-// (keep using zustand just like your other stores)
+import { mapBackendRowToPeptide } from "@/lib/mappers"; // unchanged
 
+// --- SMART RANKING (weights + scorer) ---
 export const useThresholds = create<{
   wH: number; wCharge: number; wMuH: number; wHelix: number;
   topN: number;
@@ -24,49 +24,37 @@ export function scorePeptide(
   p: Peptide,
   w: { wH:number; wCharge:number; wMuH:number; wHelix:number }
 ){
-  const h = Number(p.hydrophobicity ?? 0);       // larger can be “better”
-  const c = Math.abs(Number(p.charge ?? 0));     // absolute charge magnitude
-  const m = Number(p.muH ?? 0);                  // hydrophobic moment
+  const h = Number(p.hydrophobicity ?? 0);
+  const c = Math.abs(Number(p.charge ?? 0));
+  const m = Number(p.muH ?? 0);
   const helix = typeof p.ffHelixPercent === "number" ? (p.ffHelixPercent >= 50 ? 1 : 0) : 0;
   return w.wH*h + w.wCharge*c + w.wMuH*m + w.wHelix*helix;
 }
 
-
 type BackendRow = Record<string, any>;
 
 interface DatasetState {
-  // Raw CSV data (preview)
   rawData: ParsedCSVData | null;
-
-  // Processed peptide data (after mapping / backend analysis)
   peptides: Peptide[];
-
-  // Column mapping chosen by the user
   columnMapping: ColumnMapping;
-
-  // Aggregate stats for Results / Detail pages
   stats: DatasetStats | null;
 
-  // Dataset metadata (JPred, Tango usage, etc.)
+  // 🔹 NEW: keep backend provenance info
   meta: DatasetMetadata | null;
 
-  // UI state
   isLoading: boolean;
   error: string | null;
 
-  // Actions
   setRawData: (data: ParsedCSVData) => void;
-  setRawPreview: (data: ParsedCSVData) => void; // alias
+  setRawPreview: (data: ParsedCSVData) => void;
   setPeptides: (peptides: Peptide[]) => void;
-  ingestBackendRows: (rows: BackendRow[], meta?: DatasetMetadata) => void;
+  ingestBackendRows: (rows: BackendRow[], meta?: DatasetMetadata) => void; // 🔹 changed
   setColumnMapping: (mapping: ColumnMapping) => void;
-  setMetadata: (meta: DatasetMetadata) => void;
+  setMetadata: (meta: DatasetMetadata) => void; // 🔹 new
   calculateStats: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
   resetData: () => void;
-
-  // Lookups
   getPeptideById: (id: string) => Peptide | undefined;
 }
 
@@ -88,7 +76,7 @@ const initialState: Omit<
   peptides: [],
   columnMapping: {},
   stats: null,
-  meta: null,
+  meta: null, // 🔹 added
   isLoading: false,
   error: null,
 };
@@ -106,15 +94,14 @@ export const useDatasetStore = create<DatasetState>()(
         get().calculateStats();
       },
 
+      // 🔹 Changed: now accepts `meta` and saves it
       ingestBackendRows: (rows: BackendRow[], meta?: DatasetMetadata) => {
-        // Map whatever the backend returns into the Peptide shape used by the UI.
-        // Defensive: accepts multiple possible key names.
         const mapped: Peptide[] = rows
           .map((r: BackendRow, i: number) => {
             const seq: string | undefined =
               r.Sequence ?? r.sequence ?? r.seq ?? undefined;
             if (!seq) return undefined;
-      
+
             const id: string = String(
               r.Entry ??
                 r.entry ??
@@ -125,15 +112,14 @@ export const useDatasetStore = create<DatasetState>()(
                 r.name ??
                 i + 1
             );
-      
+
             const length =
               Number(
                 r.Length ??
                   r.length ??
                   (typeof seq === "string" ? seq.length : undefined)
               ) || 0;
-      
-            // --- μH: prefer "Full length uH", else "Hydrophobic moment" ---
+
             const muH =
               r["Full length uH"] !== undefined
                 ? Number(r["Full length uH"])
@@ -142,8 +128,7 @@ export const useDatasetStore = create<DatasetState>()(
                 : r.muH !== undefined
                 ? Number(r.muH)
                 : undefined;
-      
-            // --- FF-Helix: backend flag -1/1 → UI wants percent 0/100 ---
+
             let ffHelixPercent: number | undefined = undefined;
             if (r["FF-Helix (Jpred)"] !== undefined) {
               const flag = Number(r["FF-Helix (Jpred)"]);
@@ -159,8 +144,7 @@ export const useDatasetStore = create<DatasetState>()(
             } else if (r["Helix percentage (Jpred)"] !== undefined) {
               ffHelixPercent = Number(r["Helix percentage (Jpred)"]);
             }
-      
-            // --- Chameleon: prefer final FF flag, else raw SSW, else fallback ---
+
             const chameleonPrediction =
               (r["FF-Secondary structure switch"] ??
                 r["FF-Chameleon"] ??
@@ -170,8 +154,7 @@ export const useDatasetStore = create<DatasetState>()(
                 r.chameleon ??
                 r["SSW prediction"] ??
                 0) as -1 | 0 | 1;
-      
-            // --- JPred fragments: stringified JSON or array ---
+
             let helixFragments: [number, number][] | undefined;
             const rawFragments =
               r["Helix fragments (Jpred)"] ??
@@ -181,13 +164,11 @@ export const useDatasetStore = create<DatasetState>()(
               try {
                 const arr = JSON.parse(rawFragments);
                 if (Array.isArray(arr)) helixFragments = arr;
-              } catch {
-                // ignore parse errors
-              }
+              } catch {}
             } else if (Array.isArray(rawFragments)) {
               helixFragments = rawFragments as [number, number][];
             }
-      
+
             const peptide: Peptide = {
               id,
               name:
@@ -213,18 +194,18 @@ export const useDatasetStore = create<DatasetState>()(
               ffHelixPercent,
               jpred: helixFragments ? { helixFragments } : undefined,
             };
-      
+
             return peptide;
           })
           .filter(Boolean) as Peptide[];
-      
-        set({ peptides: mapped, meta: meta || null });
+
+        set({ peptides: mapped, meta: meta || null }); // 🔹 save meta too
         get().calculateStats();
       },
-      
 
       setColumnMapping: (mapping) => set({ columnMapping: mapping }),
-      
+
+      // 🔹 Added: standalone setter for meta
       setMetadata: (meta) => set({ meta }),
 
       calculateStats: () => {
@@ -267,18 +248,12 @@ export const useDatasetStore = create<DatasetState>()(
 
       setLoading: (isLoading) => set({ isLoading }),
       setError: (error) => set({ error }),
-
       resetData: () => set({ ...initialState }),
-
-      getPeptideById: (id) => {
-        const { peptides } = get();
-        return peptides.find((p) => p.id === id);
-      },
+      getPeptideById: (id) => get().peptides.find((p) => p.id === id),
     }),
     {
       name: 'peptide-dataset-storage',
       partialize: (state) => ({
-        // keep mapping between page reloads; avoid persisting heavy arrays
         columnMapping: state.columnMapping,
       }),
     }
@@ -286,19 +261,14 @@ export const useDatasetStore = create<DatasetState>()(
 );
 
 // --- Flag threshold store ---
-
 type FlagsState = {
   muHCutoff: number;
   hydroCutoff: number;
   setFlags: (p: Partial<Pick<FlagsState, 'muHCutoff' | 'hydroCutoff'>>) => void;
 };
 
-// Either style works; pick ONE of these:
-
-// A) Standard generic form
 export const useFlags = create<FlagsState>((set) => ({
   muHCutoff: 0,
   hydroCutoff: 0,
   setFlags: (p) => set(p),
 }));
-

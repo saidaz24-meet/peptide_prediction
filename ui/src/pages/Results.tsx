@@ -26,7 +26,7 @@ import AppFooter from "@/components/AppFooter";
 
 
 export default function Results() {
-  const { peptides, stats } = useDatasetStore();
+  const { peptides, stats, meta } = useDatasetStore();
   const navigate = useNavigate();
 
   // smart ranking weights
@@ -115,19 +115,33 @@ export default function Results() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
           {/* Header */}
           <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Analysis Results</h1>
-              <p className="text-muted-foreground mt-1">Comprehensive peptide analysis and visualizations</p>
-            </div>
-
-            <div className="flex items-center space-x-3">
-              <Legend />
-              <Button variant="outline" size="sm" onClick={() => exportResultsAsPDF()}>
-                <Download className="w-4 h-4 mr-2" />
-                Export Report
-              </Button>
-            </div>
+          <div>
+            <h1 className="text-3xl font-bold text-foreground">Analysis Results</h1>
+            <p className="text-muted-foreground mt-1">Comprehensive peptide analysis and visualizations</p>
           </div>
+
+          <div className="flex items-center space-x-3">
+
+          {meta && (
+            <div className="flex gap-2">
+              <Badge variant={meta.use_jpred ? "default" : "outline"}>
+                JPred: {meta.use_jpred ? `ON (${meta.jpred_rows})` : "OFF"}
+              </Badge>
+              <Badge variant={meta.use_tango ? "default" : "outline"}>
+                Tango: {meta.use_tango ? `ON (${meta.ssw_rows})` : "OFF"}
+              </Badge>
+              <Badge variant="secondary">n = {peptides.length}</Badge>
+            </div>
+          )}
+
+            <Legend />
+            <Button variant="outline" size="sm" onClick={() => exportResultsAsPDF()}>
+              <Download className="w-4 h-4 mr-2" />
+              Export Report
+            </Button>
+          </div>
+        </div>
+
 
           {/* KPIs */}
           <ResultsKpis stats={stats} />

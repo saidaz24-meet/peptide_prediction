@@ -29,3 +29,8 @@ export async function predictOne(sequence: string, entry?: string) {
   const res = await fetch(`${API_BASE}/api/predict`, { method: "POST", body: fd, mode: "cors" });
   return await handleResponse(res);
 }
+
+export async function fetchExampleDataset(recalc = 0) {
+    const res = await fetch(`${API_BASE}/api/example?recalc=${recalc}`, { method: "GET" });
+    return (await handleResponse(res)) as { rows: any[]; meta?: any };
+  }
