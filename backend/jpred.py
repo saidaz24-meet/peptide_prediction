@@ -6,7 +6,7 @@ import subprocess
 
 import auxiliary
 import main
-from tango import __get_database_tango_results
+from tango import process_tango_output
 
 PATH = os.getcwd()
 JPRED_INPUT_FILEPATH = "Jpred/"

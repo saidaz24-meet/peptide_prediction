@@ -12,18 +12,26 @@ import { ParsedCSVData } from '@/types/peptide';
 import { toast } from 'react-hot-toast';
 import * as XLSX from "xlsx";
 
+/** so we now should try to do the one sequence immideate results rq. */
+
 
 interface UploadDropzoneProps {
+  /** Fire as soon as a File object is available (enables Analyze upstream) */
+  onFileSelected?: (file: File) => void;
+  /** Fire after preview/processing finishes (to advance steps) */
   onFileProcessed: () => void;
 }
 
-export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
+export function UploadDropzone({ onFileSelected, onFileProcessed }: UploadDropzoneProps) {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isProcessing, setIsProcessing] = useState(false);
   const { setRawData, setError } = useDatasetStore();
 
   const processFile = useCallback(
     async (file: File) => {
+      // NEW: let parent know immediately so "Analyze" can enable
+      onFileSelected?.(file);
+
       setIsProcessing(true);
       setUploadProgress(0);
       setError(null);
@@ -31,7 +39,7 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
       try {
         const ext = file.name.split('.').pop()?.toLowerCase();
 
-        // --- CSV preview locally ---
+        // --- CSV/TSV/TXT: preview locally ---
         if (ext === 'csv' || ext === 'tsv' || ext === 'txt') {
           setUploadProgress(25);
 
@@ -81,9 +89,8 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
           return;
         }
 
-        // --- XLS/XLSX: skip client parsing; let backend handle it ---
+        // --- XLS/XLSX: skip client parsing; backend will parse on Analyze ---
         if (ext === 'xlsx' || ext === 'xls') {
-          // Provide a minimal preview shell so the UI flow continues.
           const parsed: ParsedCSVData = {
             headers: [],
             rows: [],
@@ -114,7 +121,7 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
         setIsProcessing(false);
       }
     },
-    [setRawData, setError, onFileProcessed]
+    [setRawData, setError, onFileProcessed, onFileSelected]
   );
 
   const onDrop = useCallback(
@@ -153,7 +160,14 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
             ${!isDragActive ? 'border-border hover:border-primary/50 hover:bg-muted/30' : ''}
             ${isProcessing ? 'pointer-events-none opacity-60' : ''}`}
         >
-          <input {...getInputProps()} />
+          <input
+            {...getInputProps()}
+            onChange={(e) => {
+              // ensure manual click selection also triggers our pipeline
+              const f = e.currentTarget.files?.[0];
+              if (f) processFile(f);
+            }}
+          />
           <CardContent className="flex flex-col items-center justify-center py-12 px-6 text-center">
             <motion.div
               animate={{
@@ -227,17 +241,15 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
         </motion.div>
       )}
 
-
+      {/* Example dataset loader (from /public) */}
       <Button
         variant="outline"
         size="sm"
         onClick={async () => {
           try {
-            // fetch the xlsx file from public
             const resp = await fetch("/Final_Staphylococcus_2023_new.xlsx");
             const buffer = await resp.arrayBuffer();
 
-            // parse with xlsx
             const workbook = XLSX.read(buffer, { type: "array" });
             const firstSheetName = workbook.SheetNames[0];
             const worksheet = workbook.Sheets[firstSheetName];
@@ -265,9 +277,7 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
             });
 
             toast.success(`Loaded ${rows.length} example rows from XLSX`);
-
             onFileProcessed();
-
           } catch (err) {
             toast.error("Failed to load example dataset");
             console.error(err);
@@ -277,8 +287,6 @@ export function UploadDropzone({ onFileProcessed }: UploadDropzoneProps) {
         <FileText className="w-4 h-4 mr-2" />
         Load Example Dataset
       </Button>
-
-
     </div>
   );
 }

@@ -1,3 +1,4 @@
+// src/pages/Results.tsx
 import { motion } from 'framer-motion';
 import { Download, Filter, Search } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
@@ -20,10 +21,10 @@ import { useThresholds, scorePeptide } from '@/stores/datasetStore'; // smart ra
 import { useFlags } from '@/stores/datasetStore'; // threshold tuner
 import { exportResultsAsPDF } from '@/lib/report';
 
+import type { Peptide, ChameleonPrediction } from '@/types/peptide';
+
 import { CorrelationCard } from '@/components/CorrelationCard';
-import AppFooter from "@/components/AppFooter";
-
-
+import AppFooter from '@/components/AppFooter';
 
 export default function Results() {
   const { peptides, stats, meta } = useDatasetStore();
@@ -46,15 +47,48 @@ export default function Results() {
     return null; // Will redirect
   }
 
+  // -------- Type normalization (fixes lib/types shape mismatch) --------
+  const normalizePeptide = (p: any): Peptide => {
+    const chamRaw = p?.chameleonPrediction;
+    const cham: ChameleonPrediction =
+      chamRaw === 1 ? 1 : chamRaw === 0 ? 0 : -1;
+
+    // preserve everything else; enforce the fields TS cares about
+    return {
+      id: String(p.id ?? p.Entry ?? ''),
+      name: p.name,
+      species: p.species,
+      sequence: String(p.sequence ?? p.Sequence ?? ''),
+      length: Number(p.length ?? p.Length ?? 0),
+      hydrophobicity: Number(p.hydrophobicity ?? p.Hydrophobicity ?? 0),
+      muH: typeof p.muH === 'number' ? p.muH : (typeof p['Full length uH'] === 'number' ? p['Full length uH'] : undefined),
+      charge: Number(p.charge ?? p.Charge ?? 0),
+      chameleonPrediction: cham,
+      ffHelixPercent: typeof p.ffHelixPercent === 'number' ? p.ffHelixPercent
+        : (typeof p['FF-Helix %'] === 'number' ? p['FF-Helix %'] : undefined),
+      jpred: p.jpred ?? {
+        helixFragments: p['Helix fragments (Jpred)'] ?? undefined,
+        helixScore: typeof p['Helix score (Jpred)'] === 'number' ? p['Helix score (Jpred)'] : undefined,
+      },
+      extra: p.extra ?? {},
+    };
+  };
+
+  // Canonical typed arrays used everywhere below
+  const peptidesTyped: Peptide[] = useMemo(
+    () => peptides.map(normalizePeptide),
+    [peptides]
+  );
+
   // -------- Smart Candidate Ranking --------
-  const shortlist = useMemo(() => {
-    if (!peptides?.length) return [];
-    return [...peptides]
-      .map((p) => ({ p, s: scorePeptide(p, { wH, wCharge, wMuH, wHelix }) }))
+  const shortlist: Peptide[] = useMemo(() => {
+    if (!peptidesTyped?.length) return [];
+    return [...peptidesTyped]
+      .map((p) => ({ p, s: scorePeptide(p as any, { wH, wCharge, wMuH, wHelix }) }))
       .sort((a, b) => b.s - a.s)
       .slice(0, Math.max(1, Number(topN) || 10))
       .map((x) => x.p);
-  }, [peptides, wH, wCharge, wMuH, wHelix, topN]);
+  }, [peptidesTyped, wH, wCharge, wMuH, wHelix, topN]);
 
   function exportShortlistCSV() {
     if (!shortlist.length) return;
@@ -70,7 +104,16 @@ export default function Results() {
       'ffHelixPercent',
       'chameleonPrediction',
     ];
-    const rows = shortlist.map((p) => cols.map((c) => (p as any)[c] ?? ''));
+    const rows = shortlist.map((p) =>
+      cols.map((c) => {
+        const val = (p as any)[c];
+        if (val === undefined || val === null) return '';
+        if (c === 'chameleonPrediction') {
+          return val === 1 ? 'Positive' : val === -1 ? 'N/A' : 'Negative';
+        }
+        return val;
+      })
+    );
     const header = cols.join(',');
     const body = rows
       .map((r) =>
@@ -94,20 +137,20 @@ export default function Results() {
 
   // -------- Threshold Tuner (view-only derived flags) --------
   const viewPeptides = useMemo(() => {
-    return peptides.map((p) => {
+    return peptidesTyped.map((p) => {
       const muH = typeof p.muH === 'number' ? p.muH : 0;
       const H = typeof p.hydrophobicity === 'number' ? p.hydrophobicity : 0;
-      const cham = (p.chameleonPrediction ?? 0) as -1 | 0 | 1;
+      const cham = p.chameleonPrediction;
 
       const ffHelixView = muH >= muHCutoff ? 1 : 0;
       const sswView = cham === 1 && H >= hydroCutoff ? 1 : cham === -1 ? -1 : 0;
 
       return { ...p, ffHelixView, sswView };
     });
-  }, [peptides, muHCutoff, hydroCutoff]);
+  }, [peptidesTyped, muHCutoff, hydroCutoff]);
 
-  const ffHelixOnCount = viewPeptides.filter((p) => (p as any).ffHelixView === 1).length;
-  const chamOnCount = viewPeptides.filter((p) => (p as any).sswView === 1).length;
+  const ffHelixOnCount = viewPeptides.filter((p: any) => p.ffHelixView === 1).length;
+  const chamOnCount = viewPeptides.filter((p: any) => p.sswView === 1).length;
 
   return (
     <div className="min-h-screen bg-gradient-surface">
@@ -115,33 +158,31 @@ export default function Results() {
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-8">
           {/* Header */}
           <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Analysis Results</h1>
-            <p className="text-muted-foreground mt-1">Comprehensive peptide analysis and visualizations</p>
-          </div>
-
-          <div className="flex items-center space-x-3">
-
-          {meta && (
-            <div className="flex gap-2">
-              <Badge variant={meta.use_jpred ? "default" : "outline"}>
-                JPred: {meta.use_jpred ? `ON (${meta.jpred_rows})` : "OFF"}
-              </Badge>
-              <Badge variant={meta.use_tango ? "default" : "outline"}>
-                Tango: {meta.use_tango ? `ON (${meta.ssw_rows})` : "OFF"}
-              </Badge>
-              <Badge variant="secondary">n = {peptides.length}</Badge>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">Analysis Results</h1>
+              <p className="text-muted-foreground mt-1">Comprehensive peptide analysis and visualizations</p>
             </div>
-          )}
 
-            <Legend />
-            <Button variant="outline" size="sm" onClick={() => exportResultsAsPDF()}>
-              <Download className="w-4 h-4 mr-2" />
-              Export Report
-            </Button>
+            <div className="flex items-center space-x-3">
+              {meta && (
+                <div className="flex gap-2">
+                  <Badge variant={meta.use_jpred ? 'default' : 'outline'}>
+                    JPred: {meta.use_jpred ? `ON (${meta.jpred_rows})` : 'OFF'}
+                  </Badge>
+                  <Badge variant={meta.use_tango ? 'default' : 'outline'}>
+                    Tango: {meta.use_tango ? `ON (${meta.ssw_rows})` : 'OFF'}
+                  </Badge>
+                  <Badge variant="secondary">n = {peptidesTyped.length}</Badge>
+                </div>
+              )}
+
+              <Legend />
+              <Button variant="outline" size="sm" onClick={() => exportResultsAsPDF()}>
+                <Download className="w-4 h-4 mr-2" />
+                Export Report
+              </Button>
+            </div>
           </div>
-        </div>
-
 
           {/* KPIs */}
           <ResultsKpis stats={stats} />
@@ -166,39 +207,21 @@ export default function Results() {
                     <span>|Charge| weight</span>
                     <span className="text-muted-foreground">{wCharge.toFixed(2)}</span>
                   </div>
-                  <Slider
-                    min={0}
-                    max={3}
-                    step={0.1}
-                    value={[wCharge]}
-                    onValueChange={([v]) => setWeights({ wCharge: v })}
-                  />
+                  <Slider min={0} max={3} step={0.1} value={[wCharge]} onValueChange={([v]) => setWeights({ wCharge: v })} />
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span>μH (moment) weight</span>
                     <span className="text-muted-foreground">{wMuH.toFixed(2)}</span>
                   </div>
-                  <Slider
-                    min={0}
-                    max={3}
-                    step={0.1}
-                    value={[wMuH]}
-                    onValueChange={([v]) => setWeights({ wMuH: v })}
-                  />
+                  <Slider min={0} max={3} step={0.1} value={[wMuH]} onValueChange={([v]) => setWeights({ wMuH: v })} />
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span>Helix flag weight</span>
                     <span className="text-muted-foreground">{wHelix.toFixed(2)}</span>
                   </div>
-                  <Slider
-                    min={0}
-                    max={3}
-                    step={0.1}
-                    value={[wHelix]}
-                    onValueChange={([v]) => setWeights({ wHelix: v })}
-                  />
+                  <Slider min={0} max={3} step={0.1} value={[wHelix]} onValueChange={([v]) => setWeights({ wHelix: v })} />
                 </div>
               </div>
 
@@ -280,10 +303,10 @@ export default function Results() {
             </TabsList>
 
             <TabsContent value="overview" className="space-y-6">
-              {/* Keep your original behavior: charts use the full dataset */}
-              <ResultsCharts peptides={peptides} />
-              {/* New: cohort correlation heatmap */}
-              <CorrelationCard peptides={peptides} />
+              {/* Charts use the full dataset */}
+              <ResultsCharts peptides={peptidesTyped} />
+              {/* cohort correlation heatmap */}
+              <CorrelationCard peptides={peptidesTyped} />
             </TabsContent>
 
             <TabsContent value="data" className="space-y-6">
@@ -308,16 +331,14 @@ export default function Results() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  {/* Keep existing behavior: show full dataset in the table */}
-                  <PeptideTable peptides={peptides} />
+                  {/* Show full dataset in the table */}
+                  <PeptideTable peptides={peptidesTyped} />
                 </CardContent>
               </Card>
             </TabsContent>
           </Tabs>
 
           <AppFooter />
-
-
         </motion.div>
       </div>
     </div>

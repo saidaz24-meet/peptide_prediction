@@ -1,14 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type {
-  Peptide,
   ColumnMapping,
   DatasetStats,
   ParsedCSVData,
   DatasetMetadata,
 } from '../types/peptide';
 
-import { mapBackendRowToPeptide } from "@/lib/mappers"; // unchanged
+import { mapBackendRowToPeptide, type Peptide } from "@/lib/mappers";
 
 // --- SMART RANKING (weights + scorer) ---
 export const useThresholds = create<{
@@ -27,7 +26,7 @@ export function scorePeptide(
   const h = Number(p.hydrophobicity ?? 0);
   const c = Math.abs(Number(p.charge ?? 0));
   const m = Number(p.muH ?? 0);
-  const helix = typeof p.ffHelixPercent === "number" ? (p.ffHelixPercent >= 50 ? 1 : 0) : 0;
+  const helix = p.ffHelixPercent && p.ffHelixPercent >= 50 ? 1 : 0;
   return w.wH*h + w.wCharge*c + w.wMuH*m + w.wHelix*helix;
 }
 
@@ -38,8 +37,6 @@ interface DatasetState {
   peptides: Peptide[];
   columnMapping: ColumnMapping;
   stats: DatasetStats | null;
-
-  // 🔹 NEW: keep backend provenance info
   meta: DatasetMetadata | null;
 
   isLoading: boolean;
@@ -48,9 +45,9 @@ interface DatasetState {
   setRawData: (data: ParsedCSVData) => void;
   setRawPreview: (data: ParsedCSVData) => void;
   setPeptides: (peptides: Peptide[]) => void;
-  ingestBackendRows: (rows: BackendRow[], meta?: DatasetMetadata) => void; // 🔹 changed
+  ingestBackendRows: (rows: BackendRow[], meta?: DatasetMetadata) => void;
   setColumnMapping: (mapping: ColumnMapping) => void;
-  setMetadata: (meta: DatasetMetadata) => void; // 🔹 new
+  setMetadata: (meta: DatasetMetadata) => void;
   calculateStats: () => void;
   setLoading: (loading: boolean) => void;
   setError: (error: string | null) => void;
@@ -61,7 +58,7 @@ interface DatasetState {
 const initialState: Omit<
   DatasetState,
   | 'setRawData'
-  | 'setRawPreview'
+  | 'setRawPreview' 
   | 'setPeptides'
   | 'ingestBackendRows'
   | 'setColumnMapping'
@@ -76,7 +73,7 @@ const initialState: Omit<
   peptides: [],
   columnMapping: {},
   stats: null,
-  meta: null, // 🔹 added
+  meta: null,
   isLoading: false,
   error: null,
 };
@@ -94,118 +91,27 @@ export const useDatasetStore = create<DatasetState>()(
         get().calculateStats();
       },
 
-      // 🔹 Changed: now accepts `meta` and saves it
       ingestBackendRows: (rows: BackendRow[], meta?: DatasetMetadata) => {
+        console.log('[DEBUG] Raw backend row sample:', rows[0]); // Debug log
+        
         const mapped: Peptide[] = rows
-          .map((r: BackendRow, i: number) => {
-            const seq: string | undefined =
-              r.Sequence ?? r.sequence ?? r.seq ?? undefined;
-            if (!seq) return undefined;
-
-            const id: string = String(
-              r.Entry ??
-                r.entry ??
-                r.id ??
-                r.Accession ??
-                r.accession ??
-                r.uniprot ??
-                r.name ??
-                i + 1
-            );
-
-            const length =
-              Number(
-                r.Length ??
-                  r.length ??
-                  (typeof seq === "string" ? seq.length : undefined)
-              ) || 0;
-
-            const muH =
-              r["Full length uH"] !== undefined
-                ? Number(r["Full length uH"])
-                : r["Hydrophobic moment"] !== undefined
-                ? Number(r["Hydrophobic moment"])
-                : r.muH !== undefined
-                ? Number(r.muH)
-                : undefined;
-
-            let ffHelixPercent: number | undefined = undefined;
-            if (r["FF-Helix (Jpred)"] !== undefined) {
-              const flag = Number(r["FF-Helix (Jpred)"]);
-              ffHelixPercent = flag === 1 ? 100 : 0;
-            } else if (
-              r["FF-Helix"] !== undefined ||
-              r.ffHelixPercent !== undefined ||
-              r.helix_percent !== undefined
-            ) {
-              ffHelixPercent = Number(
-                r["FF-Helix"] ?? r.ffHelixPercent ?? r.helix_percent
-              );
-            } else if (r["Helix percentage (Jpred)"] !== undefined) {
-              ffHelixPercent = Number(r["Helix percentage (Jpred)"]);
+          .map((r: BackendRow) => {
+            try {
+              return mapBackendRowToPeptide(r);
+            } catch (error) {
+              console.warn('Failed to map row:', r, error);
+              return null;
             }
-
-            const chameleonPrediction =
-              (r["FF-Secondary structure switch"] ??
-                r["FF-Chameleon"] ??
-                r.FFChameleon ??
-                r["Chameleon prediction"] ??
-                r.chameleonPrediction ??
-                r.chameleon ??
-                r["SSW prediction"] ??
-                0) as -1 | 0 | 1;
-
-            let helixFragments: [number, number][] | undefined;
-            const rawFragments =
-              r["Helix fragments (Jpred)"] ??
-              r.helixFragments ??
-              r.jpredFragments;
-            if (typeof rawFragments === "string") {
-              try {
-                const arr = JSON.parse(rawFragments);
-                if (Array.isArray(arr)) helixFragments = arr;
-              } catch {}
-            } else if (Array.isArray(rawFragments)) {
-              helixFragments = rawFragments as [number, number][];
-            }
-
-            const peptide: Peptide = {
-              id,
-              name:
-                r["Protein name"] ??
-                r.ProteinName ??
-                r.Name ??
-                r["Entry name"] ??
-                r.name ??
-                `Peptide ${i + 1}`,
-              sequence: String(seq).toUpperCase(),
-              length,
-              species: r.Organism ?? r.organism ?? r.Species ?? r.species,
-              hydrophobicity:
-                Number(
-                  r.Hydrophobicity ??
-                    r.hydrophobicity ??
-                    r.hydro ??
-                    0
-                ) || 0,
-              charge: Number(r.Charge ?? r.charge ?? 0) || 0,
-              muH,
-              chameleonPrediction,
-              ffHelixPercent,
-              jpred: helixFragments ? { helixFragments } : undefined,
-            };
-
-            return peptide;
           })
-          .filter(Boolean) as Peptide[];
+          .filter((p): p is Peptide => p !== null);
 
-        set({ peptides: mapped, meta: meta || null }); // 🔹 save meta too
+        console.log('[DEBUG] First mapped peptide:', mapped[0]); // Debug log
+        
+        set({ peptides: mapped, meta: meta || null });
         get().calculateStats();
       },
 
       setColumnMapping: (mapping) => set({ columnMapping: mapping }),
-
-      // 🔹 Added: standalone setter for meta
       setMetadata: (meta) => set({ meta }),
 
       calculateStats: () => {
@@ -216,23 +122,31 @@ export const useDatasetStore = create<DatasetState>()(
         }
 
         const totalPeptides = peptides.length;
+        
+        // Count chameleon positives (prediction === 1)
         const chameleonPositive = peptides.filter(
           (p) => p.chameleonPrediction === 1
         ).length;
-        const chameleonPositivePercent =
-          (chameleonPositive / totalPeptides) * 100;
+        const chameleonPositivePercent = (chameleonPositive / totalPeptides) * 100;
 
-        const mean = (arr: number[]) =>
-          arr.reduce((s, v) => s + v, 0) / arr.length;
+        // Helper for means
+        const mean = (arr: number[]) => arr.length > 0 ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
 
+        // Basic biochemical stats
         const meanHydrophobicity = mean(peptides.map((p) => p.hydrophobicity));
-        const meanCharge = mean(peptides.map((p) => p.charge));
+        const meanCharge = mean(peptides.map((p) => Math.abs(p.charge)));
         const meanLength = mean(peptides.map((p) => p.length));
 
+        // FF-Helix stats (only count peptides where we have data)
         const helixVals = peptides
           .map((p) => p.ffHelixPercent)
           .filter((v): v is number => typeof v === 'number');
         const meanFFHelixPercent = helixVals.length ? mean(helixVals) : 0;
+
+        // Count availability of different prediction types
+        const jpredAvailable = peptides.filter(p => p.jpred?.helixFragments.length).length;
+        const ffHelixAvailable = peptides.filter(p => p.ffHelixPercent !== undefined).length;
+        const chameleonAvailable = peptides.filter(p => p.chameleonPrediction !== -1).length;
 
         const stats: DatasetStats = {
           totalPeptides,
@@ -241,7 +155,13 @@ export const useDatasetStore = create<DatasetState>()(
           meanCharge,
           meanFFHelixPercent,
           meanLength,
+          // Add these for better UI display
+          jpredAvailable,
+          ffHelixAvailable, 
+          chameleonAvailable,
         };
+
+        console.log('[DEBUG] Calculated stats:', stats); // Debug log
 
         set({ stats });
       },
@@ -260,7 +180,7 @@ export const useDatasetStore = create<DatasetState>()(
   )
 );
 
-// --- Flag threshold store ---
+// --- Flag threshold store (unchanged) ---
 type FlagsState = {
   muHCutoff: number;
   hydroCutoff: number;
