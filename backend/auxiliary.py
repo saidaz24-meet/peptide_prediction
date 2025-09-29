@@ -21,62 +21,80 @@ MAX_CHAMELEON_DIFFERENCE_TANGO = np.inf
 
 # Simple helix propensity (normalized ~0..1) — tweak if you like
 _HELIX_PROP = {
-    "A": 1.00, "L": 0.97, "E": 0.95, "M": 0.90, "Q": 0.86, "K": 0.85, "R": 0.81,
-    "I": 0.76, "V": 0.72, "W": 0.70, "F": 0.68, "T": 0.66, "S": 0.60, "Y": 0.59,
-    "H": 0.58, "C": 0.53, "N": 0.50, "D": 0.47, "G": 0.35, "P": 0.05,
+    "A": 1.42, "E": 1.51, "L": 1.21, "M": 1.45, "Q": 1.11, "K": 1.14, "R": 0.98,
+    "I": 1.08, "V": 1.06, "W": 1.08, "F": 1.13, "T": 0.83, "S": 0.77, "Y": 0.69,
+    "H": 1.00, "C": 0.70, "N": 0.67, "D": 1.01, "G": 0.57, "P": 0.57,
 }
 
 def _hprop(seq: str):
-    return [_HELIX_PROP.get(aa, 0.5) for aa in (seq or "").upper()]
+    """Get helix propensity for each residue in sequence."""
+    return [_HELIX_PROP.get(aa, 1.0) for aa in (seq or "").upper()]
 
-def ff_helix_percent(seq: str, core_len: int = 6, thr: float = 0.80) -> float:
-    """% of residues that belong to ≥core_len window with mean helix prop ≥ thr."""
-    s = (seq or "").upper()
+def ff_helix_percent(seq: str, core_len: int = 6, thr: float = 1.0) -> float:
+    """
+    Calculate percentage of residues that belong to ≥core_len window with mean helix propensity ≥ threshold.
+    Uses a more realistic threshold of 1.0 (average helix propensity).
+    """
+    s = (seq or "").upper().strip()
     if len(s) < core_len:
         return 0.0
+    
     hp = _hprop(s)
-    in_core = [False]*len(s)
-    # sliding mean
-    window_sum = sum(hp[:core_len])
-    if window_sum/core_len >= thr:
-        for i in range(core_len):
-            in_core[i] = True
-    for i in range(core_len, len(s)):
-        window_sum += hp[i] - hp[i-core_len]
-        if window_sum/core_len >= thr:
-            for j in range(i-core_len+1, i+1):
+    in_core = [False] * len(s)
+    
+    # Check each possible window
+    for i in range(len(s) - core_len + 1):
+        window_props = hp[i:i + core_len]
+        window_mean = sum(window_props) / core_len
+        
+        if window_mean >= thr:
+            # Mark all residues in this window as part of a helix core
+            for j in range(i, i + core_len):
                 in_core[j] = True
-    return round(100.0 * sum(in_core) / len(s), 1)
+    
+    if not any(in_core):
+        return 0.0
+    
+    percent = round(100.0 * sum(in_core) / len(s), 1)
+    return percent
 
-def ff_helix_cores(seq: str, core_len: int = 6, thr: float = 0.80):
-    """List of [start,end] (1-based) contiguous helical cores as above."""
-    s = (seq or "").upper()
-    res = []
+def ff_helix_cores(seq: str, core_len: int = 6, thr: float = 1.0):
+    """
+    Find FF-Helix core segments as contiguous regions where sliding windows meet threshold.
+    Returns list of [start, end] segments (1-indexed).
+    """
+    s = (seq or "").upper().strip()
     if len(s) < core_len:
-        return res
+        return []
+    
     hp = _hprop(s)
-    core_marks = [False]*len(s)
-    ws = sum(hp[:core_len])
-    if ws/core_len >= thr:
-        for k in range(core_len):
-            core_marks[k] = True
-    for i in range(core_len, len(s)):
-        ws += hp[i] - hp[i-core_len]
-        if ws/core_len >= thr:
-            for j in range(i-core_len+1, i+1):
+    core_marks = [False] * len(s)
+    
+    # Mark residues that are part of qualifying windows
+    for i in range(len(s) - core_len + 1):
+        window_props = hp[i:i + core_len]
+        window_mean = sum(window_props) / core_len
+        
+        if window_mean >= thr:
+            for j in range(i, i + core_len):
                 core_marks[j] = True
-    # collapse marks → ranges
+    
+    # Convert marks to contiguous segments
+    segments = []
     i = 0
     while i < len(s):
         if core_marks[i]:
-            j = i
-            while j+1 < len(s) and core_marks[j+1]:
-                j += 1
-            res.append([i+1, j+1])  # 1-based
-            i = j+1
+            start = i
+            # Find the end of this contiguous region
+            while i < len(s) and core_marks[i]:
+                i += 1
+            end = i - 1
+            # Convert to 1-indexed and add to results
+            segments.append([start + 1, end + 1])
         else:
             i += 1
-    return res
+    
+    return segments
 
 
 def get_input_files(run_job: str) -> list:
@@ -294,21 +312,35 @@ def find_secondary_structure_switch_segments(beta_segments: list, helix_segments
     return merged_segments
 
 
-def get_avg_uH_by_segments(sequence: str, secondary_structure_idx: list) -> float:
-    """
-    This function calculates the average hydrophobic moments (uH) of all segments predicted as helical of a given sequence
 
-    :param sequence: Sequence in one-letter code
-    :param secondary_structure_idx: list of tuples with start and end indexes of residues predicted as helical.
-    :return: Average uH of helical segments
+# Also add this function that's missing from your auxiliary.py:
+def get_avg_uH_by_segments(sequence: str, segments: list) -> float:
     """
-    if len(secondary_structure_idx) == 0:
-        return -1
-    segments_uH = []
-    for start, end in secondary_structure_idx:
-       segments_uH.append(biochemCalculation.hydrophobic_moment(sequence[start:(end + 1)]))
-    return mean(segments_uH)
-
+    Calculate average hydrophobic moment for given segments.
+    Returns -1 if no valid segments.
+    """
+    if not sequence or not segments:
+        return -1.0
+    
+    try:
+        total_muH = 0.0
+        total_length = 0
+        
+        for segment in segments:
+            if len(segment) >= 2:
+                start, end = segment[0] - 1, segment[1]  # Convert to 0-indexed
+                if 0 <= start < len(sequence) and start < end <= len(sequence):
+                    seg_seq = sequence[start:end]
+                    if seg_seq:  # Make sure segment is not empty
+                        muH = biochemCalculation.hydrophobic_moment(seg_seq)
+                        total_muH += muH * len(seg_seq)
+                        total_length += len(seg_seq)
+        
+        return total_muH / total_length if total_length > 0 else -1.0
+        
+    except Exception as e:
+        print(f"[DEBUG] Error in get_avg_uH_by_segments: {e}")
+        return -1.0
 
 def check_secondary_structure_prediction_content(secondary_structure_prediction_conf: list) -> float:
     """

@@ -25,6 +25,9 @@ export function ResultsKpis({ stats }: ResultsKpisProps) {
     );
   }
 
+  // NEW: determine FF-Helix availability correctly (not by mean > 0)
+  const ffAvailable = (stats.ffHelixAvailable ?? 0) > 0;
+
   const kpis = [
     {
       title: 'Total Peptides',
@@ -49,7 +52,8 @@ export function ResultsKpis({ stats }: ResultsKpisProps) {
     },
     {
       title: 'Avg FF-Helix',
-      value: stats.meanFFHelixPercent > 0 ? `${stats.meanFFHelixPercent.toFixed(1)}%` : 'Not available',
+      // CHANGED: show number whenever data exists (even if it's 0.0%)
+      value: ffAvailable ? `${stats.meanFFHelixPercent.toFixed(1)}%` : 'Not available',
       icon: BarChart3,
       color: 'text-helix',
       bgColor: 'bg-helix/10',

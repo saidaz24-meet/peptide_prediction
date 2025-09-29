@@ -9,39 +9,80 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
 
+// Get API base URL from environment
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+
+// --- Shape of /api/predict response we actually use here ---
+type PredictResponse = {
+  Entry: string;
+  Sequence: string;
+  Length: number;
+  Charge: number;
+  Hydrophobicity: number;
+  "Full length uH": number;
+  "Beta full length uH": number;
+
+  // Flags & FF
+  chameleonPrediction: number;   // (-1 | 0 | 1) as number from backend
+  ffHelixPercent: number;        // camelCase copy from server
+  "FF-Helix (Jpred)": number;    // 1 or -1
+};
+
 // Simple helper: POST form-urlencoded to /api/predict
 async function predictOne(sequence: string, entry?: string) {
   const form = new URLSearchParams();
   form.set("sequence", sequence.trim());
   if (entry?.trim()) form.set("entry", entry.trim());
-  const res = await fetch("http://127.0.0.1:8000/api/predict", {
+
+  const res = await fetch(`${API_BASE_URL}/api/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
     body: form.toString(),
   });
+
   if (!res.ok) {
     const t = await res.text().catch(() => "");
     throw new Error(`Predict failed (${res.status}): ${t || "unknown error"}`);
   }
-  return (await res.json()) as {
-    Entry: string;
-    Sequence: string;
-    Length: number;
-    Charge: number;
-    Hydrophobicity: number;
-    "Full length uH": number;
-    "Helix (Jpred) uH": number; // -1 if not available
-    "Beta full length uH": number;
-    "FF-Secondary structure switch": number; // 1 or -1
-    "FF-Helix (Jpred)": number; // 1 or -1
+
+  const json = (await res.json()) as Record<string, any>;
+
+  // Normalize a couple of keys that the UI expects
+  const ffHelixPercent =
+    typeof json["FF Helix %"] === "number"
+      ? json["FF Helix %"]
+      : typeof json["ffHelixPercent"] === "number"
+      ? json["ffHelixPercent"]
+      : 0;
+
+  const chameleonPrediction =
+    typeof json["Chameleon"] === "number"
+      ? json["Chameleon"]
+      : typeof json["chameleonPrediction"] === "number"
+      ? json["chameleonPrediction"]
+      : -1;
+
+  const shaped: PredictResponse = {
+    Entry: String(json["Entry"] ?? ""),
+    Sequence: String(json["Sequence"] ?? ""),
+    Length: Number(json["Length"] ?? 0),
+    Charge: Number(json["Charge"] ?? 0),
+    Hydrophobicity: Number(json["Hydrophobicity"] ?? 0),
+    "Full length uH": Number(json["Full length uH"] ?? 0),
+    "Beta full length uH": Number(json["Beta full length uH"] ?? 0),
+    chameleonPrediction,
+    ffHelixPercent,
+    "FF-Helix (Jpred)": Number(json["FF-Helix (Jpred)"] ?? -1),
   };
+
+  return shaped;
 }
 
 export default function QuickAnalyze() {
   const [sequence, setSequence] = useState("");
   const [entry, setEntry] = useState("");
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<Awaited<ReturnType<typeof predictOne>> | null>(null);
+  const [data, setData] = useState<PredictResponse | null>(null);
   const navigate = useNavigate();
 
   const onSubmit = async (e: React.FormEvent) => {
@@ -63,15 +104,25 @@ export default function QuickAnalyze() {
     }
   };
 
-  const flagBadge = (v: number) =>
-    v === 1 ? (
-      <Badge className="bg-emerald-600 hover:bg-emerald-600">Flag: Positive</Badge>
-    ) : (
-      <Badge variant="secondary">Flag: Negative</Badge>
-    );
+  const flagBadge = (v: number, label: string) => {
+    if (v === 1) {
+      return <Badge className="bg-emerald-600 hover:bg-emerald-600">{label}: Positive</Badge>;
+    } else if (v === -1) {
+      return <Badge variant="outline">{label}: N/A</Badge>;
+    } else {
+      return <Badge variant="secondary">{label}: Negative</Badge>;
+    }
+  };
 
-  const availability = (v: number) =>
-    v === -1 ? <Badge variant="outline">JPred: not available</Badge> : <Badge>JPred: on</Badge>;
+  const ffHelixDisplay = (percent: number) => {
+    if (percent === -1 || percent === undefined) {
+      return <Badge variant="outline">FF-Helix: N/A</Badge>;
+    } else if (percent > 0) {
+      return <Badge className="bg-blue-600 hover:bg-blue-600">FF-Helix: {percent.toFixed(1)}%</Badge>;
+    } else {
+      return <Badge variant="secondary">FF-Helix: 0%</Badge>;
+    }
+  };
 
   return (
     <div className="max-w-5xl mx-auto p-6 space-y-8">
@@ -139,9 +190,9 @@ export default function QuickAnalyze() {
                 <div className="font-medium">{data.Length} aa</div>
 
                 <div className="flex flex-wrap gap-2 mt-3">
-                  {flagBadge(data["FF-Secondary structure switch"])}
-                  {flagBadge(data["FF-Helix (Jpred)"])}
-                  {availability(data["Helix (Jpred) uH"])}
+                  {flagBadge(data.chameleonPrediction, "Chameleon")}
+                  {ffHelixDisplay(data.ffHelixPercent)}
+                  {flagBadge(data["FF-Helix (Jpred)"], "JPred")}
                 </div>
               </CardContent>
             </Card>
@@ -171,6 +222,10 @@ export default function QuickAnalyze() {
                   <div className="text-sm text-muted-foreground">β μH (full length)</div>
                   <div className="text-xl font-semibold">{data["Beta full length uH"].toFixed(3)}</div>
                 </div>
+
+                {/* Charts for single-sequence are optional and currently not wired.
+                   When backend returns per-residue curves for single prediction,
+                   render them here. */}
               </CardContent>
             </Card>
 
@@ -192,7 +247,7 @@ export default function QuickAnalyze() {
                   helical segments. <strong>β μH</strong> uses a 160° angle for β-like profiles.
                 </p>
                 <p className="text-muted-foreground">
-                  JPred/Tango columns will read “not available” if those providers aren’t wired for single-sequence
+                  JPred/Tango columns will read "not available" if those providers aren't wired for single-sequence
                   runs on your machine.
                 </p>
               </CardContent>

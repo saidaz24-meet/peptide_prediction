@@ -1,143 +1,148 @@
 // src/lib/mappers.ts
-// Central place to convert backend rows -> frontend Peptide objects
-// Tolerant to column name variants and missing fields.
+// Central mapper: backend row -> Peptide view model
+// Keeps backward-compat with mixed key styles (snake/camel/labels).
 
-export type Segment = [number, number];
+import type { Peptide, Segment } from "@/types/peptide";
 
-export interface JPredInfo {
-  helixFragments: Segment[];
+// ----- optional nested shapes (match types/peptide) -----
+type JPredInfo = {
+  helixFragments?: Array<[number, number]> | Segment[];
   helixScore?: number;
-}
+};
 
-export interface Peptide {
-  // identity & metadata
-  id: string;                // Entry / Accession
-  name?: string;             // Protein name
-  species?: string;          // Organism
-  sequence: string;
-  length: number;
+type TangoCurves = {
+  agg?: number[];
+  beta?: number[];
+  helix?: number[];
+  turn?: number[];
+};
 
-  // basic biophysics
-  hydrophobicity: number;    // "Hydrophobicity"
-  charge: number;            // "Charge"
-  muH: number;               // "Full length uH"
+type PsipredInfo = {
+  pH?: number[];
+  pE?: number[];
+  pC?: number[];
+  helixSegments?: Array<[number, number]>;
+};
 
-  // FF Helix (from auxiliary; percent + fragments)
-  ffHelixPercent?: number;   // "FF-Helix %", number or undefined when unavailable
-  ffHelixFragments?: Segment[]; // "FF Helix fragments"
+// ----- helpers -----
+const num = (v: any, allowUndefined = false): number | undefined => {
+  const n = typeof v === "string" ? Number(v) : v;
+  if (n === null || n === undefined || Number.isNaN(Number(n))) {
+    return allowUndefined ? undefined : 0;
+  }
+  return Number(n);
+};
 
-  // Tango / Chameleon
-  chameleonPrediction: number;   // "SSW prediction" (1 / 0 / -1)
-  sswScore?: number;             // "SSW score"
-  sswDiff?: number;              // "SSW diff"
-  sswHelixPct?: number;          // "SSW helix percentage"
-  sswBetaPct?: number;           // "SSW beta percentage"
+const toSegments = (val: any): Array<[number, number]> => {
+  if (!val) return [];
+  if (Array.isArray(val)) {
+    // already [[s,e], ...] or Segment[]
+    if (val.length && Array.isArray(val[0])) return val as Array<[number, number]>;
+    if (val.length && typeof val[0] === "object" && "start" in val[0] && "end" in val[0]) {
+      return (val as Segment[]).map((s) => [s.start, s.end]);
+    }
+  }
+  if (typeof val === "string") {
+    // try JSON first
+    try {
+      const parsed = JSON.parse(val);
+      return toSegments(parsed);
+    } catch {
+      // fallback: "5-12;20-28" or "5:12,20:28"
+      const out: Array<[number, number]> = [];
+      val
+        .split(/[;,]/)
+        .map((s: string) => s.trim())
+        .forEach((piece: string) => {
+          const m = piece.match(/^(\d+)\s*[-:]\s*(\d+)$/);
+          if (m) out.push([Number(m[1]), Number(m[2])]);
+        });
+      return out;
+    }
+  }
+  return [];
+};
 
-  // Optional JPred block
-  jpred?: JPredInfo;
-
-  // raw passthrough (just in case)
-  _raw?: Record<string, any>;
-}
-
-/** Safely parse a number; treat -1 or NaN as undefined when requested. */
-function num(x: any, undefIfNegOne = false): number | undefined {
-  const v = typeof x === "number" ? x : Number(String(x ?? "").trim());
-  if (Number.isNaN(v)) return undefined;
-  if (undefIfNegOne && v === -1) return undefined;
-  return v;
-}
-
-/** Normalize a string key (for tolerant column lookups). */
-function key(s: string): string {
-  return s.toLowerCase().replace(/\s+/g, " ").trim();
-}
-
-/** Read a value by trying several alternative keys. */
-function getAny(obj: Record<string, any>, keys: string[], fallback?: any) {
+const getAny = (row: Record<string, any>, keys: string[], fallback?: any) => {
   for (const k of keys) {
-    const hit = Object.keys(obj).find((c) => key(c) === key(k));
-    if (hit !== undefined) return obj[hit];
+    if (row[k] !== undefined) return row[k];
   }
   return fallback;
-}
+};
 
-/** Convert "5-12; 20-28" | JSON | array -> Segment[] */
-function toSegments(val: any): Segment[] {
-  if (val == null) return [];
-  if (Array.isArray(val)) {
-    // e.g. [[5,12],[20,28]]
-    const segs: Segment[] = [];
-    for (const it of val) {
-      if (Array.isArray(it) && it.length >= 2) {
-        const a = Number(it[0]);
-        const b = Number(it[1]);
-        if (!Number.isNaN(a) && !Number.isNaN(b)) segs.push([a, b]);
-      }
-    }
-    return segs;
-  }
-  const s = String(val).trim();
-  if (!s) return [];
-  // Try JSON
-  try {
-    const j = JSON.parse(s);
-    return toSegments(j);
-  } catch {
-    // try "5-12;20-28" / "5:12, 20:28"
-    const pieces = s.split(/[;,]/).map((p) => p.trim()).filter(Boolean);
-    const segs: Segment[] = [];
-    for (const p of pieces) {
-      const m = p.match(/^(\d+)\s*[-:]\s*(\d+)$/);
-      if (m) segs.push([Number(m[1]), Number(m[2])]);
-    }
-    return segs;
-  }
-}
-
-/** Map a backend DataFrame row (as JSON) into a Peptide object. */
+// ----- main mapper -----
 export function mapBackendRowToPeptide(row: Record<string, any>): Peptide {
-  const id =
-    getAny(row, ["Entry", "Accession", "ID", "entry", "accession", "id"], "") ?? "";
-  const seq = String(
-    getAny(row, ["Sequence", "sequence", "seq"], "") ?? ""
-  );
-  const length =
-    num(getAny(row, ["Length", "length", "len"], seq?.length || 0)) ?? (seq?.length || 0);
+  const id = getAny(row, ["Entry", "Accession", "ID", "id"]);
+  const seq = String(getAny(row, ["Sequence", "sequence"], "") || "");
+  const length = num(getAny(row, ["Length", "length"], 0)) ?? 0;
 
-  // core biophysics
-  const hydrophobicity =
-    num(getAny(row, ["Hydrophobicity", "hydrophobicity"]), true) ?? 0;
-  const charge = num(getAny(row, ["Charge", "charge"]), true) ?? 0;
-  const muH =
-    num(getAny(row, ["Full length uH", "Full-length uH", "muH", "Full length μH"]), true) ?? 0;
+  const hydrophobicity = Number(getAny(row, ["Hydrophobicity", "hydrophobicity"], 0) || 0);
+  const muH = num(getAny(row, ["Full length uH", "uH", "muH"]), true);
+  const charge = Number(getAny(row, ["Charge", "charge"], 0) || 0);
 
-  // FF-Helix
-  const ffHelixPercent = num(getAny(row, ["FF-Helix %", "FF Helix %", "ffHelixPercent"]), true);
-  const ffHelixFragments = toSegments(
-    getAny(row, ["FF Helix fragments", "FF-Helix fragments", "ffHelixFragments"], [])
-  );
+  // Flags / SSW (Chameleon)
+  const chameleonPrediction = Number(
+    getAny(row, ["chameleonPrediction", "Chameleon", "Chameleon_Prediction"], -1)
+  ) as -1 | 0 | 1;
 
-  // Tango / Chameleon
-  const chameleonPrediction =
-    (num(getAny(row, ["SSW prediction", "Chameleon", "chameleonPrediction"])) as number | undefined) ??
-    -1;
   const sswScore = num(getAny(row, ["SSW score", "sswScore"]), true);
   const sswDiff = num(getAny(row, ["SSW diff", "sswDiff"]), true);
-  const sswHelixPct = num(getAny(row, ["SSW helix percentage", "Helix percentage", "helixPct"]), true);
-  const sswBetaPct = num(getAny(row, ["SSW beta percentage", "Beta percentage", "betaPct"]), true);
+  const sswHelixPct = num(getAny(row, ["SSW helix percentage", "sswHelixPct", "helixPercent"]), true);
+  const sswBetaPct  = num(getAny(row, ["SSW beta percentage", "sswBetaPct", "betaPercent"]), true);
+
+
+  // FF-Helix - DEBUG VERSION
+  const rawFFValue = getAny(row, ["FF Helix %", "FF-Helix %", "ffHelixPercent", "FF Helix", "FF-Helix"]);
+  
+  console.log('[MAPPER DEBUG] FF-Helix raw value:', rawFFValue, 'type:', typeof rawFFValue);
+  const ffHelixPercent =
+    num(rawFFValue, true) ?? undefined;
+
+
+  const ffHelixFragments = toSegments(
+    getAny(row, ["FF Helix fragments", "ffHelixFragments"], [])
+  );
 
   // JPred
   const jpredFrags = toSegments(
     getAny(row, ["Helix fragments (Jpred)", "JPred Helix fragments", "jpredHelixFragments"], [])
   );
-  const jpredScore = num(getAny(row, ["Helix score (Jpred)", "JPred Helix score", "jpredHelixScore"]), true);
+  const jpredScore = num(
+    getAny(row, ["Helix score (Jpred)", "JPred Helix score", "jpredHelixScore"]),
+    true
+  );
   const jpred: JPredInfo | undefined =
-    jpredFrags.length || jpredScore !== undefined
+    (jpredFrags?.length ?? 0) || jpredScore !== undefined
       ? { helixFragments: jpredFrags, helixScore: jpredScore }
       : undefined;
 
-  return {
+  // Optional per-residue curves (Tango)
+  const tango: TangoCurves | undefined = (() => {
+    const agg   = getAny(row, ["Tango Aggregation curve", "tangoAgg"]) as number[] | undefined;
+    const beta  = getAny(row, ["Tango Beta curve", "tangoBeta"])       as number[] | undefined;
+    const helix = getAny(row, ["Tango Helix curve", "tangoHelix"])     as number[] | undefined;
+    const turn  = getAny(row, ["Tango Turn curve", "tangoTurn"])       as number[] | undefined;
+    if (agg || beta || helix || turn) return { agg, beta, helix, turn };
+    return undefined;
+  })();
+
+  // Optional per-residue curves (PSIPRED)
+  const psipred: PsipredInfo | undefined = (() => {
+    const pH = getAny(row, ["Psipred P_H", "psipredPH"]) as number[] | undefined;
+    const pE = getAny(row, ["Psipred P_E", "psipredPE"]) as number[] | undefined;
+    const pC = getAny(row, ["Psipred P_C", "psipredPC"]) as number[] | undefined;
+    const helixSegments = getAny(
+      row,
+      ["Helix fragments (Psipred)", "psipredHelixSegments"],
+      []
+    ) as Array<[number, number]>;
+    if ((pH && pH.length) || (pE && pE.length) || (pC && pC.length) || (helixSegments?.length ?? 0) > 0) {
+      return { pH, pE, pC, helixSegments };
+    }
+    return undefined;
+  })();
+
+  const peptide: Peptide = {
     id: String(id || "").trim(),
     name: getAny(row, ["Protein name", "Name", "name"]),
     species: getAny(row, ["Organism", "Species", "organism", "species"]),
@@ -148,16 +153,24 @@ export function mapBackendRowToPeptide(row: Record<string, any>): Peptide {
     charge,
     muH,
 
+    // FF
     ffHelixPercent,
     ffHelixFragments,
 
-    chameleonPrediction: typeof chameleonPrediction === "number" ? chameleonPrediction : -1,
+    // SSW / Chameleon
+    chameleonPrediction,
     sswScore,
     sswDiff,
     sswHelixPct,
     sswBetaPct,
 
+    // Providers
     jpred,
-    _raw: row,
+    tango,
+    psipred,
+
+   
   };
+
+  return peptide;
 }

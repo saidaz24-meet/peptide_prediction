@@ -95,6 +95,53 @@ def _finalize_ui_aliases(df: pd.DataFrame) -> None:
         df["FF Helix fragments"] = pd.Series([[] for _ in range(len(df))], dtype=object)
 
 
+
+# Add these functions to your server.py file
+
+def normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize column names to expected format."""
+    df = canonicalize_headers(df)
+    
+    # Ensure required columns exist
+    if "entry" in df.columns:
+        df = df.rename(columns={"entry": "Entry"})
+    if "sequence" in df.columns:
+        df = df.rename(columns={"sequence": "Sequence"})
+    if "length" in df.columns:
+        df = df.rename(columns={"length": "Length"})
+    if "organism" in df.columns:
+        df = df.rename(columns={"organism": "Organism"})
+    if "name" in df.columns:
+        df = df.rename(columns={"name": "Protein name"})
+    
+    return df
+
+def ensure_cols(df: pd.DataFrame):
+    """Ensure all required columns exist with default values."""
+    required_cols = [
+        "Charge", "Hydrophobicity", "Full length uH", "Helix (Jpred) uH",
+        "Beta full length uH", "SSW prediction", "SSW score", "SSW diff",
+        "SSW helix percentage", "SSW beta percentage",
+        "FF-Secondary structure switch", "FF-Helix (Jpred)"
+    ]
+    
+    for col in required_cols:
+        if col not in df.columns:
+            if col == "Helix fragments (Jpred)":
+                df[col] = pd.Series([[] for _ in range(len(df))], dtype=object)
+            else:
+                df[col] = -1
+
+def ff_flags(df: pd.DataFrame):
+    """Calculate FF flags based on existing data."""
+    # This function should compute your final FF flags
+    # For now, just ensure the columns exist
+    if "FF-Helix (Jpred)" not in df.columns:
+        df["FF-Helix (Jpred)"] = -1
+    if "FF-Secondary structure switch" not in df.columns:
+        df["FF-Secondary structure switch"] = -1
+
+
 @app.get("/api/example")
 def load_example(recalc: int = 0):
     """
@@ -484,8 +531,10 @@ async def predict(sequence: str = Form(...), entry: Optional[str] = Form(None)):
             # prefer simple runner; fallback to generic if not present
             tango_records = [(entry or "adhoc", seq)]
             if hasattr(tango, "run_tango_simple"):
+                print("running tango simple")
                 tango.run_tango_simple(tango_records)
             else:
+                print("not running tango simple, but run_tango instead because the other one failed")
                 tango.run_tango(records=tango_records)
 
             tango.process_tango_output(df)

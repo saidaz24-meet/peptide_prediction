@@ -142,6 +142,9 @@ def _parse_ss2(path: str) -> Optional[pd.DataFrame]:
             try:
                 idx = int(parts[0]); aa = parts[1]; ss = parts[2]
                 ph,pe,pc = map(float, parts[3:6])
+                df.loc[i, "Psipred P_H"] = ph
+                df.loc[i, "Psipred P_E"] = pe
+                df.loc[i, "Psipred P_C"] = pc
                 rows.append((idx, aa, ss, ph, pe, pc))
             except Exception:
                 continue

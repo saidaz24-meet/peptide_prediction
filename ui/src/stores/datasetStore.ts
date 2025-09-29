@@ -7,7 +7,8 @@ import type {
   DatasetMetadata,
 } from '../types/peptide';
 
-import { mapBackendRowToPeptide, type Peptide } from "@/lib/mappers";
+import { mapBackendRowToPeptide } from "@/lib/mappers";
+import type { Peptide } from "@/types/peptide";
 
 // --- SMART RANKING (weights + scorer) ---
 export const useThresholds = create<{
@@ -93,6 +94,8 @@ export const useDatasetStore = create<DatasetState>()(
 
       ingestBackendRows: (rows: BackendRow[], meta?: DatasetMetadata) => {
         console.log('[DEBUG] Raw backend row sample:', rows[0]); // Debug log
+        console.log('[DEBUG] FF-Helix keys in first row:', Object.keys(rows[0]).filter(k => k.toLowerCase().includes('helix')));
+
         
         const mapped: Peptide[] = rows
           .map((r: BackendRow) => {
@@ -145,7 +148,7 @@ export const useDatasetStore = create<DatasetState>()(
 
         // Count availability of different prediction types
         const jpredAvailable = peptides.filter(p => p.jpred?.helixFragments.length).length;
-        const ffHelixAvailable = peptides.filter(p => p.ffHelixPercent !== undefined).length;
+        const ffHelixAvailable = peptides.filter(p => typeof p.ffHelixPercent === 'number').length;
         const chameleonAvailable = peptides.filter(p => p.chameleonPrediction !== -1).length;
 
         const stats: DatasetStats = {

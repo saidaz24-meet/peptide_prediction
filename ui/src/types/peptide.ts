@@ -41,10 +41,31 @@ export type Peptide = {
   ffHelixPercent?: number;                                   // "FF-Helix %"
   ffHelixFragments?: Array<SegmentTuple> | Segment[];        // "FF Helix fragments"
 
+  // ----- NEW: unified secondary-structure percentages used by Results table -----
+  // These are filled by the mapper from PSIPRED if present, otherwise Tango fallback.
+  helixPercent?: number;   // preferred: PSIPRED helix %; fallback: "SSW helix percentage"
+  betaPercent?: number;    // preferred: PSIPRED beta %;  fallback: "SSW beta percentage"
+
   // Optional JPred block
   jpred?: {
     helixFragments?: Array<SegmentTuple> | Segment[];
     helixScore?: number;
+  };
+
+  // --- NEW (optional) PSIPRED curves + segments
+  psipred?: {
+    pH?: number[]; // per-residue P(helix)
+    pE?: number[]; // per-residue P(beta)
+    pC?: number[]; // per-residue P(coil)
+    helixSegments?: Array<[number, number]>;
+  };
+
+  // --- NEW (optional) Tango per-residue curves
+  tango?: {
+    agg?: number[];   // Aggregation curve
+    beta?: number[];  // Beta curve
+    helix?: number[]; // Helix curve
+    turn?: number[];  // Turn curve
   };
 
   // passthrough for any extras
@@ -76,6 +97,10 @@ export type ColumnMapping = {
   jpred_helix_percent?: string;    // (if you ever store it)
   jpred_helix_fragments?: string;
   jpred_helix_score?: string;
+
+  // ----- NEW: optional direct mapping for unified columns -----
+  helix_percent?: string;          // maps to Peptide.helixPercent
+  beta_percent?: string;           // maps to Peptide.betaPercent
 
   // metadata
   species?: string;
