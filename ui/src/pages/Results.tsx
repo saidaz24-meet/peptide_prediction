@@ -13,7 +13,7 @@ import { Slider } from '@/components/ui/slider';
 
 import { ResultsKpis } from '@/components/ResultsKpis';
 import { ResultsCharts } from '@/components/ResultsCharts';
-import { PeptideTable } from '@/components/PeptideTable';
+import  {PeptideTable}  from '@/components/PeptideTable';
 import { Legend } from '@/components/Legend';
 
 import { useDatasetStore } from '@/stores/datasetStore';
