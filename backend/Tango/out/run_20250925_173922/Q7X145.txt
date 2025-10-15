@@ -1,0 +1,60 @@
+Do you want a prediction per residue?. If yes type Y. Default, N
+Type the name of the file with the peptide names, conditions and sequence in one letter code and press Enter
+Ficher = Q7X145
+Nterm = N
+Cterm = N
+pH = 7
+temperatura = 298
+ionic = 0.1
+Stability = 0
+Concentration = 1
+aminoacido = MAKKESFF
+1 peptides run, last one Q7X145 N N 7.00 298.00 0.10 MAKKESFF
+1 6 0 M
+1 6 1 A
+1 6 2 K
+1 6 3 K
+1 6 4 E
+1 6 5 S
+2 6 1 A
+2 6 2 K
+2 6 3 K
+2 6 4 E
+2 6 5 S
+2 6 6 F
+6 6
+3 6 2 K
+3 6 3 K
+3 6 4 E
+3 6 5 S
+3 6 6 F
+3 6 7 F
+7 7
+1 7 0 M
+1 7 1 A
+1 7 2 K
+1 7 3 K
+1 7 4 E
+1 7 5 S
+1 7 6 F
+6 6
+2 7 1 A
+2 7 2 K
+2 7 3 K
+2 7 4 E
+2 7 5 S
+2 7 6 F
+2 7 7 F
+7 7
+1 8 0 M
+1 8 1 A
+1 8 2 K
+1 8 3 K
+1 8 4 E
+1 8 5 S
+1 8 6 F
+1 8 7 F
+7 7
+betaaggr
+partition
+AGG 0 AMYLO 1.75129e-26 TURN 0.924951 HELIX 0 HELAGG 0 BETA6.66471

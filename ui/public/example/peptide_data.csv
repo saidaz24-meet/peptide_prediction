@@ -1,0 +1,17 @@
+ID,Species,Sequence,Length,Hydrophobicity,Hydrophobic_Moment,Charge,Chameleon_Prediction,FF_Helix_Percent
+A0A0C5B5G6,Homo sapiens (Human),MRWQEMGYIFYPRKLR,16,0.485,,3,0,-1
+C0HK44,Lasioglossum laticeps (Bee),VNWKKILGKIIKVVK,15,0.4973333333,,5,0,-1
+P0C005,Anoplius samariensis (Solitary wasp),GLLKRIKTLL,10,0.587,,3,0,-1
+P0C1Q4,Polybia paulista (Neotropical social wasp) (Swarm-founding polistine wasp),IDWKKLLDAAKQIL,14,0.4885714286,,1,0,-1
+P0C1R7,Conus omaria (Omaria cone),GCCSHPACNVNNPHICG,17,0.55,,0,0,-1
+P0DI90,Daboia russelii (Russel's viper) (Vipera russelii),ADDKNPLEECFCEDDDYCEG,20,0.105,,-8,0,-1
+P0DJG7,Deinagkistrodon acutus (Hundred-pace snake) (Agkistrodon acutus),VIGGVECDINEHRFL,15,0.5026666667,,-2,0,-1
+P0DJH3,Deinagkistrodon acutus (Hundred-pace snake) (Agkistrodon acutus),DVVSPPVCGN,10,0.523,,-1,0,-1
+P0DJJ6,Bothrops leucurus (Whitetail lancehead),TLTSFGEWR,9,0.5077777778,,0,0,-1
+P0DL39,Conus australis (Austral cone) (Asprella australis),SCCARNPACRHNHPCV,16,0.4025,,2,0,-1
+P0DQM9,Conus zonatus (Zoned cone),GFRSPCPPFC,10,0.777,,1,0,-1
+P50983,Conus imperialis (Imperial cone),IVRRGCCSDPRCAWRCG,17,0.4476470588,,3,0,-1
+P56917,Rana temporaria (European common frog),FLPLIGRVLSGIL,13,1.0061538462,,1,0,-1
+P81563,Rattus norvegicus (Rat),DTLKSEKNADFKDLY,15,0.0106666667,,-1,0,-1
+C0HMA1,Homo sapiens (Human),MEMALMVAQTRKGKSVV,17,0.3552941176,,2,0,-1
+P69208,Homo sapiens (Human),QPPGGSKVILF,11,0.6090909091,,1,0,-1

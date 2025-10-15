@@ -1,0 +1,14 @@
+Do you want a prediction per residue?. If yes type Y. Default, N
+Type the name of the file with the peptide names, conditions and sequence in one letter code and press Enter
+Ficher = Q9KJM1
+Nterm = N
+Cterm = N
+pH = 7
+temperatura = 298
+ionic = 0.1
+Stability = 0
+Concentration = 1
+aminoacido = MXTAHSYTXKYNGYTAN
+1 peptides run, last one Q9KJM1 N N 7.00 298.00 0.10 MXTAHSYTXKYNGYTAN
+88, File not properly written, try writing it up again, 
+ 

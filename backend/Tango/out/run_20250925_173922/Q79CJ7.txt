@@ -1,0 +1,95 @@
+Do you want a prediction per residue?. If yes type Y. Default, N
+Type the name of the file with the peptide names, conditions and sequence in one letter code and press Enter
+Ficher = Q79CJ7
+Nterm = N
+Cterm = N
+pH = 7
+temperatura = 298
+ionic = 0.1
+Stability = 0
+Concentration = 1
+aminoacido = MKKSEDYSS
+1 peptides run, last one Q79CJ7 N N 7.00 298.00 0.10 MKKSEDYSS
+1 6 0 M
+1 6 1 K
+1 6 2 K
+1 6 3 S
+1 6 4 E
+1 6 5 D
+5 5
+2 6 1 K
+2 6 2 K
+2 6 3 S
+2 6 4 E
+2 6 5 D
+2 6 6 Y
+6 6
+3 6 2 K
+3 6 3 S
+3 6 4 E
+3 6 5 D
+3 6 6 Y
+3 6 7 S
+7 7
+4 6 3 S
+4 6 4 E
+4 6 5 D
+4 6 6 Y
+4 6 7 S
+4 6 8 S
+8 8
+1 7 0 M
+1 7 1 K
+1 7 2 K
+1 7 3 S
+1 7 4 E
+1 7 5 D
+1 7 6 Y
+6 6
+2 7 1 K
+2 7 2 K
+2 7 3 S
+2 7 4 E
+2 7 5 D
+2 7 6 Y
+2 7 7 S
+7 7
+3 7 2 K
+3 7 3 S
+3 7 4 E
+3 7 5 D
+3 7 6 Y
+3 7 7 S
+3 7 8 S
+8 8
+1 8 0 M
+1 8 1 K
+1 8 2 K
+1 8 3 S
+1 8 4 E
+1 8 5 D
+1 8 6 Y
+1 8 7 S
+7 7
+2 8 1 K
+2 8 2 K
+2 8 3 S
+2 8 4 E
+2 8 5 D
+2 8 6 Y
+2 8 7 S
+2 8 8 S
+8 8
+1 9 0 M
+1 9 1 K
+1 9 2 K
+1 9 3 S
+1 9 4 E
+1 9 5 D
+1 9 6 Y
+1 9 7 S
+1 9 8 S
+8 8
+betaaggr
+partition
+AGG 0 AMYLO 7.74305e-13 TURN 12.5209 HELIX 0 HELAGG 0 BETA10.3607

@@ -1,0 +1,92 @@
+Do you want a prediction per residue?. If yes type Y. Default, N
+Type the name of the file with the peptide names, conditions and sequence in one letter code and press Enter
+Ficher = A0A6G5ZZP1
+Nterm = N
+Cterm = N
+pH = 7
+temperatura = 298
+ionic = 0.1
+Stability = 0
+Concentration = 1
+aminoacido = MTHAMKLRF
+1 peptides run, last one A0A6G5ZZP1 N N 7.00 298.00 0.10 MTHAMKLRF
+1 6 0 M
+1 6 1 T
+1 6 2 H
+1 6 3 A
+1 6 4 M
+1 6 5 K
+5 5
+2 6 1 T
+2 6 2 H
+2 6 3 A
+2 6 4 M
+2 6 5 K
+2 6 6 L
+6 6
+3 6 2 H
+3 6 3 A
+3 6 4 M
+3 6 5 K
+3 6 6 L
+3 6 7 R
+4 6 3 A
+4 6 4 M
+4 6 5 K
+4 6 6 L
+4 6 7 R
+4 6 8 F
+8 8
+1 7 0 M
+1 7 1 T
+1 7 2 H
+1 7 3 A
+1 7 4 M
+1 7 5 K
+1 7 6 L
+6 6
+2 7 1 T
+2 7 2 H
+2 7 3 A
+2 7 4 M
+2 7 5 K
+2 7 6 L
+2 7 7 R
+3 7 2 H
+3 7 3 A
+3 7 4 M
+3 7 5 K
+3 7 6 L
+3 7 7 R
+3 7 8 F
+8 8
+1 8 0 M
+1 8 1 T
+1 8 2 H
+1 8 3 A
+1 8 4 M
+1 8 5 K
+1 8 6 L
+1 8 7 R
+2 8 1 T
+2 8 2 H
+2 8 3 A
+2 8 4 M
+2 8 5 K
+2 8 6 L
+2 8 7 R
+2 8 8 F
+8 8
+1 9 0 M
+1 9 1 T
+1 9 2 H
+1 9 3 A
+1 9 4 M
+1 9 5 K
+1 9 6 L
+1 9 7 R
+1 9 8 F
+8 8
+betaaggr
+partition
+AGG 0 AMYLO 4.32214e-10 TURN 0.239049 HELIX 0 HELAGG 0 BETA18.7256

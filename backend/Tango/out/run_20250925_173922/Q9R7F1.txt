@@ -1,0 +1,261 @@
+Do you want a prediction per residue?. If yes type Y. Default, N
+Type the name of the file with the peptide names, conditions and sequence in one letter code and press Enter
+Ficher = Q9R7F1
+Nterm = N
+Cterm = N
+pH = 7
+temperatura = 298
+ionic = 0.1
+Stability = 0
+Concentration = 1
+aminoacido = MKIGYARVSTGL
+1 peptides run, last one Q9R7F1 N N 7.00 298.00 0.10 MKIGYARVSTGL
+1 6 0 M
+1 6 1 K
+1 6 2 I
+1 6 3 G
+1 6 4 Y
+1 6 5 A
+2 6 1 K
+2 6 2 I
+2 6 3 G
+2 6 4 Y
+2 6 5 A
+2 6 6 R
+6 6
+3 6 2 I
+3 6 3 G
+3 6 4 Y
+3 6 5 A
+3 6 6 R
+3 6 7 V
+7 7
+4 6 3 G
+4 6 4 Y
+4 6 5 A
+4 6 6 R
+4 6 7 V
+4 6 8 S
+8 8
+5 6 4 Y
+5 6 5 A
+5 6 6 R
+5 6 7 V
+5 6 8 S
+5 6 9 T
+6 6 5 A
+6 6 6 R
+6 6 7 V
+6 6 8 S
+6 6 9 T
+6 6 10 G
+10 10
+7 6 6 R
+7 6 7 V
+7 6 8 S
+7 6 9 T
+7 6 10 G
+7 6 11 L
+11 11
+1 7 0 M
+1 7 1 K
+1 7 2 I
+1 7 3 G
+1 7 4 Y
+1 7 5 A
+1 7 6 R
+6 6
+2 7 1 K
+2 7 2 I
+2 7 3 G
+2 7 4 Y
+2 7 5 A
+2 7 6 R
+2 7 7 V
+7 7
+3 7 2 I
+3 7 3 G
+3 7 4 Y
+3 7 5 A
+3 7 6 R
+3 7 7 V
+3 7 8 S
+8 8
+4 7 3 G
+4 7 4 Y
+4 7 5 A
+4 7 6 R
+4 7 7 V
+4 7 8 S
+4 7 9 T
+5 7 4 Y
+5 7 5 A
+5 7 6 R
+5 7 7 V
+5 7 8 S
+5 7 9 T
+5 7 10 G
+10 10
+6 7 5 A
+6 7 6 R
+6 7 7 V
+6 7 8 S
+6 7 9 T
+6 7 10 G
+6 7 11 L
+11 11
+1 8 0 M
+1 8 1 K
+1 8 2 I
+1 8 3 G
+1 8 4 Y
+1 8 5 A
+1 8 6 R
+1 8 7 V
+7 7
+2 8 1 K
+2 8 2 I
+2 8 3 G
+2 8 4 Y
+2 8 5 A
+2 8 6 R
+2 8 7 V
+2 8 8 S
+8 8
+3 8 2 I
+3 8 3 G
+3 8 4 Y
+3 8 5 A
+3 8 6 R
+3 8 7 V
+3 8 8 S
+3 8 9 T
+4 8 3 G
+4 8 4 Y
+4 8 5 A
+4 8 6 R
+4 8 7 V
+4 8 8 S
+4 8 9 T
+4 8 10 G
+10 10
+5 8 4 Y
+5 8 5 A
+5 8 6 R
+5 8 7 V
+5 8 8 S
+5 8 9 T
+5 8 10 G
+5 8 11 L
+11 11
+1 9 0 M
+1 9 1 K
+1 9 2 I
+1 9 3 G
+1 9 4 Y
+1 9 5 A
+1 9 6 R
+1 9 7 V
+1 9 8 S
+8 8
+2 9 1 K
+2 9 2 I
+2 9 3 G
+2 9 4 Y
+2 9 5 A
+2 9 6 R
+2 9 7 V
+2 9 8 S
+2 9 9 T
+3 9 2 I
+3 9 3 G
+3 9 4 Y
+3 9 5 A
+3 9 6 R
+3 9 7 V
+3 9 8 S
+3 9 9 T
+3 9 10 G
+10 10
+4 9 3 G
+4 9 4 Y
+4 9 5 A
+4 9 6 R
+4 9 7 V
+4 9 8 S
+4 9 9 T
+4 9 10 G
+4 9 11 L
+11 11
+1 10 0 M
+1 10 1 K
+1 10 2 I
+1 10 3 G
+1 10 4 Y
+1 10 5 A
+1 10 6 R
+1 10 7 V
+1 10 8 S
+1 10 9 T
+2 10 1 K
+2 10 2 I
+2 10 3 G
+2 10 4 Y
+2 10 5 A
+2 10 6 R
+2 10 7 V
+2 10 8 S
+2 10 9 T
+2 10 10 G
+10 10
+3 10 2 I
+3 10 3 G
+3 10 4 Y
+3 10 5 A
+3 10 6 R
+3 10 7 V
+3 10 8 S
+3 10 9 T
+3 10 10 G
+3 10 11 L
+11 11
+1 11 0 M
+1 11 1 K
+1 11 2 I
+1 11 3 G
+1 11 4 Y
+1 11 5 A
+1 11 6 R
+1 11 7 V
+1 11 8 S
+1 11 9 T
+1 11 10 G
+10 10
+2 11 1 K
+2 11 2 I
+2 11 3 G
+2 11 4 Y
+2 11 5 A
+2 11 6 R
+2 11 7 V
+2 11 8 S
+2 11 9 T
+2 11 10 G
+2 11 11 L
+11 11
+1 12 0 M
+1 12 1 K
+1 12 2 I
+1 12 3 G
+1 12 4 Y
+1 12 5 A
+1 12 6 R
+1 12 7 V
+1 12 8 S
+1 12 9 T
+1 12 10 G
+1 12 11 L
+11 11
+betaaggr
+partition
+AGG 0 AMYLO 0.00522313 TURN 1.4087 HELIX 0.712901 HELAGG 0 BETA17.2312

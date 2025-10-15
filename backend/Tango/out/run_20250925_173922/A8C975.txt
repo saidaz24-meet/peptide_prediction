@@ -1,0 +1,197 @@
+Do you want a prediction per residue?. If yes type Y. Default, N
+Type the name of the file with the peptide names, conditions and sequence in one letter code and press Enter
+Ficher = A8C975
+Nterm = N
+Cterm = N
+pH = 7
+temperatura = 298
+ionic = 0.1
+Stability = 0
+Concentration = 1
+aminoacido = MNNIGITPTCT
+1 peptides run, last one A8C975 N N 7.00 298.00 0.10 MNNIGITPTCT
+1 6 0 M
+1 6 1 N
+1 6 2 N
+1 6 3 I
+1 6 4 G
+1 6 5 I
+5 5
+2 6 1 N
+2 6 2 N
+2 6 3 I
+2 6 4 G
+2 6 5 I
+2 6 6 T
+6 6
+3 6 2 N
+3 6 3 I
+3 6 4 G
+3 6 5 I
+3 6 6 T
+3 6 7 P
+7 7
+4 6 3 I
+4 6 4 G
+4 6 5 I
+4 6 6 T
+4 6 7 P
+4 6 8 T
+8 8
+5 6 4 G
+5 6 5 I
+5 6 6 T
+5 6 7 P
+5 6 8 T
+5 6 9 C
+9 9
+6 6 5 I
+6 6 6 T
+6 6 7 P
+6 6 8 T
+6 6 9 C
+6 6 10 T
+10 10
+1 7 0 M
+1 7 1 N
+1 7 2 N
+1 7 3 I
+1 7 4 G
+1 7 5 I
+1 7 6 T
+6 6
+2 7 1 N
+2 7 2 N
+2 7 3 I
+2 7 4 G
+2 7 5 I
+2 7 6 T
+2 7 7 P
+7 7
+3 7 2 N
+3 7 3 I
+3 7 4 G
+3 7 5 I
+3 7 6 T
+3 7 7 P
+3 7 8 T
+8 8
+4 7 3 I
+4 7 4 G
+4 7 5 I
+4 7 6 T
+4 7 7 P
+4 7 8 T
+4 7 9 C
+9 9
+5 7 4 G
+5 7 5 I
+5 7 6 T
+5 7 7 P
+5 7 8 T
+5 7 9 C
+5 7 10 T
+10 10
+1 8 0 M
+1 8 1 N
+1 8 2 N
+1 8 3 I
+1 8 4 G
+1 8 5 I
+1 8 6 T
+1 8 7 P
+7 7
+2 8 1 N
+2 8 2 N
+2 8 3 I
+2 8 4 G
+2 8 5 I
+2 8 6 T
+2 8 7 P
+2 8 8 T
+8 8
+3 8 2 N
+3 8 3 I
+3 8 4 G
+3 8 5 I
+3 8 6 T
+3 8 7 P
+3 8 8 T
+3 8 9 C
+9 9
+4 8 3 I
+4 8 4 G
+4 8 5 I
+4 8 6 T
+4 8 7 P
+4 8 8 T
+4 8 9 C
+4 8 10 T
+10 10
+1 9 0 M
+1 9 1 N
+1 9 2 N
+1 9 3 I
+1 9 4 G
+1 9 5 I
+1 9 6 T
+1 9 7 P
+1 9 8 T
+8 8
+2 9 1 N
+2 9 2 N
+2 9 3 I
+2 9 4 G
+2 9 5 I
+2 9 6 T
+2 9 7 P
+2 9 8 T
+2 9 9 C
+9 9
+3 9 2 N
+3 9 3 I
+3 9 4 G
+3 9 5 I
+3 9 6 T
+3 9 7 P
+3 9 8 T
+3 9 9 C
+3 9 10 T
+10 10
+1 10 0 M
+1 10 1 N
+1 10 2 N
+1 10 3 I
+1 10 4 G
+1 10 5 I
+1 10 6 T
+1 10 7 P
+1 10 8 T
+1 10 9 C
+9 9
+2 10 1 N
+2 10 2 N
+2 10 3 I
+2 10 4 G
+2 10 5 I
+2 10 6 T
+2 10 7 P
+2 10 8 T
+2 10 9 C
+2 10 10 T
+10 10
+1 11 0 M
+1 11 1 N
+1 11 2 N
+1 11 3 I
+1 11 4 G
+1 11 5 I
+1 11 6 T
+1 11 7 P
+1 11 8 T
+1 11 9 C
+1 11 10 T
+10 10
+betaaggr
+partition
+AGG 0 AMYLO 0.00271413 TURN 3.03805 HELIX 0 HELAGG 0 BETA25.0087
