@@ -96,18 +96,21 @@ export const useDatasetStore = create<DatasetState>()(
         console.log('[DEBUG] Raw backend row sample:', rows[0]); // Debug log
         console.log('[DEBUG] FF-Helix keys in first row:', Object.keys(rows[0]).filter(k => k.toLowerCase().includes('helix')));
 
-        
         const mapped: Peptide[] = rows
-          .map((r: BackendRow) => {
+          .map((r: BackendRow, idx: number) => {
             try {
               return mapBackendRowToPeptide(r);
             } catch (error) {
-              console.warn('Failed to map row:', r, error);
+              console.warn(`[datasetStore] Failed to map row ${idx}:`, r, 'Error:', error);
               return null;
             }
           })
           .filter((p): p is Peptide => p !== null);
 
+        const failedCount = rows.length - mapped.length;
+        if (failedCount > 0) {
+          console.warn(`[datasetStore] ${failedCount} of ${rows.length} rows failed to map`);
+        }
         console.log('[DEBUG] First mapped peptide:', mapped[0]); // Debug log
         
         set({ peptides: mapped, meta: meta || null });

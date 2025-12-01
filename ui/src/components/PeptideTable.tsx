@@ -137,7 +137,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         },
       }),
       columnHelper.accessor('chameleonPrediction', {
-        header: 'Chameleon',
+        header: 'SSW',
         cell: (info) => {
           const prediction = info.getValue();
           if (prediction === 1) {
@@ -175,18 +175,26 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
       columnHelper.display({
         id: 'actions',
         header: 'Actions',
-        cell: (info) => (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              navigate(`/peptides/${info.row.original.id}`);
-            }}
-          >
-            <Eye className="w-4 h-4" />
-          </Button>
-        ),
+        cell: (info) => {
+          const peptideId = info.row.original.id;
+          const isValid = peptideId && String(peptideId).trim().length > 0;
+          return (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!isValid}
+              title={isValid ? 'View details' : 'ID is missing'}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isValid) {
+                  navigate(`/peptides/${peptideId}`);
+                }
+              }}
+            >
+              <Eye className="w-4 h-4" />
+            </Button>
+          );
+        },
       }),
     ],
     [navigate]
@@ -222,7 +230,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
       'Hydrophobicity',
       'Hydrophobic_Moment',
       'Charge',
-      'Chameleon_Prediction',
+      'SSW_Prediction',
       'FF_Helix_Percent',
     ];
     
@@ -313,22 +321,30 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="cursor-pointer hover:bg-muted/50"
-                  onClick={() => navigate(`/peptides/${row.original.id}`)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              table.getRowModel().rows.map((row) => {
+                const peptideId = row.original.id;
+                const isValid = peptideId && String(peptideId).trim().length > 0;
+                return (
+                  <TableRow
+                    key={row.id}
+                    className={isValid ? "cursor-pointer hover:bg-muted/50" : "opacity-50 cursor-not-allowed"}
+                    onClick={() => {
+                      if (isValid) {
+                        navigate(`/peptides/${peptideId}`);
+                      }
+                    }}
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })
             ) : (
               <TableRow>
                 <TableCell

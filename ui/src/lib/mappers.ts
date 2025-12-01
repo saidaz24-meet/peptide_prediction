@@ -3,6 +3,7 @@
 // Keeps backward-compat with mixed key styles (snake/camel/labels).
 
 import type { Peptide, Segment } from "@/types/peptide";
+import { CSV_TO_FRONTEND } from "./peptideSchema";
 
 // ----- optional nested shapes (match types/peptide) -----
 type JPredInfo = {
@@ -72,43 +73,51 @@ const getAny = (row: Record<string, any>, keys: string[], fallback?: any) => {
 
 // ----- main mapper -----
 export function mapBackendRowToPeptide(row: Record<string, any>): Peptide {
-  const id = getAny(row, ["Entry", "Accession", "ID", "id"]);
-  const seq = String(getAny(row, ["Sequence", "sequence"], "") || "");
-  const length = num(getAny(row, ["Length", "length"], 0)) ?? 0;
-
-  const hydrophobicity = Number(getAny(row, ["Hydrophobicity", "hydrophobicity"], 0) || 0);
-  const muH = num(getAny(row, ["Full length uH", "uH", "muH"]), true);
-  const charge = Number(getAny(row, ["Charge", "charge"], 0) || 0);
-
-  // Flags / SSW (Chameleon)
-  const chameleonPrediction = Number(
-    getAny(row, ["chameleonPrediction", "Chameleon", "Chameleon_Prediction"], -1)
-  ) as -1 | 0 | 1;
-
-  const sswScore = num(getAny(row, ["SSW score", "sswScore"]), true);
-  const sswDiff = num(getAny(row, ["SSW diff", "sswDiff"]), true);
-  const sswHelixPct = num(getAny(row, ["SSW helix percentage", "sswHelixPct", "helixPercent"]), true);
-  const sswBetaPct  = num(getAny(row, ["SSW beta percentage", "sswBetaPct", "betaPercent"]), true);
-
-
-  // FF-Helix - DEBUG VERSION
-  const rawFFValue = getAny(row, ["FF Helix %", "FF-Helix %", "ffHelixPercent", "FF Helix", "FF-Helix"]);
+  // Only ID is required; everything else is optional with sensible defaults
+  const id = getAny(row, ["id", "Entry", "Accession", "ID"]);
   
-  console.log('[MAPPER DEBUG] FF-Helix raw value:', rawFFValue, 'type:', typeof rawFFValue);
-  const ffHelixPercent =
-    num(rawFFValue, true) ?? undefined;
+  if (!id) {
+    console.warn('[mapBackendRowToPeptide] No valid ID found in row. Available keys:', Object.keys(row));
+    throw new Error('Cannot map row: missing required field "id" or "Entry"');
+  }
+  
+  const idStr = String(id).trim();
+  if (!idStr) {
+    console.warn('[mapBackendRowToPeptide] ID field is empty');
+    throw new Error('Cannot map row: ID field is empty');
+  }
+  
+  // All other fields are optional with safe defaults
+  const seq = String(getAny(row, ["sequence", "Sequence"], "") || "");
+  const length = num(getAny(row, ["length", "Length"], 0)) ?? 0;
 
+  const hydrophobicity = num(getAny(row, ["hydrophobicity", "Hydrophobicity"], 0)) ?? 0;
+  const muH = num(getAny(row, ["muH", "Full length uH", "uH"], undefined), true);
+  const charge = num(getAny(row, ["charge", "Charge"], 0)) ?? 0;
+
+  // Flags / SSW (Chameleon) — default to -1 (not available) if missing
+  const chameleonPredictionRaw = getAny(row, ["sswPrediction", "chameleonPrediction", "Chameleon", "Chameleon_Prediction"], -1);
+  const chameleonPrediction = (Number(chameleonPredictionRaw) as -1 | 0 | 1) || -1;
+
+  const sswScore = num(getAny(row, ["sswScore", "SSW score"], undefined), true);
+  const sswDiff = num(getAny(row, ["sswDiff", "SSW diff"], undefined), true);
+  const sswHelixPct = num(getAny(row, ["sswHelixPercentage", "sswHelixPct", "SSW helix percentage", "helixPercent"], undefined), true);
+  const sswBetaPct = num(getAny(row, ["sswBetaPercentage", "sswBetaPct", "SSW beta percentage", "betaPercent"], undefined), true);
+
+  // FF-Helix — use undefined if missing (not -1)
+  const rawFFValue = getAny(row, ["ffHelixPercent", "FF-Helix %", "FF Helix %", "FF Helix", "FF-Helix"], undefined);
+  const ffHelixPercent = num(rawFFValue, true);
 
   const ffHelixFragments = toSegments(
-    getAny(row, ["FF Helix fragments", "ffHelixFragments"], [])
+    getAny(row, ["ffHelixFragments", "FF Helix fragments", "FF-Helix fragments"], [])
   );
 
-  // JPred
+  // JPred — optional
   const jpredFrags = toSegments(
-    getAny(row, ["Helix fragments (Jpred)", "JPred Helix fragments", "jpredHelixFragments"], [])
+    getAny(row, ["jpredHelixFragments", "Helix fragments (Jpred)", "JPred Helix fragments"], [])
   );
   const jpredScore = num(
-    getAny(row, ["Helix score (Jpred)", "JPred Helix score", "jpredHelixScore"]),
+    getAny(row, ["jpredHelixScore", "Helix score (Jpred)", "JPred Helix score"], undefined),
     true
   );
   const jpred: JPredInfo | undefined =
@@ -118,24 +127,24 @@ export function mapBackendRowToPeptide(row: Record<string, any>): Peptide {
 
   // Optional per-residue curves (Tango)
   const tango: TangoCurves | undefined = (() => {
-    const agg   = getAny(row, ["Tango Aggregation curve", "tangoAgg"]) as number[] | undefined;
-    const beta  = getAny(row, ["Tango Beta curve", "tangoBeta"])       as number[] | undefined;
-    const helix = getAny(row, ["Tango Helix curve", "tangoHelix"])     as number[] | undefined;
-    const turn  = getAny(row, ["Tango Turn curve", "tangoTurn"])       as number[] | undefined;
+    const agg   = getAny(row, ["tangoAgg", "Tango Aggregation curve"], undefined) as number[] | undefined;
+    const beta  = getAny(row, ["tangoBeta", "Tango Beta curve"], undefined) as number[] | undefined;
+    const helix = getAny(row, ["tangoHelix", "Tango Helix curve"], undefined) as number[] | undefined;
+    const turn  = getAny(row, ["tangoTurn", "Tango Turn curve"], undefined) as number[] | undefined;
     if (agg || beta || helix || turn) return { agg, beta, helix, turn };
     return undefined;
   })();
 
   // Optional per-residue curves (PSIPRED)
   const psipred: PsipredInfo | undefined = (() => {
-    const pH = getAny(row, ["Psipred P_H", "psipredPH"]) as number[] | undefined;
-    const pE = getAny(row, ["Psipred P_E", "psipredPE"]) as number[] | undefined;
-    const pC = getAny(row, ["Psipred P_C", "psipredPC"]) as number[] | undefined;
+    const pH = getAny(row, ["psipredPH", "Psipred P_H"], undefined) as number[] | undefined;
+    const pE = getAny(row, ["psipredPE", "Psipred P_E"], undefined) as number[] | undefined;
+    const pC = getAny(row, ["psipredPC", "Psipred P_C"], undefined) as number[] | undefined;
     const helixSegments = getAny(
       row,
-      ["Helix fragments (Psipred)", "psipredHelixSegments"],
-      []
-    ) as Array<[number, number]>;
+      ["psipredHelixSegments", "Helix fragments (Psipred)"],
+      undefined
+    ) as Array<[number, number]> | undefined;
     if ((pH && pH.length) || (pE && pE.length) || (pC && pC.length) || (helixSegments?.length ?? 0) > 0) {
       return { pH, pE, pC, helixSegments };
     }
@@ -143,9 +152,9 @@ export function mapBackendRowToPeptide(row: Record<string, any>): Peptide {
   })();
 
   const peptide: Peptide = {
-    id: String(id || "").trim(),
-    name: getAny(row, ["Protein name", "Name", "name"]),
-    species: getAny(row, ["Organism", "Species", "organism", "species"]),
+    id: idStr,
+    name: getAny(row, ["name", "Protein name", "Name"]),
+    species: getAny(row, ["species", "Organism", "Species", "organism"]),
     sequence: seq,
     length: typeof length === "number" && !Number.isNaN(length) ? length : 0,
 
@@ -173,4 +182,26 @@ export function mapBackendRowToPeptide(row: Record<string, any>): Peptide {
   };
 
   return peptide;
+}
+
+export function mapApiRowToPeptide(row: Record<string, any>) {
+  // API should return camelCase canonical keys (id, sequence, muH, ffHelixPercent, etc.)
+  // Cast/validate minimally here — prefer backend validation.
+  return {
+    id: row.id,
+    sequence: row.sequence,
+    length: row.length,
+    name: row.name,
+    species: row.species,
+    hydrophobicity: row.hydrophobicity,
+    charge: row.charge,
+    muH: row.muH,
+    sswPrediction: row.sswPrediction,
+    sswScore: row.sswScore,
+    sswDiff: row.sswDiff,
+    sswHelixPercentage: row.sswHelixPercentage,
+    sswBetaPercentage: row.sswBetaPercentage,
+    ffHelixPercent: row.ffHelixPercent,
+    ffHelixFragments: row.ffHelixFragments,
+  };
 }

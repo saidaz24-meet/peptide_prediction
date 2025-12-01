@@ -137,7 +137,7 @@ export default function About() {
             <CardContent className="grid md:grid-cols-2 gap-3 text-sm">
               <ul className="list-disc pl-5 space-y-1">
                 <li>Flexible upload with QC (+ rejected rows export)</li>
-                <li>Hydrophobicity, Charge, μH; Chameleon & FF-Helix</li>
+                <li>Hydrophobicity, Charge, μH; SSW & FF-Helix</li>
                 <li>Cohort visualizations + correlation matrix</li>
                 <li>Sliding-window profiles with helix overlays</li>
               </ul>

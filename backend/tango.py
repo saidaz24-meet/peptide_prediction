@@ -845,3 +845,19 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
 #         fail += 0 if proc.returncode == 0 else 1
 #     print(f"[DEBUG] Tango simple stdin-run: OK={ok} FAIL={fail} • outputs at {run_dir}")
 #     return run_dir
+
+def parse_tango_result(tango_raw: dict) -> dict:
+    """
+    Return a dict whose keys are the CSV header strings expected by PeptideSchema aliases
+    (so downstream ingestion uses the same names).
+    """
+    return {
+        "Entry": tango_raw.get("Entry"),
+        "Sequence": tango_raw.get("Sequence"),
+        "SSW prediction": tango_raw.get("SSW prediction"),
+        "SSW score": tango_raw.get("SSW score"),
+        "SSW diff": tango_raw.get("SSW diff"),
+        "SSW helix percentage": tango_raw.get("SSW helix percentage"),
+        "SSW beta percentage": tango_raw.get("SSW beta percentage"),
+        # other fields as needed...
+    }

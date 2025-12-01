@@ -7,6 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import auxiliary, biochemCalculation, jpred, tango
 from auxiliary import ff_helix_percent, ff_helix_cores
+import math
+from schemas.peptide import PeptideSchema
 
 from dotenv import load_dotenv
 # Explicitly point to backend/.env
@@ -211,7 +213,31 @@ def load_example(recalc: int = 0):
     }
     print(f"[EXAMPLE] rows={len(df)} • JPred rows={meta['jpred_rows']} • Tango rows={meta['ssw_rows']} • recalc={recalc}")
 
-    return {"rows": json.loads(df.to_json(orient="records")), "meta": meta}
+    # Normalize to canonical camelCase using PeptideSchema
+    rows_out = []
+    for _, row in df.iterrows():
+        try:
+            row_dict = row.to_dict()
+            peptide_obj = PeptideSchema.parse_obj(row_dict)
+            normalized = peptide_obj.to_camel_dict()
+            rows_out.append(_sanitize_for_json(normalized))
+        except Exception as e:
+            print(f"[EXAMPLE] Warning: Failed to normalize row {row.get('Entry', 'unknown')}: {e}")
+            # Fallback: manually map common fields
+            fallback = {
+                "id": str(row.get("Entry", "")),
+                "sequence": str(row.get("Sequence", "")),
+                "length": int(row.get("Length", 0)),
+                "hydrophobicity": float(row.get("Hydrophobicity", 0)) if not pd.isna(row.get("Hydrophobicity", None)) else None,
+                "charge": float(row.get("Charge", 0)) if not pd.isna(row.get("Charge", None)) else None,
+                "muH": row.get("Full length uH"),
+                "ffHelixPercent": row.get("FF-Helix %", -1),
+                "ffHelixFragments": row.get("FF Helix fragments", []),
+                "sswPrediction": int(row.get("SSW prediction", -1)) if not pd.isna(row.get("SSW prediction", None)) else -1,
+            }
+            rows_out.append(_sanitize_for_json({k: v for k, v in fallback.items() if v is not None}))
+
+    return {"rows": rows_out, "meta": meta}
 
 @app.get("/api/health")
 def health():
@@ -321,6 +347,48 @@ def _to_segments(val):
                 seg.append([int(m.group(1)), int(m.group(2))])
         return seg
     return []
+
+
+def _sanitize_for_json(obj):
+    """
+    Recursively replace NaN / inf-like values and pandas NA with None so
+    the resulting structure is JSON-serializable.
+    """
+    # pandas has an isna util available as pd.isna
+    try:
+        if pd.isna(obj):
+            return None
+    except Exception:
+        pass
+
+    # primitives
+    if isinstance(obj, float):
+        if math.isfinite(obj):
+            return obj
+        return None
+    if isinstance(obj, (str, bool, int)):
+        return obj
+
+    # dict-like
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            out[k] = _sanitize_for_json(v)
+        return out
+
+    # list/tuple/series-like
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_for_json(v) for v in obj]
+
+    # pandas Series / numpy arrays -> convert to list then sanitize
+    try:
+        if hasattr(obj, 'tolist'):
+            return _sanitize_for_json(obj.tolist())
+    except Exception:
+        pass
+
+    # fallback: return as-is (will often be json-serializable)
+    return obj
 
 def calc_biochem(df: pd.DataFrame):
     charges, hydros, uh_full, uh_helix, uh_beta = [], [], [], [], []
@@ -490,24 +558,41 @@ async def upload_csv(file: UploadFile = File(...)):
     if "FF Helix fragments" not in df.columns:
         df["FF Helix fragments"] = pd.Series([[] for _ in range(len(df))], dtype=object)
 
-    # ===== CAMELCASE SHIM (so the UI sees the values) =====
-    df_out = df.copy()
-    # core KPIs
-    df_out["ffHelixPercent"]     = pd.to_numeric(df_out.get("FF-Helix %", -1), errors="coerce").fillna(-1)
-    df_out["ffHelixFragments"]   = df_out.get("FF Helix fragments", [[] for _ in range(len(df_out))])
-    df_out["chameleonPrediction"] = pd.to_numeric(df_out.get("SSW prediction", -1), errors="coerce").fillna(-1)
+    # ===== NORMALIZE TO CANONICAL CAMELCASE (using PeptideSchema) =====
+    rows_out = []
+    for _, row in df.iterrows():
+        try:
+            # Convert row to dict with CSV header keys (PeptideSchema expects these aliases)
+            row_dict = row.to_dict()
+            
+            # Use PeptideSchema to validate and normalize
+            peptide_obj = PeptideSchema.parse_obj(row_dict)
+            
+            # Convert to camelCase for UI
+            normalized = peptide_obj.to_camel_dict()
+            rows_out.append(_sanitize_for_json(normalized))
+        except Exception as e:
+            print(f"[UPLOAD] Warning: Failed to normalize row {row.get('Entry', 'unknown')}: {e}")
+            # Fallback: manually map common fields to ensure ID is present
+            fallback = {
+                "id": str(row.get("Entry", "")),
+                "sequence": str(row.get("Sequence", "")),
+                "length": int(row.get("Length", 0)),
+                "hydrophobicity": float(row.get("Hydrophobicity", 0)) if not pd.isna(row.get("Hydrophobicity", None)) else None,
+                "charge": float(row.get("Charge", 0)) if not pd.isna(row.get("Charge", None)) else None,
+                "muH": row.get("Full length uH"),
+                "ffHelixPercent": row.get("FF-Helix %", -1),
+                "ffHelixFragments": row.get("FF Helix fragments", []),
+                "sswPrediction": int(row.get("SSW prediction", -1)) if not pd.isna(row.get("SSW prediction", None)) else -1,
+                "sswScore": row.get("SSW score"),
+                "sswDiff": row.get("SSW diff"),
+                "sswHelixPercentage": row.get("SSW helix percentage", 0),
+                "sswBetaPercentage": row.get("SSW beta percentage", 0),
+            }
+            rows_out.append(_sanitize_for_json({k: v for k, v in fallback.items() if v is not None}))
 
-    # helix/beta % from PSIPRED if present, otherwise from Tango merge
-    df_out["helixPercent"] = pd.to_numeric(
-        df_out.get("PSIPRED helix %", df_out.get("SSW helix percentage", 0)), errors="coerce"
-    ).fillna(0)
-    df_out["betaPercent"] = pd.to_numeric(
-        df_out.get("PSIPRED beta %", df_out.get("SSW beta percentage", 0)), errors="coerce"
-    ).fillna(0)
-
-    rows_json = json.loads(df_out.to_json(orient="records"))
     return {
-        "rows": rows_json,
+        "rows": rows_out,
         "meta": {
             "use_jpred": USE_JPRED, "use_tango": USE_TANGO,
             "jpred_rows": jpred_hits, "ssw_rows": ssw_hits,
@@ -561,17 +646,30 @@ async def predict(sequence: str = Form(...), entry: Optional[str] = Form(None)):
     if "FF Helix fragments" not in df.columns:
         df["FF Helix fragments"] = pd.Series([[] for _ in range(len(df))], dtype=object)
 
-    # ===== CAMELCASE SHIM (single row) =====
-    df_out = df.copy()
-    df_out["ffHelixPercent"]      = pd.to_numeric(df_out.get("FF-Helix %", -1), errors="coerce").fillna(-1)
-    df_out["ffHelixFragments"]    = df_out.get("FF Helix fragments", [[] for _ in range(len(df_out))])
-    df_out["chameleonPrediction"] = pd.to_numeric(df_out.get("SSW prediction", -1), errors="coerce").fillna(-1)
-    df_out["helixPercent"]        = pd.to_numeric(
-        df_out.get("PSIPRED helix %", df_out.get("SSW helix percentage", 0)), errors="coerce"
-    ).fillna(0)
-    df_out["betaPercent"]         = pd.to_numeric(
-        df_out.get("PSIPRED beta %", df_out.get("SSW beta percentage", 0)), errors="coerce"
-    ).fillna(0)
+    # ===== NORMALIZE TO CANONICAL CAMELCASE (using PeptideSchema) =====
+    try:
+        row_dict = df.iloc[0].to_dict()
+        peptide_obj = PeptideSchema.parse_obj(row_dict)
+        return _sanitize_for_json(peptide_obj.to_camel_dict())
+    except Exception as e:
+        print(f"[PREDICT][WARN] Failed to normalize with PeptideSchema: {e}")
+        # Fallback: manually map common fields
+        row = df.iloc[0]
+        fallback = {
+            "id": str(row.get("Entry", "adhoc")),
+            "sequence": str(row.get("Sequence", "")),
+            "length": int(row.get("Length", 0)),
+            "hydrophobicity": float(row.get("Hydrophobicity", 0)) if not pd.isna(row.get("Hydrophobicity", None)) else None,
+            "charge": float(row.get("Charge", 0)) if not pd.isna(row.get("Charge", None)) else None,
+            "muH": row.get("Full length uH"),
+            "ffHelixPercent": row.get("FF-Helix %", -1),
+            "ffHelixFragments": row.get("FF Helix fragments", []),
+            "sswPrediction": int(row.get("SSW prediction", -1)) if not pd.isna(row.get("SSW prediction", None)) else -1,
+        }
+        return _sanitize_for_json({k: v for k, v in fallback.items() if v is not None})
 
-    return json.loads(df_out.to_json(orient="records"))[0]
+def process_row(row_dict):
+    # row_dict contains keys that are the CSV headers (exact strings)
+    peptide = PeptideSchema.parse_obj(row_dict)
+    return peptide.to_camel_dict()
 

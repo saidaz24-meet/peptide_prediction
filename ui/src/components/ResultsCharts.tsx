@@ -1,11 +1,19 @@
 import { motion } from 'framer-motion';
+import { Info } from 'lucide-react';
 import {
   ScatterChart, Scatter, XAxis, YAxis, CartesianGrid, ResponsiveContainer,
   BarChart, Bar, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend as RechartsLegend,
+  Tooltip,
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Peptide } from '@/types/peptide';
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface ResultsChartsProps {
   peptides: Peptide[];
@@ -53,16 +61,21 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
       const v = p.hydrophobicity;
       return i < 9 ? v >= binStart && v < binEnd : v >= binStart && v <= binEnd;
     }).length;
-    return { range: `${binStart.toFixed(2)}–${binEnd.toFixed(2)}`, count };
-  });
+    // Format bin labels with 2 decimals, ordered left→right (start to end)
+    return {
+      range: `${binStart.toFixed(2)}–${binEnd.toFixed(2)}`,
+      count,
+      binStart, // Use for sorting if needed
+    };
+  }).sort((a, b) => a.binStart - b.binStart); // Ensure left→right ordering
 
-  // Chameleon distribution
+  // SSW distribution
   const pos = peptides.filter(p => p.chameleonPrediction === 1).length;
   const neg = peptides.filter(p => p.chameleonPrediction === -1).length;
   const unc = peptides.filter(p => p.chameleonPrediction === 0).length;
   const chameleonDistribution = [
-    { name: 'Positive', value: pos, color: COLORS.chameleonPositive },
-    { name: 'Negative', value: neg, color: COLORS.chameleonNegative },
+    { name: 'SSW Positive', value: pos, color: COLORS.chameleonPositive },
+    { name: 'SSW Negative', value: neg, color: COLORS.chameleonNegative },
     { name: 'Not available', value: unc, color: COLORS.muted },
   ].filter(d => d.value > 0);
 
@@ -98,8 +111,22 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
         <Card className="shadow-medium">
           <CardHeader>
-            <CardTitle>Hydrophobicity vs Hydrophobic Moment</CardTitle>
-            <CardDescription>Correlation between hydrophobicity and amphipathic character</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Hydrophobicity vs Hydrophobic Moment</CardTitle>
+                <CardDescription>Correlation between hydrophobicity and amphipathic character</CardDescription>
+              </div>
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-5 h-5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Each point is a peptide. The x-axis is its mean hydrophobicity (negative = more hydrophilic, positive = more hydrophobic). The y-axis is its hydrophobic moment (µH), which reflects how amphipathic the peptide is.
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
           </CardHeader>
           <CardContent>
             {scatterData.length === 0 ? (
@@ -107,13 +134,36 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
             ) : (
               <ChartContainer config={chartConfig} className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ScatterChart>
+                  <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="hydrophobicity" name="Hydrophobicity" />
-                    <YAxis dataKey="muH" name="μH" />
-                    <ChartTooltip content={<ChartTooltipContent />} />
-                    <Scatter data={scatterData.filter(d => d.chameleon === 1)} fill={COLORS.chameleonPositive} name="Chameleon +" />
-                    <Scatter data={scatterData.filter(d => d.chameleon === -1)} fill={COLORS.chameleonNegative} name="Chameleon −" />
+                    <XAxis
+                      type="number"
+                      dataKey="hydrophobicity"
+                      name="Hydrophobicity"
+                      tickFormatter={(v) => parseFloat(v).toFixed(2)}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="muH"
+                      name="μH"
+                      tickFormatter={(v) => parseFloat(v).toFixed(2)}
+                    />
+                    <ChartTooltip
+                      content={({ payload }) => {
+                        if (payload && payload.length > 0) {
+                          const { hydrophobicity, muH } = payload[0].payload;
+                          return (
+                            <div className="bg-background border border-border rounded p-2 text-xs">
+                              <p>H: {parseFloat(hydrophobicity).toFixed(2)}</p>
+                              <p>μH: {parseFloat(muH).toFixed(2)}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Scatter data={scatterData.filter(d => d.chameleon === 1)} fill={COLORS.chameleonPositive} name="SSW +" />
+                    <Scatter data={scatterData.filter(d => d.chameleon === -1)} fill={COLORS.chameleonNegative} name="SSW −" />
                   </ScatterChart>
                 </ResponsiveContainer>
               </ChartContainer>
@@ -126,8 +176,22 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <Card className="shadow-medium">
           <CardHeader>
-            <CardTitle>Hydrophobicity Distribution</CardTitle>
-            <CardDescription>Frequency distribution of hydrophobicity values</CardDescription>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Hydrophobicity Distribution</CardTitle>
+                <CardDescription>Frequency distribution of hydrophobicity values</CardDescription>
+              </div>
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-5 h-5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Histogram of mean hydrophobicity across all peptides. Negative values correspond to more hydrophilic peptides; positive values are more hydrophobic.
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
           </CardHeader>
           <CardContent>
             {peptides.length === 0 ? (
@@ -135,11 +199,31 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
             ) : (
               <ChartContainer config={chartConfig} className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={hydrophobicityBins}>
+                  <BarChart data={hydrophobicityBins} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="range" />
+                    <XAxis
+                      dataKey="range"
+                      tick={{ fontSize: 12 }}
+                      interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      height={80}
+                    />
                     <YAxis allowDecimals={false} />
-                    <ChartTooltip content={<ChartTooltipContent />} />
+                    <ChartTooltip
+                      content={({ payload }) => {
+                        if (payload && payload.length > 0) {
+                          const { range, count } = payload[0].payload;
+                          return (
+                            <div className="bg-background border border-border rounded p-2 text-xs">
+                              <p>Range: {range}</p>
+                              <p>Count: {count}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
                     <Bar dataKey="count" fill={COLORS.primary} />
                   </BarChart>
                 </ResponsiveContainer>
@@ -149,16 +233,16 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
         </Card>
       </motion.div>
 
-      {/* Chameleon Distribution */}
+      {/* SSW Distribution */}
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
         <Card className="shadow-medium">
           <CardHeader>
-            <CardTitle>Chameleon Prediction Distribution</CardTitle>
+            <CardTitle>SSW Prediction Distribution</CardTitle>
             <CardDescription>Proportion of membrane-active predictions</CardDescription>
           </CardHeader>
           <CardContent>
             {chameleonDistribution.length === 0 ? (
-              <EmptyState title="No chameleon predictions" />
+              <EmptyState title="No SSW predictions" />
             ) : (
               <ChartContainer config={chartConfig} className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -180,7 +264,7 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
         <Card className="shadow-medium">
           <CardHeader>
             <CardTitle>Cohort Comparison</CardTitle>
-            <CardDescription>Mean profiles: Chameleon positive vs negative</CardDescription>
+            <CardDescription>Mean profiles: SSW positive vs negative</CardDescription>
           </CardHeader>
         <CardContent>
           {radarData.length === 0 ? (
@@ -192,8 +276,8 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
                   <PolarGrid />
                   <PolarAngleAxis dataKey="metric" />
                   <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} />
-                  <Radar name="Chameleon +" dataKey="positive" stroke={COLORS.chameleonPositive} fill={COLORS.chameleonPositive} fillOpacity={0.1} />
-                  <Radar name="Chameleon −" dataKey="negative" stroke={COLORS.chameleonNegative} fill={COLORS.chameleonNegative} fillOpacity={0.1} />
+                  <Radar name="SSW +" dataKey="positive" stroke={COLORS.chameleonPositive} fill={COLORS.chameleonPositive} fillOpacity={0.1} />
+                  <Radar name="SSW −" dataKey="negative" stroke={COLORS.chameleonNegative} fill={COLORS.chameleonNegative} fillOpacity={0.1} />
                   <RechartsLegend />
                 </RadarChart>
               </ResponsiveContainer>

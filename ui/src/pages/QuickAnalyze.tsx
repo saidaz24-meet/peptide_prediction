@@ -271,7 +271,7 @@ export default function QuickAnalyze() {
                     <div className="font-medium">{data.Length} aa</div>
 
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {flagBadge(data.chameleonPrediction, "Chameleon")}
+                      {flagBadge(data.chameleonPrediction, "SSW")}
                       {ffHelixDisplay(data.ffHelixPercent)}
                       {flagBadge(data["FF-Helix (Jpred)"], "JPred")}
                     </div>

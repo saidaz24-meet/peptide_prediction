@@ -89,14 +89,14 @@ export default function PeptideDetail() {
       return (
         <Badge className="bg-chameleon-positive text-white">
           <CheckCircle className="w-3 h-3 mr-1" />
-          Chameleon Positive
+          SSW Positive
         </Badge>
       );
     } else if (peptide.chameleonPrediction === -1) {
       return (
         <Badge variant="secondary">
           <XCircle className="w-3 h-3 mr-1" />
-          Chameleon Negative
+          SSW Negative
         </Badge>
       );
     } else {

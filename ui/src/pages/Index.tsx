@@ -64,7 +64,7 @@ const Index = () => {
                 <Beaker className="w-8 h-8 text-primary mb-2" />
                 <CardTitle>Scientific Analysis</CardTitle>
                 <CardDescription>
-                  Hydrophobicity, charge, helix content, and Chameleon predictions
+                  Hydrophobicity, charge, helix content, and SSW predictions
                 </CardDescription>
               </CardHeader>
             </Card>

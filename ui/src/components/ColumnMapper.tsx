@@ -11,6 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { useDatasetStore } from '@/stores/datasetStore';
 import { ColumnMapping, Peptide, ChameleonPrediction } from '@/types/peptide';
 import { toast } from 'react-hot-toast';
+import React from "react";
+import { CSV_HEADERS } from "../lib/peptideSchema";
 
 interface ColumnMapperProps {
   headers: string[];
@@ -31,7 +33,7 @@ const optionalFields = [
   { key: 'species', label: 'Species', description: 'Source organism' },
   { key: 'hydrophobicity', label: 'Hydrophobicity', description: 'Hydrophobicity value (auto-calculated if not provided)' },
   { key: 'charge', label: 'Charge', description: 'Net charge at physiological pH (auto-calculated if not provided)' },
-  { key: 'chameleon_prediction', label: 'Chameleon Prediction', description: 'Switch (chameleon) prediction (auto-calculated if not provided)' },
+  { key: 'chameleon_prediction', label: 'SSW Prediction', description: 'Switch (SSW) prediction (auto-calculated if not provided)' },
   { key: 'name', label: 'Name', description: 'Peptide name or description' },
   { key: 'notes', label: 'Notes', description: 'Additional information' },
 ];
@@ -95,6 +97,8 @@ export function ColumnMapper({ headers, onMappingComplete }: ColumnMapperProps) 
       const peptides: Peptide[] = [];
       const rows = rawData.rows as Record<string, any>[];
 
+      let dropped = 0;
+
       rows.forEach((row, i) => {
         const entry = String(row[mapping.entry!]).trim();
         const sequence = String(row[mapping.sequence!]).trim().toUpperCase();
@@ -112,7 +116,8 @@ export function ColumnMapper({ headers, onMappingComplete }: ColumnMapperProps) 
           else if (['-1', 'false', 'negative', 'no'].includes(chValue)) chameleonPrediction = -1;
         }
 
-        if (!entry || !sequence || !/^[ACDEFGHIKLMNPQRSTVWY]+$/.test(sequence)) return;
+        if (!/^[ACDEFGHIKLMNPQRSTVWYXBZJUO*-]+$/.test(sequence)) return;
+
 
         const length =
           mapping.length && Number.isFinite(Number(row[mapping.length]))
@@ -143,6 +148,9 @@ export function ColumnMapper({ headers, onMappingComplete }: ColumnMapperProps) 
         });
       });
 
+      console.log('Total rows:', rows.length, 'Accepted:', peptides.length, 'Dropped:', dropped);
+
+
       if (!peptides.length) {
         toast.error('Could not process any rows from the preview.');
         setIsProcessing(false);
@@ -170,6 +178,10 @@ export function ColumnMapper({ headers, onMappingComplete }: ColumnMapperProps) 
     const used = new Set(
       Object.values(mapping).filter((v): v is string => typeof v === 'string' && v.length > 0)
     );
+
+  // csvColumns: string[] from uploaded CSV
+  // show suggestions using CSV_HEADERS values (exact strings)
+  const suggestions = Object.values(CSV_HEADERS);
 
   return (
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">

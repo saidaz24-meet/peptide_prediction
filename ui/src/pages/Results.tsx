@@ -49,15 +49,18 @@ export default function Results() {
 
   // -------- Type normalization (fixes lib/types shape mismatch) --------
   const normalizePeptide = (p: any): Peptide => {
-    const chamRaw = p?.chameleonPrediction;
+    const chamRaw = p?.chameleonPrediction ?? p?.sswPrediction;
     const cham: ChameleonPrediction =
       chamRaw === 1 ? 1 : chamRaw === 0 ? 0 : -1;
 
+    // Ensure ID is always present — try canonical first, then fallbacks
+    const id = String(p.id ?? p.Entry ?? p.entry ?? p.Accession ?? p.accession ?? '').trim();
+    
     // preserve everything else; enforce the fields TS cares about
     return {
-      id: String(p.id ?? p.Entry ?? ''),
-      name: p.name,
-      species: p.species,
+      id,
+      name: p.name ?? p['Protein name'],
+      species: p.species ?? p.Organism,
       sequence: String(p.sequence ?? p.Sequence ?? ''),
       length: Number(p.length ?? p.Length ?? 0),
       hydrophobicity: Number(p.hydrophobicity ?? p.Hydrophobicity ?? 0),
@@ -255,7 +258,7 @@ export default function Results() {
             <CardHeader>
               <CardTitle>Flag Threshold Tuner</CardTitle>
               <CardDescription>
-                Adjust μH and Hydrophobicity cutoffs to see FF-Helix & Chameleon flags flip live (view-only).
+                Adjust μH and Hydrophobicity cutoffs to see FF-Helix & SSW flags flip live (view-only).
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -288,7 +291,7 @@ export default function Results() {
                   <div className="text-lg font-semibold">{ffHelixOnCount}</div>
                 </div>
                 <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">Chameleon (view) = 1</div>
+                  <div className="text-xs text-muted-foreground">SSW (view) = 1</div>
                   <div className="text-lg font-semibold">{chamOnCount}</div>
                 </div>
               </div>

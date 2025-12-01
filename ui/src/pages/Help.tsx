@@ -44,7 +44,7 @@ const metrics = [
   },
   {
     icon: BarChart3,
-    name: 'Chameleon Prediction',
+    name: 'SSW Prediction',
     description: 'Binary prediction for membrane-active potential',
     interpretation: 'Positive = likely membrane-active, Negative = likely not membrane-active',
     color: 'text-chameleon-positive',
@@ -70,7 +70,7 @@ const chartTypes = [
   {
     name: 'Radar Charts',
     description: 'Multi-dimensional comparison profiles',
-    insights: 'Compare chameleon-positive vs negative cohorts',
+    insights: 'Compare SSW-positive vs negative cohorts',
   },
 ];
 
@@ -181,11 +181,11 @@ export default function Help() {
               <div className="grid md:grid-cols-3 gap-4">
                 <div className="flex items-center space-x-3">
                   <div className="w-4 h-4 rounded-full bg-chameleon-positive"></div>
-                  <span className="text-sm">Chameleon Positive</span>
+                  <span className="text-sm">SSW Positive</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="w-4 h-4 rounded-full bg-chameleon-negative"></div>
-                  <span className="text-sm">Chameleon Negative</span>
+                  <span className="text-sm">SSW Negative</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="w-4 h-4 rounded-full bg-helix"></div>
