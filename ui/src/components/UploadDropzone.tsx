@@ -29,9 +29,14 @@ export function UploadDropzone({ onFileSelected, onFileProcessed }: UploadDropzo
 
   const processFile = useCallback(
     async (file: File) => {
-      // NEW: let parent know immediately so "Analyze" can enable
-      onFileSelected?.(file);
+      // If onFileSelected is provided, let parent handle all processing
+      if (onFileSelected) {
+        onFileSelected(file);
+        // Parent will call onFileProcessed when ready
+        return;
+      }
 
+      // Otherwise, handle processing internally (for backward compatibility)
       setIsProcessing(true);
       setUploadProgress(0);
       setError(null);

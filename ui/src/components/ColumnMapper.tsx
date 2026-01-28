@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { useDatasetStore } from '@/stores/datasetStore';
-import { ColumnMapping, Peptide, ChameleonPrediction } from '@/types/peptide';
+import { ColumnMapping, Peptide, SSWPrediction } from '@/types/peptide';
 import { toast } from 'react-hot-toast';
 import React from "react";
 import { CSV_HEADERS } from "../lib/peptideSchema";
@@ -62,7 +62,7 @@ export function ColumnMapper({ headers, onMappingComplete }: ColumnMapperProps) 
         if (s.includes('moment') || s.includes('μh') || s.includes('muh')) auto.hydrophobic_moment = h;
         else auto.hydrophobicity = h;
       } else if (s.includes('charge')) auto.charge = h;
-      else if (s.includes('chameleon') || s.includes('switch')) auto.chameleon_prediction = h;
+      else if (s.includes('ssw') || s.includes('switch')) auto.ssw_prediction = h;
       else if (s.includes('length') || s.includes('len')) auto.length = h;
       else if (s.includes('helix') && (s.includes('ff') || s.includes('fold'))) auto.ff_helix_percent = h;
       else if (s.includes('jpred') && s.includes('helix')) auto.jpred_helix_percent = h;
@@ -109,11 +109,12 @@ export function ColumnMapper({ headers, onMappingComplete }: ColumnMapperProps) 
         const charge = mapping.charge && row[mapping.charge] 
           ? Number(row[mapping.charge]) : 0;
 
-        let chameleonPrediction: ChameleonPrediction = 0;
-        if (mapping.chameleon_prediction && row[mapping.chameleon_prediction]) {
-          const chValue = String(row[mapping.chameleon_prediction]).toLowerCase();
-          if (['1', 'true', 'positive', 'yes'].includes(chValue)) chameleonPrediction = 1;
-          else if (['-1', 'false', 'negative', 'no'].includes(chValue)) chameleonPrediction = -1;
+        let sswPrediction: SSWPrediction = 0;
+        const predictionKey = mapping.ssw_prediction || mapping.chameleon_prediction; // Backward compat
+        if (predictionKey && row[predictionKey]) {
+          const chValue = String(row[predictionKey]).toLowerCase();
+          if (['1', 'true', 'positive', 'yes'].includes(chValue)) sswPrediction = 1;
+          else if (['-1', 'false', 'negative', 'no'].includes(chValue)) sswPrediction = -1;
         }
 
         if (!/^[ACDEFGHIKLMNPQRSTVWYXBZJUO*-]+$/.test(sequence)) return;
@@ -143,7 +144,8 @@ export function ColumnMapper({ headers, onMappingComplete }: ColumnMapperProps) 
           hydrophobicity,
           muH,
           charge,
-          chameleonPrediction,
+          sswPrediction,
+          chameleonPrediction: sswPrediction, // Backward compatibility alias
           ffHelixPercent,
         });
       });

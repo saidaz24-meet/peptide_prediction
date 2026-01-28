@@ -1,6 +1,7 @@
 import os
 from statistics import mean
 from statistics import median
+from typing import Optional
 import numpy as np
 import pandas as pd
 import warnings
@@ -30,11 +31,23 @@ def _hprop(seq: str):
     """Get helix propensity for each residue in sequence."""
     return [_HELIX_PROP.get(aa, 1.0) for aa in (seq or "").upper()]
 
-def ff_helix_percent(seq: str, core_len: int = 6, thr: float = 1.0) -> float:
+def ff_helix_percent(seq: str, core_len: Optional[int] = None, thr: Optional[float] = None) -> float:
     """
     Calculate percentage of residues that belong to ≥core_len window with mean helix propensity ≥ threshold.
     Uses a more realistic threshold of 1.0 (average helix propensity).
+    
+    Args:
+        seq: Amino acid sequence
+        core_len: Window size for helix core detection (default from FF_HELIX_CORE_LEN env, or 6)
+        thr: Threshold for helix propensity (default from FF_HELIX_THRESHOLD env, or 1.0)
+    
+    Returns a value in [0.0, 100.0] (clamped to ensure valid range).
     """
+    # Get defaults from env vars (maintains backward compatibility)
+    if core_len is None:
+        core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
+    if thr is None:
+        thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
     s = (seq or "").upper().strip()
     if len(s) < core_len:
         return 0.0
@@ -56,13 +69,24 @@ def ff_helix_percent(seq: str, core_len: int = 6, thr: float = 1.0) -> float:
         return 0.0
     
     percent = round(100.0 * sum(in_core) / len(s), 1)
-    return percent
+    # Ensure result is in valid range [0.0, 100.0]
+    return max(0.0, min(100.0, percent))
 
-def ff_helix_cores(seq: str, core_len: int = 6, thr: float = 1.0):
+def ff_helix_cores(seq: str, core_len: Optional[int] = None, thr: Optional[float] = None):
     """
     Find FF-Helix core segments as contiguous regions where sliding windows meet threshold.
     Returns list of [start, end] segments (1-indexed).
+    
+    Args:
+        seq: Amino acid sequence
+        core_len: Window size for helix core detection (default from FF_HELIX_CORE_LEN env, or 6)
+        thr: Threshold for helix propensity (default from FF_HELIX_THRESHOLD env, or 1.0)
     """
+    # Get defaults from env vars (maintains backward compatibility)
+    if core_len is None:
+        core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
+    if thr is None:
+        thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
     s = (seq or "").upper().strip()
     if len(s) < core_len:
         return []

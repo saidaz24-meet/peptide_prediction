@@ -1,49 +1,49 @@
 export const API_BASE =
   (import.meta.env.VITE_API_BASE_URL as string) || "http://127.0.0.1:8000";
 
+import type { ThresholdConfig } from "@/types/peptide";
 
-  function tryJson(s: string) {
-    try {
-      return JSON.parse(s);
-    } catch {
-      return null;
-    }
+class ApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+    this.name = 'ApiError';
   }
-  
-  async function handle(res: Response) {
-    const txt = await res.text();
-    if (!res.ok) {
-      const j = tryJson(txt);
-      throw new Error(j?.detail || txt || `HTTP ${res.status}`);
-    }
-    return tryJson(txt) ?? txt;
-  }
-  
+}
+
 async function handleResponse(res: Response) {
   const text = await res.text();
   if (!res.ok) {
     // try to parse JSON error from FastAPI, else show raw text
     try {
       const j = JSON.parse(text);
-      throw new Error(j.detail || JSON.stringify(j));
-    } catch {
-      throw new Error(text || `${res.status} ${res.statusText}`);
+      throw new ApiError(j.detail || JSON.stringify(j), res.status);
+    } catch (e) {
+      if (e instanceof ApiError) throw e;
+      throw new ApiError(text || `${res.status} ${res.statusText}`, res.status);
     }
   }
   try { return JSON.parse(text); } catch { return text; }
 }
 
-export async function uploadCSV(file: File) {
+export async function uploadCSV(file: File, thresholdConfig?: ThresholdConfig) {
   const fd = new FormData();
   fd.append("file", file);
+  if (thresholdConfig) {
+    fd.append("thresholdConfig", JSON.stringify(thresholdConfig));
+  }
   const res = await fetch(`${API_BASE}/api/upload-csv`, { method: "POST", body: fd, mode: "cors" });
   return (await handleResponse(res)) as { rows: any[], meta?: any };
 }
 
-export async function predictOne(sequence: string, entry?: string) {
+export async function predictOne(sequence: string, entry?: string, thresholdConfig?: ThresholdConfig) {
   const fd = new FormData();
   fd.append("sequence", sequence);
   if (entry) fd.append("entry", entry);
+  if (thresholdConfig) {
+    fd.append("thresholdConfig", JSON.stringify(thresholdConfig));
+  }
   const res = await fetch(`${API_BASE}/api/predict`, { method: "POST", body: fd, mode: "cors" });
   return await handleResponse(res);
 }
@@ -51,104 +51,55 @@ export async function predictOne(sequence: string, entry?: string) {
 export async function fetchExampleDataset(recalc = 0) {
     const res = await fetch(`${API_BASE}/api/example?recalc=${recalc}`, { method: "GET" });
     return (await handleResponse(res)) as { rows: any[]; meta?: any };
-  }
+}
 
-
-export async function callPredict(payload: {sequence: string; entry?: string}) {
-  const form = new FormData();
-  form.append("sequence", payload.sequence);
-  if (payload.entry) form.append("entry", payload.entry);
-  
-  const res = await fetch(import.meta.env.VITE_API_BASE + "/api/predict", {
-    method: "POST",
-    body: form,
+/**
+ * Execute a UniProt query with centralized error handling and auto-retry.
+ * Strips HTML from error messages and provides clean error text.
+ */
+export async function executeUniProtQuery(requestBody: any, signal?: AbortSignal): Promise<{ rows: any[]; meta: any }> {
+  const response = await fetch(`${API_BASE}/api/uniprot/execute`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(requestBody),
+    signal,
   });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
-  
+
+  if (!response.ok) {
+    let errorData: any;
+    try {
+      const text = await response.text();
+      try {
+        errorData = JSON.parse(text);
+      } catch {
+        // If not JSON, try to extract from HTML or use text
+        const htmlMatch = text.match(/<h1[^>]*>([^<]+)<\/h1>/i) || text.match(/HTTP Status (\d+)/i);
+        if (htmlMatch) {
+          errorData = { detail: htmlMatch[1] || `HTTP ${response.status}` };
+        } else {
+          errorData = { detail: text || `HTTP ${response.status}` };
+        }
+      }
+    } catch {
+      errorData = { detail: `HTTP ${response.status}` };
+    }
+    
+    // Extract error message (handle both formats: {detail: "..."} or {source: "uniprot", error: "..."})
+    let errorMessage = errorData.detail || errorData.error || 'Failed to execute query';
+    // If it's a JSON string, try to parse it
+    if (typeof errorMessage === 'string' && errorMessage.startsWith('{')) {
+      try {
+        const parsed = JSON.parse(errorMessage);
+        errorMessage = parsed.error || parsed.detail || errorMessage;
+      } catch {
+        // Not JSON, use as-is
+      }
+    }
+    
+    // Strip HTML tags if present and show clean error
+    const cleanMessage = errorMessage.replace(/<[^>]*>/g, '').trim() || 'Failed to execute query';
+    throw new ApiError(cleanMessage, response.status);
   }
 
-  
-  // api.ts — make sure this normalizeRow is used on every fetch result
-
-type RawRow = Record<string, any>;
-export type Peptide = {
-  id: string;
-  name?: string;
-  species?: string;
-  sequence: string;
-  length: number;
-
-  hydrophobicity?: number;
-  charge?: number;
-  muH?: number; // Full length μH
-
-  // PSIPRED/Tango normalized fields expected by UI:
-  helixPercent?: number; // from PSIPRED or Tango %
-  betaPercent?: number;  // from PSIPRED or Tango %
-  ffHelixPercent?: number;            // from backend "FF-Helix %"
-  ffHelixFragments?: number[][] | []; // from backend "FF Helix fragments"
-  chameleonPrediction?: -1 | 0 | 1;   // from backend "SSW prediction"
-
-  // keep anything else you already use...
-};
-
-function num(v: any, dflt: number | null = null): number | null {
-  if (v === null || v === undefined) return dflt;
-  const n = typeof v === 'string' ? Number(v) : v;
-  return Number.isFinite(n) ? (n as number) : dflt;
+  return await response.json();
 }
-
-function parseSegs(v: any): number[][] {
-  if (!v) return [];
-  if (Array.isArray(v)) return v as number[][];
-  // support "5-12;20-28" or JSON string
-  try {
-    const j = JSON.parse(v);
-    if (Array.isArray(j)) return j;
-  } catch {}
-  const out: number[][] = [];
-  String(v)
-    .split(/[;,]/)
-    .map((s) => s.trim())
-    .forEach((tok) => {
-      const m = tok.match(/^(\d+)\s*[-:]\s*(\d+)$/);
-      if (m) out.push([Number(m[1]), Number(m[2])]);
-    });
-  return out;
-}
-
-export function normalizeRow(r: RawRow): Peptide {
-  return {
-    id: r.Entry ?? r.entry ?? r.id ?? '',
-    name: r['Protein name'] ?? r.name ?? '',
-    species: r.Organism ?? r.organism ?? '',
-    sequence: r.Sequence ?? r.sequence ?? '',
-    length: Number(r.Length ?? r.length ?? (r.Sequence ? String(r.Sequence).length : 0)),
-
-    hydrophobicity: num(r['Hydrophobicity']),
-    charge: num(r['Charge']),
-    muH: num(r['Full length uH']),
-
-    // PSIPRED/Tango percentages (whatever is present)
-    helixPercent: num(r['PSIPRED helix %']) ?? num(r['SSW helix percentage']) ?? 0,
-    betaPercent: num(r['PSIPRED beta %']) ?? num(r['SSW beta percentage']) ?? 0,
-
-    // FF-Helix family
-    ffHelixPercent: num(r['FF-Helix %'], -1) ?? -1,
-    ffHelixFragments: parseSegs(r['FF Helix fragments']),
-
-    // Chameleon from Tango SSW
-    chameleonPrediction:
-      (num(r['SSW prediction']) as -1 | 0 | 1) ??
-      ((r['SSW prediction'] === -1 || r['SSW prediction'] === 0 || r['SSW prediction'] === 1)
-        ? (r['SSW prediction'] as -1 | 0 | 1)
-        : 0),
-  };
-}
-
-// Wherever you fetch:
-// const data = await (await fetch(...)).json();
-// const peptides = (data.rows ?? []).map(normalizeRow);
-// const meta = data.meta ?? {};
-// return { peptides, meta, ... }

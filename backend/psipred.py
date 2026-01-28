@@ -6,8 +6,13 @@ import pandas as pd
 
 PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
 PSI_DIR      = os.path.join(PROJECT_PATH, "Psipred")
-WORK_DIR     = os.path.join(PSI_DIR, "work")
-OUT_DIR      = os.path.join(PSI_DIR, "out")
+
+# Runtime output directories: Use temp location to avoid triggering uvicorn --reload
+# If PSIPRED_RUNTIME_DIR env var is set, use it; otherwise use .run_cache in backend/
+# This prevents file watchers from restarting the server during PSIPRED execution
+_RUNTIME_BASE = os.getenv("PSIPRED_RUNTIME_DIR", os.path.join(PROJECT_PATH, ".run_cache", "Psipred"))
+WORK_DIR     = os.path.join(_RUNTIME_BASE, "work")
+OUT_DIR      = os.path.join(_RUNTIME_BASE, "out")
 KEY          = "Entry"
 
 AA20 = set("ACDEFGHIKLMNPQRSTVWY")
@@ -90,20 +95,25 @@ def run_psipred(records: List[Tuple[str,str]]) -> str:
         return run_dir
 
     # Run each sequence with a per-seq timeout so nothing can hang
+    # Note: WORK_DIR and OUT_DIR now point to _RUNTIME_BASE (e.g., .run_cache/Psipred/)
+    # Docker needs to mount the runtime base directory to access work/ and out/
     for eid, _ in records:
         fa_rel  = f"work/{eid}.fa"
         out_rel = f"out/{os.path.basename(run_dir)}/{eid}"
+        # Mount _RUNTIME_BASE (contains work/ and out/) to /app/Psipred_runtime
+        # Also mount PSI_DIR for any scripts/binaries if needed
         cmd = [
             "docker","run","--rm",
-            "-v", f"{PSI_DIR}:/app/Psipred",
+            "-v", f"{_RUNTIME_BASE}:/app/Psipred_runtime",  # Runtime cache (work/out)
+            "-v", f"{PSI_DIR}:/app/Psipred",  # Original dir (for any scripts/binaries)
             "-v", f"{db_host}:/db:ro",
-            "-w", "/app/Psipred",
+            "-w", "/app/Psipred_runtime",  # Work in runtime directory
             image,
             "bash","-lc",
             (
                 f"set -euo pipefail; "
                 f"mkdir -p {out_rel} && "
-                # 1) build MSA
+                # 1) build MSA (paths relative to /app/Psipred_runtime)
                 f"hhblits -i {fa_rel} "
                 f"-oa3m {out_rel}/{eid}.a3m "
                 f"-o {out_rel}/{eid}.hhblits "
@@ -216,48 +226,46 @@ def process_psipred_output(database: pd.DataFrame) -> None:
         print("[PSIPRED][WARN] No PSIPRED run dir; skipping merge.")
         return
 
-    helix_frags_col=[]; helix_pct_col=[]; beta_pct_col=[]; ffh_col=[]
-    ssw_frags=[]; ssw_score=[]; ssw_diff=[]; ssw_hpct=[]; ssw_bpct=[]
+    # Initialize columns with default values (aligned by index, not order)
+    n = len(database)
+    database["Helix fragments (Psipred)"] = pd.Series([[]] * n, index=database.index, dtype=object)
+    database["Psipred helix %"] = pd.Series([0.0] * n, index=database.index)
+    database["Psipred beta %"]  = pd.Series([0.0] * n, index=database.index)
+    database["FF-Helix %"]      = pd.Series([0.0] * n, index=database.index)
+    
+    # Preserve existing SSW values if present, else defaults
+    if "SSW fragments" not in database.columns:
+        database["SSW fragments"] = pd.Series(["-"] * n, index=database.index, dtype=object)
+    if "SSW score" not in database.columns:
+        database["SSW score"] = pd.Series([-1] * n, index=database.index)
+    if "SSW diff" not in database.columns:
+        database["SSW diff"] = pd.Series([0] * n, index=database.index)
+    if "SSW helix percentage" not in database.columns:
+        database["SSW helix percentage"] = pd.Series([0.0] * n, index=database.index)
+    if "SSW beta percentage" not in database.columns:
+        database["SSW beta percentage"] = pd.Series([0.0] * n, index=database.index)
 
-    for _, row in database.iterrows():
+    for idx, row in database.iterrows():
         entry = str(row.get(KEY) or "").strip()
         ss2 = os.path.join(run_dir, entry, f"{entry}.ss2")
         df = _parse_ss2(ss2)
         if df is None:
-            helix_frags_col.append([])
-            helix_pct_col.append(0.0)
-            beta_pct_col.append(0.0)
-            ffh_col.append(0.0)
-            ssw_frags.append(row.get("SSW fragments","-") or "-")
-            ssw_score.append(row.get("SSW score",-1))
-            ssw_diff.append(row.get("SSW diff",0))
-            ssw_hpct.append(row.get("SSW helix percentage",0))
-            ssw_bpct.append(row.get("SSW beta percentage",0))
+            # Keep defaults (already set above)
             continue
 
         helix_segs = _segments(df["P_H"], thr=0.5, minlen=6)
-        helix_frags_col.append(helix_segs)
-        helix_pct_col.append(round(100.0*(df["P_H"]>=0.5).mean(),1))
-        beta_pct_col.append(round(100.0*(df["P_E"]>=0.5).mean(),1))
-        ffh_col.append(_ff_helix_percent(df))
+        
+        # Assign directly to this row by index (stable, regardless of DataFrame order)
+        database.loc[idx, "Helix fragments (Psipred)"] = helix_segs
+        database.loc[idx, "Psipred helix %"] = round(100.0*(df["P_H"]>=0.5).mean(),1)
+        database.loc[idx, "Psipred beta %"]  = round(100.0*(df["P_E"]>=0.5).mean(),1)
+        database.loc[idx, "FF-Helix %"]      = _ff_helix_percent(df)
 
         if (row.get("SSW score", -1) == -1) and (row.get("SSW fragments","-") in ("-","",None,[])):
             fr, sc, dfv, hp, bp = _ssw_from_psipred(df)
-            ssw_frags.append(fr); ssw_score.append(sc); ssw_diff.append(dfv)
-            ssw_hpct.append(hp);  ssw_bpct.append(bp)
-        else:
-            ssw_frags.append(row.get("SSW fragments"))
-            ssw_score.append(row.get("SSW score"))
-            ssw_diff.append(row.get("SSW diff"))
-            ssw_hpct.append(row.get("SSW helix percentage"))
-            ssw_bpct.append(row.get("SSW beta percentage"))
-
-    database["Helix fragments (Psipred)"] = helix_frags_col
-    database["Psipred helix %"] = helix_pct_col
-    database["Psipred beta %"]  = beta_pct_col
-    database["FF-Helix %"]      = ffh_col
-    database["SSW fragments"]         = ssw_frags
-    database["SSW score"]             = ssw_score
-    database["SSW diff"]              = ssw_diff
-    database["SSW helix percentage"]  = ssw_hpct
-    database["SSW beta percentage"]   = ssw_bpct
+            database.loc[idx, "SSW fragments"]        = fr
+            database.loc[idx, "SSW score"]            = sc
+            database.loc[idx, "SSW diff"]             = dfv
+            database.loc[idx, "SSW helix percentage"] = hp
+            database.loc[idx, "SSW beta percentage"]  = bp
+        # else: keep existing SSW values (already in DataFrame from Tango or defaults)

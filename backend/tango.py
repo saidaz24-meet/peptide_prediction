@@ -1,13 +1,18 @@
 # backend/tango.py
 import os
 import re
+import json
 import subprocess
 import shutil
+import math
 from datetime import datetime
 from typing import List, Tuple, Dict, Any, Optional
 
 import pandas as pd
 import auxiliary
+from services.logger import get_logger, get_trace_id, log_info, log_warning, log_error
+
+logger = get_logger()
 
 # ---------------------------------------------------------------------
 # Docker availability
@@ -22,9 +27,12 @@ def _docker_available() -> bool:
 PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
 TANGO_DIR    = os.path.abspath(os.path.join(PROJECT_PATH, "Tango"))
 
-# Canonical working/output dirs
-WORK_DIR = os.path.join(TANGO_DIR, "work")   # inputs for runs
-OUT_DIR  = os.path.join(TANGO_DIR, "out")    # per-run outputs
+# Runtime output directories: Use temp location to avoid triggering uvicorn --reload
+# If TANGO_RUNTIME_DIR env var is set, use it; otherwise use .run_cache in backend/
+# This prevents file watchers from restarting the server during TANGO execution
+_RUNTIME_BASE = os.getenv("TANGO_RUNTIME_DIR", os.path.join(PROJECT_PATH, ".run_cache", "Tango"))
+WORK_DIR = os.path.join(_RUNTIME_BASE, "work")   # inputs for runs
+OUT_DIR  = os.path.join(_RUNTIME_BASE, "out")    # per-run outputs
 
 # Back-compat aliases (older code referenced these)
 TANGO_WORK_DIR = WORK_DIR
@@ -247,18 +255,28 @@ def _write_single_inputs(entry: str, seq: str) -> Dict[str, str]:
 # ---------------------------------------------------------------------
 def _write_simple_bat(records: List[Tuple[str, str]], script_path: str) -> None:
     """
-    Create a simple per-peptide runner script (bash, but named .bat for parity).
+    Create a simple per-peptide runner script (bash script).
     Each line calls the Tango binary with inline params and redirects to <ID>.txt.
+    Script is written to run_dir, and executed with cwd=run_dir, so outputs go to run_dir.
+    Uses absolute path to the TANGO binary to avoid path resolution issues.
     """
     os.makedirs(os.path.dirname(script_path), exist_ok=True)
+    # Compute absolute path to TANGO binary at script generation time
+    abs_bin = os.path.abspath(os.path.join(TANGO_DIR, "bin", "tango"))
     lines = []
     lines.append("#!/bin/bash\n")
     lines.append("set -euo pipefail\n")
-    lines.append('BIN="$(dirname "$0")/bin/tango"\n')
+    # Use absolute path to binary (computed at script generation time)
+    lines.append(f'BIN="{abs_bin}"\n')
+    # Ensure binary is executable and not quarantined (macOS safety)
+    lines.append('xattr -d com.apple.quarantine "$BIN" >/dev/null 2>&1 || true\n')
+    lines.append('chmod +x "$BIN" || true\n')
     lines.append('if [ ! -x "$BIN" ]; then echo "[TANGO] tango binary missing at $BIN"; exit 1; fi\n')
     for entry_id, seq in records:
         safe = _safe_id(entry_id)
         # Tango inline args format (what your colleague used)
+        # Output to current directory (run_dir) where script is executed
+        # Since cwd=run_dir, just use relative path
         lines.append(
             f'"$BIN" {safe} nt="N" ct="N" ph="7" te="298" io="0.1" tf="0" seq="{seq}" > "{safe}.txt"\n'
         )
@@ -266,29 +284,121 @@ def _write_simple_bat(records: List[Tuple[str, str]], script_path: str) -> None:
         fh.writelines(lines)
     os.chmod(script_path, 0o755)
 
-def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> None:
+def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> str:
     """
     Very small, mac-native runner:
-      - writes Tango_run.bat (bash script) into Tango/
+      - creates per-run folder Tango/out/run_*/
+      - writes Tango_run.sh (bash script) into the run folder
       - executes it inside the per-run folder
       - outputs land under Tango/out/run_*/
     Safe no-op if records is empty; safe no-crash if tango/bin is missing.
+    Returns the run_dir path for subsequent parsing.
+    
+    On failure, writes run_meta.json with diagnostic information.
     """
+    import json
+    from datetime import datetime
+    
     _ensure_dirs()
     if not records:
-        print("[TANGO][WARN] No records for simple runner; skipping.")
-        return
+        log_warning("tango_simple_skip", "No records for simple runner; skipping.")
+        # Still create a run_dir to maintain consistency
+        return _start_new_run_dir()
 
     # Prepare per-run folder and script
     run_dir = _start_new_run_dir()
-    script_path = os.path.join(TANGO_DIR, "Tango_run.bat")  # keep name for parity
+    log_info("tango_simple_prepare", f"Prepared run directory: {run_dir}", **{"run_dir": run_dir, "sequence_count": len(records)})
+    # Write script to run_dir (not global Tango/) to avoid conflicts with concurrent runs
+    script_path = os.path.join(run_dir, "Tango_run.sh")
     _write_simple_bat(records, script_path)
 
-    # Make sure macOS Gatekeeper doesn’t block
+    # Capture absolute paths and environment for diagnostics
     bin_path = os.path.join(TANGO_DIR, "bin", "tango")
+    bin_path_abs = os.path.abspath(bin_path)
+    run_dir_abs = os.path.abspath(run_dir)
+    script_path_abs = os.path.abspath(script_path)
+    
+    # Capture input file paths (fmt1/2/3 from WORK_DIR)
+    input_files = {}
+    for fmt_name, fmt_file in [("fmt1", "Tango_input_fmt1.txt"), ("fmt2", "Tango_input_fmt2.txt"), ("fmt3", "Tango_input_fmt3.txt")]:
+        fmt_path = os.path.join(WORK_DIR, fmt_file)
+        if os.path.exists(fmt_path):
+            input_files[fmt_name] = {
+                "path": os.path.abspath(fmt_path),
+                "size_bytes": os.path.getsize(fmt_path)
+            }
+    
+    # Capture environment hints (first 200 chars of PATH, full LD_LIBRARY_PATH/DYLD_LIBRARY_PATH)
+    env_hints = {}
+    for env_var in ["PATH", "LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]:
+        val = os.environ.get(env_var, "")
+        if env_var == "PATH" and val:
+            env_hints["PATH_head"] = val[:200]  # First 200 chars
+        elif val:
+            env_hints[env_var] = val
+    
+    # Check if binary exists before attempting execution
     if not os.path.exists(bin_path):
-        print(f"[TANGO][WARN] tango binary not found at {bin_path}; skipping execution.")
-        return
+        reason = "ENOENT"
+        run_meta = {
+            "traceId": get_trace_id(),
+            "timestamp": datetime.now().isoformat(),
+            "cmd": ["bash", "Tango_run.sh"],
+            "cwd": run_dir_abs,
+            "bin_path": bin_path_abs,
+            "bin_exists": False,
+            "envHints": env_hints,
+            "inputs": input_files,
+            "exit_code": None,
+            "stderr_tail": "",
+            "reason": reason,
+        }
+        meta_path = os.path.join(run_dir, "run_meta.json")
+        try:
+            with open(meta_path, "w") as f:
+                json.dump(run_meta, f, indent=2)
+        except Exception:
+            pass
+        log_error("tango_simple_failed", f"TANGO binary not found at {bin_path_abs}", **{
+            "traceId": run_meta["traceId"],
+            "reason": reason,
+            "exit": None,
+            "path": bin_path_abs,
+        })
+        return run_dir
+    
+    # Check if binary is executable
+    if not os.access(bin_path, os.X_OK):
+        reason = "EACCES"
+        run_meta = {
+            "traceId": get_trace_id(),
+            "timestamp": datetime.now().isoformat(),
+            "cmd": ["bash", "Tango_run.sh"],
+            "cwd": run_dir_abs,
+            "bin_path": bin_path_abs,
+            "bin_exists": True,
+            "bin_executable": False,
+            "envHints": env_hints,
+            "inputs": input_files,
+            "exit_code": None,
+            "stderr_tail": "",
+            "reason": reason,
+        }
+        meta_path = os.path.join(run_dir, "run_meta.json")
+        try:
+            with open(meta_path, "w") as f:
+                json.dump(run_meta, f, indent=2)
+        except Exception:
+            pass
+        log_error("tango_simple_failed", f"TANGO binary not executable at {bin_path_abs}", **{
+            "traceId": run_meta["traceId"],
+            "reason": reason,
+            "exit": None,
+            "path": bin_path_abs,
+        })
+        return run_dir
+    
+    # Make sure macOS Gatekeeper doesn't block
     try:
         os.chmod(bin_path, 0o755)
         subprocess.run(["xattr", "-d", "com.apple.quarantine", bin_path],
@@ -297,24 +407,188 @@ def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> None:
         pass
 
     # Execute inside the run directory so each <ID>.txt lands here
+    # Use relative path to script since we're already in run_dir
+    trace_id = get_trace_id()
+    cmd = ["bash", "Tango_run.sh"]
+    exception_type = None
+    exit_code = None
+    stderr_tail = ""
+    reason = None
+    
     try:
         proc = subprocess.run(
-            ["bash", script_path],
+            cmd,
             cwd=run_dir,
             capture_output=True,
             text=True,
             timeout=3600  # 1 h guard
         )
+        exit_code = proc.returncode
+        # Capture last 2KB of stderr
+        if proc.stderr:
+            stderr_tail = proc.stderr[-2048:] if len(proc.stderr) > 2048 else proc.stderr
+        
         if proc.returncode != 0:
-            print("[TANGO][ERR] simple runner failed")
-            print(proc.stdout[:2000])
-            print(proc.stderr[:2000])
+            reason = "NonZeroExit"
+            run_meta = {
+                "traceId": trace_id,
+                "timestamp": datetime.now().isoformat(),
+                "cmd": cmd,
+                "cwd": run_dir_abs,
+                "bin_path": bin_path_abs,
+                "bin_exists": True,
+                "bin_executable": True,
+                "envHints": env_hints,
+                "inputs": input_files,
+                "exit_code": exit_code,
+                "stdout_preview": proc.stdout[:500] if proc.stdout else "",
+                "stderr_tail": stderr_tail,
+                "reason": reason,
+            }
+            meta_path = os.path.join(run_dir, "run_meta.json")
+            try:
+                with open(meta_path, "w") as f:
+                    json.dump(run_meta, f, indent=2)
+            except Exception as e:
+                log_warning("tango_meta_write_failed", f"Failed to write run_meta.json: {e}", **{"error": str(e)})
+            
+            log_error("tango_simple_failed", "Simple runner failed", **{
+                "traceId": trace_id,
+                "reason": reason,
+                "exit": exit_code,
+                "path": bin_path_abs,
+            })
         else:
             count_txt = len([f for f in os.listdir(run_dir) if f.lower().endswith(".txt")])
             ok = count_txt
-            print(f"[DEBUG] Tango simple run: OK={ok} FAIL={max(0, len(records)-ok)} • outputs at {run_dir}")
-    except subprocess.TimeoutExpired:
-        print("[TANGO][ERR] simple runner timed out; partial outputs may exist.")
+            failed = max(0, len(records) - ok)
+            log_info("tango_simple_complete", f"Tango simple run completed: {ok} succeeded, {failed} failed", **{
+                "succeeded": ok,
+                "failed": failed,
+                "run_dir": run_dir,
+            })
+    except subprocess.TimeoutExpired as e:
+        exception_type = "TimeoutExpired"
+        reason = "Timeout"
+        stderr_tail = "Execution timed out after 3600 seconds"
+        run_meta = {
+            "traceId": trace_id,
+            "timestamp": datetime.now().isoformat(),
+            "cmd": cmd,
+            "cwd": run_dir_abs,
+            "bin_path": bin_path_abs,
+            "bin_exists": True,
+            "bin_executable": True,
+            "envHints": env_hints,
+            "inputs": input_files,
+            "exit_code": None,
+            "exception_type": exception_type,
+            "stderr_tail": stderr_tail,
+            "reason": reason,
+        }
+        meta_path = os.path.join(run_dir, "run_meta.json")
+        try:
+            with open(meta_path, "w") as f:
+                json.dump(run_meta, f, indent=2)
+        except Exception:
+            pass
+        log_error("tango_simple_failed", "Simple runner timed out", **{
+            "traceId": trace_id,
+            "reason": reason,
+            "exit": None,
+            "path": bin_path_abs,
+        })
+    except FileNotFoundError as e:
+        exception_type = "FileNotFoundError"
+        reason = "ENOENT"
+        run_meta = {
+            "traceId": trace_id,
+            "timestamp": datetime.now().isoformat(),
+            "cmd": cmd,
+            "cwd": run_dir_abs,
+            "bin_path": bin_path_abs,
+            "bin_exists": False,
+            "envHints": env_hints,
+            "inputs": input_files,
+            "exit_code": None,
+            "exception_type": exception_type,
+            "stderr_tail": str(e),
+            "reason": reason,
+        }
+        meta_path = os.path.join(run_dir, "run_meta.json")
+        try:
+            with open(meta_path, "w") as f:
+                json.dump(run_meta, f, indent=2)
+        except Exception:
+            pass
+        log_error("tango_simple_failed", f"TANGO binary or script not found: {e}", **{
+            "traceId": trace_id,
+            "reason": reason,
+            "exit": None,
+            "path": bin_path_abs,
+        })
+    except PermissionError as e:
+        exception_type = "PermissionError"
+        reason = "EACCES"
+        run_meta = {
+            "traceId": trace_id,
+            "timestamp": datetime.now().isoformat(),
+            "cmd": cmd,
+            "cwd": run_dir_abs,
+            "bin_path": bin_path_abs,
+            "bin_exists": True,
+            "bin_executable": False,
+            "envHints": env_hints,
+            "inputs": input_files,
+            "exit_code": None,
+            "exception_type": exception_type,
+            "stderr_tail": str(e),
+            "reason": reason,
+        }
+        meta_path = os.path.join(run_dir, "run_meta.json")
+        try:
+            with open(meta_path, "w") as f:
+                json.dump(run_meta, f, indent=2)
+        except Exception:
+            pass
+        log_error("tango_simple_failed", f"TANGO binary not executable: {e}", **{
+            "traceId": trace_id,
+            "reason": reason,
+            "exit": None,
+            "path": bin_path_abs,
+        })
+    except Exception as e:
+        exception_type = type(e).__name__
+        reason = "UnexpectedError"
+        run_meta = {
+            "traceId": trace_id,
+            "timestamp": datetime.now().isoformat(),
+            "cmd": cmd,
+            "cwd": run_dir_abs,
+            "bin_path": bin_path_abs,
+            "bin_exists": os.path.exists(bin_path),
+            "bin_executable": os.access(bin_path, os.X_OK) if os.path.exists(bin_path) else False,
+            "envHints": env_hints,
+            "inputs": input_files,
+            "exit_code": None,
+            "exception_type": exception_type,
+            "stderr_tail": str(e),
+            "reason": reason,
+        }
+        meta_path = os.path.join(run_dir, "run_meta.json")
+        try:
+            with open(meta_path, "w") as f:
+                json.dump(run_meta, f, indent=2)
+        except Exception:
+            pass
+        log_error("tango_simple_failed", f"Unexpected error during TANGO execution: {e}", **{
+            "traceId": trace_id,
+            "reason": reason,
+            "exit": None,
+            "path": bin_path_abs,
+        })
+    
+    return run_dir
 
 
 # ---------------------------------------------------------------------
@@ -374,9 +648,11 @@ def run_tango_docker(records: List[Tuple[str, str]]) -> str:
 
     run_dir_name = os.path.basename(run_dir)
 
+    # ✅ Use absolute path for Docker volume mount
+    tango_dir_abs = os.path.abspath(TANGO_DIR)
     docker_cmd = [
         "docker","run","--rm",
-        "-v", f"{TANGO_DIR}:/app/Tango",
+        "-v", f"{tango_dir_abs}:/app/Tango",
         "-w", "/app/Tango",
         "--user", f"{os.getuid()}:{os.getgid()}",
         # Only force platform if you KNOW your base image is amd64-only.
@@ -385,6 +661,10 @@ def run_tango_docker(records: List[Tuple[str, str]]) -> str:
         # ENTRYPOINT is assumed to be /bin/bash -lc
         f"chmod +x ./Tango_run.sh && ./Tango_run.sh work/Tango_input_fmt2.txt out/{run_dir_name}",
     ]
+    log_info("tango_docker_mount", f"Docker volume mount: {tango_dir_abs}:/app/Tango", **{
+        "host_path": tango_dir_abs,
+        "container_path": "/app/Tango",
+    })
     print("[DEBUG] Docker Tango:", " ".join(docker_cmd))
     result = subprocess.run(docker_cmd, capture_output=True, text=True, timeout=900)
     if result.returncode != 0:
@@ -400,30 +680,28 @@ def run_tango_docker(records: List[Tuple[str, str]]) -> str:
 # ---------------------------------------------------------------------
 # Main entry: SIMPLE first; Host/Docker kept as optional fallbacks
 # ---------------------------------------------------------------------
-def run_tango(records: Optional[List[Tuple[str, str]]] = None) -> None:
+def run_tango(records: Optional[List[Tuple[str, str]]] = None) -> Optional[str]:
     """
     Entry point used by server.py
     - If records provided, prefer SIMPLE mac runner (colleague parity).
     - If env TANGO_SIMPLE=0, try Docker/Host paths below.
     - If records is None, do nothing (server builds records via create_tango_input).
+    Returns the run_dir path for subsequent parsing.
     """
     if not records:
         print("[TANGO][WARN] No records provided to run_tango(); skipping execution")
-        return
+        return None
 
     if os.getenv("TANGO_SIMPLE", "1") == "1":
-        run_tango_simple(records)
-        return
+        return run_tango_simple(records)
 
     # Optional fallbacks (kept functional; not used by default)
     try:
-        run_tango_docker(records)
-        return
+        return run_tango_docker(records)
     except Exception as e:
         print(f"[TANGO][WARN] Docker path failed: {e} — trying host...")
 
-    run_tango_host(records)
-    return
+    return run_tango_host(records)
 
 
 # ---------------------------------------------------------------------
@@ -553,14 +831,31 @@ def __get_peptide_tango_result(filepath: str) -> Optional[dict]:
     return None
 
 
+def none_if_nan(x: Any) -> Any:
+    """
+    Utility to convert NaN/inf to None for JSON serialization and Pydantic validation.
+    Returns None if x is None, NaN, or inf; otherwise returns x unchanged.
+    """
+    if x is None:
+        return None
+    if isinstance(x, float):
+        if math.isnan(x) or not math.isfinite(x):
+            return None
+    return x
+
+
 def __analyse_tango_results(peptide_tango_results: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    """
+    Analyze TANGO results for a single peptide.
+    Returns None (not -1/0) for missing metrics to indicate data unavailability.
+    """
     if not peptide_tango_results:
         return {
             "SSW_residues": [],
-            "SSW_avg_score": -1,
-            "Helix_and_beta_diff": 0,
-            "Helix_percentage": 0,
-            "Beta_percentage": 0,
+            "SSW_avg_score": None,  # None instead of -1 to indicate missing data
+            "Helix_and_beta_diff": None,  # None instead of 0 to indicate missing data
+            "Helix_percentage": None,  # None instead of 0 to indicate missing data
+            "Beta_percentage": None,  # None instead of 0 to indicate missing data
         }
 
     helix_track = peptide_tango_results.get("Helix prediction", []) or []
@@ -572,16 +867,34 @@ def __analyse_tango_results(peptide_tango_results: Optional[Dict[str, Any]]) -> 
 
     # Fallback to summary if tracks are empty
     if helix_pct is None:
-        helix_pct = float(peptide_tango_results.get("Helix_pct_summary") or 0)
+        helix_pct_summary = peptide_tango_results.get("Helix_pct_summary")
+        if helix_pct_summary is not None:
+            try:
+                helix_pct = float(helix_pct_summary)
+            except (ValueError, TypeError):
+                helix_pct = None
+        else:
+            helix_pct = None
     if beta_pct is None:
-        beta_pct = float(peptide_tango_results.get("Beta_pct_summary") or 0)
+        beta_pct_summary = peptide_tango_results.get("Beta_pct_summary")
+        if beta_pct_summary is not None:
+            try:
+                beta_pct = float(beta_pct_summary)
+            except (ValueError, TypeError):
+                beta_pct = None
+        else:
+            beta_pct = None
+
+    # Sanitize percentages: convert NaN/inf to None
+    helix_pct = none_if_nan(helix_pct)
+    beta_pct = none_if_nan(beta_pct)
 
     result = {
         "SSW_residues": [],
-        "SSW_avg_score": -1,
-        "Helix_and_beta_diff": 0,     # cannot compute without per-residue tracks
-        "Helix_percentage": helix_pct or 0,
-        "Beta_percentage":  beta_pct or 0,
+        "SSW_avg_score": None,  # None indicates missing data (not -1)
+        "Helix_and_beta_diff": None,  # None indicates missing data (not 0)
+        "Helix_percentage": helix_pct,  # Can be None if missing
+        "Beta_percentage": beta_pct,  # Can be None if missing
     }
 
     # Only compute SSW when we have per-residue tracks
@@ -590,14 +903,17 @@ def __analyse_tango_results(peptide_tango_results: Optional[Dict[str, Any]]) -> 
         beta_segments  = auxiliary.get_secondary_structure_segments(beta_track,  prediction_method="Tango")
         ssw_fragments  = auxiliary.find_secondary_structure_switch_segments(beta_segments=beta_segments,
                                                                            helix_segments=helix_segments)
-        ssw_score, ssw_diff = auxiliary.calc_secondary_structure_switch_difference_and_score(
-            beta_prediction=beta_track,
-            helix_prediction=helix_track,
-            structure_prediction_indexes=ssw_fragments
-        )
-        result["SSW_residues"] = ssw_fragments or []
-        result["SSW_avg_score"] = ssw_score if ssw_fragments else -1
-        result["Helix_and_beta_diff"] = ssw_diff if ssw_fragments else 0
+        if ssw_fragments:
+            ssw_score, ssw_diff = auxiliary.calc_secondary_structure_switch_difference_and_score(
+                beta_prediction=beta_track,
+                helix_prediction=helix_track,
+                structure_prediction_indexes=ssw_fragments
+            )
+            # Sanitize: convert NaN/inf to None
+            result["SSW_residues"] = ssw_fragments
+            result["SSW_avg_score"] = none_if_nan(ssw_score)
+            result["Helix_and_beta_diff"] = none_if_nan(ssw_diff)
+        # else: keep None values (no valid SSW fragments)
 
     return result
 
@@ -612,9 +928,9 @@ def _append_defaults(fragments, scores, diffs, helix_pcts, beta_pcts):
     helix_pcts.append(0)
     beta_pcts.append(0)
 
-def process_tango_output(database: pd.DataFrame) -> None:
+def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) -> Dict[str, int]:
     """
-    Parse the **latest** run in OUT_DIR/run_*/ and fill columns:
+    Parse a specific run in OUT_DIR/run_*/ and fill columns:
       - 'SSW fragments'
       - 'SSW score'
       - 'SSW diff'
@@ -622,6 +938,14 @@ def process_tango_output(database: pd.DataFrame) -> None:
       - 'SSW beta percentage'
     Also attaches per-residue curves (lists) when available:
       - 'Tango Beta curve', 'Tango Helix curve', 'Tango Turn curve', 'Tango Aggregation curve'
+
+    Args:
+        database: DataFrame to fill with TANGO results
+        run_dir: Explicit run directory path. If None, falls back to _latest_run_dir() 
+                 (race condition risk - only for backward compatibility with example dataset).
+                 
+    WARNING: In request flows (upload-csv, uniprot/execute), always pass explicit run_dir
+             to avoid race conditions with concurrent requests.
 
     Safe defaults are used when a peptide file is missing or unparsable.
     Always fills every row so researchers see complete results.
@@ -636,23 +960,46 @@ def process_tango_output(database: pd.DataFrame) -> None:
         _cb.append([]); _ch.append([]); _ct.append([]); _ca.append([])
 
     _ensure_dirs()
-    run_dir = _latest_run_dir()
+    # Use explicit run_dir if provided, otherwise fall back to latest (for backward compatibility only)
+    # WARNING: Falling back to _latest_run_dir() is not thread-safe and can cause race conditions
+    # in concurrent request scenarios. Always pass explicit run_dir in request flows.
+    if run_dir is None:
+        run_dir = _latest_run_dir()
+        if run_dir is None:
+            raise ValueError("process_tango_output: run_dir is None and _latest_run_dir() returned None. "
+                           "In request flows, always pass explicit run_dir from the runner.")
+    
+    trace_id = get_trace_id()
+    log_info("tango_parse_start", f"Parsing TANGO outputs from {run_dir}", **{"run_dir": run_dir})
 
     # ---------- Preferred: per-peptide files ----------
     if run_dir and os.path.isdir(run_dir):
-        ssw_frags, ssw_scores, ssw_diffs, helix_pct, beta_pct = [], [], [], [], []
-        beta_curves, helix_curves, turn_curves, agg_curves = [], [], [], []
+        # Build dict keyed by Entry (stable key) with all TANGO results
+        # This ensures alignment by Entry, not row order
+        results_by_entry: Dict[str, Dict[str, Any]] = {}
         bad_ctr, ok_ctr = 0, 0
-
-        # Iterate rows in order; collect aligned lists
+        
+        # Collect all Entry IDs from database
+        entry_set = set()
         for _, row in database.iterrows():
             entry = str(row.get(KEY) or "").strip()
-            if not entry:
-                bad_ctr += 1
-                _append_defaults_local(ssw_frags, ssw_scores, ssw_diffs, helix_pct, beta_pct,
-                                       beta_curves, helix_curves, turn_curves, agg_curves)
-                continue
+            if entry:
+                entry_set.add(entry)
+                # Initialize defaults for this entry
+                results_by_entry[entry] = {
+                    "SSW fragments": "-",
+                    "SSW score": -1,
+                    "SSW diff": 0,
+                    "SSW helix percentage": 0.0,
+                    "SSW beta percentage": 0.0,
+                    "Tango Beta curve": [],
+                    "Tango Helix curve": [],
+                    "Tango Turn curve": [],
+                    "Tango Aggregation curve": [],
+                }
 
+        # Process TANGO output files and populate results_by_entry
+        for entry in entry_set:
             safe = _safe_id(entry)
             out_file = os.path.join(run_dir, f"{safe}.txt")
 
@@ -663,62 +1010,108 @@ def process_tango_output(database: pd.DataFrame) -> None:
 
             if not res:
                 bad_ctr += 1
-                _append_defaults_local(ssw_frags, ssw_scores, ssw_diffs, helix_pct, beta_pct,
-                                       beta_curves, helix_curves, turn_curves, agg_curves)
                 continue
 
             analysed = __analyse_tango_results(res) or {}
-            ssw_frags.append(analysed.get("SSW_residues", "-") or "-")
-            ssw_scores.append(analysed.get("SSW_avg_score", -1))
-            ssw_diffs.append(analysed.get("Helix_and_beta_diff", 0))
-            helix_pct.append(analysed.get("Helix_percentage", 0))
-            beta_pct.append(analysed.get("Beta_percentage", 0))
-
-            beta_curves.append(res.get("Beta prediction", []) or [])
-            helix_curves.append(res.get("Helix prediction", []) or [])
-            turn_curves.append(res.get("Turn prediction", []) or [])
-            agg_curves.append(res.get("Aggregation prediction", []) or [])
-
+            
+            # Store results keyed by Entry
+            # Use None (not -1/0) for missing metrics to indicate data unavailability
+            results_by_entry[entry] = {
+                "SSW fragments": analysed.get("SSW_residues", []) or "-",
+                "SSW score": analysed.get("SSW_avg_score"),  # None if missing (not -1)
+                "SSW diff": analysed.get("Helix_and_beta_diff"),  # None if missing (not 0)
+                "SSW helix percentage": analysed.get("Helix_percentage"),  # None if missing (not 0)
+                "SSW beta percentage": analysed.get("Beta_percentage"),  # None if missing (not 0)
+                "Tango Beta curve": res.get("Beta prediction", []) or [],
+                "Tango Helix curve": res.get("Helix prediction", []) or [],
+                "Tango Turn curve": res.get("Turn prediction", []) or [],
+                "Tango Aggregation curve": res.get("Aggregation prediction", []) or [],
+            }
+            
+            # Debug tracing for specific entry (avoid circular import)
+            debug_entry = os.getenv("DEBUG_ENTRY", "").strip()
+            if debug_entry and str(entry).strip() == str(debug_entry).strip():
+                log_info("tango_parse_entry", f"Parsing TANGO output for entry {entry}", entry=entry, **{
+                    "raw_keys": list(res.keys()) if res else [],
+                    "beta_prediction_len": len(res.get('Beta prediction', [])) if res else 0,
+                    "helix_prediction_len": len(res.get('Helix prediction', [])) if res else 0,
+                    "analysed_keys": list(analysed.keys()),
+                    "helix_percentage": analysed.get('Helix_percentage'),
+                    "beta_percentage": analysed.get('Beta_percentage'),
+                    "ssw_avg_score": analysed.get('SSW_avg_score'),
+                    "helix_beta_diff": analysed.get('Helix_and_beta_diff'),
+                })
+            
             ok_ctr += 1
 
-        print(f"[DEBUG] Tango parse lists lens: frags={len(ssw_frags)} scores={len(ssw_scores)} "
-              f"diffs={len(ssw_diffs)} H%={len(helix_pct)} B%={len(beta_pct)} rows={len(database)}")
-
-        # Defensive: make sure we have 1 value per input row
-        n = len(database)
-        def _fix_len(lst, fill):
-            if len(lst) < n:
-                lst = list(lst) + [fill] * (n - len(lst))
-            elif len(lst) > n:
-                lst = list(lst)[:n]
-            return lst
-
-        ssw_frags  = _fix_len(ssw_frags, "-")
-        ssw_scores = _fix_len(ssw_scores, -1)
-        ssw_diffs  = _fix_len(ssw_diffs, 0)
-        helix_pct  = _fix_len(helix_pct, 0)
-        beta_pct   = _fix_len(beta_pct, 0)
-
-        beta_curves  = _fix_len(beta_curves,  [])
-        helix_curves = _fix_len(helix_curves, [])
-        turn_curves  = _fix_len(turn_curves,  [])
-        agg_curves   = _fix_len(agg_curves,   [])
-
-        # Assign with Series to avoid index/shape complaints
-        database["SSW fragments"]        = pd.Series(ssw_frags,  index=database.index, dtype=object)
-        database["SSW score"]            = pd.Series(ssw_scores, index=database.index)
-        database["SSW diff"]             = pd.Series(ssw_diffs,  index=database.index)
-        database["SSW helix percentage"] = pd.Series(helix_pct,  index=database.index)
-        database["SSW beta percentage"]  = pd.Series(beta_pct,   index=database.index)
-
-        # Per-residue curves for plotting (object dtype lists)
-        database["Tango Beta curve"]        = pd.Series(beta_curves,  index=database.index, dtype=object)
-        database["Tango Helix curve"]       = pd.Series(helix_curves, index=database.index, dtype=object)
-        database["Tango Turn curve"]        = pd.Series(turn_curves,  index=database.index, dtype=object)
-        database["Tango Aggregation curve"] = pd.Series(agg_curves,   index=database.index, dtype=object)
-
-        print(f"[DEBUG] Tango parsing/merge complete • OK={ok_ctr} BAD/empty={bad_ctr}")
-        return
+        log_info("tango_parse_progress", f"Parsed {ok_ctr} OK, {bad_ctr} missing/failed", **{
+            "ok_count": ok_ctr,
+            "bad_count": bad_ctr,
+            "total_entries": len(entry_set),
+        })
+        
+        # Assign using Entry-aligned mapping (.map() ensures alignment by stable key)
+        # This eliminates ndarray length mismatch errors
+        # Use None (not -1/0) for missing metrics to indicate data unavailability
+        database["SSW fragments"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("SSW fragments", "-"))
+        # Use object dtype to allow None values
+        database["SSW score"] = database[KEY].map(lambda e: none_if_nan(results_by_entry.get(str(e).strip(), {}).get("SSW score")))
+        database["SSW diff"] = database[KEY].map(lambda e: none_if_nan(results_by_entry.get(str(e).strip(), {}).get("SSW diff")))
+        database["SSW helix percentage"] = database[KEY].map(lambda e: none_if_nan(results_by_entry.get(str(e).strip(), {}).get("SSW helix percentage")))
+        database["SSW beta percentage"] = database[KEY].map(lambda e: none_if_nan(results_by_entry.get(str(e).strip(), {}).get("SSW beta percentage")))
+        database["Tango Beta curve"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("Tango Beta curve", []))
+        database["Tango Helix curve"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("Tango Helix curve", []))
+        database["Tango Turn curve"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("Tango Turn curve", []))
+        database["Tango Aggregation curve"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("Tango Aggregation curve", []))
+        
+        # Regression check: verify all columns have correct length
+        expected_len = len(database)
+        for col in ["SSW fragments", "SSW score", "SSW diff", "SSW helix percentage", 
+                    "SSW beta percentage", "Tango Beta curve", "Tango Helix curve", 
+                    "Tango Turn curve", "Tango Aggregation curve"]:
+            if col in database.columns:
+                actual_len = len(database[col])
+                if actual_len != expected_len:
+                    raise ValueError(
+                        f"[TANGO][ERROR] Column '{col}' length mismatch after Entry-aligned assignment: "
+                        f"expected {expected_len} (DataFrame rows), got {actual_len}. "
+                        f"TANGO provider status: FAILED - assignment alignment error."
+                    )
+        
+        log_info("tango_parse_complete", f"Tango parsing/merge complete: {ok_ctr} OK, {bad_ctr} BAD/empty", **{
+            "ok_count": ok_ctr,
+            "bad_count": bad_ctr,
+            "total_entries": len(entry_set),
+        })
+        result = {
+            "parsed_ok": ok_ctr,
+            "parsed_bad": bad_ctr,
+            "requested": len(entry_set),
+        }
+        # If zero outputs, try to read reason from run_meta.json
+        if ok_ctr == 0:
+            reason = _read_run_meta_reason(run_dir)
+            if reason:
+                result["reason"] = reason
+            else:
+                result["reason"] = "No run_meta.json; parser produced empty outputs"
+            
+            # ✅ Fatal check: raise ValueError if 0 outputs for N inputs
+            if len(entry_set) > 0:
+                error_msg = (
+                    f"TANGO produced 0 outputs for {len(entry_set)} inputs. "
+                    f"Run directory: {run_dir}. "
+                    f"Reason: {result.get('reason', 'Unknown')}. "
+                    f"Check run_meta.json for diagnostics."
+                )
+                log_error("tango_zero_outputs_fatal", error_msg, **{
+                    "requested": len(entry_set),
+                    "parsed_ok": ok_ctr,
+                    "run_dir": run_dir,
+                    "reason": result.get("reason"),
+                })
+                raise ValueError(error_msg)
+        return result
 
     # ---------- Fallback: single batch file ----------
     batch_path = os.path.join(TANGO_DIR, "Tango_output.txt")
@@ -740,39 +1133,145 @@ def process_tango_output(database: pd.DataFrame) -> None:
             df_out = None
             name_col = helix_pct_col = beta_pct_col = None
 
-        ssw_frags, ssw_scores, ssw_diffs, helix_pct, beta_pct = [], [], [], [], []
-        bad_ctr, ok_ctr = 0, 0
+        # Build dict keyed by Entry for Entry-aligned assignment
+        results_by_entry: Dict[str, Dict[str, Any]] = {}
         for _, row in database.iterrows():
-            if df_out is not None and name_col:
-                m = df_out[df_out[name_col] == row.get(KEY)]
+            entry = str(row.get(KEY) or "").strip()
+            if entry:
+                results_by_entry[entry] = {
+                    "SSW fragments": "-",
+                    "SSW score": -1,  # batch file doesn't have score
+                    "SSW diff": 0,
+                    "SSW helix percentage": 0.0,
+                    "SSW beta percentage": 0.0,
+                }
+        
+        bad_ctr, ok_ctr = 0, 0
+        if df_out is not None and name_col:
+            # Match by Entry and populate results_by_entry
+            for entry, result_dict in results_by_entry.items():
+                m = df_out[df_out[name_col] == entry]
                 if not m.empty:
                     m0 = m.iloc[0]
-                    ssw_frags.append("-")
-                    ssw_scores.append(-1)
-                    ssw_diffs.append(0)
-                    helix_pct.append(m0.get(helix_pct_col, 0) if helix_pct_col else 0)
-                    beta_pct.append(m0.get(beta_pct_col, 0)   if beta_pct_col  else 0)
+                    result_dict["SSW helix percentage"] = m0.get(helix_pct_col, 0) if helix_pct_col else 0
+                    result_dict["SSW beta percentage"] = m0.get(beta_pct_col, 0) if beta_pct_col else 0
                     ok_ctr += 1
-                    continue
-            bad_ctr += 1
-            _append_defaults(ssw_frags, ssw_scores, ssw_diffs, helix_pct, beta_pct)
+                else:
+                    bad_ctr += 1
+        else:
+            bad_ctr = len(results_by_entry)
+        
+        # Assign using Entry-aligned mapping (eliminates ndarray length mismatch)
+        # Use None (not -1/0) for missing metrics to indicate data unavailability
+        database["SSW fragments"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("SSW fragments", "-"))
+        database["SSW score"] = database[KEY].map(lambda e: none_if_nan(results_by_entry.get(str(e).strip(), {}).get("SSW score")))
+        database["SSW diff"] = database[KEY].map(lambda e: none_if_nan(results_by_entry.get(str(e).strip(), {}).get("SSW diff")))
+        database["SSW helix percentage"] = database[KEY].map(lambda e: none_if_nan(results_by_entry.get(str(e).strip(), {}).get("SSW helix percentage")))
+        database["SSW beta percentage"] = database[KEY].map(lambda e: none_if_nan(results_by_entry.get(str(e).strip(), {}).get("SSW beta percentage")))
 
-        database["SSW fragments"]        = pd.Series(ssw_frags,  index=database.index, dtype=object)
-        database["SSW score"]            = pd.Series(ssw_scores, index=database.index)
-        database["SSW diff"]             = pd.Series(ssw_diffs,  index=database.index)
-        database["SSW helix percentage"] = pd.Series(helix_pct,  index=database.index)
-        database["SSW beta percentage"]  = pd.Series(beta_pct,   index=database.index)
-
-        print(f"[DEBUG] Tango parsing/merge complete (batch fallback) • OK={ok_ctr} BAD/empty={bad_ctr}")
-        return
+        log_info("tango_parse_batch_complete", f"Tango parsing/merge complete (batch fallback): {ok_ctr} OK, {bad_ctr} BAD/empty", **{
+            "ok_count": ok_ctr,
+            "bad_count": bad_ctr,
+            "total_entries": len(results_by_entry),
+        })
+        result = {
+            "parsed_ok": ok_ctr,
+            "parsed_bad": bad_ctr,
+            "requested": len(results_by_entry),
+        }
+        # If zero outputs, try to read reason from run_meta.json
+        if ok_ctr == 0:
+            reason = _read_run_meta_reason(run_dir)
+            if reason:
+                result["reason"] = reason
+            else:
+                result["reason"] = "No run_meta.json; parser produced empty outputs"
+            
+            # ✅ Fatal check: raise ValueError if 0 outputs for N inputs
+            if len(results_by_entry) > 0:
+                error_msg = (
+                    f"TANGO produced 0 outputs for {len(results_by_entry)} inputs. "
+                    f"Run directory: {run_dir}. "
+                    f"Reason: {result.get('reason', 'Unknown')}. "
+                    f"Check run_meta.json for diagnostics."
+                )
+                log_error("tango_zero_outputs_fatal", error_msg, **{
+                    "requested": len(results_by_entry),
+                    "parsed_ok": ok_ctr,
+                    "run_dir": run_dir,
+                    "reason": result.get("reason"),
+                })
+                raise ValueError(error_msg)
+        return result
 
     # ---------- Nothing: defaults ----------
     print("[TANGO][WARN] No run directory or batch output found; filling defaults.")
-    database["SSW fragments"]        = "-"
-    database["SSW score"]            = -1
-    database["SSW diff"]             = 0
-    database["SSW helix percentage"] = 0
-    database["SSW beta percentage"]  = 0
+    n = len(database)
+    # Use index-aligned Series to ensure proper alignment
+    # Use None (not -1/0) for missing metrics to indicate data unavailability
+    database["SSW fragments"]        = pd.Series(["-"] * n, index=database.index, dtype=object)
+    database["SSW score"]            = pd.Series([None] * n, index=database.index, dtype=object)
+    database["SSW diff"]             = pd.Series([None] * n, index=database.index, dtype=object)
+    database["SSW helix percentage"] = pd.Series([None] * n, index=database.index, dtype=object)
+    database["SSW beta percentage"]  = pd.Series([None] * n, index=database.index, dtype=object)
+    
+    # Return stats indicating no successful parses
+    requested = len(database)
+    result = {
+        "parsed_ok": 0,
+        "parsed_bad": requested,
+        "requested": requested,
+    }
+    # Try to read reason from run_meta.json if run_dir exists
+    if run_dir:
+        reason = _read_run_meta_reason(run_dir)
+        if reason:
+            result["reason"] = reason
+        else:
+            result["reason"] = "No run directory or batch output found"
+    else:
+        result["reason"] = "No run directory or batch output found"
+    
+    # ✅ Fatal check: raise ValueError if 0 outputs for N inputs
+    if requested > 0:
+        error_msg = (
+            f"TANGO produced 0 outputs for {requested} inputs. "
+            f"Run directory: {run_dir or 'None'}. "
+            f"Reason: {result.get('reason', 'Unknown')}. "
+            f"Check run_meta.json for diagnostics."
+        )
+        log_error("tango_zero_outputs_fatal", error_msg, **{
+            "requested": requested,
+            "parsed_ok": 0,
+            "run_dir": run_dir,
+            "reason": result.get("reason"),
+        })
+        raise ValueError(error_msg)
+    
+    return result
+
+
+# ---------------------------------------------------------------------
+# Helper: read reason from run_meta.json
+# ---------------------------------------------------------------------
+def _read_run_meta_reason(run_dir: Optional[str]) -> Optional[str]:
+    """
+    Read the 'reason' field from run_meta.json if it exists.
+    Returns None if file doesn't exist or reason is not present.
+    """
+    if not run_dir or not os.path.isdir(run_dir):
+        return None
+    
+    meta_path = os.path.join(run_dir, "run_meta.json")
+    if not os.path.exists(meta_path):
+        return None
+    
+    try:
+        with open(meta_path, "r") as f:
+            meta = json.load(f)
+            return meta.get("reason")
+    except Exception:
+        return None
 
 
 # ---------------------------------------------------------------------
@@ -781,16 +1280,94 @@ def process_tango_output(database: pd.DataFrame) -> None:
 def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_result_dict: dict) -> None:
     """
     Mark 'SSW prediction' = 1 when SSW diff is <= avg threshold; else -1.
+    Uses index-aligned Series to ensure proper DataFrame alignment.
+    
+    Threshold calculation strategy (env var SSW_DIFF_THRESHOLD_STRATEGY):
+    - "mean" (default): Use mean of valid SSW diff values
+    - "median": Use median of valid SSW diff values
+    - "fixed": Use fixed value from SSW_DIFF_THRESHOLD_FIXED (default: 0.0)
+    - "multiplier": Use mean * SSW_DIFF_THRESHOLD_MULTIPLIER (default: 1.0)
+    
+    Fallback threshold when no valid diffs (env var SSW_DIFF_THRESHOLD_FALLBACK, default: 0.0)
     """
-    avg_diff = database[database["SSW diff"] != -1]["SSW diff"].mean()
-    statistical_result_dict[database_name]['4 SSW helix and beta difference threshold'] = avg_diff
-    preds = []
-    for _, row in database.iterrows():
-        if row["SSW diff"] > avg_diff or row["SSW diff"] == -1:
-            preds.append(-1)
+    import os
+    from services.logger import log_warning
+    
+    if "SSW diff" not in database.columns:
+        # Use None (not -1) to indicate missing data
+        database["SSW diff"] = pd.Series([None] * len(database), index=database.index, dtype=object)
+    
+    # Get threshold strategy from env (default: "mean" to match current behavior)
+    strategy = os.getenv("SSW_DIFF_THRESHOLD_STRATEGY", "mean").lower()
+    fallback_threshold = float(os.getenv("SSW_DIFF_THRESHOLD_FALLBACK", "0.0"))
+    
+    # Calculate threshold based on strategy
+    # Gate: Only use rows with valid TANGO metrics (SSW diff is not None and not NaN)
+    valid_diffs = database[database["SSW diff"].notna()]["SSW diff"]
+    # Filter out NaN/inf values
+    valid_diffs = valid_diffs[valid_diffs.apply(lambda x: x is not None and isinstance(x, (int, float)) and math.isfinite(x))]
+    if len(valid_diffs) == 0:
+        avg_diff = fallback_threshold
+        log_warning("ssw_diff_no_valid", f"No valid SSW diff values; using fallback threshold {fallback_threshold}", **{"strategy": strategy, "fallback": fallback_threshold})
+    else:
+        if strategy == "mean":
+            avg_diff = valid_diffs.mean()
+        elif strategy == "median":
+            avg_diff = valid_diffs.median()
+        elif strategy == "fixed":
+            avg_diff = float(os.getenv("SSW_DIFF_THRESHOLD_FIXED", "0.0"))
+        elif strategy == "multiplier":
+            multiplier = float(os.getenv("SSW_DIFF_THRESHOLD_MULTIPLIER", "1.0"))
+            avg_diff = valid_diffs.mean() * multiplier
         else:
-            preds.append(1)
-    database["SSW prediction"] = preds
+            # Unknown strategy, fall back to mean
+            log_warning("ssw_diff_unknown_strategy", f"Unknown threshold strategy '{strategy}', using 'mean'", **{"strategy": strategy})
+            avg_diff = valid_diffs.mean()
+    
+    statistical_result_dict[database_name]['4 SSW helix and beta difference threshold'] = avg_diff
+    
+    # Build predictions as index-aligned Series (not raw list)
+    # Gate: Only compute SSW prediction for rows with valid TANGO metrics (SSW diff is not None and not NaN)
+    # For rows without valid TANGO metrics, set sswPrediction = None (not -1, not 0, not 1)
+    # Note: Original behavior is "prediction = 1 if diff <= avg_diff, else -1"
+    # This is equivalent to checking "if diff > avg_diff, then -1"
+    # The comparison operator determines when to mark as 1 (default: "<=" to match original)
+    comparison_op = os.getenv("SSW_DIFF_COMPARISON", "<=").strip()
+    preds = []
+    for idx, row in database.iterrows():
+        ssw_diff_val = row["SSW diff"]
+        # Guard: Never compute SSW when required TANGO field is None or NaN
+        if ssw_diff_val is None or (isinstance(ssw_diff_val, float) and (math.isnan(ssw_diff_val) or not math.isfinite(ssw_diff_val))):
+            # No valid TANGO metrics → set to None (will be converted to null in JSON)
+            preds.append(None)
+        elif comparison_op == ">=":
+            preds.append(1 if ssw_diff_val >= avg_diff else -1)
+        elif comparison_op == "<=":
+            preds.append(1 if ssw_diff_val <= avg_diff else -1)
+        elif comparison_op == ">":
+            preds.append(1 if ssw_diff_val > avg_diff else -1)
+        elif comparison_op == "<":
+            preds.append(1 if ssw_diff_val < avg_diff else -1)
+        else:
+            # Default to "<=" (original behavior: prediction = 1 if diff <= avg_diff)
+            preds.append(1 if ssw_diff_val <= avg_diff else -1)
+    
+    # Assign using index-aligned Series to ensure proper alignment
+    # Use object dtype to allow None values
+    preds_series = pd.Series(preds, index=database.index, dtype=object)
+    
+    # Sanitize: replace any NaN values with None (shouldn't happen, but defensive)
+    preds_series = preds_series.apply(lambda x: None if (isinstance(x, float) and (math.isnan(x) or not math.isfinite(x))) else x)
+    
+    # Assertion: verify length matches before assignment
+    if len(preds_series) != len(database):
+        raise ValueError(
+            f"[TANGO][ERROR] SSW prediction length mismatch: "
+            f"expected {len(database)} (DataFrame rows), got {len(preds_series)}. "
+            f"TANGO provider status: FAILED - assignment alignment error."
+        )
+    
+    database["SSW prediction"] = preds_series
 
 
 # =====================================================================

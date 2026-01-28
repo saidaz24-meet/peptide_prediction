@@ -3,6 +3,15 @@ backend/.venv/
 __pycache__/
 *.pyc
 
+# Runtime cache (prevents uvicorn --reload from watching TANGO/PSIPRED outputs)
+backend/.run_cache/
+
+# Legacy runtime directories (moved to .run_cache, but keep ignored for safety)
+backend/Tango/out/
+backend/Tango/work/
+backend/Psipred/out/
+backend/Psipred/work/
+
 
 
 # ⚠️ Removed from ignore list ↓ (So you can get them: No worries Peleg, I'll add them back later)
@@ -30,6 +39,7 @@ __pycache__/
 # 📦 NODE (Frontend)
 ui/.next/
 ui/node_modules/
+ui/dist/
 
 # 🔐 ENVIRONMENT FILES
 .env
@@ -54,3 +64,10 @@ Thumbs.db
 # 🪵 LOGS
 *.log
 *.log.*
+
+# 🧪 TEST & COVERAGE
+.coverage
+htmlcov/
+.pytest_cache/
+*.cover
+.hypothesis/

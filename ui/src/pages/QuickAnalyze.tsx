@@ -23,7 +23,8 @@ type PredictResponse = {
   "Beta full length uH": number;
 
   // Flags & FF
-  chameleonPrediction: number;   // (-1 | 0 | 1) as number from backend
+  sswPrediction: number;   // (-1 | 0 | 1) as number from backend
+  chameleonPrediction?: number; // Backward compatibility alias (deprecated)
   ffHelixPercent: number;        // camelCase copy from server
   "FF-Helix (Jpred)": number;    // 1 or -1
 };
@@ -55,11 +56,13 @@ async function predictOne(sequence: string, entry?: string) {
       ? json["ffHelixPercent"]
       : 0;
 
-  const chameleonPrediction =
-    typeof json["Chameleon"] === "number"
-      ? json["Chameleon"]
-      : typeof json["chameleonPrediction"] === "number"
+  const sswPrediction =
+    typeof json["sswPrediction"] === "number"
+      ? json["sswPrediction"]
+      : typeof json["chameleonPrediction"] === "number" // Backward compat
       ? json["chameleonPrediction"]
+      : typeof json["Chameleon"] === "number" // Legacy alias
+      ? json["Chameleon"]
       : -1;
 
   const shaped: PredictResponse = {
@@ -70,7 +73,8 @@ async function predictOne(sequence: string, entry?: string) {
     Hydrophobicity: Number(json["Hydrophobicity"] ?? 0),
     "Full length uH": Number(json["Full length uH"] ?? 0),
     "Beta full length uH": Number(json["Beta full length uH"] ?? 0),
-    chameleonPrediction,
+    sswPrediction,
+    chameleonPrediction: sswPrediction, // Backward compatibility alias
     ffHelixPercent,
     "FF-Helix (Jpred)": Number(json["FF-Helix (Jpred)"] ?? -1),
   };
@@ -271,7 +275,7 @@ export default function QuickAnalyze() {
                     <div className="font-medium">{data.Length} aa</div>
 
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {flagBadge(data.chameleonPrediction, "SSW")}
+                      {flagBadge(data.sswPrediction ?? data.chameleonPrediction, "SSW")}
                       {ffHelixDisplay(data.ffHelixPercent)}
                       {flagBadge(data["FF-Helix (Jpred)"], "JPred")}
                     </div>
@@ -295,14 +299,8 @@ export default function QuickAnalyze() {
                       <div className="text-sm text-muted-foreground">Hydrophobicity (H)</div>
                       <div className="text-xl font-semibold">{data.Hydrophobicity.toFixed(3)}</div>
                     </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">μH (full length)</div>
-                      <div className="text-xl font-semibold">{data["Full length uH"].toFixed(3)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">β μH (full length)</div>
-                      <div className="text-xl font-semibold">{data["Beta full length uH"].toFixed(3)}</div>
-                    </div>
+                    {/* Removed hydrophobic moment (μH) from single-sequence view - not meaningful for individual peptides */}
+                    {/* μH is more useful in batch comparisons, not single-sequence analysis */}
                   </CardContent>
                 </Card>
 
@@ -320,8 +318,8 @@ export default function QuickAnalyze() {
                       amyloid-prone candidates. Higher hydrophobicity with positive charge can suggest membrane activity.
                     </p>
                     <p>
-                      <strong>μH</strong> (hydrophobic moment) summarizes amphipathicity; higher values often align with
-                      helical segments. <strong>β μH</strong> uses a 160° angle for β-like profiles.
+                      <strong>Hydrophobicity</strong> measures peptide's preference for nonpolar environments; higher values often align with
+                      helical segments and membrane activity.
                     </p>
                     <p className="text-muted-foreground">
                       JPred/Tango columns will read "not available" if those providers aren't wired for single-sequence

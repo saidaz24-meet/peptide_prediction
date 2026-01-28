@@ -5,7 +5,7 @@ import pandas as pd
 import subprocess
 
 import auxiliary
-import main
+import batch_process as main  # Legacy import for backward compatibility
 from tango import process_tango_output
 
 PATH = os.getcwd()
@@ -205,18 +205,27 @@ def process_jpred_output(database: pd.DataFrame, database_name: str):
     """
     jpred_results_dict = __get_database_jpred_results(database_name)
 
-    jpred_helix_by_residue = []
-    jpred_helix_scores = []
-    jpred_helix_percentage = []
+    # Initialize columns with default values (aligned by index, not order)
+    n = len(database)
+    database["Helix fragments (Jpred)"] = pd.Series([[]] * n, index=database.index, dtype=object)
+    database["Helix score (Jpred)"] = pd.Series([-1] * n, index=database.index)
+    database["Helix percentage (Jpred)"] = pd.Series([0.0] * n, index=database.index)
 
-    for _, row in database.iterrows():
-        peptide_jpred_results = jpred_results_dict[row["Entry"]]
+    for idx, row in database.iterrows():
+        entry = row["Entry"]
+        
+        # Handle missing Entry in results dictionary gracefully
+        if entry not in jpred_results_dict:
+            # Keep defaults (already set above)
+            continue
+        
+        peptide_jpred_results = jpred_results_dict[entry]
         peptide_jpred_pred = peptide_jpred_results["Jpred_prediction"]
         peptide_jpred_conf = peptide_jpred_results["Jpred_conf"]
 
         helix_conf_list = __get_only_helix_conf_score(peptide_jpred_pred, peptide_jpred_conf)
 
-        jpred_helix_percentage.append(auxiliary.check_secondary_structure_prediction_content(helix_conf_list))
+        helix_percentage = auxiliary.check_secondary_structure_prediction_content(helix_conf_list)
 
         jpred_helix_prediction_idx = auxiliary.get_secondary_structure_segments(helix_conf_list, "Jpred")
         if row["Length"] < 20 and len(jpred_helix_prediction_idx) > 0:
@@ -225,12 +234,10 @@ def process_jpred_output(database: pd.DataFrame, database_name: str):
         helix_avg_score = auxiliary.__calc_average_score(prediction=helix_conf_list,
                                                          structure_prediction_indexes=jpred_helix_prediction_idx)
 
-        jpred_helix_by_residue.append(jpred_helix_prediction_idx)
-        jpred_helix_scores.append(helix_avg_score)
-
-    database["Helix fragments (Jpred)"] = jpred_helix_by_residue
-    database["Helix score (Jpred)"] = jpred_helix_scores
-    database["Helix percentage (Jpred)"] = jpred_helix_percentage
+        # Assign directly to this row by index (stable, regardless of DataFrame order)
+        database.loc[idx, "Helix fragments (Jpred)"] = jpred_helix_prediction_idx
+        database.loc[idx, "Helix score (Jpred)"] = helix_avg_score
+        database.loc[idx, "Helix percentage (Jpred)"] = helix_percentage
 
 
 

@@ -95,9 +95,17 @@ export function mapBackendRowToPeptide(row: Record<string, any>): Peptide {
   const muH = num(getAny(row, ["muH", "Full length uH", "uH"], undefined), true);
   const charge = num(getAny(row, ["charge", "Charge"], 0)) ?? 0;
 
-  // Flags / SSW (Chameleon) — default to -1 (not available) if missing
-  const chameleonPredictionRaw = getAny(row, ["sswPrediction", "chameleonPrediction", "Chameleon", "Chameleon_Prediction"], -1);
-  const chameleonPrediction = (Number(chameleonPredictionRaw) as -1 | 0 | 1) || -1;
+  // SSW (Secondary Structure Switch) - canonical field: sswPrediction (-1/0/1 classification)
+  // Priority: sswPrediction (canonical) > chameleonPrediction (backward compat, deprecated)
+  const sswPredictionRaw = getAny(row, ["sswPrediction", "chameleonPrediction"], -1);
+  // Backward compatibility warning
+  if ("chameleonPrediction" in row && !("sswPrediction" in row)) {
+    console.warn('[mapBackendRowToPeptide] Using deprecated field "chameleonPrediction". Backend should use "sswPrediction".');
+  }
+  const numVal = Number(sswPredictionRaw);
+  const sswPrediction = (numVal === -1 || numVal === 0 || numVal === 1) 
+    ? (numVal as -1 | 0 | 1)
+    : -1;
 
   const sswScore = num(getAny(row, ["sswScore", "SSW score"], undefined), true);
   const sswDiff = num(getAny(row, ["sswDiff", "SSW diff"], undefined), true);
@@ -151,6 +159,10 @@ export function mapBackendRowToPeptide(row: Record<string, any>): Peptide {
     return undefined;
   })();
 
+  // Provider status: pass through from backend row (row.providerStatus or row.provider_status)
+  // Do not fabricate provider status; only pass through what backend provides
+  const providerStatus = row.providerStatus || row.provider_status || undefined;
+
   const peptide: Peptide = {
     id: idStr,
     name: getAny(row, ["name", "Protein name", "Name"]),
@@ -166,8 +178,10 @@ export function mapBackendRowToPeptide(row: Record<string, any>): Peptide {
     ffHelixPercent,
     ffHelixFragments,
 
-    // SSW / Chameleon
-    chameleonPrediction,
+    // SSW (Secondary Structure Switch)
+    sswPrediction,
+    // Backward compatibility alias (deprecated)
+    chameleonPrediction: sswPrediction,
     sswScore,
     sswDiff,
     sswHelixPct,
@@ -178,7 +192,8 @@ export function mapBackendRowToPeptide(row: Record<string, any>): Peptide {
     tango,
     psipred,
 
-   
+    // Provider status (Principle B: mandatory provider status)
+    providerStatus,
   };
 
   return peptide;

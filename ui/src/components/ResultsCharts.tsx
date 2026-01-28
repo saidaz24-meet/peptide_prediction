@@ -70,18 +70,18 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
   }).sort((a, b) => a.binStart - b.binStart); // Ensure left→right ordering
 
   // SSW distribution
-  const pos = peptides.filter(p => p.chameleonPrediction === 1).length;
-  const neg = peptides.filter(p => p.chameleonPrediction === -1).length;
-  const unc = peptides.filter(p => p.chameleonPrediction === 0).length;
-  const chameleonDistribution = [
+  const pos = peptides.filter(p => (p.sswPrediction ?? (p as any).chameleonPrediction) === 1).length; // Backward compat
+  const neg = peptides.filter(p => (p.sswPrediction ?? (p as any).chameleonPrediction) === -1).length; // Backward compat
+  const unc = peptides.filter(p => (p.sswPrediction ?? (p as any).chameleonPrediction) === 0).length; // Backward compat
+  const sswDistribution = [
     { name: 'SSW Positive', value: pos, color: COLORS.chameleonPositive },
     { name: 'SSW Negative', value: neg, color: COLORS.chameleonNegative },
     { name: 'Not available', value: unc, color: COLORS.muted },
   ].filter(d => d.value > 0);
 
   // Radar comparison (if both groups empty, render empty)
-  const positiveGroup = peptides.filter(p => p.chameleonPrediction === 1);
-  const negativeGroup = peptides.filter(p => p.chameleonPrediction === -1);
+  const positiveGroup = peptides.filter(p => (p.sswPrediction ?? (p as any).chameleonPrediction) === 1); // Backward compat
+  const negativeGroup = peptides.filter(p => (p.sswPrediction ?? (p as any).chameleonPrediction) === -1); // Backward compat
   const mean = (arr: number[]) => (arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0);
   const radarData =
     positiveGroup.length + negativeGroup.length > 0
@@ -241,15 +241,15 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
             <CardDescription>Proportion of membrane-active predictions</CardDescription>
           </CardHeader>
           <CardContent>
-            {chameleonDistribution.length === 0 ? (
+            {sswDistribution.length === 0 ? (
               <EmptyState title="No SSW predictions" />
             ) : (
               <ChartContainer config={chartConfig} className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={chameleonDistribution} cx="50%" cy="50%" outerRadius={82} dataKey="value"
+                    <Pie data={sswDistribution} cx="50%" cy="50%" outerRadius={82} dataKey="value"
                       label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(1)}%`}>
-                      {chameleonDistribution.map((d, i) => <Cell key={i} fill={d.color} />)}
+                      {sswDistribution.map((d, i) => <Cell key={i} fill={d.color} />)}
                     </Pie>
                   </PieChart>
                 </ResponsiveContainer>

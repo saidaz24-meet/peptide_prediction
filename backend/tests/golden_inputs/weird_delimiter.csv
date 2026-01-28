@@ -1,0 +1,5 @@
+Entry	Sequence	Length	Description
+P12345	ACDEFGHIKLMNPQRSTVWY	21	Note, with comma
+P67890	ACDEFGHIKLMNPQRSTVW	20	Normal note
+P11111	ACDEFGHIKLMNPQRST	18	Quoted; with semicolon
+

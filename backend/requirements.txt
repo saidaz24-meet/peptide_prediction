@@ -4,3 +4,5 @@ pandas
 numpy
 openpyxl
 python-multipart
+httpx
+sentry-sdk[fastapi]
