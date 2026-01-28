@@ -1,0 +1,5 @@
+Entry,Sequence,Length,Organism,Protein name
+P12345,ACDEFGHIKLMNPQRSTVWY,21,Homo sapiens,Test Protein 1
+P67890,ACDEFGHIKLMNPQRSTVW,20,Mus musculus,Test Protein 2
+P11111,ACDEFGHIKLMNPQRST,18,E. coli,Test Protein 3
+

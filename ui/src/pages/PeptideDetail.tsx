@@ -23,6 +23,7 @@ import { SegmentTrack } from '@/components/SegmentTrack';
 import { EvidencePanel } from '@/components/EvidencePanel';
 import { PeptideRadarChart } from '@/components/PeptideRadarChart';
 import { PositionBars } from '@/components/PositionBars';
+import { ProviderBadge } from '@/components/ProviderBadge';
 
 // NEW: small additions for sliding-window profiles
 import { useMemo, useState } from 'react';
@@ -84,15 +85,32 @@ export default function PeptideDetail() {
     toast.success('Peptide data downloaded');
   };
 
-  const getChameleonBadge = () => {
-    if (peptide.chameleonPrediction === 1) {
+  const getSSWBadge = () => {
+    const tangoStatus = peptide.providerStatus?.tango?.status;
+    const tangoRan = peptide.providerStatus?.tango?.ran ?? false;
+    // NO LYING UI: If TANGO didn't run or is OFF/UNAVAILABLE, show N/A
+    const isUnavailable = !tangoRan || (tangoStatus !== 'AVAILABLE' && tangoStatus !== 'PARTIAL' && tangoStatus !== undefined);
+    
+    const sswPred = peptide.sswPrediction ?? (peptide as any).chameleonPrediction; // Backward compat
+    
+    // If TANGO didn't run or is unavailable, always show N/A
+    if (isUnavailable || sswPred === null || sswPred === undefined) {
+      return (
+        <Badge variant="outline">
+          <Info className="w-3 h-3 mr-1" />
+          N/A
+        </Badge>
+      );
+    }
+    
+    if (sswPred === 1) {
       return (
         <Badge className="bg-chameleon-positive text-white">
           <CheckCircle className="w-3 h-3 mr-1" />
           SSW Positive
         </Badge>
       );
-    } else if (peptide.chameleonPrediction === -1) {
+    } else if (sswPred === -1) {
       return (
         <Badge variant="secondary">
           <XCircle className="w-3 h-3 mr-1" />
@@ -150,15 +168,37 @@ export default function PeptideDetail() {
               </div>
             </div>
 
-            <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm" onClick={handleCopySequence}>
-                <Copy className="w-4 h-4 mr-2" />
-                Copy Sequence
-              </Button>
-              <Button variant="outline" size="sm" onClick={handleDownloadJSON}>
-                <Download className="w-4 h-4 mr-2" />
-                Download JSON
-              </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Provider status pills */}
+              {peptide.providerStatus?.tango && (
+                <ProviderBadge 
+                  name="Tango" 
+                  status={peptide.providerStatus.tango as any}
+                />
+              )}
+              {peptide.providerStatus?.psipred && (
+                <ProviderBadge 
+                  name="PSIPRED" 
+                  status={peptide.providerStatus.psipred as any}
+                />
+              )}
+              {peptide.providerStatus?.jpred && (
+                <ProviderBadge 
+                  name="JPred" 
+                  status={peptide.providerStatus.jpred as any}
+                />
+              )}
+              
+              <div className="flex items-center space-x-2">
+                <Button variant="outline" size="sm" onClick={handleCopySequence}>
+                  <Copy className="w-4 h-4 mr-2" />
+                  Copy Sequence
+                </Button>
+                <Button variant="outline" size="sm" onClick={handleDownloadJSON}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download JSON
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -173,7 +213,7 @@ export default function PeptideDetail() {
                   </CardDescription>
                 </div>
                 <div className="flex items-center space-x-2">
-                  {getChameleonBadge()}
+                  {getSSWBadge()}
                   <Badge variant="outline" className="text-helix border-helix">
                     {typeof peptide.ffHelixPercent === 'number'
                       ? `${peptide.ffHelixPercent.toFixed(1)}% Helix`
@@ -232,70 +272,92 @@ export default function PeptideDetail() {
           </div>
 
           {/* NEW: Sliding-Window Profiles (frontend-only, non-destructive) */}
-          <Card className="shadow-medium">
-            <CardHeader>
-              <CardTitle>Sliding-Window Profiles</CardTitle>
-              <CardDescription>
-                Hydrophobicity (Kyte–Doolittle) and hydrophobic moment (μH), computed on the fly from the sequence.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Window size</span>
-                  <span className="text-muted-foreground">{win}</span>
+          {/* Gate: Hide per-residue charts for sequences > 200 residues (unreadable and slow) */}
+          {peptide.length <= 200 ? (
+            <Card className="shadow-medium">
+              <CardHeader>
+                <CardTitle>Sliding-Window Profiles</CardTitle>
+                <CardDescription>
+                  Hydrophobicity (Kyte–Doolittle) and hydrophobic moment (μH), computed on the fly from the sequence.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Window size</span>
+                    <span className="text-muted-foreground">{win}</span>
+                  </div>
+                  <Slider min={5} max={21} step={2} value={[win]} onValueChange={([v]) => setWin(v)} />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Odd sizes recommended (e.g., 9, 11, 13). Larger window = smoother profiles.
+                  </p>
                 </div>
-                <Slider min={5} max={21} step={2} value={[win]} onValueChange={([v]) => setWin(v)} />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Odd sizes recommended (e.g., 9, 11, 13). Larger window = smoother profiles.
-                </p>
-              </div>
 
-              {/* Hydrophobicity (KD) */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold">Hydrophobicity (Kyte–Doolittle)</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={profilePoints}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="x" tickCount={10} />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      {helixBands.map((r, i) => (
-                        <ReferenceArea key={i} x1={r.x1} x2={r.x2} opacity={0.15} />
-                      ))}
-                      <Line type="monotone" dataKey="H" dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                {/* Hydrophobicity (KD) */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Hydrophobicity (Kyte–Doolittle)</h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={profilePoints}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="x" tickCount={10} />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        {helixBands.map((r, i) => (
+                          <ReferenceArea key={i} x1={r.x1} x2={r.x2} opacity={0.15} />
+                        ))}
+                        <Line type="monotone" dataKey="H" dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-              </div>
 
-              {/* Hydrophobic moment (μH) */}
-              <div className="space-y-2">
-                <h3 className="text-sm font-semibold">Hydrophobic Moment (μH)</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={profilePoints}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="x" tickCount={10} />
-                      <YAxis />
-                      <Tooltip />
-                      <Legend />
-                      {helixBands.map((r, i) => (
-                        <ReferenceArea key={i} x1={r.x1} x2={r.x2} opacity={0.15} />
-                      ))}
-                      <Line type="monotone" dataKey="muH" dot={false} />
-                    </LineChart>
-                  </ResponsiveContainer>
+                {/* Hydrophobic moment (μH) */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Hydrophobic Moment (μH)</h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={profilePoints}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="x" tickCount={10} />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        {helixBands.map((r, i) => (
+                          <ReferenceArea key={i} x1={r.x1} x2={r.x2} opacity={0.15} />
+                        ))}
+                        <Line type="monotone" dataKey="muH" dot={false} />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
                 </div>
-              </div>
 
-              <div className="text-xs text-muted-foreground">
-                Shaded regions = JPred helix segments (if available).
-              </div>
-            </CardContent>
-          </Card>
+                <div className="text-xs text-muted-foreground">
+                  Shaded regions = JPred helix segments (if available).
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="shadow-medium">
+              <CardHeader>
+                <CardTitle>Sliding-Window Profiles</CardTitle>
+                <CardDescription>
+                  Per-residue profiles not available for long sequences.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="py-8 text-center text-muted-foreground">
+                  <p className="text-sm mb-2">
+                    Sequence too long for per-residue plot (length: {peptide.length}).
+                  </p>
+                  <p className="text-xs">
+                    Use windowing or open advanced view for detailed analysis.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Feature tiles */}
           <div className="grid md:grid-cols-4 gap-4">
@@ -349,7 +411,7 @@ export default function PeptideDetail() {
                     : 'Not available'}
                 </div>
                 <div className="text-sm text-muted-foreground">FF-Helix</div>
-                {stats && stats.meanFFHelixPercent > 0 && (
+                {stats && stats.meanFFHelixPercent !== null && stats.meanFFHelixPercent !== undefined && (
                   <div className="text-xs text-muted-foreground mt-1">
                     Cohort: {stats.meanFFHelixPercent.toFixed(0)}%
                   </div>

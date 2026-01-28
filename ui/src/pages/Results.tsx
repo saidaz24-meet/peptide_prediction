@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { ProviderBadge } from '@/components/ProviderBadge';
 import { Slider } from '@/components/ui/slider';
 
 import { ResultsKpis } from '@/components/ResultsKpis';
@@ -18,23 +19,101 @@ import { Legend } from '@/components/Legend';
 
 import { useDatasetStore } from '@/stores/datasetStore';
 import { useThresholds, scorePeptide } from '@/stores/datasetStore'; // smart ranking
-import { useFlags } from '@/stores/datasetStore'; // threshold tuner
 import { exportResultsAsPDF } from '@/lib/report';
+import { applyThresholds, DEFAULT_THRESHOLDS, meetsFFHelixThreshold, type ResolvedThresholds } from '@/lib/thresholds';
+import { uploadCSV, predictOne } from '@/lib/api';
+import { RotateCcw } from 'lucide-react';
 
-import type { Peptide, ChameleonPrediction } from '@/types/peptide';
+import type { Peptide, ChameleonPrediction, SSWPrediction } from '@/types/peptide';
 
 import { CorrelationCard } from '@/components/CorrelationCard';
 import AppFooter from '@/components/AppFooter';
+import { toast } from 'sonner';
+
+// Reproduce button component
+function ReproduceButton({ 
+  getLastRun, 
+  ingestBackendRows, 
+  setLoading, 
+  setError 
+}: { 
+  getLastRun: () => { type: 'upload' | 'predict' | null; input: any; config: any }; 
+  ingestBackendRows: (rows: any[], meta?: any) => void;
+  setLoading: (loading: boolean) => void;
+  setError: (error: string | null) => void;
+}) {
+  const handleReproduce = async () => {
+    const { type, input, config } = getLastRun();
+    
+    if (!type || !input) {
+      toast.error('No previous run to reproduce. Upload or analyze a sequence first.');
+      return;
+    }
+    
+    try {
+      setLoading(true);
+      setError(null);
+      
+      if (type === 'upload') {
+        // Reproduce upload
+        if (!(input instanceof File)) {
+          toast.error('Cannot reproduce: file data lost (page was refreshed). Please re-upload.');
+          return;
+        }
+        const { rows, meta } = await uploadCSV(input, config);
+        ingestBackendRows(rows, meta);
+        toast.success('Run reproduced successfully');
+      } else if (type === 'predict') {
+        // Reproduce predict (single sequence)
+        if (typeof input !== 'object' || !input.sequence) {
+          toast.error('Cannot reproduce: sequence data lost. Please re-analyze.');
+          return;
+        }
+        const result = await predictOne(input.sequence, input.entry, config);
+        // For predict, we convert single result to array format for consistency
+        const rows = [result];
+        const meta = (result as any).meta || {};
+        ingestBackendRows(rows, meta);
+        toast.success('Run reproduced successfully');
+      }
+    } catch (e: any) {
+      const errorMsg = e?.message || 'Reproduce failed';
+      setError(errorMsg);
+      toast.error(`Reproduce failed: ${errorMsg}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  const { type } = getLastRun();
+  const canReproduce = type !== null;
+  
+  return (
+    <Button 
+      variant="outline" 
+      size="sm" 
+      onClick={handleReproduce}
+      disabled={!canReproduce}
+      title={canReproduce ? 'Reproduce last run with same input and config' : 'No previous run to reproduce'}
+    >
+      <RotateCcw className="w-4 h-4 mr-2" />
+      Reproduce
+    </Button>
+  );
+}
 
 export default function Results() {
-  const { peptides, stats, meta } = useDatasetStore();
+  const { peptides, stats, meta, getLastRun, ingestBackendRows, setLoading, setError } = useDatasetStore();
   const navigate = useNavigate();
 
   // smart ranking weights
   const { wH, wCharge, wMuH, wHelix, topN, setWeights } = useThresholds();
 
-  // threshold tuner state (μH & Hydrophobicity)
-  const { muHCutoff, hydroCutoff, setFlags } = useFlags();
+  // Use meta.thresholds as source of truth, fallback to defaults
+  const resolvedThresholds: ResolvedThresholds = meta?.thresholds || DEFAULT_THRESHOLDS;
+  
+  // threshold mode from meta (for display)
+  const thresholdMode = meta?.thresholdConfigResolved?.mode || meta?.thresholdConfigRequested?.mode || 'default';
 
   useEffect(() => {
     // Redirect to upload if no data
@@ -49,9 +128,9 @@ export default function Results() {
 
   // -------- Type normalization (fixes lib/types shape mismatch) --------
   const normalizePeptide = (p: any): Peptide => {
-    const chamRaw = p?.chameleonPrediction ?? p?.sswPrediction;
-    const cham: ChameleonPrediction =
-      chamRaw === 1 ? 1 : chamRaw === 0 ? 0 : -1;
+    const sswRaw = p?.sswPrediction ?? p?.chameleonPrediction; // Backward compat
+    const ssw: SSWPrediction =
+      sswRaw === 1 ? 1 : sswRaw === 0 ? 0 : -1;
 
     // Ensure ID is always present — try canonical first, then fallbacks
     const id = String(p.id ?? p.Entry ?? p.entry ?? p.Accession ?? p.accession ?? '').trim();
@@ -66,7 +145,8 @@ export default function Results() {
       hydrophobicity: Number(p.hydrophobicity ?? p.Hydrophobicity ?? 0),
       muH: typeof p.muH === 'number' ? p.muH : (typeof p['Full length uH'] === 'number' ? p['Full length uH'] : undefined),
       charge: Number(p.charge ?? p.Charge ?? 0),
-      chameleonPrediction: cham,
+      sswPrediction: ssw,
+      chameleonPrediction: ssw, // Backward compatibility alias
       ffHelixPercent: typeof p.ffHelixPercent === 'number' ? p.ffHelixPercent
         : (typeof p['FF-Helix %'] === 'number' ? p['FF-Helix %'] : undefined),
       jpred: p.jpred ?? {
@@ -87,11 +167,11 @@ export default function Results() {
   const shortlist: Peptide[] = useMemo(() => {
     if (!peptidesTyped?.length) return [];
     return [...peptidesTyped]
-      .map((p) => ({ p, s: scorePeptide(p as any, { wH, wCharge, wMuH, wHelix }) }))
+      .map((p) => ({ p, s: scorePeptide(p as any, { wH, wCharge, wMuH, wHelix }, resolvedThresholds.ffHelixPercentThreshold) }))
       .sort((a, b) => b.s - a.s)
       .slice(0, Math.max(1, Number(topN) || 10))
       .map((x) => x.p);
-  }, [peptidesTyped, wH, wCharge, wMuH, wHelix, topN]);
+  }, [peptidesTyped, wH, wCharge, wMuH, wHelix, topN, resolvedThresholds.ffHelixPercentThreshold]);
 
   function exportShortlistCSV() {
     if (!shortlist.length) return;
@@ -111,7 +191,7 @@ export default function Results() {
       cols.map((c) => {
         const val = (p as any)[c];
         if (val === undefined || val === null) return '';
-        if (c === 'chameleonPrediction') {
+        if (c === 'sswPrediction' || c === 'chameleonPrediction') { // Backward compat
           return val === 1 ? 'Positive' : val === -1 ? 'N/A' : 'Negative';
         }
         return val;
@@ -139,18 +219,13 @@ export default function Results() {
   }
 
   // -------- Threshold Tuner (view-only derived flags) --------
+  // Use meta.thresholds as source of truth, apply consistently via helper
   const viewPeptides = useMemo(() => {
     return peptidesTyped.map((p) => {
-      const muH = typeof p.muH === 'number' ? p.muH : 0;
-      const H = typeof p.hydrophobicity === 'number' ? p.hydrophobicity : 0;
-      const cham = p.chameleonPrediction;
-
-      const ffHelixView = muH >= muHCutoff ? 1 : 0;
-      const sswView = cham === 1 && H >= hydroCutoff ? 1 : cham === -1 ? -1 : 0;
-
+      const { ffHelixView, sswView } = applyThresholds(p, resolvedThresholds);
       return { ...p, ffHelixView, sswView };
     });
-  }, [peptidesTyped, muHCutoff, hydroCutoff]);
+  }, [peptidesTyped, resolvedThresholds]);
 
   const ffHelixOnCount = viewPeptides.filter((p: any) => p.ffHelixView === 1).length;
   const chamOnCount = viewPeptides.filter((p: any) => p.sswView === 1).length;
@@ -169,17 +244,37 @@ export default function Results() {
             <div className="flex items-center space-x-3">
               {meta && (
                 <div className="flex gap-2">
-                  <Badge variant={meta.use_jpred ? 'default' : 'outline'}>
-                    JPred: {meta.use_jpred ? `ON (${meta.jpred_rows})` : 'OFF'}
-                  </Badge>
-                  <Badge variant={meta.use_tango ? 'default' : 'outline'}>
-                    Tango: {meta.use_tango ? `ON (${meta.ssw_rows})` : 'OFF'}
-                  </Badge>
+                  {meta.provider_status?.jpred ? (
+                    <ProviderBadge 
+                      name="JPred" 
+                      status={meta.provider_status.jpred as any}
+                    />
+                  ) : (
+                    <Badge variant={meta.use_jpred ? 'default' : 'outline'}>
+                      JPred: {meta.use_jpred ? `ON (${meta.jpred_rows})` : 'OFF'}
+                    </Badge>
+                  )}
+                  {meta.provider_status?.tango ? (
+                    <ProviderBadge 
+                      name="Tango" 
+                      status={meta.provider_status.tango as any}
+                    />
+                  ) : (
+                    <Badge variant="outline">
+                      Tango: {meta.use_tango ? 'ENABLED' : 'OFF'}
+                    </Badge>
+                  )}
                   <Badge variant="secondary">n = {peptidesTyped.length}</Badge>
+                  {meta?.thresholds && (
+                    <Badge variant="outline" className="text-xs">
+                      Using {thresholdMode === 'default' ? 'default' : thresholdMode === 'recommended' ? 'recommended' : 'custom'} thresholds
+                    </Badge>
+                  )}
                 </div>
               )}
 
               <Legend />
+              <ReproduceButton getLastRun={getLastRun} ingestBackendRows={ingestBackendRows} setLoading={setLoading} setError={setError} />
               <Button variant="outline" size="sm" onClick={() => exportResultsAsPDF()}>
                 <Download className="w-4 h-4 mr-2" />
                 Export Report
@@ -188,7 +283,7 @@ export default function Results() {
           </div>
 
           {/* KPIs */}
-          <ResultsKpis stats={stats} />
+          <ResultsKpis stats={stats} meta={meta} />
 
           {/* Smart Candidate Ranking */}
           <Card className="shadow-medium">
@@ -253,34 +348,59 @@ export default function Results() {
             </CardContent>
           </Card>
 
-          {/* Flag Threshold Tuner (view-only) */}
+          {/* Flag Threshold Tuner (view-only, uses meta.thresholds) */}
           <Card className="shadow-medium">
             <CardHeader>
               <CardTitle>Flag Threshold Tuner</CardTitle>
               <CardDescription>
-                Adjust μH and Hydrophobicity cutoffs to see FF-Helix & SSW flags flip live (view-only).
+                Current thresholds from backend (mode: {thresholdMode}). Pass/fail labels use these values.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span>μH cutoff</span>
-                  <span className="text-muted-foreground">{muHCutoff.toFixed(2)}</span>
+                  <span className="text-muted-foreground">{resolvedThresholds.muHCutoff.toFixed(2)}</span>
                 </div>
-                <Slider min={0} max={5} step={0.1} value={[muHCutoff]} onValueChange={([v]) => setFlags({ muHCutoff: v })} />
+                <Slider 
+                  min={-5} 
+                  max={5} 
+                  step={0.1} 
+                  value={[resolvedThresholds.muHCutoff]} 
+                  disabled
+                  className="opacity-60"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Read-only: set via threshold mode in upload</p>
               </div>
 
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span>Hydrophobicity cutoff</span>
-                  <span className="text-muted-foreground">{hydroCutoff.toFixed(2)}</span>
+                  <span className="text-muted-foreground">{resolvedThresholds.hydroCutoff.toFixed(2)}</span>
                 </div>
                 <Slider
                   min={-5}
                   max={5}
                   step={0.1}
-                  value={[hydroCutoff]}
-                  onValueChange={([v]) => setFlags({ hydroCutoff: v })}
+                  value={[resolvedThresholds.hydroCutoff]}
+                  disabled
+                  className="opacity-60"
+                />
+                <p className="text-xs text-muted-foreground mt-1">Read-only: set via threshold mode in upload</p>
+              </div>
+
+              <div>
+                <div className="flex justify-between text-sm mb-1">
+                  <span>FF-Helix % threshold (for scoring)</span>
+                  <span className="text-muted-foreground">{resolvedThresholds.ffHelixPercentThreshold.toFixed(1)}%</span>
+                </div>
+                <Slider
+                  min={0}
+                  max={100}
+                  step={0.1}
+                  value={[resolvedThresholds.ffHelixPercentThreshold]}
+                  disabled
+                  className="opacity-60"
                 />
               </div>
 

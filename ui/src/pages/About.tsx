@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Bug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { motion, cubicBezier } from "framer-motion";
+import * as Sentry from "@sentry/react";
 
 /** ---------- ScreenTransition (local, no extra files) ---------- */
 type Phase = "idle" | "enter" | "exit";
@@ -161,6 +162,70 @@ export default function About() {
               </p>
             </CardContent>
           </Card>
+
+          {/* Sentry Test (Development Only) */}
+          {import.meta.env.MODE === "development" && (
+            <Card className="shadow-medium border-orange-200">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bug className="w-5 h-5" />
+                  Sentry Test
+                </CardTitle>
+                <CardDescription>Test Sentry error tracking (development only)</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      Sentry.captureMessage("Test message from About page", "info");
+                      alert("Test message sent! Check Sentry dashboard.");
+                    }}
+                  >
+                    Send Test Message
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      Sentry.captureException(new Error("Test exception from About page"));
+                      alert("Test exception sent! Check Sentry dashboard.");
+                    }}
+                  >
+                    Send Test Exception
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const response = await fetch("/api/test-sentry-simple");
+                        const data = await response.json();
+                        alert(`Backend test: ${JSON.stringify(data, null, 2)}`);
+                      } catch (error) {
+                        alert(`Backend test failed: ${error}`);
+                      }
+                    }}
+                  >
+                    Test Backend Sentry
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    onClick={() => {
+                      throw new Error("Test React error from About page");
+                    }}
+                  >
+                    Throw React Error
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Use browser console (F12) and run <code>testSentry()</code> for more tests.
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </motion.div>
     </>

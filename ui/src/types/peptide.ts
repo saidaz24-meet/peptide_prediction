@@ -12,7 +12,49 @@ export type Segment = {
 export type SegmentTuple = [number, number];
 
 // ----- Prediction enums -----
-export type ChameleonPrediction = -1 | 0 | 1; // -1 = no/NA, 0 = uncertain, 1 = yes
+export type SSWPrediction = -1 | 0 | 1; // -1 = no/NA, 0 = uncertain, 1 = yes
+// Backward compatibility alias (deprecated, use SSWPrediction)
+export type ChameleonPrediction = SSWPrediction;
+
+// ----- Provider Status -----
+export type ProviderStatus = {
+  tango?: {
+    enabled?: boolean;
+    requested?: boolean;
+    ran?: boolean;
+    status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
+    reason?: string | null;
+    stats?: {
+      requested: number;
+      parsed_ok: number;
+      parsed_bad: number;
+    };
+  };
+  psipred?: {
+    enabled?: boolean;
+    requested?: boolean;
+    ran?: boolean;
+    status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
+    reason?: string | null;
+    stats?: {
+      requested: number;
+      parsed_ok: number;
+      parsed_bad: number;
+    };
+  };
+  jpred?: {
+    enabled?: boolean;
+    requested?: boolean;
+    ran?: boolean;
+    status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
+    reason?: string | null;
+    stats?: {
+      requested: number;
+      parsed_ok: number;
+      parsed_bad: number;
+    };
+  };
+};
 
 // ----- Core Peptide model used across the UI -----
 export type Peptide = {
@@ -30,8 +72,10 @@ export type Peptide = {
   muH?: number; // hydrophobic moment if present
   charge: number;
 
-  // Tango / Chameleon (a.k.a. SSW)
-  chameleonPrediction: ChameleonPrediction; // from "SSW prediction"
+  // Tango / SSW (Secondary Structure Switch)
+  sswPrediction: SSWPrediction; // from "SSW prediction"
+  // Backward compatibility alias (deprecated, use sswPrediction)
+  chameleonPrediction?: SSWPrediction;
   sswScore?: number;                        // "SSW score"
   sswDiff?: number;                         // "SSW diff"
   sswHelixPct?: number;                     // "SSW helix percentage"
@@ -68,6 +112,11 @@ export type Peptide = {
     turn?: number[];  // Turn curve
   };
 
+  // Provider status (Principle B: mandatory provider status)
+  // Row-level provider status (from row.providerStatus or row.provider_status)
+  // Passed through from backend without modification
+  providerStatus?: ProviderStatus;
+
   // passthrough for any extras
   extra?: Record<string, any>;
 };
@@ -82,8 +131,10 @@ export type ColumnMapping = {
   hydrophobic_moment?: string;
   charge?: string;
 
-  // Chameleon / SSW
-  chameleon_prediction?: string;   // maps to Peptide.chameleonPrediction
+  // SSW (Secondary Structure Switch)
+  ssw_prediction?: string;   // maps to Peptide.sswPrediction
+  // Backward compatibility alias (deprecated, use ssw_prediction)
+  chameleon_prediction?: string;
   ssw_score?: string;
   ssw_diff?: string;
   ssw_helix_percentage?: string;
@@ -111,15 +162,18 @@ export type ColumnMapping = {
 // ----- Dataset-level stats for KPI cards -----
 export type DatasetStats = {
   totalPeptides: number;
-  chameleonPositivePercent: number;
+  sswPositivePercent: number | null; // null when TANGO unavailable
   meanHydrophobicity: number;
   meanCharge: number;
-  meanFFHelixPercent: number;
+  meanFFHelixPercent: number | null; // null when no FF-Helix data available
   meanLength: number;
 
   // availability counts for better UI display
   jpredAvailable?: number;
   ffHelixAvailable?: number;
+  sswAvailable?: number;
+  // Backward compatibility aliases (deprecated, use ssw*)
+  chameleonPositivePercent?: number | null;
   chameleonAvailable?: number;
 };
 
@@ -165,11 +219,68 @@ export type PeptideRow = {
   "Organism"?: string;
 };
 
+// ----- Threshold Configuration -----
+export type ThresholdConfig = {
+  mode: "default" | "recommended" | "custom";
+  custom?: Record<string, any>;  // Custom threshold values when mode is "custom"
+  version: string;  // Config schema version
+};
+
 // ----- Backend-provided metadata for pills at top-right -----
 export type DatasetMetadata = {
+  runId?: string;
+  traceId?: string;
+  inputsHash?: string;
+  configHash?: string;
   use_jpred?: boolean;
   jpred_rows?: number;
   use_tango?: boolean;
   ssw_rows?: number;
   valid_seq_rows?: number;
+  thresholds?: {
+    muHCutoff: number;
+    hydroCutoff: number;
+    ffHelixPercentThreshold: number;
+  };
+  thresholdConfigRequested?: ThresholdConfig | null;
+  thresholdConfigResolved?: ThresholdConfig | null;
+  providerStatusSummary?: any;  // Provider status summary from backend
+  provider_status?: {
+    tango?: {
+      enabled?: boolean;
+      requested?: boolean;
+      ran?: boolean;
+      status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
+      reason?: string | null;
+      stats?: {
+        requested: number;
+        parsed_ok: number;
+        parsed_bad: number;
+      };
+    };
+    psipred?: {
+      enabled?: boolean;
+      requested?: boolean;
+      ran?: boolean;
+      status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
+      reason?: string | null;
+      stats?: {
+        requested: number;
+        parsed_ok: number;
+        parsed_bad: number;
+      };
+    };
+    jpred?: {
+      enabled?: boolean;
+      requested?: boolean;
+      ran?: boolean;
+      status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
+      reason?: string | null;
+      stats?: {
+        requested: number;
+        parsed_ok: number;
+        parsed_bad: number;
+      };
+    };
+  };
 };

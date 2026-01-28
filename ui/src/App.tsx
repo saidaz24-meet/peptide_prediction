@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 import Upload from "./pages/Upload";
 import Results from "./pages/Results";
 import PeptideDetail from "./pages/PeptideDetail";
+import MetricDetail from "./pages/MetricDetail";
 import Help from "./pages/Help";
 import NotFound from "./pages/NotFound";
 import About from "@/pages/About";
@@ -103,6 +104,7 @@ const App = () => (
           <Route path="/upload" element={<Upload />} />
           <Route path="/results" element={<Results />} />
           <Route path="/peptides/:id" element={<PeptideDetail />} />
+          <Route path="/metrics/:metricId" element={<MetricDetail />} />
           <Route path="/help" element={<Help />} />
           <Route path="/about" element={<About />} />
           {/* NEW */}

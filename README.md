@@ -162,6 +162,22 @@ This keeps sensitive tools and data inside your lab while offering a stable publ
 
 📖 All options are fully described in `DEPLOYMENT.md` with exact commands and example configs.
 
+## 📚 Technical Documentation
+
+**📖 [docs/KNOWLEDGE_INDEX.md](docs/KNOWLEDGE_INDEX.md)** — **Start here!** Single entry point to all documentation.
+
+**Quick links to core docs:**
+
+- **[WORKFLOWS.md](docs/WORKFLOWS.md)** — Operator cookbook (setup, running, troubleshooting)
+- **[SYSTEM_MAP.md](docs/SYSTEM_MAP.md)** — Architecture overview
+- **[EXECUTION_PATHS.md](docs/EXECUTION_PATHS.md)** — End-to-end execution flows
+- **[FAILURE_MODES.md](docs/FAILURE_MODES.md)** — Silent failure modes (MUST READ)
+- **[CONFIG_MATRIX.md](docs/CONFIG_MATRIX.md)** — All configuration options
+- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Detailed frontend architecture
+- **[FILE_REFERENCE.md](docs/FILE_REFERENCE.md)** — File-by-file commentary
+
+**See [docs/KNOWLEDGE_INDEX.md](docs/KNOWLEDGE_INDEX.md) for complete documentation index.**
+
 ## 🗺️ Roadmap (what's next)
 
 - **🎨 Single-sequence drawer**: PSIPRED curves (P(H)/P(E)/P(C)), Tango β-aggregation track, segment ribbons.

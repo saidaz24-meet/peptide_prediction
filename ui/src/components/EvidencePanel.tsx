@@ -43,7 +43,10 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
     });
 
     // FF-Helix evidence
-    if (peptide.ffHelixPercent !== undefined && cohortStats.meanFFHelixPercent > 0) {
+    if (peptide.ffHelixPercent !== undefined && 
+        cohortStats.meanFFHelixPercent !== null && 
+        cohortStats.meanFFHelixPercent !== undefined &&
+        cohortStats.meanFFHelixPercent >= 0) {
       const helixDiff = peptide.ffHelixPercent - cohortStats.meanFFHelixPercent;
       const helixIsHigher = helixDiff > 0;
       const HelixIcon = helixIsHigher ? TrendingUp : TrendingDown;
@@ -80,18 +83,30 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
     });
   }
 
-  // Chameleon prediction evidence
-  const chameleonEvidence = {
-    property: 'Chameleon Prediction',
-    value: peptide.chameleonPrediction === 1 ? 'Positive' : peptide.chameleonPrediction === -1 ? 'Negative' : 'Not available',
-    comparison: peptide.chameleonPrediction === 1 
-      ? 'Predicted to be membrane-active'
-      : peptide.chameleonPrediction === -1
-      ? 'Predicted to be non-membrane-active'
-      : 'No chameleon prediction available',
+  // SSW (Secondary Structure Switch) prediction evidence
+  // Gate: Only show valid predictions when TANGO provider status is AVAILABLE
+  const sswPred = peptide.sswPrediction ?? (peptide as any).chameleonPrediction; // Backward compat
+  const tangoAvailable = peptide.providerStatus?.tango?.status === "AVAILABLE";
+  const hasValidSSW = sswPred !== null && sswPred !== undefined && sswPred !== "null";
+  const sswEvidence = {
+    property: 'SSW Prediction',
+    value: !tangoAvailable || !hasValidSSW 
+      ? 'N/A' 
+      : sswPred === 1 
+        ? 'Positive' 
+        : sswPred === -1 
+          ? 'Negative' 
+          : 'Not available',
+    comparison: !tangoAvailable || !hasValidSSW
+      ? 'TANGO output not available'
+      : sswPred === 1 
+        ? 'Predicted to be membrane-active'
+        : sswPred === -1
+          ? 'Predicted to be non-membrane-active'
+          : 'No SSW prediction available',
     difference: '',
-    icon: peptide.chameleonPrediction === 1 ? CheckCircle : peptide.chameleonPrediction === -1 ? XCircle : Minus,
-    color: peptide.chameleonPrediction === 1 ? 'text-chameleon-positive' : peptide.chameleonPrediction === -1 ? 'text-muted-foreground' : 'text-muted-foreground',
+    icon: !tangoAvailable || !hasValidSSW ? Minus : sswPred === 1 ? CheckCircle : sswPred === -1 ? XCircle : Minus,
+    color: !tangoAvailable || !hasValidSSW ? 'text-muted-foreground' : sswPred === 1 ? 'text-chameleon-positive' : sswPred === -1 ? 'text-muted-foreground' : 'text-muted-foreground',
   };
 
   return (
@@ -110,13 +125,13 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
           className="p-4 rounded-lg border-l-4 border-l-chameleon-positive bg-gradient-to-r from-chameleon-positive/5 to-transparent"
         >
           <div className="flex items-center space-x-3">
-            <chameleonEvidence.icon className={`w-5 h-5 ${chameleonEvidence.color}`} />
+            <sswEvidence.icon className={`w-5 h-5 ${sswEvidence.color}`} />
             <div className="flex-1">
               <h4 className="font-semibold text-foreground">
-                {chameleonEvidence.property}: {chameleonEvidence.value}
+                {sswEvidence.property}: {sswEvidence.value}
               </h4>
               <p className="text-sm text-muted-foreground">
-                {chameleonEvidence.comparison}
+                {sswEvidence.comparison}
               </p>
             </div>
           </div>

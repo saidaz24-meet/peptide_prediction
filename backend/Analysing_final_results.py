@@ -1,5 +1,5 @@
 import pandas as pd
-from main import write_to_excel
+from batch_process import write_to_excel
 
 def analyse_database(filepath: str):
     database = pd.read_csv(filepath)

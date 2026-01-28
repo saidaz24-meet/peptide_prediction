@@ -64,9 +64,16 @@ export function PositionBars({ peptide, allPeptides }: PositionBarsProps) {
     }
   }
 
-  // Add FF-Helix if available
-  if (peptide.ffHelixPercent !== undefined) {
-    const peptidesWithHelix = allPeptides.filter(p => p.ffHelixPercent !== undefined);
+  // Add FF-Helix if available (only show in detailed view, not main dashboard)
+  // Filter out invalid values (negative or >100)
+  if (peptide.ffHelixPercent !== undefined && 
+      peptide.ffHelixPercent >= 0 && 
+      peptide.ffHelixPercent <= 100) {
+    const peptidesWithHelix = allPeptides.filter(
+      p => p.ffHelixPercent !== undefined && 
+           p.ffHelixPercent >= 0 && 
+           p.ffHelixPercent <= 100
+    );
     if (peptidesWithHelix.length > 1) {
       metrics.push({
         label: 'FF-Helix %',

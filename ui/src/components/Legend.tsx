@@ -24,13 +24,13 @@ export function Legend() {
             <h4 className="font-semibold text-sm mb-3">Color Conventions</h4>
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm">Chameleon Positive</span>
+                <span className="text-sm">SSW Positive</span>
                 <Badge className="bg-chameleon-positive text-white">
                   Positive
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm">Chameleon Negative</span>
+                <span className="text-sm">SSW Negative</span>
                 <Badge variant="secondary">
                   Negative
                 </Badge>

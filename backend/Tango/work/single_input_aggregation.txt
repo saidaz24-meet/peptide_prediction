@@ -1,2 +1,0 @@
-Sequence	Aggregation	Conc_Stab_Aggregation
-W8RDQ1    	1445.09	1445.09

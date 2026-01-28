@@ -13,6 +13,7 @@ import {
 import { ArrowUpDown, ChevronLeft, ChevronRight, Download, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -136,10 +137,34 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           );
         },
       }),
-      columnHelper.accessor('chameleonPrediction', {
+      columnHelper.accessor('sswPrediction', {
         header: 'SSW',
         cell: (info) => {
+          const peptide = info.row.original;
           const prediction = info.getValue();
+          const tangoStatus = peptide.providerStatus?.tango?.status;
+          const tangoRan = peptide.providerStatus?.tango?.ran ?? false;
+          // NO LYING UI: If TANGO didn't run or is OFF/UNAVAILABLE, show N/A
+          const isUnavailable = !tangoRan || (tangoStatus !== 'AVAILABLE' && tangoStatus !== 'PARTIAL' && tangoStatus !== undefined);
+          
+          // If provider didn't run or is not AVAILABLE/PARTIAL, show N/A with tooltip
+          if (isUnavailable || prediction === null || prediction === undefined) {
+            return (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Badge variant="outline">
+                      N/A
+                    </Badge>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>TANGO output not available</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            );
+          }
+          
           if (prediction === 1) {
             return (
               <Badge className="bg-chameleon-positive text-white">
@@ -244,7 +269,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         peptide.hydrophobicity,
         peptide.muH || '',
         peptide.charge,
-        peptide.chameleonPrediction,
+        peptide.sswPrediction ?? (peptide as any).chameleonPrediction, // Backward compat
         peptide.ffHelixPercent || '',
       ].join(','))
     ].join('\n');

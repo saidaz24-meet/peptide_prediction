@@ -78,8 +78,13 @@ export function PeptideRadarChart({ peptide, cohortStats }: PeptideRadarChartPro
     });
   }
 
-  // Add FF-Helix if available
-  if (peptide.ffHelixPercent !== undefined && cohortStats.meanFFHelixPercent > 0) {
+  // Add FF-Helix if available (filter invalid values)
+  if (peptide.ffHelixPercent !== undefined && 
+      peptide.ffHelixPercent >= 0 && 
+      peptide.ffHelixPercent <= 100 &&
+      cohortStats.meanFFHelixPercent !== null &&
+      cohortStats.meanFFHelixPercent !== undefined &&
+      cohortStats.meanFFHelixPercent >= 0) {
     data.push({
       metric: 'FF-Helix %',
       peptide: peptide.ffHelixPercent / 100, // Normalize to 0-1
