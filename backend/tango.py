@@ -28,9 +28,13 @@ PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
 TANGO_DIR    = os.path.abspath(os.path.join(PROJECT_PATH, "Tango"))
 
 # Runtime output directories: Use temp location to avoid triggering uvicorn --reload
-# If TANGO_RUNTIME_DIR env var is set, use it; otherwise use .run_cache in backend/
-# This prevents file watchers from restarting the server during TANGO execution
-_RUNTIME_BASE = os.getenv("TANGO_RUNTIME_DIR", os.path.join(PROJECT_PATH, ".run_cache", "Tango"))
+# Load from config (with fallback for backward compatibility)
+try:
+    from config import settings
+    _RUNTIME_BASE = settings.tango_runtime_dir
+except ImportError:
+    # Fallback if config not available (shouldn't happen in normal usage)
+    _RUNTIME_BASE = os.getenv("TANGO_RUNTIME_DIR", os.path.join(PROJECT_PATH, ".run_cache", "Tango"))
 WORK_DIR = os.path.join(_RUNTIME_BASE, "work")   # inputs for runs
 OUT_DIR  = os.path.join(_RUNTIME_BASE, "out")    # per-run outputs
 
@@ -923,10 +927,10 @@ def __analyse_tango_results(peptide_tango_results: Optional[Dict[str, Any]]) -> 
 # ---------------------------------------------------------------------
 def _append_defaults(fragments, scores, diffs, helix_pcts, beta_pcts):
     fragments.append("-")
-    scores.append(-1)
-    diffs.append(0)
-    helix_pcts.append(0)
-    beta_pcts.append(0)
+    scores.append(None)  # Use None instead of -1 for missing SSW score
+    diffs.append(None)   # Use None instead of 0 for missing SSW diff
+    helix_pcts.append(None)  # Use None for missing percentage
+    beta_pcts.append(None)   # Use None for missing percentage
 
 def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) -> Dict[str, int]:
     """
@@ -953,10 +957,10 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
 
     def _append_defaults_local(_frags, _scores, _diffs, _h_pct, _b_pct, _cb, _ch, _ct, _ca):
         _frags.append("-")
-        _scores.append(-1)
-        _diffs.append(0)
-        _h_pct.append(0)
-        _b_pct.append(0)
+        _scores.append(None)  # Use None instead of -1 for missing SSW score
+        _diffs.append(None)   # Use None instead of 0 for missing SSW diff
+        _h_pct.append(None)   # Use None for missing percentage
+        _b_pct.append(None)   # Use None for missing percentage
         _cb.append([]); _ch.append([]); _ct.append([]); _ca.append([])
 
     _ensure_dirs()
@@ -985,13 +989,13 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
             entry = str(row.get(KEY) or "").strip()
             if entry:
                 entry_set.add(entry)
-                # Initialize defaults for this entry
+                # Initialize defaults for this entry (use None for missing data, not -1)
                 results_by_entry[entry] = {
                     "SSW fragments": "-",
-                    "SSW score": -1,
-                    "SSW diff": 0,
-                    "SSW helix percentage": 0.0,
-                    "SSW beta percentage": 0.0,
+                    "SSW score": None,  # Use None instead of -1
+                    "SSW diff": None,   # Use None instead of 0
+                    "SSW helix percentage": None,  # Use None instead of 0.0
+                    "SSW beta percentage": None,   # Use None instead of 0.0
                     "Tango Beta curve": [],
                     "Tango Helix curve": [],
                     "Tango Turn curve": [],
@@ -1140,10 +1144,10 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
             if entry:
                 results_by_entry[entry] = {
                     "SSW fragments": "-",
-                    "SSW score": -1,  # batch file doesn't have score
-                    "SSW diff": 0,
-                    "SSW helix percentage": 0.0,
-                    "SSW beta percentage": 0.0,
+                    "SSW score": None,  # Use None instead of -1 for missing data
+                    "SSW diff": None,   # Use None instead of 0 for missing data
+                    "SSW helix percentage": None,  # Use None instead of 0.0
+                    "SSW beta percentage": None,   # Use None instead of 0.0
                 }
         
         bad_ctr, ok_ctr = 0, 0
@@ -1153,8 +1157,8 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
                 m = df_out[df_out[name_col] == entry]
                 if not m.empty:
                     m0 = m.iloc[0]
-                    result_dict["SSW helix percentage"] = m0.get(helix_pct_col, 0) if helix_pct_col else 0
-                    result_dict["SSW beta percentage"] = m0.get(beta_pct_col, 0) if beta_pct_col else 0
+                    result_dict["SSW helix percentage"] = m0.get(helix_pct_col, None) if helix_pct_col else None
+                    result_dict["SSW beta percentage"] = m0.get(beta_pct_col, None) if beta_pct_col else None
                     ok_ctr += 1
                 else:
                     bad_ctr += 1
@@ -1297,9 +1301,19 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
         # Use None (not -1) to indicate missing data
         database["SSW diff"] = pd.Series([None] * len(database), index=database.index, dtype=object)
     
-    # Get threshold strategy from env (default: "mean" to match current behavior)
-    strategy = os.getenv("SSW_DIFF_THRESHOLD_STRATEGY", "mean").lower()
-    fallback_threshold = float(os.getenv("SSW_DIFF_THRESHOLD_FALLBACK", "0.0"))
+    # Get threshold strategy from config (with fallback for backward compatibility)
+    try:
+        from config import settings
+        strategy = settings.SSW_DIFF_THRESHOLD_STRATEGY
+        fallback_threshold = settings.SSW_DIFF_THRESHOLD_FALLBACK
+        fixed_threshold = settings.SSW_DIFF_THRESHOLD_FIXED
+        multiplier = settings.SSW_DIFF_THRESHOLD_MULTIPLIER
+    except ImportError:
+        # Fallback if config not available
+        strategy = os.getenv("SSW_DIFF_THRESHOLD_STRATEGY", "mean").lower()
+        fallback_threshold = float(os.getenv("SSW_DIFF_THRESHOLD_FALLBACK", "0.0"))
+        fixed_threshold = float(os.getenv("SSW_DIFF_THRESHOLD_FIXED", "0.0"))
+        multiplier = float(os.getenv("SSW_DIFF_THRESHOLD_MULTIPLIER", "1.0"))
     
     # Calculate threshold based on strategy
     # Gate: Only use rows with valid TANGO metrics (SSW diff is not None and not NaN)
@@ -1315,9 +1329,8 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
         elif strategy == "median":
             avg_diff = valid_diffs.median()
         elif strategy == "fixed":
-            avg_diff = float(os.getenv("SSW_DIFF_THRESHOLD_FIXED", "0.0"))
+            avg_diff = fixed_threshold
         elif strategy == "multiplier":
-            multiplier = float(os.getenv("SSW_DIFF_THRESHOLD_MULTIPLIER", "1.0"))
             avg_diff = valid_diffs.mean() * multiplier
         else:
             # Unknown strategy, fall back to mean

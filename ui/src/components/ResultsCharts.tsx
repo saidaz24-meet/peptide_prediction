@@ -44,7 +44,7 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
     .map(p => ({
       hydrophobicity: p.hydrophobicity,
       muH: p.muH as number,
-      chameleon: p.chameleonPrediction,
+      ssw: p.sswPrediction,
       id: p.id,
     }));
 
@@ -70,9 +70,9 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
   }).sort((a, b) => a.binStart - b.binStart); // Ensure left→right ordering
 
   // SSW distribution
-  const pos = peptides.filter(p => (p.sswPrediction ?? (p as any).chameleonPrediction) === 1).length; // Backward compat
-  const neg = peptides.filter(p => (p.sswPrediction ?? (p as any).chameleonPrediction) === -1).length; // Backward compat
-  const unc = peptides.filter(p => (p.sswPrediction ?? (p as any).chameleonPrediction) === 0).length; // Backward compat
+  const pos = peptides.filter(p => p.sswPrediction === 1).length;
+  const neg = peptides.filter(p => p.sswPrediction === -1).length;
+  const unc = peptides.filter(p => p.sswPrediction === 0).length;
   const sswDistribution = [
     { name: 'SSW Positive', value: pos, color: COLORS.chameleonPositive },
     { name: 'SSW Negative', value: neg, color: COLORS.chameleonNegative },
@@ -80,8 +80,8 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
   ].filter(d => d.value > 0);
 
   // Radar comparison (if both groups empty, render empty)
-  const positiveGroup = peptides.filter(p => (p.sswPrediction ?? (p as any).chameleonPrediction) === 1); // Backward compat
-  const negativeGroup = peptides.filter(p => (p.sswPrediction ?? (p as any).chameleonPrediction) === -1); // Backward compat
+  const positiveGroup = peptides.filter(p => p.sswPrediction === 1);
+  const negativeGroup = peptides.filter(p => p.sswPrediction === -1);
   const mean = (arr: number[]) => (arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0);
   const radarData =
     positiveGroup.length + negativeGroup.length > 0
@@ -162,8 +162,8 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
                         return null;
                       }}
                     />
-                    <Scatter data={scatterData.filter(d => d.chameleon === 1)} fill={COLORS.chameleonPositive} name="SSW +" />
-                    <Scatter data={scatterData.filter(d => d.chameleon === -1)} fill={COLORS.chameleonNegative} name="SSW −" />
+                    <Scatter data={scatterData.filter(d => d.ssw === 1)} fill={COLORS.chameleonPositive} name="SSW +" />
+                    <Scatter data={scatterData.filter(d => d.ssw === -1)} fill={COLORS.chameleonNegative} name="SSW −" />
                   </ScatterChart>
                 </ResponsiveContainer>
               </ChartContainer>

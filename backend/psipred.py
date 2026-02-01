@@ -8,9 +8,13 @@ PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
 PSI_DIR      = os.path.join(PROJECT_PATH, "Psipred")
 
 # Runtime output directories: Use temp location to avoid triggering uvicorn --reload
-# If PSIPRED_RUNTIME_DIR env var is set, use it; otherwise use .run_cache in backend/
-# This prevents file watchers from restarting the server during PSIPRED execution
-_RUNTIME_BASE = os.getenv("PSIPRED_RUNTIME_DIR", os.path.join(PROJECT_PATH, ".run_cache", "Psipred"))
+# Load from config (with fallback for backward compatibility)
+try:
+    from config import settings
+    _RUNTIME_BASE = settings.psipred_runtime_dir
+except ImportError:
+    # Fallback if config not available (shouldn't happen in normal usage)
+    _RUNTIME_BASE = os.getenv("PSIPRED_RUNTIME_DIR", os.path.join(PROJECT_PATH, ".run_cache", "Psipred"))
 WORK_DIR     = os.path.join(_RUNTIME_BASE, "work")
 OUT_DIR      = os.path.join(_RUNTIME_BASE, "out")
 KEY          = "Entry"
@@ -82,12 +86,21 @@ def run_psipred(records: List[Tuple[str,str]]) -> str:
         print("[PSIPRED][WARN] Docker not found on PATH; skipping PSIPRED.")
         return run_dir
 
-    image = os.getenv("PSIPRED_IMAGE", "psipred-hhblits")
+    # Get PSIPRED config (with fallback for backward compatibility)
+    try:
+        from config import settings
+        image = settings.PSIPRED_IMAGE
+        db_host = settings.PSIPRED_DB or ""
+    except ImportError:
+        # Fallback if config not available
+        image = os.getenv("PSIPRED_IMAGE", "psipred-hhblits")
+        db_host = os.getenv("PSIPRED_DB", "").strip()
+    
     if not _image_exists(image):
         print(f"[PSIPRED][WARN] Docker image '{image}' not found; skipping PSIPRED.")
         return run_dir
 
-    db_host = os.getenv("PSIPRED_DB", "").strip()
+    db_host = db_host.strip()
     have_db = bool(db_host) and os.path.isdir(db_host)
     if not have_db:
         # Don’t attempt hhblits without a database; skip gracefully
@@ -208,7 +221,7 @@ def _ssw_from_psipred(df_ss2: pd.DataFrame):
     helix_pct = round(100.0*(PH>=0.5).mean(),1)
     beta_pct  = round(100.0*(PE>=0.5).mean(),1)
     if not frags:
-        return [], -1.0, 0.0, helix_pct, beta_pct
+        return [], None, None, helix_pct, beta_pct  # Use None instead of -1.0/0.0 for missing data
     return frags, round(best_score,3), round(best_diff,3), helix_pct, beta_pct
 
 def process_psipred_output(database: pd.DataFrame) -> None:
@@ -233,17 +246,17 @@ def process_psipred_output(database: pd.DataFrame) -> None:
     database["Psipred beta %"]  = pd.Series([0.0] * n, index=database.index)
     database["FF-Helix %"]      = pd.Series([0.0] * n, index=database.index)
     
-    # Preserve existing SSW values if present, else defaults
+    # Preserve existing SSW values if present, else defaults (use None for missing data)
     if "SSW fragments" not in database.columns:
         database["SSW fragments"] = pd.Series(["-"] * n, index=database.index, dtype=object)
     if "SSW score" not in database.columns:
-        database["SSW score"] = pd.Series([-1] * n, index=database.index)
+        database["SSW score"] = pd.Series([None] * n, index=database.index, dtype=object)
     if "SSW diff" not in database.columns:
-        database["SSW diff"] = pd.Series([0] * n, index=database.index)
+        database["SSW diff"] = pd.Series([None] * n, index=database.index, dtype=object)
     if "SSW helix percentage" not in database.columns:
-        database["SSW helix percentage"] = pd.Series([0.0] * n, index=database.index)
+        database["SSW helix percentage"] = pd.Series([None] * n, index=database.index, dtype=object)
     if "SSW beta percentage" not in database.columns:
-        database["SSW beta percentage"] = pd.Series([0.0] * n, index=database.index)
+        database["SSW beta percentage"] = pd.Series([None] * n, index=database.index, dtype=object)
 
     for idx, row in database.iterrows():
         entry = str(row.get(KEY) or "").strip()
@@ -261,7 +274,10 @@ def process_psipred_output(database: pd.DataFrame) -> None:
         database.loc[idx, "Psipred beta %"]  = round(100.0*(df["P_E"]>=0.5).mean(),1)
         database.loc[idx, "FF-Helix %"]      = _ff_helix_percent(df)
 
-        if (row.get("SSW score", -1) == -1) and (row.get("SSW fragments","-") in ("-","",None,[])):
+        # Check if SSW data is missing (None or NaN) - use pd.isna() for proper null checking
+        ssw_score = row.get("SSW score")
+        ssw_frags = row.get("SSW fragments", "-")
+        if (ssw_score is None or pd.isna(ssw_score)) and (ssw_frags in ("-", "", None, [])):
             fr, sc, dfv, hp, bp = _ssw_from_psipred(df)
             database.loc[idx, "SSW fragments"]        = fr
             database.loc[idx, "SSW score"]            = sc

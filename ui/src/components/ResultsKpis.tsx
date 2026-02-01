@@ -60,8 +60,8 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
     {
       title: 'SSW Positive',
       // NO LYING UI: If TANGO didn't run, show N/A (not 0%)
-      value: tangoAvailable 
-        ? formatPercent(stats.sswPositivePercent ?? stats.chameleonPositivePercent ?? null)
+      value: tangoAvailable
+        ? formatPercent(stats.sswPositivePercent)
         : 'N/A',
       icon: TrendingUp,
       color: 'text-chameleon-positive',

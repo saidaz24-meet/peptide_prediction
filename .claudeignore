@@ -1,0 +1,23 @@
+# --- Documentation Access Rules ---
+# Ignore all docs except docs/active/ (authoritative source)
+docs/_archive/**
+docs/legacy/**
+docs/reference/**
+docs/user/**
+# Ignore all markdown files in docs/ except docs/active/
+docs/**/*.md
+!docs/active/**/*.md
+
+# --- Never read generated / bulky stuff ---
+**/node_modules/**
+**/.venv/**
+**/dist/**
+**/build/**
+**/.next/**
+**/.expo/**
+**/coverage/**
+**/*.log
+**/*.lock
+**/*.zip
+**/*.tar
+**/*.gz

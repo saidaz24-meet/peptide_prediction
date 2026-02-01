@@ -7,7 +7,7 @@ Tests:
 - (c) Analysis pipeline runs on UniProt results
 """
 import pytest
-from services.uniprot_query import parse_uniprot_query, QueryMode
+from services.uniprot_parser import parse_uniprot_query, QueryMode
 
 
 def test_organism_id_9606_parsed_correctly():
@@ -35,7 +35,7 @@ def test_organism_id_with_keyword():
 
 def test_pure_numeric_not_keyword():
     """Test that pure numeric strings are not extracted as keywords."""
-    from services.uniprot_query import extract_keyword
+    from services.uniprot_parser import extract_keyword
     
     # Pure numeric should return None (it's an organism ID)
     assert extract_keyword("9606") is None, "Pure numeric '9606' should not be extracted as keyword"

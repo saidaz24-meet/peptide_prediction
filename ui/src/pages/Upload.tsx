@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { ColumnMapper } from "@/components/ColumnMapper";
+// ColumnMapper removed - columns are auto-detected by backend
 import { DataPreview } from "@/components/DataPreview";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { uploadCSV } from "@/lib/api";
@@ -23,8 +23,7 @@ import type { ThresholdConfig } from "@/types/peptide";
 
 const steps = [
   { id: "upload", title: "Upload File", icon: UploadIcon },
-  { id: "preview", title: "Preview Data", icon: FileText },
-  { id: "mapping", title: "Map Columns", icon: CheckCircle },
+  { id: "analyze", title: "Preview & Analyze", icon: CheckCircle },
 ];
 
 // 20-AA quick validator (preview-only)
@@ -176,7 +175,7 @@ export default function Upload() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Upload & Process Dataset</h1>
             <p className="text-muted-foreground mb-6">
-              Upload your peptide CSV/TSV/XLSX and generate visualizations. (Mapping optional.)
+              Upload your peptide CSV/TSV/XLSX — columns are auto-detected.
             </p>
 
             <div className="space-y-4">
@@ -285,12 +284,96 @@ export default function Upload() {
                       <div className="flex items-center justify-between">
                         <div>
                           <h3 className="text-lg font-semibold">Data Preview</h3>
-                          <p className="text-muted-foreground">Quick look before analysis</p>
+                          <p className="text-muted-foreground">
+                            Columns are auto-detected. Click Analyze to process your data.
+                          </p>
                         </div>
-                        <Badge variant="secondary">{rawData.rowCount ?? rawData.rows?.length ?? 0} preview rows</Badge>
+                        <Badge variant="secondary">{rawData.rowCount ?? rawData.rows?.length ?? 0} rows</Badge>
                       </div>
 
                       <DataPreview data={rawData} />
+
+                      {/* Auto-detected columns info */}
+                      {rawData.headers && rawData.headers.length > 0 && (
+                        <div className="bg-muted/50 rounded-lg p-4">
+                          <p className="text-sm font-medium mb-2">Detected columns:</p>
+                          <div className="flex flex-wrap gap-2">
+                            {rawData.headers.slice(0, 8).map((h: string) => (
+                              <Badge key={h} variant="outline" className="text-xs">{h}</Badge>
+                            ))}
+                            {rawData.headers.length > 8 && (
+                              <Badge variant="outline" className="text-xs">+{rawData.headers.length - 8} more</Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Threshold Configuration (collapsed by default) */}
+                      <details className="border rounded-lg">
+                        <summary className="px-4 py-3 cursor-pointer text-sm font-medium hover:bg-muted/50">
+                          Advanced: Threshold Configuration
+                        </summary>
+                        <div className="px-4 pb-4 space-y-4">
+                          <div>
+                            <Label htmlFor="threshold-mode">Threshold Mode</Label>
+                            <Select value={thresholdMode} onValueChange={(v: 'default' | 'recommended' | 'custom') => setThresholdMode(v)}>
+                              <SelectTrigger id="threshold-mode" className="w-full">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="default">Default</SelectItem>
+                                <SelectItem value="recommended">Recommended (computed from data)</SelectItem>
+                                <SelectItem value="custom">Custom</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {thresholdMode === 'default' && 'Use default threshold values'}
+                              {thresholdMode === 'recommended' && 'Compute thresholds from data using median'}
+                              {thresholdMode === 'custom' && 'Set custom threshold values'}
+                            </p>
+                          </div>
+
+                          {thresholdMode === 'custom' && (
+                            <div className="grid grid-cols-3 gap-4">
+                              <div>
+                                <Label htmlFor="muH-cutoff">μH Cutoff</Label>
+                                <input
+                                  id="muH-cutoff"
+                                  type="number"
+                                  step="0.1"
+                                  className="w-full mt-1 px-3 py-2 border rounded-md"
+                                  value={customThresholds.muHCutoff}
+                                  onChange={(e) => setCustomThresholds({ ...customThresholds, muHCutoff: parseFloat(e.target.value) || 0 })}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="hydro-cutoff">Hydrophobicity Cutoff</Label>
+                                <input
+                                  id="hydro-cutoff"
+                                  type="number"
+                                  step="0.1"
+                                  className="w-full mt-1 px-3 py-2 border rounded-md"
+                                  value={customThresholds.hydroCutoff}
+                                  onChange={(e) => setCustomThresholds({ ...customThresholds, hydroCutoff: parseFloat(e.target.value) || 0 })}
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="ffHelix-threshold">FF-Helix % Threshold</Label>
+                                <input
+                                  id="ffHelix-threshold"
+                                  type="number"
+                                  step="0.1"
+                                  min="0"
+                                  max="100"
+                                  className="w-full mt-1 px-3 py-2 border rounded-md"
+                                  value={customThresholds.ffHelixPercentThreshold}
+                                  onChange={(e) => setCustomThresholds({ ...customThresholds, ffHelixPercentThreshold: parseFloat(e.target.value) || 50 })}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </details>
                     </>
                   )}
 
@@ -298,93 +381,8 @@ export default function Upload() {
                     <Button variant="outline" onClick={() => setCurrentStep(0)}>
                       Back
                     </Button>
-                    <Button onClick={() => setCurrentStep(2)} disabled={isLoading}>
-                      Continue to Mapping
-                    </Button>
-                  </div>
-                </motion.div>
-              )}
-
-              {currentStep === 2 && (
-                <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold">Map Columns (Optional)</h3>
-                    <p className="text-muted-foreground">
-                      The backend recognizes UniProt headers and computes metrics even if you skip mapping.
-                      You can still align columns here for clarity.
-                    </p>
-                  </div>
-
-                  {rawData && <ColumnMapper headers={rawData.headers} onMappingComplete={() => {}} />}
-
-                  {/* Threshold Configuration */}
-                  <div className="space-y-4 pt-4 border-t">
-                    <div>
-                      <Label htmlFor="threshold-mode">Threshold Mode</Label>
-                      <Select value={thresholdMode} onValueChange={(v: 'default' | 'recommended' | 'custom') => setThresholdMode(v)}>
-                        <SelectTrigger id="threshold-mode" className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="default">Default</SelectItem>
-                          <SelectItem value="recommended">Recommended (computed from data)</SelectItem>
-                          <SelectItem value="custom">Custom</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {thresholdMode === 'default' && 'Use default threshold values'}
-                        {thresholdMode === 'recommended' && 'Compute thresholds from data using median'}
-                        {thresholdMode === 'custom' && 'Set custom threshold values'}
-                      </p>
-                    </div>
-
-                    {thresholdMode === 'custom' && (
-                      <div className="grid grid-cols-3 gap-4">
-                        <div>
-                          <Label htmlFor="muH-cutoff">μH Cutoff</Label>
-                          <input
-                            id="muH-cutoff"
-                            type="number"
-                            step="0.1"
-                            className="w-full mt-1 px-3 py-2 border rounded-md"
-                            value={customThresholds.muHCutoff}
-                            onChange={(e) => setCustomThresholds({ ...customThresholds, muHCutoff: parseFloat(e.target.value) || 0 })}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="hydro-cutoff">Hydrophobicity Cutoff</Label>
-                          <input
-                            id="hydro-cutoff"
-                            type="number"
-                            step="0.1"
-                            className="w-full mt-1 px-3 py-2 border rounded-md"
-                            value={customThresholds.hydroCutoff}
-                            onChange={(e) => setCustomThresholds({ ...customThresholds, hydroCutoff: parseFloat(e.target.value) || 0 })}
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="ffHelix-threshold">FF-Helix % Threshold</Label>
-                          <input
-                            id="ffHelix-threshold"
-                            type="number"
-                            step="0.1"
-                            min="0"
-                            max="100"
-                            className="w-full mt-1 px-3 py-2 border rounded-md"
-                            value={customThresholds.ffHelixPercentThreshold}
-                            onChange={(e) => setCustomThresholds({ ...customThresholds, ffHelixPercentThreshold: parseFloat(e.target.value) || 50 })}
-                          />
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex justify-between">
-                    <Button variant="outline" onClick={() => setCurrentStep(1)}>
-                      Back
-                    </Button>
-                    <Button onClick={handleAnalyze} disabled={!localFile || isAnalyzing}>
-                      {isAnalyzing ? "Analyzing…" : "Analyze"}
+                    <Button onClick={handleAnalyze} disabled={!localFile || isAnalyzing} size="lg">
+                      {isAnalyzing ? "Analyzing…" : "Analyze Dataset"}
                     </Button>
                   </div>
                 </motion.div>

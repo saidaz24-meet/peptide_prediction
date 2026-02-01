@@ -37,18 +37,28 @@ def determine_tango_status(
     ssw_pred = row.get("SSW prediction", None)
     ssw_score = row.get("SSW score", None)
     ssw_fragments = row.get("SSW fragments", None)
-    
+    ssw_helix_pct = row.get("SSW helix percentage", None)
+    ssw_beta_pct = row.get("SSW beta percentage", None)
+
     # Real TANGO output would have:
-    # - ssw_prediction: -1, 0, or 1 (valid if not default -1 from initialization)
+    # - ssw_prediction: -1, 0, or 1 (ALL are valid prediction values!)
+    #   Note: -1 means "no switch predicted", NOT "not available"
     # - ssw_score: float (valid if not -1.0)
     # - ssw_fragments: string (valid if not "-" or empty)
-    
+    # - ssw_helix_percentage / ssw_beta_percentage: valid float values
+
     has_valid_data = False
-    if ssw_pred is not None and ssw_pred != -1:  # -1 is the "not available" default
+    # SSW prediction can be -1, 0, or 1 - all are valid prediction values
+    # -1 = no switch, 0 = uncertain, 1 = switch predicted
+    if ssw_pred is not None and ssw_pred in [-1, 0, 1]:
         has_valid_data = True
     elif ssw_score is not None and ssw_score != -1.0:
         has_valid_data = True
     elif ssw_fragments is not None and ssw_fragments != "-" and ssw_fragments != "":
+        has_valid_data = True
+    elif ssw_helix_pct is not None and not pd.isna(ssw_helix_pct) and ssw_helix_pct >= 0:
+        has_valid_data = True
+    elif ssw_beta_pct is not None and not pd.isna(ssw_beta_pct) and ssw_beta_pct >= 0:
         has_valid_data = True
     
     if has_valid_data:

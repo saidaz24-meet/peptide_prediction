@@ -33,7 +33,7 @@ const optionalFields = [
   { key: 'species', label: 'Species', description: 'Source organism' },
   { key: 'hydrophobicity', label: 'Hydrophobicity', description: 'Hydrophobicity value (auto-calculated if not provided)' },
   { key: 'charge', label: 'Charge', description: 'Net charge at physiological pH (auto-calculated if not provided)' },
-  { key: 'chameleon_prediction', label: 'SSW Prediction', description: 'Switch (SSW) prediction (auto-calculated if not provided)' },
+  { key: 'ssw_prediction', label: 'SSW Prediction', description: 'Switch (SSW) prediction (auto-calculated if not provided)' },
   { key: 'name', label: 'Name', description: 'Peptide name or description' },
   { key: 'notes', label: 'Notes', description: 'Additional information' },
 ];
@@ -110,7 +110,7 @@ export function ColumnMapper({ headers, onMappingComplete }: ColumnMapperProps) 
           ? Number(row[mapping.charge]) : 0;
 
         let sswPrediction: SSWPrediction = 0;
-        const predictionKey = mapping.ssw_prediction || mapping.chameleon_prediction; // Backward compat
+        const predictionKey = mapping.ssw_prediction;
         if (predictionKey && row[predictionKey]) {
           const chValue = String(row[predictionKey]).toLowerCase();
           if (['1', 'true', 'positive', 'yes'].includes(chValue)) sswPrediction = 1;
@@ -145,7 +145,6 @@ export function ColumnMapper({ headers, onMappingComplete }: ColumnMapperProps) 
           muH,
           charge,
           sswPrediction,
-          chameleonPrediction: sswPrediction, // Backward compatibility alias
           ffHelixPercent,
         });
       });

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import warnings
 
-import biochemCalculation
+import biochem_calculation
 
 PATH = os.getcwd()
 JPRED_INPUT_FILEPATH = "jpred_input.txt"
@@ -16,7 +16,7 @@ MIN_LENGTH = 5
 MAX_GAP = 3
 MIN_JPRED_SCORE = 7
 MIN_TANGO_SCORE = 0
-MAX_CHAMELEON_DIFFERENCE_TANGO = np.inf
+MAX_SSW_DIFFERENCE_TANGO = np.inf
 
 # --- FF-Helix helpers (pure Python; no external tools) ---
 
@@ -39,15 +39,23 @@ def ff_helix_percent(seq: str, core_len: Optional[int] = None, thr: Optional[flo
     Args:
         seq: Amino acid sequence
         core_len: Window size for helix core detection (default from FF_HELIX_CORE_LEN env, or 6)
-        thr: Threshold for helix propensity (default from FF_HELIX_THRESHOLD env, or 1.0)
+        thr: Threshold for helix propensity (default from config, or 1.0)
     
     Returns a value in [0.0, 100.0] (clamped to ensure valid range).
     """
-    # Get defaults from env vars (maintains backward compatibility)
+    # Get defaults from config (with fallback for backward compatibility)
     if core_len is None:
-        core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
+        try:
+            from config import settings
+            core_len = settings.FF_HELIX_CORE_LEN
+        except ImportError:
+            core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
     if thr is None:
-        thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
+        try:
+            from config import settings
+            thr = settings.FF_HELIX_THRESHOLD
+        except ImportError:
+            thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
     s = (seq or "").upper().strip()
     if len(s) < core_len:
         return 0.0
@@ -79,14 +87,22 @@ def ff_helix_cores(seq: str, core_len: Optional[int] = None, thr: Optional[float
     
     Args:
         seq: Amino acid sequence
-        core_len: Window size for helix core detection (default from FF_HELIX_CORE_LEN env, or 6)
-        thr: Threshold for helix propensity (default from FF_HELIX_THRESHOLD env, or 1.0)
+        core_len: Window size for helix core detection (default from config, or 6)
+        thr: Threshold for helix propensity (default from config, or 1.0)
     """
-    # Get defaults from env vars (maintains backward compatibility)
+    # Get defaults from config (with fallback for backward compatibility)
     if core_len is None:
-        core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
+        try:
+            from config import settings
+            core_len = settings.FF_HELIX_CORE_LEN
+        except ImportError:
+            core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
     if thr is None:
-        thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
+        try:
+            from config import settings
+            thr = settings.FF_HELIX_THRESHOLD
+        except ImportError:
+            thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
     s = (seq or "").upper().strip()
     if len(s) < core_len:
         return []
@@ -168,7 +184,7 @@ def __check_subsegment_without_the_end(prediction, start, original_end, min_leng
         if good_segment:
             return cur_end
         cur_end -= 1
-    return -1
+    return None  # No valid segment found
 
 
 def __check_subsegment(prediction: list, start: int, end: int) -> tuple:
@@ -229,14 +245,14 @@ def get_secondary_structure_segments(prediction: list, prediction_method: str) -
             elif segment_length >= MIN_LENGTH:
                 shorter_segment_start, shorter_segment_end, shorter_segment_score = __check_subsegment(prediction,
                                                                                                        start, end)
-                if shorter_segment_end != -1 and shorter_segment_start != -1 and shorter_segment_score >= min_score:
+                if shorter_segment_end is not None and shorter_segment_start is not None and shorter_segment_score >= min_score:
                     segments.append(tuple((shorter_segment_start, shorter_segment_end)))
 
         i += 1
     return segments
 
 
-def __calc_average_score(prediction: list, structure_prediction_indexes: list) -> float:
+def __calc_average_score(prediction: list, structure_prediction_indexes: list) -> Optional[float]:
     """
     Calculates the average score of the secondary structure prediction by averaging the average score of each segment
     predicted to have secondary structure.
@@ -244,10 +260,10 @@ def __calc_average_score(prediction: list, structure_prediction_indexes: list) -
     :param prediction: list of prediction scores
     :param structure_prediction_indexes: list of tuples, each tuple represent the start and end index of segment
     predicted to have secondary structure.
-    :return: average prediction score
+    :return: average prediction score, or None if no segments
     """
     if len(structure_prediction_indexes) == 0:
-        return -1
+        return None  # No segments to calculate
     segments_scores = []
     for start, end in structure_prediction_indexes:
         segments_scores.append(mean(prediction[start: end + 1]))
@@ -264,10 +280,10 @@ def calc_secondary_structure_switch_difference_and_score(beta_prediction: list, 
     :param helix_prediction: list of prediction scores
     :param structure_prediction_indexes: list of tuples, each tuple represent the start and end index of segment
     predicted to have secondary structure.
-    :return: secondary structure switch score, secondary structure switch difference
+    :return: secondary structure switch score, secondary structure switch difference (None, None if no segments)
     """
     if len(structure_prediction_indexes) == 0:
-        return -1, -1
+        return None, None  # No segments to calculate
 
     beta_score = __calc_average_score(beta_prediction, structure_prediction_indexes)
     helix_score = __calc_average_score(helix_prediction, structure_prediction_indexes)
@@ -337,34 +353,33 @@ def find_secondary_structure_switch_segments(beta_segments: list, helix_segments
 
 
 
-# Also add this function that's missing from your auxiliary.py:
-def get_avg_uH_by_segments(sequence: str, segments: list) -> float:
+def get_avg_uH_by_segments(sequence: str, segments: list) -> Optional[float]:
     """
     Calculate average hydrophobic moment for given segments.
-    Returns -1 if no valid segments.
+    Returns None if no valid segments (instead of -1).
     """
     if not sequence or not segments:
-        return -1.0
-    
+        return None  # No data to calculate
+
     try:
         total_muH = 0.0
         total_length = 0
-        
+
         for segment in segments:
             if len(segment) >= 2:
                 start, end = segment[0] - 1, segment[1]  # Convert to 0-indexed
                 if 0 <= start < len(sequence) and start < end <= len(sequence):
                     seg_seq = sequence[start:end]
                     if seg_seq:  # Make sure segment is not empty
-                        muH = biochemCalculation.hydrophobic_moment(seg_seq)
+                        muH = biochem_calculation.hydrophobic_moment(seg_seq)
                         total_muH += muH * len(seg_seq)
                         total_length += len(seg_seq)
-        
-        return total_muH / total_length if total_length > 0 else -1.0
-        
+
+        return total_muH / total_length if total_length > 0 else None
+
     except Exception as e:
         print(f"[DEBUG] Error in get_avg_uH_by_segments: {e}")
-        return -1.0
+        return None  # Return None on error
 
 def check_secondary_structure_prediction_content(secondary_structure_prediction_conf: list) -> float:
     """

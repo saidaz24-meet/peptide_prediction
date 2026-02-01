@@ -24,7 +24,8 @@ import { applyThresholds, DEFAULT_THRESHOLDS, meetsFFHelixThreshold, type Resolv
 import { uploadCSV, predictOne } from '@/lib/api';
 import { RotateCcw } from 'lucide-react';
 
-import type { Peptide, ChameleonPrediction, SSWPrediction } from '@/types/peptide';
+import type { Peptide, SSWPrediction } from '@/types/peptide';
+// mapApiRowsToPeptides removed - peptides from store are already mapped
 
 import { CorrelationCard } from '@/components/CorrelationCard';
 import AppFooter from '@/components/AppFooter';
@@ -71,8 +72,9 @@ function ReproduceButton({
         }
         const result = await predictOne(input.sequence, input.entry, config);
         // For predict, we convert single result to array format for consistency
-        const rows = [result];
-        const meta = (result as any).meta || {};
+        // result is PredictResponse: {row, meta}
+        const rows = [result.row];
+        const meta = result.meta || {};
         ingestBackendRows(rows, meta);
         toast.success('Run reproduced successfully');
       }
@@ -126,42 +128,9 @@ export default function Results() {
     return null; // Will redirect
   }
 
-  // -------- Type normalization (fixes lib/types shape mismatch) --------
-  const normalizePeptide = (p: any): Peptide => {
-    const sswRaw = p?.sswPrediction ?? p?.chameleonPrediction; // Backward compat
-    const ssw: SSWPrediction =
-      sswRaw === 1 ? 1 : sswRaw === 0 ? 0 : -1;
-
-    // Ensure ID is always present — try canonical first, then fallbacks
-    const id = String(p.id ?? p.Entry ?? p.entry ?? p.Accession ?? p.accession ?? '').trim();
-    
-    // preserve everything else; enforce the fields TS cares about
-    return {
-      id,
-      name: p.name ?? p['Protein name'],
-      species: p.species ?? p.Organism,
-      sequence: String(p.sequence ?? p.Sequence ?? ''),
-      length: Number(p.length ?? p.Length ?? 0),
-      hydrophobicity: Number(p.hydrophobicity ?? p.Hydrophobicity ?? 0),
-      muH: typeof p.muH === 'number' ? p.muH : (typeof p['Full length uH'] === 'number' ? p['Full length uH'] : undefined),
-      charge: Number(p.charge ?? p.Charge ?? 0),
-      sswPrediction: ssw,
-      chameleonPrediction: ssw, // Backward compatibility alias
-      ffHelixPercent: typeof p.ffHelixPercent === 'number' ? p.ffHelixPercent
-        : (typeof p['FF-Helix %'] === 'number' ? p['FF-Helix %'] : undefined),
-      jpred: p.jpred ?? {
-        helixFragments: p['Helix fragments (Jpred)'] ?? undefined,
-        helixScore: typeof p['Helix score (Jpred)'] === 'number' ? p['Helix score (Jpred)'] : undefined,
-      },
-      extra: p.extra ?? {},
-    };
-  };
-
-  // Canonical typed arrays used everywhere below
-  const peptidesTyped: Peptide[] = useMemo(
-    () => peptides.map(normalizePeptide),
-    [peptides]
-  );
+  // peptides from store is already Peptide[] (mapped by ingestBackendRows)
+  // No re-mapping needed - use directly
+  const peptidesTyped: Peptide[] = peptides;
 
   // -------- Smart Candidate Ranking --------
   const shortlist: Peptide[] = useMemo(() => {
@@ -185,13 +154,13 @@ export default function Results() {
       'charge',
       'muH',
       'ffHelixPercent',
-      'chameleonPrediction',
+      'sswPrediction',
     ];
     const rows = shortlist.map((p) =>
       cols.map((c) => {
         const val = (p as any)[c];
         if (val === undefined || val === null) return '';
-        if (c === 'sswPrediction' || c === 'chameleonPrediction') { // Backward compat
+        if (c === 'sswPrediction') {
           return val === 1 ? 'Positive' : val === -1 ? 'N/A' : 'Negative';
         }
         return val;

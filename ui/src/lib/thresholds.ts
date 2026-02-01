@@ -34,7 +34,7 @@ export function applyThresholds(
 ): { ffHelixView: number; sswView: number } {
   const muH = typeof peptide.muH === 'number' ? peptide.muH : 0;
   const H = typeof peptide.hydrophobicity === 'number' ? peptide.hydrophobicity : 0;
-  const ssw = peptide.sswPrediction ?? (peptide as any).chameleonPrediction ?? -1;
+  const ssw = peptide.sswPrediction ?? -1;
 
   // FF-Helix flag: 1 if muH >= muHCutoff, else 0
   const ffHelixView = muH >= thresholds.muHCutoff ? 1 : 0;

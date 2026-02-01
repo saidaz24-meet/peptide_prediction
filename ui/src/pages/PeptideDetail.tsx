@@ -91,7 +91,7 @@ export default function PeptideDetail() {
     // NO LYING UI: If TANGO didn't run or is OFF/UNAVAILABLE, show N/A
     const isUnavailable = !tangoRan || (tangoStatus !== 'AVAILABLE' && tangoStatus !== 'PARTIAL' && tangoStatus !== undefined);
     
-    const sswPred = peptide.sswPrediction ?? (peptide as any).chameleonPrediction; // Backward compat
+    const sswPred = peptide.sswPrediction;
     
     // If TANGO didn't run or is unavailable, always show N/A
     if (isUnavailable || sswPred === null || sswPred === undefined) {

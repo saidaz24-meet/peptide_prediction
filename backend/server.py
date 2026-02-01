@@ -11,12 +11,14 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-import auxiliary, biochemCalculation, tango
-# JPred module kept for reference only - not used functionally
-# import jpred
+import auxiliary, tango
+# JPred module removed (dead code)
+# biochem_calculation renamed to calculations/biochem.py
 from auxiliary import ff_helix_percent, ff_helix_cores
 import math
 from schemas.peptide import PeptideSchema
+from schemas.api_models import RowsResponse, PredictResponse
+from schemas.feedback import FeedbackRequest
 from calculations.biochem import calculate_biochemical_features as calc_biochem
 from services.normalize import (
     canonicalize_headers,
@@ -26,600 +28,83 @@ from services.normalize import (
     finalize_ff_fields,
     normalize_rows_for_ui,
 )
-from services.thresholds import resolve_thresholds
-from services.uniprot_query import parse_uniprot_query, build_uniprot_export_url
+from services.thresholds import resolve_thresholds, parse_threshold_config
+from services.upload_service import (
+    process_upload_dataframe,
+    UploadProcessingError,
+    get_last_provider_status,
+    get_last_run_dir,
+    set_last_provider_status,
+    set_last_run_dir,
+)
+from services.predict_service import process_single_sequence
+from services.uniprot_service import (
+    ping_uniprot as uniprot_ping_service,
+    parse_query as parse_uniprot_query_service,
+    window_protein_sequences as window_sequences_service,
+)
+from services.uniprot_parser import parse_uniprot_query, build_uniprot_export_url
 from schemas.uniprot_query import UniProtQueryParseRequest, UniProtQueryParseResponse, UniProtQueryExecuteRequest
 from services.logger import get_logger, set_trace_id, log_info, log_warning, log_error
+from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
+from services.dataframe_utils import (
+    has_any,
+    has_all,
+    ensure_ff_cols,
+    ensure_cols,
+    ff_flags,
+    require_cols,
+    read_any_table,
+    ensure_computed_cols,
+    apply_ff_flags,
+    fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
+    ssw_positive_percent as _ssw_positive_percent,
+)
 import httpx
 
-from dotenv import load_dotenv
-# Explicitly point to backend/.env
-dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
-load_dotenv(dotenv_path)
+# Import config first (loads .env files)
+from config import settings
 
-# If you use python-dotenv, make sure .env is loaded before reading env vars:
-from pathlib import Path
-try:
-    from dotenv import load_dotenv
-    load_dotenv(dotenv_path=Path(__file__).with_name(".env"))
-except Exception:
-    pass
+# Note: Sentry initialization and FastAPI app setup moved to api/main.py
+# SENTRY_INITIALIZED will be imported from api/main.py at the end of this file
 
-# Initialize Sentry before FastAPI app creation
-import sentry_sdk
-from sentry_sdk.integrations.fastapi import FastApiIntegration
+# Provider flags are read dynamically from settings to avoid caching issues
+# Use settings.USE_TANGO, settings.USE_PSIPRED, settings.USE_JPRED directly
+DEBUG_ENTRY = settings.DEBUG_ENTRY
+use_simple = settings.TANGO_MODE == "simple"
 
-# Sentry DSN must be provided via SENTRY_DSN environment variable
-# Never hardcode DSNs in source code
-SENTRY_DSN = os.getenv("SENTRY_DSN")
-SENTRY_INITIALIZED = False
-if SENTRY_DSN:
-    try:
-        sentry_sdk.init(
-            dsn=SENTRY_DSN,
-            integrations=[FastApiIntegration()],
-            # Add data like request headers and IP for users
-            send_default_pii=True,
-            # Set traces_sample_rate to 1.0 to capture 100% of transactions for performance monitoring
-            # Adjust this value in production
-            traces_sample_rate=0.1,
-            # Set profiles_sample_rate to profile 10% of sampled transactions
-            profiles_sample_rate=0.1,
-            # Environment for filtering in Sentry dashboard
-            environment=os.getenv("ENVIRONMENT", "development"),
-            # Enable debug mode to see what Sentry is doing (disable in production)
-            debug=os.getenv("SENTRY_DEBUG", "false").lower() == "true",
-        )
-        SENTRY_INITIALIZED = True
-        print("[SENTRY] Initialized successfully")
-        # Send a test message to verify connection
-        sentry_sdk.capture_message("Sentry backend initialized", level="info")
-    except Exception as e:
-        print(f"[SENTRY] Failed to initialize: {e}")
-        SENTRY_INITIALIZED = False
-else:
-    print("[SENTRY] No DSN provided (SENTRY_DSN env var not set), Sentry disabled")
-
-def env_true(name: str, default: bool = True) -> bool:
-    """Treat 1/true/yes/on (case-insensitive) as True; 0/false/no/off as False."""
-    v = os.getenv(name)
-    if v is None:
-        return default
-    return str(v).strip().lower() in ("1", "true", "yes", "on")
-
-# Debug entry for tracing specific peptide through pipeline
-DEBUG_ENTRY = os.getenv("DEBUG_ENTRY", "").strip()
-
-# JPred disabled - kept for reference only, not used functionally
-USE_JPRED = False  # Always disabled
-# Use env_true for consistent environment variable parsing (accepts 1/true/yes/on)
-USE_TANGO = env_true("USE_TANGO", True)
-USE_PSIPRED = env_true("USE_PSIPRED", True)
-
-use_simple = os.getenv("TANGO_MODE", "simple").lower() == "simple"
-
-app = FastAPI(title="Peptide Prediction Service")
-
-# Add exception handler to capture HTTPExceptions to Sentry
-from fastapi import Request
-from fastapi.responses import JSONResponse
-
-@app.exception_handler(HTTPException)
-async def http_exception_handler(request: Request, exc: HTTPException):
-    """
-    Capture HTTPExceptions to Sentry.
-    By default, FastApiIntegration only captures 5xx errors.
-    This handler captures important 4xx errors too.
-    """
-    # Capture 5xx errors as errors, important 4xx as warnings
-    if exc.status_code >= 500:
-        sentry_sdk.capture_exception(exc, level="error")
-    elif exc.status_code in [400, 401, 403, 404, 422]:
-        # Capture common 4xx errors as warnings (optional - remove if too noisy)
-        sentry_sdk.capture_exception(exc, level="warning")
-    
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail}
-    )
+# Note: FastAPI app creation, exception handlers, and middleware moved to api/main.py
+# Endpoint functions are kept here for backward compatibility and service imports
+# The actual app will be imported from api/main.py at the end of this file
 
 # Structured logging setup
 logger = get_logger()
 
-# Middleware to attach traceId to each request
-class TraceIdMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
-        # Generate or use existing traceId from header (full uuid4 for uniqueness)
-        trace_id = request.headers.get("X-Trace-Id") or str(uuid.uuid4())
-        set_trace_id(trace_id)
-        
-        # Store trace_id in request state for access in handlers
-        request.state.trace_id = trace_id
-        
-        # Log request start
-        log_info("request_start", f"{request.method} {request.url.path}", **{
-            "method": request.method,
-            "path": request.url.path,
-            "stage": "request",
-        })
-        
-        try:
-            response = await call_next(request)
-            log_info("request_end", f"{request.method} {request.url.path} {response.status_code}", **{
-                "method": request.method,
-                "path": request.url.path,
-                "status_code": response.status_code,
-                "stage": "request",
-            })
-            return response
-        except Exception as e:
-            log_error("request_error", f"{request.method} {request.url.path} failed: {e}", **{
-                "method": request.method,
-                "path": request.url.path,
-                "error": str(e),
-                "stage": "request",
-            })
-            # Capture exception to Sentry (will be filtered by FastApiIntegration for HTTPExceptions)
-            sentry_sdk.capture_exception(e, level="error")
-            raise
-
-def ensure_ff_cols(df):
-    df["FF-Helix %"] = df["Sequence"].astype(str).apply(ff_helix_percent)
-    df["FF Helix fragments"] = df["Sequence"].astype(str).apply(ff_helix_cores)
+# DataFrame utility functions are imported from services.dataframe_utils:
+# ensure_ff_cols, has_any, has_all, ensure_cols, ff_flags, require_cols,
+# read_any_table, ensure_computed_cols, apply_ff_flags,
+# _fill_percent_from_tango_if_missing, _ssw_positive_percent
 
 # --- Example dataset config ---
+from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent  # adjust one/two levels as needed
 EXAMPLE_PATH = BASE_DIR / "ui" / "public" / "Final_Staphylococcus_2023_new.xlsx"
 
-# columns that mean “we already have results” so don’t recompute
+# Column constants for checking pre-existing results
 JPRED_COLS = ["Helix fragments (Jpred)", "Helix score (Jpred)"]
 TANGO_COLS = ["SSW prediction", "SSW score"]
 BIOCHEM_COLS = ["Charge", "Hydrophobicity", "Full length uH"]
 
-def has_any(df: pd.DataFrame, cols: list[str]) -> bool:
-    return any(c in df.columns for c in cols)
-
-def has_all(df: pd.DataFrame, cols: list[str]) -> bool:
-    return all(c in df.columns for c in cols)
-
-# CORS for local dev (Vite on :5173)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "http://127.0.0.1:5173",
-        "http://localhost:5173",
-        "http://127.0.0.1:8080",
-        "http://localhost:8080",
-    ],
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Add TraceIdMiddleware last (so it executes first/outermost and captures all requests)
-app.add_middleware(TraceIdMiddleware)
-
-log_info("boot", f"USE_JPRED={USE_JPRED} • USE_TANGO={USE_TANGO}")
-
-
-
-# --- UI compatibility shims (naming + per-row flags) ---
-# _finalize_ui_aliases is now imported from services.normalize as finalize_ui_aliases
-
-
-
-# Add these functions to your server.py file
-
-# normalize_cols is now imported from services.normalize
-
-def ensure_cols(df: pd.DataFrame):
-    """Ensure all required columns exist with default values."""
-    required_cols = [
-        "Charge", "Hydrophobicity", "Full length uH", "Helix (Jpred) uH",
-        "Beta full length uH", "SSW prediction", "SSW score", "SSW diff",
-        "SSW helix percentage", "SSW beta percentage",
-        "FF-Secondary structure switch", "FF-Helix (Jpred)"
-    ]
-    
-    for col in required_cols:
-        if col not in df.columns:
-            if col == "Helix fragments (Jpred)":
-                df[col] = pd.Series([[] for _ in range(len(df))], dtype=object)
-            else:
-                df[col] = -1
-
-def ff_flags(df: pd.DataFrame):
-    """Calculate FF flags based on existing data."""
-    # This function should compute your final FF flags
-    # For now, just ensure the columns exist
-    if "FF-Helix (Jpred)" not in df.columns:
-        df["FF-Helix (Jpred)"] = -1
-    if "FF-Secondary structure switch" not in df.columns:
-        df["FF-Secondary structure switch"] = -1
-
-
-@app.get("/api/example")
-def load_example(recalc: int = 0):
-    """
-    Serve the presentation dataset with JPred/Tango already computed.
-    By default (recalc=0) we DO NOT recompute biochem/JPred/Tango.
-    Set recalc=1 if you explicitly want to recompute locally.
-    """
-    if not os.path.exists(EXAMPLE_PATH):
-        raise HTTPException(status_code=404, detail=f"Example file not found at {EXAMPLE_PATH}")
-
-    try:
-        df = pd.read_excel(EXAMPLE_PATH)  # needs openpyxl
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed reading example xlsx: {e}")
-
-    # Normalize essential columns but DO NOT drop precomputed fields
-    try:
-        df = normalize_cols(df)  # your existing helper: maps Entry/Sequence/Length
-    except HTTPException:
-        # for legacy sheets, derive Length if missing
-        if "Sequence" in df.columns and "Length" not in df.columns:
-            df["Length"] = df["Sequence"].astype(str).str.len()
-
-    # Decide what to compute based on what's already present
-    already_has_biochem = has_all(df, BIOCHEM_COLS)
-    already_has_jpred  = has_any(df, JPRED_COLS)
-    already_has_tango  = has_any(df, TANGO_COLS)
-
-    # Recompute only if asked (recalc=1) or missing
-    if recalc or not already_has_biochem:
-        ensure_cols(df)     # creates missing cols with -1
-        calc_biochem(df)    # computes Charge, Hydrophobicity, uH
-    else:
-        # ensure numeric types for charts
-        for c in BIOCHEM_COLS:
-            if c in df.columns:
-                df[c] = pd.to_numeric(df[c], errors="coerce")
-
-    # JPred disabled - kept for reference only
-    # Secondary structure predictions will be handled by a flexible interface in the future
-    already_has_jpred = False
-
-    if recalc or (USE_TANGO and not already_has_tango):
-        try:
-            # whichever Tango flow you use; if you switched to run_and_attach, call that
-            if hasattr(tango, "run_and_attach"):
-                tango.run_and_attach(df)
-            else:
-                try:
-                    # For example dataset, use latest run (backward compatibility)
-                    tango.process_tango_output(df, run_dir=None)
-                except ValueError as e:
-                    print(f"[TANGO][ERROR] {e}")
-                    print("[TANGO] Provider status: FAILED - continuing without Tango results")
-                except Exception as e:
-                    print(f"[TANGO][WARN] Unexpected error during output processing: {e}")
-                
-                try:
-                    tango.filter_by_avg_diff(df, "Example", {"Example": {}})
-                except ValueError as e:
-                    print(f"[TANGO][ERROR] {e}")
-                    print("[TANGO] Provider status: FAILED - SSW prediction computation failed")
-                except Exception as e:
-                    print(f"[WARN] Tango filter failed (example): {e}")
-        except Exception as e:
-            print(f"[WARN] Tango parse failed (example): {e}")
-
-    # Always compute final FF flags on the DataFrame we’re returning
-    ensure_cols(df)
-    ff_flags(df)
-
-    # build meta so the UI can show provenance pills
-    meta = {
-            "use_jpred": False,  # JPred disabled - kept for reference only
-        "use_tango": USE_TANGO or already_has_tango,
-        "jpred_rows": int((df.get("Helix fragments (Jpred)", pd.Series([-1]*len(df))) != -1).sum()),
-        "ssw_rows":   int((df.get("SSW prediction", pd.Series([-1]*len(df))) != -1).sum()),
-        "valid_seq_rows": int(df["Sequence"].notna().sum())
-    }
-    print(f"[EXAMPLE] rows={len(df)} • JPred rows={meta['jpred_rows']} • Tango rows={meta['ssw_rows']} • recalc={recalc}")
-
-    # Normalize to canonical camelCase using PeptideSchema (with provider status - Principle B)
-    rows_out = normalize_rows_for_ui(
-        df,
-        is_single_row=False,
-        tango_enabled=USE_TANGO or already_has_tango,
-        psipred_enabled=USE_PSIPRED,
-        jpred_enabled=False  # JPred disabled
-    )
-
-    return {"rows": rows_out, "meta": meta}
-
-@app.get("/api/health")
-def health():
-    return {"ok": True}
-
-@app.get("/api/test-sentry")
-async def test_sentry():
-    """
-    Test endpoint to verify Sentry connection.
-    Sends different types of test events to Sentry.
-    """
-    import sentry_sdk
-    
-    results = {
-        "sentry_initialized": SENTRY_INITIALIZED,
-        "sentry_dsn_configured": bool(SENTRY_DSN),  # Don't expose actual DSN
-        "tests": {}
-    }
-    
-    if not SENTRY_INITIALIZED:
-        return {
-            **results,
-            "error": "Sentry not initialized. Check DSN and initialization logs."
-        }
-    
-    # Test 1: Send a simple message
-    try:
-        sentry_sdk.capture_message("Test message from /api/test-sentry", level="info")
-        results["tests"]["message"] = "sent"
-    except Exception as e:
-        results["tests"]["message"] = f"failed: {str(e)}"
-    
-    # Test 2: Send an exception
-    try:
-        test_error = ValueError("Test exception from /api/test-sentry")
-        sentry_sdk.capture_exception(test_error, level="error")
-        results["tests"]["exception"] = "sent"
-    except Exception as e:
-        results["tests"]["exception"] = f"failed: {str(e)}"
-    
-    # Test 3: Trigger an HTTPException (5xx)
-    try:
-        raise HTTPException(status_code=500, detail="Test 500 error from /api/test-sentry")
-    except HTTPException as e:
-        # This will be caught by the exception handler and sent to Sentry
-        results["tests"]["http_500"] = "triggered"
-        raise
-    
-    return results
-
-@app.get("/api/test-sentry-simple")
-async def test_sentry_simple():
-    """
-    Simple test that just sends a message to Sentry.
-    Check your Sentry dashboard after calling this.
-    """
-    import sentry_sdk
-    
-    if not SENTRY_INITIALIZED:
-        raise HTTPException(status_code=503, detail="Sentry not initialized")
-    
-    # Send a test message
-    event_id = sentry_sdk.capture_message(
-        f"Test from backend at {time.time()}",
-        level="info"
-    )
-    
-    return {
-        "status": "sent",
-        "event_id": event_id,
-        "message": "Check your Sentry dashboard for this event",
-        "sentry_configured": True,
-    }
-
-# sanitize_seq is now in calculations.biochem
-
-# canonicalize_headers is now imported from services.normalize
-
-def require_cols(df: pd.DataFrame, cols: List[str]):
-    """
-    Validate that required columns exist in the DataFrame.
-    
-    Args:
-        df: DataFrame to validate
-        cols: List of required column names
-    
-    Raises:
-        HTTPException 400: If any required columns are missing
-    """
-    missing = [c for c in cols if c not in df.columns]
-    if missing:
-        available = list(df.columns)
-        # Provide helpful suggestions for common column name variations
-        suggestions = {}
-        for col in missing:
-            col_lower = col.lower()
-            matches = [c for c in available if c.lower() == col_lower or col_lower in c.lower() or c.lower() in col_lower]
-            if matches:
-                suggestions[col] = matches[:3]  # Top 3 matches
-        
-        suggestion_text = ""
-        if suggestions:
-            suggestion_parts = []
-            for req_col, matches in suggestions.items():
-                # Build quoted matches list to avoid nested f-string syntax issues
-                quoted_matches = ', '.join(f"'{m}'" for m in matches)
-                suggestion_parts.append(f"  '{req_col}' might be: {quoted_matches}")
-            suggestion_text = "\n" + "\n".join(suggestion_parts)
-        
-        detail_msg = (
-            f"Missing required column(s): {missing}. "
-            f"Available columns: {available}. "
-            f"Required columns: {cols}. "
-            f"Ensure your file contains at least an ID field (Entry/Accession/ID) and 'Sequence'. "
-            f"Accepted file formats: .csv, .tsv, .xlsx, .xls, .txt."
-        )
-        if suggestion_text:
-            detail_msg += suggestion_text
-        
-        raise HTTPException(400, detail=detail_msg)
-
-def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
-    """
-    Read CSV/TSV/XLS(X) with intelligent delimiter detection and BOM handling.
-    
-    Supported formats:
-    - .csv, .txt (comma-separated)
-    - .tsv (tab-separated)
-    - .xlsx, .xls (Excel files)
-    
-    Normalization:
-    - Strips UTF-8 BOM if present (utf-8-sig encoding)
-    - Normalizes line endings (handled by pandas)
-    - Auto-detects delimiter when file extension is ambiguous
-    
-    Args:
-        raw: File contents as bytes
-        filename: Original filename (used for extension-based detection)
-    
-    Returns:
-        DataFrame with parsed data
-    
-    Raises:
-        ValueError: If file format is not supported or parsing fails
-    """
-    fn = filename.lower() if filename else ""
-    
-    # Normalize input: strip BOM and normalize line endings
-    # utf-8-sig encoding automatically strips BOM
-    # pandas handles line ending normalization internally
-    
-    # Excel files (.xlsx, .xls)
-    if fn.endswith((".xlsx", ".xls")):
-        try:
-            bio = io.BytesIO(raw)
-            return pd.read_excel(bio, engine='openpyxl' if fn.endswith('.xlsx') else None)
-        except Exception as e:
-            raise ValueError(f"Failed to parse Excel file {filename}: {e}. "
-                           f"Ensure file is a valid .xlsx or .xls file. "
-                           f"If using .xlsx, openpyxl must be installed.")
-
-    # TSV files (.tsv) - tab-separated
-    if fn.endswith(".tsv"):
-        try:
-            return pd.read_csv(
-                io.BytesIO(raw),
-                sep="\t",
-                encoding="utf-8-sig",  # Strips BOM
-                engine="python"  # More lenient with malformed files
-            )
-        except Exception as e:
-            raise ValueError(f"Failed to parse TSV file {filename}: {e}. "
-                           f"Ensure file uses tab-separated values.")
-
-    # CSV or TXT files - try extension-based detection, then auto-detect
-    if fn.endswith((".csv", ".txt")):
-        # First try comma-separated (most common for .csv)
-        if fn.endswith(".csv"):
-            try:
-                return pd.read_csv(
-                    io.BytesIO(raw),
-                    sep=",",  # Explicit comma for .csv
-                    encoding="utf-8-sig",  # Strips BOM
-                    engine="python"
-                )
-            except Exception:
-                # Fallback: let pandas auto-detect delimiter
-                try:
-                    return pd.read_csv(
-                        io.BytesIO(raw),
-                        sep=None,  # Auto-detect
-                        engine="python",
-                        encoding="utf-8-sig"
-                    )
-                except Exception as e:
-                    raise ValueError(f"Failed to parse CSV file {filename}: {e}. "
-                                   f"Ensure file uses comma-separated values.")
-
-        # .txt files - auto-detect delimiter (could be CSV or TSV)
-        else:
-            # Try auto-detection first
-            try:
-                return pd.read_csv(
-                    io.BytesIO(raw),
-                    sep=None,  # Auto-detect delimiter
-                    engine="python",
-                    encoding="utf-8-sig"
-                )
-            except Exception:
-                # Fallback: try tab, then comma
-                try:
-                    return pd.read_csv(
-                        io.BytesIO(raw),
-                        sep="\t",
-                        encoding="utf-8-sig",
-                        engine="python"
-                    )
-                except Exception:
-                    return pd.read_csv(
-                        io.BytesIO(raw),
-                        sep=",",
-                        encoding="utf-8-sig",
-                        engine="python"
-                    )
-
-    # Unknown extension - try auto-detection
-    try:
-        return pd.read_csv(
-            io.BytesIO(raw),
-            sep=None,  # Auto-detect delimiter
-            engine="python",
-            encoding="utf-8-sig"
-        )
-    except Exception as e:
-        raise ValueError(f"Unsupported file format: {filename}. "
-                       f"Accepted formats: .csv, .tsv, .xlsx, .xls, .txt. "
-                       f"Error: {e}")
-
-# ---------- NEW: small utilities for FF + percents ----------
-def ensure_computed_cols(df: pd.DataFrame):
-    for c in [
-        "Charge", "Hydrophobicity", "Full length uH", "Helix (Jpred) uH",
-        "Helix fragments (Jpred)", "Helix score (Jpred)",
-        "SSW prediction", "SSW score", "Beta full length uH"
-    ]:
-        if c not in df.columns:
-            if c == "Helix fragments (Jpred)":
-                # object dtype column of empty lists
-                df[c] = pd.Series([[] for _ in range(len(df))], dtype=object)
-            else:
-                df[c] = -1
-
-# _to_segments is now in calculations.biochem
-# _sanitize_for_json is now in services.normalize
-# calc_biochem is now imported from calculations.biochem
-
-def apply_ff_flags(df: pd.DataFrame):
-    ssw_avg_H = df[df["SSW prediction"] != 1]["Hydrophobicity"].mean()
-    jpred_avg_uH = df[df["Helix (Jpred) uH"] != -1]["Helix (Jpred) uH"].mean()
-    df["FF-Secondary structure switch"] = [
-        1 if r["SSW prediction"] == 1 and r["Hydrophobicity"] >= ssw_avg_H else -1
-        for _, r in df.iterrows()
-    ]
-    df["FF-Helix (Jpred)"] = [
-        1 if r["Helix (Jpred) uH"] != -1 and r["Helix (Jpred) uH"] >= jpred_avg_uH else -1
-        for _, r in df.iterrows()
-    ]
-
-def _fill_percent_from_tango_if_missing(df: pd.DataFrame) -> None:
-    """
-    If PSIPRED is off, ensure percent content fields exist using Tango merges.
-    (Your tango.process_tango_output already sets these for each row.)
-    We just guarantee presence + numeric dtype so the UI cards can compute means.
-    """
-    for col in ["SSW helix percentage", "SSW beta percentage"]:
-        if col not in df.columns:
-            df[col] = 0
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-def _chameleon_percent(df: pd.DataFrame) -> float:
-    """Percent of rows that are chameleon-positive (SSW prediction == 1)."""
-    if "SSW prediction" not in df.columns or len(df) == 0:
-        return 0.0
-    pos = int((df["SSW prediction"] == 1).sum())
-    return round(100.0 * pos / len(df), 1)
+# Note: CORS and TraceIdMiddleware are configured in api/main.py
+# Note: _finalize_ui_aliases imported from services.normalize
+# Note: normalize_cols imported from services.normalize
+# Note: canonicalize_headers imported from services.normalize
 
 # ---------- Endpoints ----------
 
-@app.post("/api/upload-csv")
+# @app.post("/api/upload-csv", response_model=RowsResponse)  # Moved to api/routes/upload.py
 async def upload_csv(
-    file: UploadFile = File(...), 
+    file: UploadFile = File(...),
     debug_entry: Optional[str] = Query(None, description="Entry ID to trace through pipeline"),
     thresholdConfig: Optional[str] = Form(None, description="Threshold configuration JSON")
 ):
@@ -628,57 +113,44 @@ async def upload_csv(
     debug_entry: Optional entry ID to enable detailed tracing for that specific peptide.
     Only 'Entry/Accession' and 'Sequence' are required; 'Length' is computed if missing.
     Computed fields (Hydrophobicity, Charge, μH, FF flags) are added server-side.
+
+    Core processing logic is in services/upload_service.py.
+    This function handles HTTP-specific concerns (file validation, UploadFile handling).
     """
     # Use env var or query param for debug entry
     trace_entry = debug_entry or DEBUG_ENTRY
     if trace_entry:
         log_info("upload_trace_entry", f"Tracing entry: {trace_entry}", entry=trace_entry)
-    
-    # Parse thresholdConfig if provided
-    threshold_config_requested = None
-    if thresholdConfig:
-        try:
-            threshold_config_requested = json.loads(thresholdConfig)
-        except json.JSONDecodeError:
-            # Invalid JSON, log warning but continue with defaults
-            log_warning("threshold_config_invalid", f"Invalid thresholdConfig JSON: {thresholdConfig}", **{"error": "JSON decode failed"})
-    
-    # Resolve threshold config (use defaults for now, no behavior changes)
-    threshold_config_resolved = {
-        "mode": "default",
-        "version": "1.0.0"
-    }
-    if threshold_config_requested:
-        # Echo requested config structure (validation/resolution to be added later)
-        threshold_config_resolved = {
-            "mode": threshold_config_requested.get("mode", "default"),
-            "version": threshold_config_requested.get("version", "1.0.0"),
-            "custom": threshold_config_requested.get("custom") if threshold_config_requested.get("mode") == "custom" else None,
-        }
-    
+
+    # Parse threshold config (shared helper)
+    threshold_config_requested, threshold_config_resolved = parse_threshold_config(thresholdConfig)
+
     # Validate file format upfront
     if not file.filename:
         raise HTTPException(400, detail="File must have a filename. "
                                        "Accepted formats: .csv, .tsv, .xlsx, .xls, .txt")
-    
+
     file_ext = file.filename.lower().split('.')[-1] if '.' in file.filename else ""
     if file_ext not in ["csv", "tsv", "xlsx", "xls", "txt"]:
         raise HTTPException(400, detail=f"Unsupported file format: '{file_ext}'. "
                                        "Accepted formats: .csv (comma-separated), .tsv (tab-separated), "
                                        ".xlsx/.xls (Excel), .txt (auto-detect delimiter).")
-    
+
+    # Performance timing: Parse stage
+    parse_start_time = time.time()
     log_info("upload_parse_start", f"Parsing file: {file.filename}", stage="parse")
     raw = await file.read()
-    
+
     # Validate file is not empty
     if len(raw) == 0:
         raise HTTPException(400, detail="Uploaded file is empty. "
                                        "Please upload a non-empty file with at least one data row.")
-    
+
     try:
         df = read_any_table(raw, file.filename)
-        log_info("upload_parse_complete", f"Parsed {len(df)} rows from {file.filename}", 
-                stage="parse", **{"row_count": len(df), "upload_filename": file.filename})
+        parse_elapsed = (time.time() - parse_start_time) * 1000  # Convert to ms
+        log_info("upload_parse_complete", f"Parsed {len(df)} rows from {file.filename}",
+                stage="parse", **{"row_count": len(df), "upload_filename": file.filename, "parse_time_ms": round(parse_elapsed, 2)})
     except ValueError as e:
         # ValueError from read_any_table with detailed format/parsing error
         log_error("upload_parse_failed", f"Failed to parse table: {e}", stage="parse", **{"error": str(e)})
@@ -689,16 +161,19 @@ async def upload_csv(
         raise HTTPException(400, detail=f"Failed to parse file '{file.filename}': {e}. "
                                        "Ensure file is a valid .csv, .tsv, .xlsx, or .xls file. "
                                        "Required columns: Entry/Accession (or ID) and Sequence.")
-    
+
     # Validate we got some data
     if len(df) == 0:
         raise HTTPException(400, detail="Parsed file contains no data rows. "
                                        "Ensure file has at least one row with data (excluding headers).")
 
+    # Performance timing: Normalize stage
+    normalize_start_time = time.time()
     log_info("normalize_start", "Normalizing column headers", stage="normalize")
     df = normalize_cols(df)
-    log_info("normalize_complete", f"Normalized columns: {list(df.columns)[:5]}...", 
-            stage="normalize", **{"column_count": len(df.columns)})
+    normalize_elapsed = (time.time() - normalize_start_time) * 1000
+    log_info("normalize_complete", f"Normalized columns: {list(df.columns)[:5]}...",
+            stage="normalize", **{"column_count": len(df.columns), "normalize_time_ms": round(normalize_elapsed, 2)})
     # normalize_cols already converts lowercase to capitalized (entry->Entry, sequence->Sequence)
     require_cols(df, ["Entry", "Sequence"])
 
@@ -706,574 +181,51 @@ async def upload_csv(
     if "Length" not in df.columns:
         df["Length"] = df["Sequence"].astype(str).str.len()
 
-    # Step 2 (already present): compute FF-Helix %
-    log_info("ff_helix_compute_start", "Computing FF-Helix % for all sequences")
-    ensure_ff_cols(df)
-    ensure_computed_cols(df)
-    log_info("ff_helix_complete", f"Computed FF-Helix for {len(df)} peptides")
-
-    # Secondary structure prediction via provider interface
-    # See backend/services/secondary_structure.py for provider abstraction
-    from services.secondary_structure import get_provider
+    # Process the DataFrame through the full pipeline
+    # Core logic is in services/upload_service.py
+    from api.main import SENTRY_INITIALIZED
     try:
-        provider = get_provider()
-        log_info("secondary_structure_start", f"Starting {provider.get_name()} processing")
-        provider.run(df)
-        log_info("secondary_structure_complete", f"{provider.get_name()} processing complete")
-    except Exception as e:
-        log_warning("secondary_structure_error", f"Secondary structure provider error: {e}", **{"error": str(e)})
+        return process_upload_dataframe(
+            df=df,
+            threshold_config_requested=threshold_config_requested,
+            threshold_config_resolved=threshold_config_resolved,
+            trace_entry=trace_entry,
+            sentry_initialized=SENTRY_INITIALIZED
+        )
+    except UploadProcessingError as e:
+        # Convert service errors to HTTP errors
+        raise HTTPException(status_code=e.status_code, detail=json.dumps(e.detail) if e.detail else e.message)
 
-    # JPred disabled - kept for reference only
-    # Secondary structure predictions will be handled by a flexible interface in the future
-
-    # --- TANGO (simple mac runner) -----------------------------------------
-    # Provider toggle precedence: ENV USE_TANGO (if False, always skip) > request flag
-    # For /api/upload-csv: Always run if USE_TANGO=true (no request flag, consistent behavior)
-    tango_stats = {"requested": 0, "parsed_ok": 0, "parsed_bad": 0}
-    tango_provider_status = "OFF"
-    tango_provider_reason = None
-    tango_enabled_flag = USE_TANGO  # Env flag (primary gate)
-    tango_requested_flag = True  # Upload CSV always requests Tango if enabled
-    tango_ran = False
-    try:
-        if tango_enabled_flag:
-            # Build fresh records (Entry, Sequence) from df
-            existed = tango.get_all_existed_tango_results_entries()
-            records = tango.create_tango_input(df, existed_tango_results=existed, force=True)
-            requested = len(records) if records else 0
-            tango_stats["requested"] = requested
-
-            if records:
-                log_info("tango_run_start", f"Running TANGO for {len(records)} sequences", 
-                        stage="tango_run", **{"sequence_count": len(records)})
-                run_dir = tango.run_tango_simple(records)  # creates out/run_*/<ID>.txt
-                tango_ran = True
-                run_id = os.path.basename(run_dir) if run_dir else None
-                log_info("tango_run_complete", f"TANGO run completed, outputs in {run_dir}", 
-                        stage="tango_run", run_id=run_id, **{"run_dir": run_dir})
-            else:
-                log_info("tango_skip", "No records to run (possibly all already processed).")
-                run_dir = None
-                tango_provider_status = "UNAVAILABLE"
-                tango_provider_reason = "No records to process"
-                # Set all SSW fields to None for all rows when no records
-                n = len(df)
-                df["SSW fragments"] = pd.Series(["-"] * n, index=df.index, dtype=object)
-                df["SSW score"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW diff"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW helix percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW beta percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW prediction"] = pd.Series([None] * n, index=df.index, dtype=object)
-
-            # Parse the specific run_* back into the DataFrame
-            parse_stats = None
-            run_id = os.path.basename(run_dir) if run_dir else None
-            try:
-                log_info("tango_parse_start", "Parsing TANGO output files", 
-                        stage="tango_parse", run_id=run_id)
-                parse_stats = tango.process_tango_output(df, run_dir=run_dir)
-                if parse_stats:
-                    tango_stats["parsed_ok"] = parse_stats.get("parsed_ok", 0)
-                    tango_stats["parsed_bad"] = parse_stats.get("parsed_bad", 0)
-                    tango_stats["requested"] = parse_stats.get("requested", requested)
-                log_info("tango_parse_complete", f"Parsed TANGO outputs: {tango_stats['parsed_ok']} OK, {tango_stats['parsed_bad']} failed", 
-                        stage="tango_parse", run_id=run_id, **tango_stats)
-                
-                # If parse_ok == 0 and requested > 0, runner likely failed
-                # Use reason from parse_stats (which reads from run_meta.json if available)
-                if parse_stats and parse_stats.get("parsed_ok", 0) == 0 and parse_stats.get("requested", 0) > 0:
-                    tango_provider_status = "UNAVAILABLE"
-                    # Use reason from parse_stats (extracted from run_meta.json by process_tango_output)
-                    meta_reason = parse_stats.get("reason")
-                    if meta_reason:
-                        tango_provider_reason = meta_reason
-                    else:
-                        tango_provider_reason = f"Runner failed; {parse_stats.get('parsed_ok', 0)}/{parse_stats.get('requested', 0)} parsed"
-                    # Ensure all SSW fields are None for all rows
-                    n = len(df)
-                    if "SSW prediction" in df.columns:
-                        df["SSW prediction"] = pd.Series([None] * n, index=df.index, dtype=object)
-                    if "SSW score" in df.columns:
-                        df["SSW score"] = pd.Series([None] * n, index=df.index, dtype=object)
-                    if "SSW diff" in df.columns:
-                        df["SSW diff"] = pd.Series([None] * n, index=df.index, dtype=object)
-                    if "SSW helix percentage" in df.columns:
-                        df["SSW helix percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
-                    if "SSW beta percentage" in df.columns:
-                        df["SSW beta percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
-            except ValueError as e:
-                # ✅ Check if this is a fatal "0 outputs" error
-                if "TANGO produced 0 outputs" in str(e):
-                    log_error("tango_zero_outputs_ui", f"TANGO zero outputs error: {e}", entry=trace_entry, **{"error": str(e), "run_dir": run_dir})
-                    # Extract run_dir from error message if available
-                    error_detail = {
-                        "source": "tango",
-                        "error": str(e),
-                        "run_dir": run_dir if run_dir else None,
-                        "suspected_cause": parse_stats.get("reason", "Unknown") if parse_stats else "Unknown",
-                    }
-                    raise HTTPException(
-                        status_code=500,
-                        detail=json.dumps(error_detail)
-                    )
-                
-                # Catch alignment errors and report clearly
-                log_error("tango_parse_failed", f"TANGO parse error: {e}", entry=trace_entry, **{"error": str(e)})
-                tango_provider_status = "UNAVAILABLE"
-                tango_provider_reason = f"Parse error: {str(e)}"
-                # Set all SSW fields to None (not -1, not 0) when parse fails
-                n = len(df)
-                df["SSW fragments"] = pd.Series(["-"] * n, index=df.index, dtype=object)
-                df["SSW score"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW diff"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW helix percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW beta percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW prediction"] = pd.Series([None] * n, index=df.index, dtype=object)
-            except Exception as e:
-                log_warning("tango_parse_error", f"Unexpected error during output processing: {e}", **{"error": str(e)})
-                tango_provider_status = "UNAVAILABLE"
-                tango_provider_reason = f"Unexpected error: {str(e)}"
-                # Set all SSW fields to None when unexpected error occurs
-                n = len(df)
-                df["SSW fragments"] = pd.Series(["-"] * n, index=df.index, dtype=object)
-                df["SSW score"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW diff"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW helix percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW beta percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW prediction"] = pd.Series([None] * n, index=df.index, dtype=object)
-
-            # Step 3: ensure %Helix / %β present from Tango if PSIPRED is off
-            _fill_percent_from_tango_if_missing(df)
-
-            # Produce SSW prediction column used by the SSW badge
-            try:
-                log_info("tango_filter_start", "Computing SSW predictions from TANGO results")
-                stats = {"upload": {}}
-                tango.filter_by_avg_diff(df, "upload", stats)
-                log_info("tango_filter_complete", "SSW predictions computed")
-            except ValueError as e:
-                # Catch alignment errors and report clearly
-                log_error("tango_filter_failed", f"SSW prediction computation failed: {e}", entry=trace_entry, **{"error": str(e)})
-                tango_provider_status = "UNAVAILABLE"
-                tango_provider_reason = f"SSW prediction computation failed: {str(e)}"
-                # Fill default to prevent downstream errors
-                n = len(df)
-                df["SSW prediction"] = pd.Series([None] * n, index=df.index, dtype=object)
-            except Exception as e:
-                log_warning("tango_filter_error", f"Could not compute SSW prediction: {e}", **{"error": str(e)})
-                tango_provider_status = "UNAVAILABLE"
-                tango_provider_reason = f"SSW prediction error: {str(e)}"
-            
-            # Compute provider status based on parse stats (canonical rules)
-            # Rules:
-            # - If feature flag disabled → OFF
-            # - If enabled and run attempted:
-            #   - parsed_ok == 0 → UNAVAILABLE
-            #   - 0 < parsed_ok < requested → PARTIAL
-            #   - parsed_ok == requested → AVAILABLE
-            parsed_ok = tango_stats.get("parsed_ok", 0)
-            requested = tango_stats.get("requested", 0)
-            
-            if not env_true("USE_TANGO", True):
-                tango_provider_status = "OFF"
-                tango_provider_reason = "TANGO disabled in environment (USE_TANGO=0)"
-            elif parsed_ok == 0 and requested > 0:
-                # Runner failed or parse failed: set status to UNAVAILABLE
-                tango_provider_status = "UNAVAILABLE"
-                tango_provider_reason = f"Runner failed; {parsed_ok}/{requested} parsed"
-                # When provider status is not AVAILABLE, set all dependent row fields to None
-                n = len(df)
-                df["SSW fragments"] = pd.Series(["-"] * n, index=df.index, dtype=object)
-                df["SSW score"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW diff"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW helix percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW beta percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
-                df["SSW prediction"] = pd.Series([None] * n, index=df.index, dtype=object)
-            elif 0 < parsed_ok < requested:
-                tango_provider_status = "PARTIAL"
-                tango_provider_reason = f"Only {parsed_ok}/{requested} sequences processed successfully"
-                # For PARTIAL: rows without valid TANGO metrics already have None from filter_by_avg_diff
-                # Ensure rows without valid metrics have all SSW fields set to None
-                if "SSW diff" in df.columns:
-                    mask_no_valid = df["SSW diff"].isna()
-                    if mask_no_valid.any():
-                        df.loc[mask_no_valid, "SSW prediction"] = None
-                        df.loc[mask_no_valid, "SSW score"] = None
-                        df.loc[mask_no_valid, "SSW diff"] = None
-                        df.loc[mask_no_valid, "SSW helix percentage"] = None
-                        df.loc[mask_no_valid, "SSW beta percentage"] = None
-            elif parsed_ok == requested and requested > 0:
-                tango_provider_status = "AVAILABLE"
-                tango_provider_reason = None
-            else:
-                # Default: OFF if no run attempted
-                tango_provider_status = "OFF"
-                tango_provider_reason = "No TANGO run attempted"
-            
-            log_info("tango_stats", f"TANGO provider status: {tango_provider_status}", **{
-                "status": tango_provider_status,
-                "reason": tango_provider_reason,
-                **tango_stats,
-            })
-
-        else:
-            # ENV USE_TANGO=false: Always skip (primary gate)
-            log_info("tango_disabled", "TANGO disabled by USE_TANGO env (USE_TANGO=0)", **{"run_tango": False, "reason": "TANGO disabled in environment (USE_TANGO=0)"})
-            tango_provider_status = "OFF"
-            tango_provider_reason = "TANGO disabled in environment (USE_TANGO=0)"
-    except Exception as e:
-        log_warning("tango_error", f"TANGO error: {e} (continuing without Tango)", **{"error": str(e)})
-        tango_provider_status = "UNAVAILABLE"
-        tango_provider_reason = f"TANGO execution error: {str(e)}"
-    # -----------------------------------------------------------------------
-
-    # JPred disabled - kept for reference only
-    jpred_hits = 0
-    # Count rows with valid TANGO metrics (sswPrediction is not None/null)
-    if "SSW prediction" in df.columns:
-        ssw_hits = int(df["SSW prediction"].notna().sum())
-    else:
-        ssw_hits = 0
-
-    # Debug: Log DataFrame values after Tango merge
-    if trace_entry:
-        trace_row = df[df["Entry"].astype(str).str.strip() == str(trace_entry).strip()]
-        if not trace_row.empty:
-            idx = trace_row.index[0]
-            log_info("trace_dataframe_merge", f"DataFrame merge for entry {trace_entry}", entry=trace_entry, **{
-                "index": int(idx),
-                "sequence_length": len(str(trace_row.iloc[0].get('Sequence', ''))),
-            })
-            for col in ["SSW prediction", "SSW score", "SSW diff", "SSW helix percentage", "SSW beta percentage", 
-                       "FF-Helix %", "FF Helix %"]:
-                if col in df.columns:
-                    val = trace_row.iloc[0][col]
-                    log_info("trace_field", f"{col}: {val}", entry=trace_entry, **{"field": col, "value": str(val), "type": type(val).__name__})
-        else:
-            log_warning("trace_entry_not_found", f"Entry {trace_entry} not found in DataFrame", entry=trace_entry)
-
-    # Compute biochemical features and flags
-    log_info("biochem_compute_start", "Computing biochemical features (Charge, Hydrophobicity, μH)")
-    calc_biochem(df)
-    apply_ff_flags(df)
-    _finalize_ui_aliases(df)
-    finalize_ff_fields(df)
-    log_info("biochem_complete", f"Computed biochemical features for {len(df)} peptides")
-    
-    # Debug: Log after finalize_ui_aliases
-    if trace_entry:
-        trace_row = df[df["Entry"].astype(str).str.strip() == str(trace_entry).strip()]
-        if not trace_row.empty:
-            log_info("trace_after_finalize", f"After finalize for entry {trace_entry}", entry=trace_entry)
-            for col in ["SSW prediction", "FF-Helix %"]:
-                if col in df.columns:
-                    val = trace_row.iloc[0][col]
-                    log_info("trace_field", f"{col}: {val}", entry=trace_entry, **{"field": col, "value": str(val), "type": type(val).__name__})
-    
-    # Normalize rows for UI (with provider status tracking - Principle B)
-    run_id = os.path.basename(run_dir) if 'run_dir' in locals() and run_dir else None
-    log_info("normalize_ui_start", "Normalizing rows for UI output", 
-            stage="normalize_rows_for_ui", run_id=run_id)
-    rows_out = normalize_rows_for_ui(
-        df,
-        is_single_row=False,
-        tango_enabled=USE_TANGO,
-        psipred_enabled=USE_PSIPRED,
-        jpred_enabled=USE_JPRED
-    )
-    log_info("normalize_ui_complete", f"Normalized {len(rows_out)} rows for UI", 
-            stage="normalize_rows_for_ui", run_id=run_id, **{"row_count": len(rows_out)})
-    
-    # Schema assert: When provider status is not AVAILABLE, ensure all dependent row fields are null
-    # This fails fast in dev with a clear error if the invariant is violated
-    if os.getenv("ENABLE_PROVIDER_STATUS_ASSERT", "0") == "1":
-        for row_dict in rows_out:
-            provider_status = row_dict.get("providerStatus", {})
-            tango_status = provider_status.get("tango", {}).get("status") if isinstance(provider_status, dict) else None
-            if tango_status and tango_status != "AVAILABLE":
-                # Check that all TANGO-dependent fields are null
-                tango_fields = ["sswPrediction", "sswScore", "sswDiff", "sswHelixPercentage", "sswBetaPercentage"]
-                for field in tango_fields:
-                    if field in row_dict and row_dict[field] is not None:
-                        raise ValueError(
-                            f"Provider status invariant violated: TANGO status is {tango_status} but {field} is not null. "
-                            f"Row ID: {row_dict.get('id', 'unknown')}"
-                        )
-
-    # Debug: Log final serialized JSON for traced entry
-    if trace_entry:
-        trace_row_out = [r for r in rows_out if str(r.get("id", "")).strip() == str(trace_entry).strip()]
-        if trace_row_out:
-            row_json = trace_row_out[0]
-            log_info("trace_api_response", f"API response for entry {trace_entry}", entry=trace_entry, **{
-                "ssw_keys": [k for k in row_json.keys() if 'ssw' in k.lower() or 'helix' in k.lower() or 'beta' in k.lower()]
-            })
-            for key in ["id", "sswPrediction", "sswHelixPercentage", "sswBetaPercentage", 
-                       "ffHelixPercent", "sswScore", "sswDiff"]:
-                if key in row_json:
-                    val = row_json[key]
-                    log_info("trace_field", f"{key}: {val}", entry=trace_entry, **{"field": key, "value": str(val), "type": type(val).__name__})
-        else:
-            log_warning("trace_entry_not_found", f"Entry {trace_entry} not found in normalized rows", entry=trace_entry)
-    
-    # Compute SSW positive % from final normalized rows (what UI actually receives)
-    # Gate: Only count rows with valid TANGO metrics (sswPrediction !== null/undefined)
-    # Use strict boolean coercion to match UI logic (sswPrediction === 1)
-    # Use canonical sswPrediction field (from PeptideSchema.to_camel_dict())
-    ssw_positives = 0
-    ssw_valid_count = 0
-    ssw_positive_entries = []
-    for row_dict in rows_out:
-        # Use canonical sswPrediction field
-        ssw_val = row_dict.get("sswPrediction") or row_dict.get("chameleonPrediction")  # Backward compat
-        # Only count rows with valid TANGO metrics (not null/undefined)
-        if ssw_val is not None and ssw_val != "null":
-            ssw_valid_count += 1
-            # Strict boolean coercion: only count as positive if exactly 1 (int/float, not "1", True, etc.)
-            if isinstance(ssw_val, (int, float)) and ssw_val == 1:
-                ssw_positives += 1
-                ssw_positive_entries.append(row_dict.get("id", "unknown"))
-    # Only compute percent if we have valid TANGO data (denominator > 0)
-    ssw_percent = round(100.0 * ssw_positives / ssw_valid_count, 1) if ssw_valid_count > 0 else None
-    
-    # Debug: Show which entries are counted as positive
-    if trace_entry:
-        print(f"[DEBUG_TRACE][SSW_COUNT] Total positives: {ssw_positives}/{len(rows_out)} ({ssw_percent}%)")
-        print(f"  Positive entries: {ssw_positive_entries[:10]}{'...' if len(ssw_positive_entries) > 10 else ''}")
-        if trace_entry in ssw_positive_entries:
-            print(f"  ✓ Entry {trace_entry} IS counted as positive")
-        else:
-            trace_row_out = [r for r in rows_out if str(r.get("id", "")).strip() == str(trace_entry).strip()]
-            if trace_row_out:
-                ssw_val = trace_row_out[0].get("sswPrediction") or trace_row_out[0].get("chameleonPrediction")
-                print(f"  ✗ Entry {trace_entry} NOT counted as positive (value: {ssw_val}, type: {type(ssw_val).__name__})")
-    
-    ff_avail = int((pd.to_numeric(df.get("FF-Helix %", pd.Series([-1]*len(df))), errors="coerce") != -1).sum())
-    
-    # Determine TANGO run_dir basename for logging (separate from reproducibility run_id)
-    tango_run_dir_basename = os.path.basename(run_dir) if 'run_dir' in locals() and run_dir else None
-    
-    log_info("upload_complete", f"Upload processing complete", stage="response", run_id=tango_run_dir_basename, **{
-        "total_rows": len(df),
-        "jpred_hits": jpred_hits,
-        "ssw_hits": ssw_hits,
-        "ssw_positive_percent": ssw_percent,
-        "ssw_positives": ssw_positives,
-        "ff_helix_available": ff_avail,
-    })
-
-    # Build provider status metadata (with deterministic flags)
-    provider_status_meta = {
-        "tango": {
-            "enabled": tango_enabled_flag,
-            "requested": tango_requested_flag,
-            "ran": tango_ran,
-            "status": tango_provider_status,
-            "reason": tango_provider_reason,
-            "stats": tango_stats,
-        },
-        "psipred": {
-            "status": "OFF",
-            "reason": "PSIPRED not enabled",
-            "stats": {"requested": 0, "parsed_ok": 0, "parsed_bad": 0},
-        },
-        "jpred": {
-            "status": "OFF",
-            "reason": "JPred disabled",
-            "stats": {"requested": 0, "parsed_ok": 0, "parsed_bad": 0},
-        },
-    }
-    
-    # Update global state for /api/providers/last-run endpoint
-    global _last_provider_status, _last_run_dir
-    _last_provider_status = provider_status_meta.copy()
-    _last_provider_status["total_rows"] = len(df)
-    _last_provider_status["ssw_rows_with_data"] = ssw_hits
-    _last_run_dir = tango._latest_run_dir()
-    
-    # Compute reproducibility primitives
-    # 1. Generate run_id (uuid4) for this request (distinct from TANGO run directory)
-    repro_run_id = str(uuid.uuid4())
-    
-    # 2. Get traceId from context (set by middleware)
-    from services.logger import get_trace_id
-    trace_id = get_trace_id()
-    
-    # 3. Compute inputs_hash from cleaned sequences + IDs (stable, deterministic)
-    # Sort entries for deterministic hash regardless of input order
-    inputs_data = []
-    for _, row in df.iterrows():
-        entry_id = str(row.get("Entry", "")).strip()
-        seq_raw = str(row.get("Sequence", "")).strip()
-        # Clean sequence using same method as pipeline
-        seq_cleaned = auxiliary.get_corrected_sequence(seq_raw) if seq_raw else ""
-        if entry_id and seq_cleaned:
-            inputs_data.append(f"{entry_id}:{seq_cleaned}")
-    
-    # Sort for deterministic hash (same inputs -> same hash regardless of order)
-    inputs_data.sort()
-    inputs_str = "\n".join(inputs_data)
-    inputs_hash = hashlib.sha256(inputs_str.encode('utf-8')).hexdigest()[:16]  # First 16 chars for readability
-    
-    # 4. Compute config_hash from configuration flags/options
-    # Include config options that affect output (provider flags, thresholds)
-    config_dict = {
-        "USE_TANGO": USE_TANGO,
-        "USE_PSIPRED": USE_PSIPRED,
-        "USE_JPRED": USE_JPRED,
-        # Add threshold config if present in future
-        # "FF_HELIX_THRESHOLD": os.getenv("FF_HELIX_THRESHOLD", "1.0"),
-        # "FF_HELIX_CORE_LEN": os.getenv("FF_HELIX_CORE_LEN", "6"),
-    }
-    # Sort keys for deterministic hash
-    config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
-    config_hash = hashlib.sha256(config_str.encode('utf-8')).hexdigest()[:16]  # First 16 chars
-    
-    # 5. Compute provider status summary counts
-    provider_status_summary = {
-        "tango": {
-            "status": tango_provider_status,
-            "requested": tango_stats.get("requested", 0),
-            "parsed_ok": tango_stats.get("parsed_ok", 0),
-            "parsed_bad": tango_stats.get("parsed_bad", 0),
-        } if tango_enabled_flag else None,
-        "psipred": {
-            "status": "OFF" if not USE_PSIPRED else "UNKNOWN",
-        },
-        "jpred": {
-            "status": "OFF",
-        },
-    }
-    
-    # 6. Resolve thresholds (deterministic computation based on mode)
-    resolved_thresholds = resolve_thresholds(threshold_config_requested, df)
-    
-    return {
-        "rows": rows_out,
-        "meta": {
-            "use_jpred": False, "use_tango": USE_TANGO,  # JPred disabled
-            "jpred_rows": jpred_hits, "ssw_rows": ssw_hits,
-            "valid_seq_rows": int(df["Sequence"].notna().sum()),
-            "provider_status": provider_status_meta,
-            # Reproducibility primitives
-            "runId": repro_run_id,
-            "traceId": trace_id,
-            "inputsHash": inputs_hash,
-            "configHash": config_hash,
-            "providerStatusSummary": provider_status_summary,
-            # Threshold configuration (plumbing only, no behavior changes)
-            "thresholdConfigRequested": threshold_config_requested,
-            "thresholdConfigResolved": threshold_config_resolved,
-            "thresholds": resolved_thresholds,
-        }
-    }
-
-
-@app.post("/api/predict")
+# @app.post("/api/predict", response_model=PredictResponse)  # Moved to api/routes/predict.py
 async def predict(
-    sequence: str = Form(...), 
+    sequence: str = Form(...),
     entry: Optional[str] = Form(None),
     thresholdConfig: Optional[str] = Form(None, description="Threshold configuration JSON")
 ):
-    # Parse thresholdConfig if provided
-    threshold_config_requested = None
-    if thresholdConfig:
-        try:
-            threshold_config_requested = json.loads(thresholdConfig)
-        except json.JSONDecodeError:
-            # Invalid JSON, log warning but continue with defaults
-            log_warning("threshold_config_invalid", f"Invalid thresholdConfig JSON: {thresholdConfig}", **{"error": "JSON decode failed"})
-    
-    # Resolve threshold config (use defaults for now, no behavior changes)
-    threshold_config_resolved = {
-        "mode": "default",
-        "version": "1.0.0"
-    }
-    if threshold_config_requested:
-        # Echo requested config structure (validation/resolution to be added later)
-        threshold_config_resolved = {
-            "mode": threshold_config_requested.get("mode", "default"),
-            "version": threshold_config_requested.get("version", "1.0.0"),
-            "custom": threshold_config_requested.get("custom") if threshold_config_requested.get("mode") == "custom" else None,
-        }
-    
+    """
+    Predict properties for a single peptide sequence.
+
+    Core processing logic is in services/predict_service.py.
+    This function handles HTTP-specific concerns (Form params, HTTPException).
+    """
+    # Parse threshold config (shared helper)
+    threshold_config_requested, threshold_config_resolved = parse_threshold_config(thresholdConfig)
+
     # Use shared function to create and validate single-sequence DataFrame
     df = create_single_sequence_df(sequence, entry)
-    seq = df.iloc[0]["Sequence"]  # Get validated sequence for downstream processing
-    entry_id = df.iloc[0]["Entry"]  # Get validated entry for downstream processing
-    
-    # Debug: verify sequence is not empty
+    seq = df.iloc[0]["Sequence"]
+
+    # Validate sequence is not empty
     if not seq or len(seq) == 0:
         raise HTTPException(status_code=400, detail="Sequence is empty after validation")
 
-    # Step 2 (already present): compute FF-Helix %
-    ensure_ff_cols(df)
-    ensure_computed_cols(df)
-
-    # Optional enrichments for single sequence
-    if USE_TANGO:
-        try:
-            # prefer simple runner; fallback to generic if not present
-            tango_records = [(entry_id, seq)]
-            if hasattr(tango, "run_tango_simple"):
-                print("running tango simple")
-                run_dir = tango.run_tango_simple(tango_records)
-            else:
-                print("not running tango simple, but run_tango instead because the other one failed")
-                run_dir = tango.run_tango(records=tango_records)
-
-            try:
-                tango.process_tango_output(df, run_dir=run_dir)
-            except ValueError as e:
-                print(f"[TANGO][ERROR] {e}")
-                print("[TANGO] Provider status: FAILED - continuing without Tango results")
-            except Exception as e:
-                print(f"[TANGO][WARN] Unexpected error during output processing: {e}")
-            
-            _fill_percent_from_tango_if_missing(df)
-            
-            try:
-                tango.filter_by_avg_diff(df, "single", {"single": {}})
-            except ValueError as e:
-                print(f"[TANGO][ERROR] {e}")
-                print("[TANGO] Provider status: FAILED - SSW prediction computation failed")
-            except Exception as e:
-                print(f"[PREDICT][WARN] Tango filter failed: {e}")
-        except Exception as e:
-            print(f"[PREDICT][WARN] Tango failed: {e}")
-
-    # Secondary structure prediction via provider interface
-    from services.secondary_structure import get_provider
-    try:
-        provider = get_provider()
-        provider.run(df)
-    except Exception as e:
-        log_warning("secondary_structure_error", f"Secondary structure provider error: {e}", **{"error": str(e)})
-
-    calc_biochem(df)
-    apply_ff_flags(df)
-    _finalize_ui_aliases(df)
-    finalize_ff_fields(df)
-    
-    # Resolve thresholds (deterministic computation based on mode)
-    resolved_thresholds = resolve_thresholds(threshold_config_requested, df)
-    
-    # Normalize single row for UI (with provider status tracking - Principle B)
-    result = normalize_rows_for_ui(
-        df,
-        is_single_row=True,
-        tango_enabled=USE_TANGO,
-        psipred_enabled=USE_PSIPRED,
-        jpred_enabled=USE_JPRED
+    # Process the single sequence through the prediction pipeline
+    # Core logic is in services/predict_service.py
+    return process_single_sequence(
+        df=df,
+        threshold_config_requested=threshold_config_requested,
+        threshold_config_resolved=threshold_config_resolved
     )
-    
-    # Add meta field with thresholds (for consistency with upload-csv response structure)
-    # normalize_rows_for_ui returns a dict for is_single_row=True
-    result["meta"] = {
-        "thresholds": resolved_thresholds,
-    }
-    
-    return result
 
 def process_row(row_dict):
     # row_dict contains keys that are the CSV headers (exact strings)
@@ -1283,11 +235,11 @@ def process_row(row_dict):
 
 # ---------- UniProt Query Endpoints ----------
 
-# Global state to track last provider status (for /api/providers/last-run)
-_last_provider_status: Optional[Dict] = None
-_last_run_dir: Optional[str] = None
+# Global state is now in services/upload_service.py
+# Use get_last_provider_status(), set_last_provider_status(),
+# get_last_run_dir(), set_last_run_dir()
 
-@app.get("/api/debug/providers")
+# @app.get("/api/debug/providers")  # Moved to api/routes/providers.py
 async def debug_providers():
     """
     Debug endpoint to quickly see provider status and sample counts.
@@ -1309,15 +261,16 @@ async def debug_providers():
         }
     }
 
-@app.get("/api/providers/last-run")
+# @app.get("/api/providers/last-run")  # Moved to api/routes/providers.py
 async def providers_last_run():
     """
     Returns the last provider status metadata from the most recent dataset processing.
     Includes provider status, reasons, stats, and run directory paths for debugging.
     """
-    global _last_provider_status, _last_run_dir
-    
-    if _last_provider_status is None:
+    last_status = get_last_provider_status()
+    last_run_dir = get_last_run_dir()
+
+    if last_status is None:
         return {
             "note": "No dataset processed yet. Load a dataset via /api/upload-csv or /api/uniprot/execute first.",
             "tango": None,
@@ -1327,24 +280,24 @@ async def providers_last_run():
                 "tango": None,
             }
         }
-    
+
     # Get latest TANGO run directory
-    latest_tango_dir = _last_run_dir or tango._latest_run_dir()
-    
+    latest_tango_dir = last_run_dir or tango._latest_run_dir()
+
     return {
-        "tango": _last_provider_status.get("tango"),
-        "psipred": _last_provider_status.get("psipred"),
-        "jpred": _last_provider_status.get("jpred"),
+        "tango": last_status.get("tango"),
+        "psipred": last_status.get("psipred"),
+        "jpred": last_status.get("jpred"),
         "run_dirs": {
             "tango": latest_tango_dir,
         },
         "sample_counts": {
-            "total_rows": _last_provider_status.get("total_rows", 0),
-            "ssw_rows_with_data": _last_provider_status.get("ssw_rows_with_data", 0),
+            "total_rows": last_status.get("total_rows", 0),
+            "ssw_rows_with_data": last_status.get("ssw_rows_with_data", 0),
         }
     }
 
-@app.get("/api/providers/diagnose/tango")
+# @app.get("/api/providers/diagnose/tango")  # Moved to api/routes/providers.py
 async def diagnose_tango():
     """
     Diagnose TANGO binary/container availability.
@@ -1354,8 +307,8 @@ async def diagnose_tango():
     import subprocess
     
     # Check if Docker mode is enabled
-    use_docker = os.getenv("TANGO_MODE", "simple").lower() != "simple"
-    docker_image = os.getenv("TANGO_DOCKER_IMAGE", "desy-tango")
+    use_docker = settings.TANGO_MODE != "simple"
+    docker_image = os.getenv("TANGO_DOCKER_IMAGE", "desy-tango")  # Not in config yet (optional)
     
     result = {
         "status": "unknown",
@@ -1465,114 +418,37 @@ async def diagnose_tango():
     result["status"] = "found"
     return result
 
-@app.get("/api/uniprot/ping")
+# @app.get("/api/uniprot/ping")  # Moved to api/routes/uniprot.py
 async def uniprot_ping():
     """
     Debug endpoint to test UniProt API connectivity.
-    Executes a simple known-good query and returns status.
+    Core logic is in services/uniprot_service.py.
     """
-    try:
-        # Simple test query: get one reviewed human protein
-        test_url = build_uniprot_export_url(
-            query_string="organism_id:9606",
-            format="tsv",
-            reviewed=True,
-            size=1,
-        )
-        
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            headers = {
-                "User-Agent": "PeptideVisualLab/1.0 (https://github.com/your-org/peptide-prediction)"
-            }
-            response = await client.get(test_url, headers=headers)
-            response.raise_for_status()
-            
-            # Parse response
-            import io
-            raw_data = response.content
-            df = read_any_table(raw_data, "uniprot_test.tsv")
-            
-            return {
-                "status": "ok",
-                "message": "UniProt API is reachable",
-                "test_query": "organism_id:9606",
-                "rows_returned": len(df),
-                "sample_columns": list(df.columns) if len(df) > 0 else [],
-            }
-    except httpx.HTTPStatusError as e:
-        return {
-            "status": "error",
-            "message": f"UniProt API returned {e.response.status_code}",
-            "error": str(e),
-        }
-    except httpx.TimeoutException:
-        return {
-            "status": "error",
-            "message": "UniProt API request timed out",
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to connect to UniProt API: {str(e)}",
-        }
+    return await uniprot_ping_service()
 
-@app.post("/api/uniprot/parse", response_model=UniProtQueryParseResponse)
+
+# @app.post("/api/uniprot/parse", response_model=UniProtQueryParseResponse)  # Moved to api/routes/uniprot.py
 async def parse_uniprot_query_endpoint(request: UniProtQueryParseRequest):
     """
     Parse a UniProt query string and detect its mode.
-    
-    Returns the detected mode (accession/keyword/organism/keyword_organism),
-    extracted components, and the final API query string that will be executed.
+    Core logic is in services/uniprot_service.py.
     """
-    parsed = parse_uniprot_query(request.query)
-    
-    return UniProtQueryParseResponse(
-        mode=parsed.mode.value,
-        accession=parsed.accession,
-        keyword=parsed.keyword,
-        organism_id=parsed.organism_id,
-        normalized_query=parsed.normalized_query,
-        api_query_string=parsed.api_query_string,
-        error=parsed.error,
-    )
+    return parse_uniprot_query_service(request)
 
 
-@app.post("/api/uniprot/window")
+# @app.post("/api/uniprot/window")  # Moved to api/routes/uniprot.py
 async def window_sequences_endpoint(request: Dict):
     """
     Window protein sequences into peptides.
-    
-    Request body:
-    {
-        "sequences": [{"id": "P53_HUMAN", "sequence": "MEEPQSDPSV..."}],
-        "windowSize": 20,
-        "stepSize": 5
-    }
-    
-    Response:
-    {
-        "peptides": [{"id": "...", "name": "...", "sequence": "...", "start": 1, "end": 20}]
-    }
+    Core logic is in services/uniprot_service.py.
     """
-    from services.uniprot import window_sequences
-    
     sequences = request.get("sequences", [])
     window_size = int(request.get("windowSize", 20))
     step_size = int(request.get("stepSize", 5))
-    
-    peptides = window_sequences(sequences, window_size, step_size)
-    
-    log_info("uniprot_windowed", 
-             f"Windowed {len(sequences)} sequences into {len(peptides)} peptides",
-             sequences=len(sequences),
-             peptides=len(peptides),
-             window_size=window_size,
-             step_size=step_size)
-    
-    return {"peptides": peptides}
+    return window_sequences_service(sequences, window_size, step_size)
 
 
-@app.post("/api/uniprot/execute")
+# @app.post("/api/uniprot/execute", response_model=RowsResponse)  # Moved to api/routes/uniprot.py
 async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
     """
     Execute a UniProt query and return results as DataFrame-ready data.
@@ -1616,19 +492,27 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             sort_value = None
         else:
             # Strict allowlist for UniProt sort format: "fieldName asc|desc"
+            # Accept both underscore format (length_asc) and space format (length asc)
+            # Note: "reviewed" is NOT a valid sort field (it's a filter, not sortable)
             ALLOWED_SORTS = {
                 "length asc", "length desc",
-                "reviewed asc", "reviewed desc",
                 "protein_name asc", "protein_name desc",
                 "organism_name asc", "organism_name desc",
             }
-            if request.sort not in ALLOWED_SORTS:
+
+            # Normalize underscore to space (length_asc -> length asc)
+            import re as re_sort
+            normalized_sort = request.sort
+            normalized_sort = re_sort.sub(r'_asc$', ' asc', normalized_sort)
+            normalized_sort = re_sort.sub(r'_desc$', ' desc', normalized_sort)
+
+            if normalized_sort not in ALLOWED_SORTS:
                 log_warning("uniprot_invalid_sort", f"Invalid sort value received: '{request.sort}'", **{"received_sort": request.sort, "allowed": sorted(ALLOWED_SORTS)})
                 raise HTTPException(
                     status_code=400,
                     detail=f"Invalid sort value: '{request.sort}'. Allowed values: {sorted(ALLOWED_SORTS)} or omit for best match"
                 )
-            sort_value = request.sort
+            sort_value = normalized_sort  # Use normalized format for UniProt API
             log_info("uniprot_sort_valid", f"Using sort: {sort_value}", **{"sort": sort_value})
     else:
         log_info("uniprot_sort_omitted", "No sort parameter provided, using default (best match)")
@@ -1720,7 +604,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             # Provider execution tracking (initialize with deterministic flags)
             provider_status_meta = {
                 "tango": {
-                    "enabled": USE_TANGO,  # Will be updated if tango processing happens
+                    "enabled": settings.USE_TANGO,  # Will be updated if tango processing happens
                     "requested": False,  # Will be updated based on request.run_tango
                     "ran": False,
                     "status": "OFF",
@@ -1743,7 +627,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             }
             
             # Secondary structure prediction via provider interface (only if explicitly requested)
-            if request.run_psipred and USE_PSIPRED:
+            if request.run_psipred and settings.USE_PSIPRED:
                 start_time = time.time()
                 try:
                     provider_status_meta["psipred"]["enabled"] = True
@@ -1779,7 +663,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             else:
                 if not request.run_psipred:
                     provider_status_meta["psipred"]["skipped_reason"] = "Not requested (run_psipred=false)"
-                elif not USE_PSIPRED:
+                elif not settings.USE_PSIPRED:
                     provider_status_meta["psipred"]["skipped_reason"] = "PSIPRED disabled in environment"
                 log_info("uniprot_psipred_skip", f"PSIPRED skipped: {provider_status_meta['psipred']['skipped_reason']}")
             
@@ -1790,7 +674,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             # To enable Tango for UniProt queries, client must explicitly set run_tango=True
             run_dir = None
             tango_start_time = None
-            tango_enabled_flag = USE_TANGO
+            tango_enabled_flag = settings.USE_TANGO
             tango_requested_flag = request.run_tango  # Use request flag directly (False=opt-in, True=run)
             try:
                 # Primary gate: ENV must be True
@@ -1837,9 +721,27 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                                 provider_status_meta["tango"]["stats"] = parse_stats
                             log_info("uniprot_tango_parse_complete", f"Parsed TANGO outputs: {parse_stats.get('parsed_ok', 0) if parse_stats else 0} OK, {parse_stats.get('parsed_bad', 0) if parse_stats else 0} failed" if parse_stats else f"Parsed TANGO outputs for {len(df)} peptides")
                         except ValueError as e:
+                            from services.logger import get_trace_id
+                            trace_id = get_trace_id()
+                            
                             # ✅ Check if this is a fatal "0 outputs" error
                             if "TANGO produced 0 outputs" in str(e):
-                                log_error("uniprot_tango_zero_outputs_ui", f"TANGO zero outputs error: {e}", **{"error": str(e), "run_dir": run_dir})
+                                log_error("uniprot_tango_zero_outputs_ui", f"TANGO zero outputs error: {e}", 
+                                        stage="tango_parse", **{"error": str(e), "run_dir": run_dir})
+                                
+                                # Capture to Sentry with context
+                                if SENTRY_INITIALIZED:
+                                    with sentry_sdk.push_scope() as scope:
+                                        scope.set_tag("provider", "tango")
+                                        scope.set_tag("stage", "parse")
+                                        scope.set_tag("error_type", "zero_outputs")
+                                        scope.set_tag("endpoint", "uniprot")
+                                        scope.set_context("tango_parse", {
+                                            "run_dir": run_dir if run_dir else None,
+                                            "trace_id": trace_id,
+                                        })
+                                        sentry_sdk.capture_exception(e, level="error")
+                                
                                 error_detail = {
                                     "source": "tango",
                                     "error": str(e),
@@ -1851,7 +753,21 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                                     detail=json.dumps(error_detail)
                                 )
                             
-                            log_error("uniprot_tango_parse_failed", f"TANGO parse error: {e}", **{"error": str(e)})
+                            log_error("uniprot_tango_parse_failed", f"TANGO parse error: {e}", 
+                                    stage="tango_parse", **{"error": str(e), "run_dir": run_dir})
+                            
+                            # Capture to Sentry with context
+                            if SENTRY_INITIALIZED:
+                                with sentry_sdk.push_scope() as scope:
+                                    scope.set_tag("provider", "tango")
+                                    scope.set_tag("stage", "parse")
+                                    scope.set_tag("endpoint", "uniprot")
+                                    scope.set_context("tango_parse", {
+                                        "run_dir": run_dir if run_dir else None,
+                                        "trace_id": trace_id,
+                                    })
+                                    sentry_sdk.capture_exception(e, level="error")
+                            
                             provider_status_meta["tango"]["status"] = "UNAVAILABLE"
                             provider_status_meta["tango"]["skipped_reason"] = f"Parse error: {str(e)}"
                             provider_status_meta["tango"]["stats"] = {"requested": len(records) if records else 0, "parsed_ok": 0, "parsed_bad": len(records) if records else 0}
@@ -1863,7 +779,23 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                             df["SSW helix percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
                             df["SSW beta percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
                         except Exception as e:
-                            log_warning("uniprot_tango_parse_error", f"Unexpected error during output processing: {e}", **{"error": str(e)})
+                            from services.logger import get_trace_id
+                            trace_id = get_trace_id()
+                            log_error("uniprot_tango_parse_error", f"Unexpected error during output processing: {e}", 
+                                    stage="tango_parse", **{"error": str(e), "run_dir": run_dir})
+                            
+                            # Capture to Sentry with context
+                            if SENTRY_INITIALIZED:
+                                with sentry_sdk.push_scope() as scope:
+                                    scope.set_tag("provider", "tango")
+                                    scope.set_tag("stage", "parse")
+                                    scope.set_tag("endpoint", "uniprot")
+                                    scope.set_context("tango_parse", {
+                                        "run_dir": run_dir if run_dir else None,
+                                        "trace_id": trace_id,
+                                    })
+                                    sentry_sdk.capture_exception(e, level="error")
+                            
                             provider_status_meta["tango"]["status"] = "UNAVAILABLE"
                             provider_status_meta["tango"]["skipped_reason"] = f"Unexpected error: {str(e)}"
                             provider_status_meta["tango"]["stats"] = {"requested": len(records) if records else 0, "parsed_ok": 0, "parsed_bad": len(records) if records else 0}
@@ -1878,14 +810,44 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                             tango.filter_by_avg_diff(df, "uniprot", stats)
                             log_info("uniprot_tango_filter_complete", "SSW predictions computed")
                         except ValueError as e:
-                            log_error("uniprot_tango_filter_failed", f"SSW prediction computation failed: {e}", **{"error": str(e)})
+                            from services.logger import get_trace_id
+                            trace_id = get_trace_id()
+                            log_error("uniprot_tango_filter_failed", f"SSW prediction computation failed: {e}", 
+                                    stage="tango_filter", **{"error": str(e)})
+                            
+                            # Capture to Sentry with context
+                            if SENTRY_INITIALIZED:
+                                with sentry_sdk.push_scope() as scope:
+                                    scope.set_tag("provider", "tango")
+                                    scope.set_tag("stage", "filter")
+                                    scope.set_tag("endpoint", "uniprot")
+                                    scope.set_context("tango_filter", {
+                                        "trace_id": trace_id,
+                                    })
+                                    sentry_sdk.capture_exception(e, level="error")
+                            
                             provider_status_meta["tango"]["status"] = "UNAVAILABLE"
                             provider_status_meta["tango"]["skipped_reason"] = f"Filter error: {str(e)}"
                             n = len(df)
                             if "SSW prediction" not in df.columns:
                                 df["SSW prediction"] = pd.Series([None] * n, index=df.index, dtype=object)
                         except Exception as e:
-                            log_warning("uniprot_tango_filter_error", f"Could not compute SSW prediction: {e}", **{"error": str(e)})
+                            from services.logger import get_trace_id
+                            trace_id = get_trace_id()
+                            log_error("uniprot_tango_filter_error", f"Could not compute SSW prediction: {e}", 
+                                    stage="tango_filter", **{"error": str(e)})
+                            
+                            # Capture to Sentry with context
+                            if SENTRY_INITIALIZED:
+                                with sentry_sdk.push_scope() as scope:
+                                    scope.set_tag("provider", "tango")
+                                    scope.set_tag("stage", "filter")
+                                    scope.set_tag("endpoint", "uniprot")
+                                    scope.set_context("tango_filter", {
+                                        "trace_id": trace_id,
+                                    })
+                                    sentry_sdk.capture_exception(e, level="error")
+                            
                             provider_status_meta["tango"]["status"] = "UNAVAILABLE"
                             provider_status_meta["tango"]["skipped_reason"] = f"SSW prediction error: {str(e)}"
                         
@@ -1965,9 +927,9 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             rows_out = normalize_rows_for_ui(
                 df,
                 is_single_row=False,
-                tango_enabled=USE_TANGO,
-                psipred_enabled=USE_PSIPRED,
-                jpred_enabled=USE_JPRED
+                tango_enabled=settings.USE_TANGO,
+                psipred_enabled=settings.USE_PSIPRED,
+                jpred_enabled=settings.USE_JPRED
             )
             log_info("uniprot_normalize_ui_complete", f"Normalized {len(rows_out)} rows for UI", **{"row_count": len(rows_out)})
             
@@ -1985,7 +947,8 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             ssw_valid_count = 0
             ssw_positive_count = 0
             for row_dict in rows_out:
-                ssw_val = row_dict.get("sswPrediction") or row_dict.get("chameleonPrediction")
+                # Use canonical sswPrediction field
+                ssw_val = row_dict.get("sswPrediction")
                 if ssw_val is not None and ssw_val != "null":
                     ssw_valid_count += 1
                     if isinstance(ssw_val, (int, float)) and ssw_val == 1:
@@ -2009,15 +972,58 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             })
             
             # Update global state for /api/providers/last-run endpoint
-            global _last_provider_status, _last_run_dir
-            _last_provider_status = provider_status_meta.copy()
-            _last_provider_status["total_rows"] = len(df)
-            _last_provider_status["ssw_rows_with_data"] = ssw_hits
-            _last_run_dir = run_dir if run_dir else tango._latest_run_dir()
+            provider_status_to_save = provider_status_meta.copy()
+            provider_status_to_save["total_rows"] = len(df)
+            provider_status_to_save["ssw_rows_with_data"] = ssw_hits
+            set_last_provider_status(provider_status_to_save)
+            set_last_run_dir(run_dir if run_dir else tango._latest_run_dir())
             
+            # Threshold config not supported in UniProt endpoint (use defaults)
+            threshold_config_requested = None
+            threshold_config_resolved = {
+                "mode": "default",
+                "version": "1.0.0"
+            }
+            
+            # Compute reproducibility primitives (same as upload-csv)
+            repro_run_id = str(uuid.uuid4())
+            trace_id = get_trace_id_for_response()
+            
+            # Compute inputs_hash from query + size (deterministic)
+            inputs_str = f"{request.query}:{request.size or 500}"
+            inputs_hash = hashlib.sha256(inputs_str.encode('utf-8')).hexdigest()[:16]
+            
+            # Compute config_hash from configuration flags
+            config_dict = {
+                "USE_TANGO": settings.USE_TANGO,
+                "USE_PSIPRED": settings.USE_PSIPRED,
+                "USE_JPRED": settings.USE_JPRED,
+            }
+            config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
+            config_hash = hashlib.sha256(config_str.encode('utf-8')).hexdigest()[:16]
+            
+            # Build provider status summary
+            provider_status_summary = {
+                "tango": {
+                    "status": provider_status_meta["tango"]["status"],
+                    "requested": provider_status_meta["tango"].get("stats", {}).get("requested", 0),
+                    "parsed_ok": provider_status_meta["tango"].get("stats", {}).get("parsed_ok", 0),
+                    "parsed_bad": provider_status_meta["tango"].get("stats", {}).get("parsed_bad", 0),
+                } if provider_status_meta["tango"]["enabled"] else None,
+                "psipred": {
+                    "status": "OFF" if not settings.USE_PSIPRED else "UNKNOWN",
+                },
+                "jpred": {
+                    "status": "OFF",
+                },
+            }
+
+            # Resolve thresholds (deterministic computation based on mode)
+            resolved_thresholds = resolve_thresholds(threshold_config_requested, df)
+
             return {
                 "rows": rows_out,
-                "meta": {
+                "meta": ensure_trace_id_in_meta({
                     "source": "uniprot_api",
                     "query": request.query,
                     "api_query_string": api_query,
@@ -2026,15 +1032,25 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                     "row_count": len(df),
                     "size_requested": request.size or 500,
                     "size_returned": len(df),
-                    "use_jpred": USE_JPRED,
+                    "use_jpred": settings.USE_JPRED,
                     "jpred_rows": jpred_hits,
                     # Meta flags: use_tango reflects env setting, provider_status reflects actual runtime state
-                    "use_tango": USE_TANGO,  # Env setting (for UI fallback compatibility)
+                    "use_tango": settings.USE_TANGO,  # Env setting (for UI fallback compatibility)
                     "run_tango": request.run_tango,  # What was requested
                     "ssw_rows": ssw_hits,
                     "valid_seq_rows": len(df),
                     "provider_status": provider_status_meta,
-                },
+                    # Reproducibility primitives
+                    "runId": repro_run_id,
+                    "traceId": trace_id,
+                    "inputsHash": inputs_hash,
+                    "configHash": config_hash,
+                    "providerStatusSummary": provider_status_summary,
+                    # Threshold configuration
+                    "thresholdConfigRequested": threshold_config_requested,
+                    "thresholdConfigResolved": threshold_config_resolved,
+                    "thresholds": resolved_thresholds,
+                }),
             }
             
     except httpx.HTTPStatusError as e:
@@ -2276,14 +1292,9 @@ def _check_rate_limit(ip: str) -> bool:
     return True
 
 
-class FeedbackRequest(BaseModel):
-    message: str
-    pageUrl: Optional[str] = None
-    userAgent: Optional[str] = None
-    screenshot: Optional[str] = None  # Base64 encoded image
+# FeedbackRequest imported from schemas.feedback (removed duplicate class)
 
-
-@app.post("/api/feedback")
+# @app.post("/api/feedback")  # Moved to api/routes/feedback.py
 async def submit_feedback(request: Request, feedback_data: FeedbackRequest = Body(...)):
     """
     Submit user feedback. Sends to Sentry as an INFO-level event that can trigger email alerts.
@@ -2432,4 +1443,8 @@ async def submit_feedback(request: Request, feedback_data: FeedbackRequest = Bod
         log_warning("feedback_sentry_disabled", "Feedback submitted but Sentry not initialized (SENTRY_DSN not set)")
     
     return {"ok": True}
+
+# Import app from api/main.py at the end so uvicorn can find it
+# This must be at the end after all function definitions
+from api.main import app, SENTRY_INITIALIZED
 

@@ -36,7 +36,7 @@ export function Legend() {
                 </Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm">Chameleon Not Available</span>
+                <span className="text-sm">SSW Not Available</span>
                 <Badge variant="outline">
                   Not available
                 </Badge>
