@@ -36,6 +36,7 @@ from services.upload_service import (
     set_last_provider_status,
     set_last_run_dir,
 )
+from services.predict_service import process_single_sequence
 from services.uniprot_query import parse_uniprot_query, build_uniprot_export_url
 from schemas.uniprot_query import UniProtQueryParseRequest, UniProtQueryParseResponse, UniProtQueryExecuteRequest
 from services.logger import get_logger, set_trace_id, log_info, log_warning, log_error
@@ -193,173 +194,34 @@ async def upload_csv(
 
 # @app.post("/api/predict", response_model=PredictResponse)  # Moved to api/routes/predict.py
 async def predict(
-    sequence: str = Form(...), 
+    sequence: str = Form(...),
     entry: Optional[str] = Form(None),
     thresholdConfig: Optional[str] = Form(None, description="Threshold configuration JSON")
 ):
+    """
+    Predict properties for a single peptide sequence.
+
+    Core processing logic is in services/predict_service.py.
+    This function handles HTTP-specific concerns (Form params, HTTPException).
+    """
     # Parse threshold config (shared helper)
     threshold_config_requested, threshold_config_resolved = parse_threshold_config(thresholdConfig)
 
     # Use shared function to create and validate single-sequence DataFrame
     df = create_single_sequence_df(sequence, entry)
-    seq = df.iloc[0]["Sequence"]  # Get validated sequence for downstream processing
-    entry_id = df.iloc[0]["Entry"]  # Get validated entry for downstream processing
-    
-    # Debug: verify sequence is not empty
+    seq = df.iloc[0]["Sequence"]
+
+    # Validate sequence is not empty
     if not seq or len(seq) == 0:
         raise HTTPException(status_code=400, detail="Sequence is empty after validation")
 
-    # Step 2 (already present): compute FF-Helix %
-    ensure_ff_cols(df)
-    ensure_computed_cols(df)
-
-    # Optional enrichments for single sequence
-    if USE_TANGO:
-        try:
-            # prefer simple runner; fallback to generic if not present
-            tango_records = [(entry_id, seq)]
-            if hasattr(tango, "run_tango_simple"):
-                print("running tango simple")
-                run_dir = tango.run_tango_simple(tango_records)
-            else:
-                print("not running tango simple, but run_tango instead because the other one failed")
-                run_dir = tango.run_tango(records=tango_records)
-
-            try:
-                tango.process_tango_output(df, run_dir=run_dir)
-            except ValueError as e:
-                print(f"[TANGO][ERROR] {e}")
-                print("[TANGO] Provider status: FAILED - continuing without Tango results")
-            except Exception as e:
-                print(f"[TANGO][WARN] Unexpected error during output processing: {e}")
-            
-            _fill_percent_from_tango_if_missing(df)
-            
-            try:
-                tango.filter_by_avg_diff(df, "single", {"single": {}})
-            except ValueError as e:
-                print(f"[TANGO][ERROR] {e}")
-                print("[TANGO] Provider status: FAILED - SSW prediction computation failed")
-            except Exception as e:
-                print(f"[PREDICT][WARN] Tango filter failed: {e}")
-        except Exception as e:
-            print(f"[PREDICT][WARN] Tango failed: {e}")
-
-    # Secondary structure prediction via provider interface
-    from services.secondary_structure import get_provider
-    try:
-        provider = get_provider()
-        provider.run(df)
-    except Exception as e:
-        log_warning("secondary_structure_error", f"Secondary structure provider error: {e}", **{"error": str(e)})
-
-    calc_biochem(df)
-    apply_ff_flags(df)
-    _finalize_ui_aliases(df)
-    finalize_ff_fields(df)
-    
-    # Resolve thresholds (deterministic computation based on mode)
-    resolved_thresholds = resolve_thresholds(threshold_config_requested, df)
-    
-    # Normalize single row for UI (with provider status tracking - Principle B)
-    # This now returns camelCase dict (id, sequence, etc.) - NOT capitalized keys
-    row_data = normalize_rows_for_ui(
-        df,
-        is_single_row=True,
-        tango_enabled=USE_TANGO,
-        psipred_enabled=USE_PSIPRED,
-        jpred_enabled=USE_JPRED
+    # Process the single sequence through the prediction pipeline
+    # Core logic is in services/predict_service.py
+    return process_single_sequence(
+        df=df,
+        threshold_config_requested=threshold_config_requested,
+        threshold_config_resolved=threshold_config_resolved
     )
-    
-    # Build provider status metadata (similar to upload-csv)
-    # Check if TANGO ran and produced results
-    tango_ran = USE_TANGO and "SSW prediction" in df.columns
-    ssw_hits = 1 if tango_ran and df.iloc[0].get("SSW prediction", -1) != -1 else 0
-    jpred_hits = 0  # JPred always disabled
-    
-    # Build provider status meta (simplified for single row)
-    provider_status_meta = {
-        "tango": {
-            "enabled": USE_TANGO,
-            "requested": USE_TANGO,
-            "ran": tango_ran,
-            "status": "AVAILABLE" if ssw_hits > 0 else ("OFF" if not USE_TANGO else "UNAVAILABLE"),
-            "reason": None if ssw_hits > 0 else ("TANGO not enabled" if not USE_TANGO else "No TANGO output"),
-            "stats": {"requested": 1 if USE_TANGO else 0, "parsed_ok": ssw_hits, "parsed_bad": 0}
-        },
-        "psipred": {
-            "enabled": USE_PSIPRED,
-            "requested": USE_PSIPRED,
-            "ran": USE_PSIPRED,  # Simplified - assume ran if enabled
-            "status": "UNKNOWN",  # Would need to check actual output
-            "reason": None,
-        },
-        "jpred": {
-            "enabled": False,
-            "requested": False,
-            "ran": False,
-            "status": "OFF",
-            "reason": "JPred disabled",
-        }
-    }
-    
-    # Compute reproducibility primitives (same as upload-csv)
-    repro_run_id = str(uuid.uuid4())
-    trace_id = get_trace_id_for_response()
-    
-    # Compute inputs_hash from cleaned sequence + ID
-    seq_cleaned = auxiliary.get_corrected_sequence(seq) if seq else ""
-    inputs_str = f"{entry_id}:{seq_cleaned}"
-    inputs_hash = hashlib.sha256(inputs_str.encode('utf-8')).hexdigest()[:16]
-    
-    # Compute config_hash from configuration flags
-    config_dict = {
-        "USE_TANGO": USE_TANGO,
-        "USE_PSIPRED": USE_PSIPRED,
-        "USE_JPRED": USE_JPRED,
-    }
-    config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
-    config_hash = hashlib.sha256(config_str.encode('utf-8')).hexdigest()[:16]
-    
-    # Build provider status summary
-    provider_status_summary = {
-        "tango": {
-            "status": "AVAILABLE" if ssw_hits > 0 else ("OFF" if not USE_TANGO else "UNAVAILABLE"),
-            "requested": 1 if USE_TANGO else 0,
-            "parsed_ok": ssw_hits,
-            "parsed_bad": 0,
-        } if USE_TANGO else None,
-        "psipred": {
-            "status": "OFF" if not USE_PSIPRED else "UNKNOWN",
-        },
-        "jpred": {
-            "status": "OFF",
-        },
-    }
-    
-    # Build complete meta structure (matching Meta model)
-    meta = ensure_trace_id_in_meta({
-        "use_jpred": False,  # JPred always disabled
-        "use_tango": USE_TANGO,
-        "jpred_rows": jpred_hits,
-        "ssw_rows": ssw_hits,
-        "valid_seq_rows": 1,  # Single row, always valid if we got here
-        "provider_status": provider_status_meta,
-        "runId": repro_run_id,
-        "traceId": trace_id,
-        "inputsHash": inputs_hash,
-        "configHash": config_hash,
-        "providerStatusSummary": provider_status_summary,
-        "thresholdConfigRequested": threshold_config_requested,
-        "thresholdConfigResolved": threshold_config_resolved,
-        "thresholds": resolved_thresholds,
-    })
-    
-    # Return PredictResponse format: {row: PeptideRow, meta: Meta}
-    return {
-        "row": row_data,
-        "meta": meta,
-    }
 
 def process_row(row_dict):
     # row_dict contains keys that are the CSV headers (exact strings)
