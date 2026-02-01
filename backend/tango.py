@@ -47,8 +47,8 @@ KEY = "Entry"  # DataFrame column that holds peptide ID (UniProt accession, etc.
 
 AA20 = set("ACDEFGHIKLMNPQRSTVWY")
 AMBIGUOUS_MAP = {
-    "B": "N",   # D/N ambiguous -> choose N
-    "Z": "Q",   # E/Q ambiguous -> choose Q
+    "B": "D",   # D/N ambiguous -> D (aspartate) to match reference
+    "Z": "E",   # E/Q ambiguous -> E (glutamate) to match reference
     "X": "",    # unknown -> drop
     "U": "C",   # selenocysteine -> treat as C
     "O": "K",   # pyrrolysine -> treat as K
@@ -1342,10 +1342,10 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
     # Build predictions as index-aligned Series (not raw list)
     # Gate: Only compute SSW prediction for rows with valid TANGO metrics (SSW diff is not None and not NaN)
     # For rows without valid TANGO metrics, set sswPrediction = None (not -1, not 0, not 1)
-    # Note: Original behavior is "prediction = 1 if diff <= avg_diff, else -1"
-    # This is equivalent to checking "if diff > avg_diff, then -1"
-    # The comparison operator determines when to mark as 1 (default: "<=" to match original)
-    comparison_op = os.getenv("SSW_DIFF_COMPARISON", "<=").strip()
+    # Note: Reference implementation uses "prediction = 1 if diff < avg_diff, else -1"
+    # This means diff >= avg → -1 (NOT SSW), diff < avg → 1 (IS SSW)
+    # The comparison operator determines when to mark as 1 (default: "<" to match reference)
+    comparison_op = os.getenv("SSW_DIFF_COMPARISON", "<").strip()
     preds = []
     for idx, row in database.iterrows():
         ssw_diff_val = row["SSW diff"]
@@ -1362,8 +1362,8 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
         elif comparison_op == "<":
             preds.append(1 if ssw_diff_val < avg_diff else -1)
         else:
-            # Default to "<=" (original behavior: prediction = 1 if diff <= avg_diff)
-            preds.append(1 if ssw_diff_val <= avg_diff else -1)
+            # Default to "<" (reference behavior: prediction = 1 if diff < avg_diff)
+            preds.append(1 if ssw_diff_val < avg_diff else -1)
     
     # Assign using index-aligned Series to ensure proper alignment
     # Use object dtype to allow None values
