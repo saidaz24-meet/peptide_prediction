@@ -8,9 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-
-// Get API base URL from environment
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000";
+import { predictOne as apiPredictOne, API_BASE } from "@/lib/api";
+import { mapApiRowToPeptide } from "@/lib/peptideMapper";
 
 // --- Shape of /api/predict response we actually use here ---
 type PredictResponse = {
@@ -24,59 +23,29 @@ type PredictResponse = {
 
   // Flags & FF
   sswPrediction: number;   // (-1 | 0 | 1) as number from backend
-  chameleonPrediction?: number; // Backward compatibility alias (deprecated)
   ffHelixPercent: number;        // camelCase copy from server
   "FF-Helix (Jpred)": number;    // 1 or -1
 };
 
-// Simple helper: POST form-urlencoded to /api/predict
+// Use centralized API function and mapper - no duplicate normalization logic
 async function predictOne(sequence: string, entry?: string) {
-  const form = new URLSearchParams();
-  form.set("sequence", sequence.trim());
-  if (entry?.trim()) form.set("entry", entry.trim());
-
-  const res = await fetch(`${API_BASE_URL}/api/predict`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: form.toString(),
-  });
-
-  if (!res.ok) {
-    const t = await res.text().catch(() => "");
-    throw new Error(`Predict failed (${res.status}): ${t || "unknown error"}`);
-  }
-
-  const json = (await res.json()) as Record<string, any>;
-
-  // Normalize a couple of keys that the UI expects
-  const ffHelixPercent =
-    typeof json["FF Helix %"] === "number"
-      ? json["FF Helix %"]
-      : typeof json["ffHelixPercent"] === "number"
-      ? json["ffHelixPercent"]
-      : 0;
-
-  const sswPrediction =
-    typeof json["sswPrediction"] === "number"
-      ? json["sswPrediction"]
-      : typeof json["chameleonPrediction"] === "number" // Backward compat
-      ? json["chameleonPrediction"]
-      : typeof json["Chameleon"] === "number" // Legacy alias
-      ? json["Chameleon"]
-      : -1;
-
+  const response = await apiPredictOne(sequence, entry);
+  // Map backend response to UI model using single mapper
+  const peptide = mapApiRowToPeptide(response.row, '/api/predict');
+  
+  // Convert to legacy PredictResponse format for backward compatibility
+  // TODO: Update QuickAnalyze to use Peptide type directly
   const shaped: PredictResponse = {
-    Entry: String(json["Entry"] ?? ""),
-    Sequence: String(json["Sequence"] ?? ""),
-    Length: Number(json["Length"] ?? 0),
-    Charge: Number(json["Charge"] ?? 0),
-    Hydrophobicity: Number(json["Hydrophobicity"] ?? 0),
-    "Full length uH": Number(json["Full length uH"] ?? 0),
-    "Beta full length uH": Number(json["Beta full length uH"] ?? 0),
-    sswPrediction,
-    chameleonPrediction: sswPrediction, // Backward compatibility alias
-    ffHelixPercent,
-    "FF-Helix (Jpred)": Number(json["FF-Helix (Jpred)"] ?? -1),
+    Entry: peptide.id,
+    Sequence: peptide.sequence,
+    Length: peptide.length ?? 0,
+    Charge: peptide.charge ?? 0,
+    Hydrophobicity: peptide.hydrophobicity ?? 0,
+    "Full length uH": peptide.muH ?? 0,
+    "Beta full length uH": 0, // Not available in current schema
+    sswPrediction: peptide.sswPrediction,
+    ffHelixPercent: peptide.ffHelixPercent ?? 0,
+    "FF-Helix (Jpred)": -1, // Not available in current schema
   };
 
   return shaped;
@@ -275,7 +244,7 @@ export default function QuickAnalyze() {
                     <div className="font-medium">{data.Length} aa</div>
 
                     <div className="flex flex-wrap gap-2 mt-3">
-                      {flagBadge(data.sswPrediction ?? data.chameleonPrediction, "SSW")}
+                      {flagBadge(data.sswPrediction, "SSW")}
                       {ffHelixDisplay(data.ffHelixPercent)}
                       {flagBadge(data["FF-Helix (Jpred)"], "JPred")}
                     </div>

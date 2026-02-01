@@ -269,7 +269,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         peptide.hydrophobicity,
         peptide.muH || '',
         peptide.charge,
-        peptide.sswPrediction ?? (peptide as any).chameleonPrediction, // Backward compat
+        peptide.sswPrediction,
         peptide.ffHelixPercent || '',
       ].join(','))
     ].join('\n');

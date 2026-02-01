@@ -64,7 +64,7 @@ class PeptideSchema(BaseModel):
     charge: Optional[float] = Field(None, alias="Charge")
     mu_h: Optional[float] = Field(None, alias="Full length uH")
 
-    # SSW / Chameleon (exact CSV headers)
+    # SSW (Secondary Structure Switch) - exact CSV headers
     ssw_prediction: Optional[int] = Field(None, alias="SSW prediction")
     ssw_score: Optional[float] = Field(None, alias="SSW score")
     ssw_diff: Optional[float] = Field(None, alias="SSW diff")
@@ -144,8 +144,7 @@ class PeptideSchema(BaseModel):
             if k == "ssw_prediction":
                 # Canonical field: sswPrediction (-1/0/1 classification)
                 out["sswPrediction"] = v
-                # Backward compatibility: also include chameleonPrediction (deprecated)
-                out["chameleonPrediction"] = v
+                # NOTE: chameleonPrediction alias removed (2026-02-01)
                 continue
             
             if k == "provider_status":

@@ -6,18 +6,69 @@ Deterministically resolves threshold configurations based on mode:
 - "custom": Validates and merges custom thresholds with defaults
 - "recommended": Computes thresholds from dataframe using stable statistical rules
 """
+import json
 import pandas as pd
 import numpy as np
-from typing import Dict, Optional, Any
+from typing import Dict, Optional, Any, Tuple
 from services.logger import log_warning
 
 
-# Default threshold values
-DEFAULT_THRESHOLDS = {
-    "muHCutoff": 0.0,  # Threshold for Full length uH (μH) flag
-    "hydroCutoff": 0.0,  # Threshold for Hydrophobicity flag
-    "ffHelixPercentThreshold": 50.0,  # Threshold for FF-Helix % (used in scoring)
-}
+def parse_threshold_config(threshold_config_json: Optional[str]) -> Tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
+    """
+    Parse threshold config from JSON string and return parsed + resolved config dicts.
+
+    This is a helper to avoid duplicating JSON parsing logic across endpoints.
+
+    Args:
+        threshold_config_json: JSON string with threshold config, or None
+
+    Returns:
+        Tuple of (threshold_config_requested, threshold_config_resolved):
+            - threshold_config_requested: Parsed dict from JSON, or None if not provided/invalid
+            - threshold_config_resolved: Resolved config dict with mode/version/custom
+
+    Example:
+        requested, resolved = parse_threshold_config('{"mode": "custom", "custom": {"muHCutoff": 0.5}}')
+    """
+    threshold_config_requested = None
+
+    if threshold_config_json:
+        try:
+            threshold_config_requested = json.loads(threshold_config_json)
+        except json.JSONDecodeError:
+            log_warning(
+                "threshold_config_invalid",
+                f"Invalid thresholdConfig JSON: {threshold_config_json}",
+                **{"error": "JSON decode failed"}
+            )
+
+    # Build resolved config structure
+    threshold_config_resolved = {
+        "mode": "default",
+        "version": "1.0.0"
+    }
+
+    if threshold_config_requested:
+        threshold_config_resolved = {
+            "mode": threshold_config_requested.get("mode", "default"),
+            "version": threshold_config_requested.get("version", "1.0.0"),
+            "custom": threshold_config_requested.get("custom") if threshold_config_requested.get("mode") == "custom" else None,
+        }
+
+    return threshold_config_requested, threshold_config_resolved
+
+
+# Default threshold values (loaded from config if available)
+try:
+    from config import settings
+    DEFAULT_THRESHOLDS = settings.default_thresholds
+except ImportError:
+    # Fallback if config not available
+    DEFAULT_THRESHOLDS = {
+        "muHCutoff": 0.0,  # Threshold for Full length uH (μH) flag
+        "hydroCutoff": 0.0,  # Threshold for Hydrophobicity flag
+        "ffHelixPercentThreshold": 50.0,  # Threshold for FF-Helix % (used in scoring)
+    }
 
 
 def resolve_thresholds(

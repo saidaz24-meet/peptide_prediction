@@ -16,7 +16,7 @@ import warnings
 
 import auxiliary
 import biochemCalculation
-import jpred
+# jpred module removed - JPred is disabled (USE_JPRED=False always)
 import tango
 from calculations.biochem import calculate_biochemical_features
 
@@ -89,18 +89,24 @@ def run_and_analyse_tango(database: pd.DataFrame, database_name: str, statistica
 
 def run_and_analyse_jpred(database: pd.DataFrame, database_name: str):
     """
-    This function prepers the input for a Jpred run and saves it into a file, and analyses the Jpred results.
+    DEPRECATED: JPred is disabled (USE_JPRED=False always).
+
+    This function is kept for backward compatibility but does nothing.
+    JPred columns will be set to default values (-1 / empty).
 
     :param database: database containing sequences.
     :param database_name: database name
-    :return: Adds columns to the given database
+    :return: Sets default JPred columns (empty/disabled)
     """
-    num_new_peptides_to_run_jpred = jpred.creat_jpred_input(database, database_name)
-    if num_new_peptides_to_run_jpred == 0:
-        jpred.process_jpred_output(database, database_name)
-        # write_to_excel(database, database_name + "After_adding_Jpred_results.xlsx")
-    else:
-        print('     {} sequences to run Jpred'.format(num_new_peptides_to_run_jpred))
+    print("     [SKIP] JPred is disabled (USE_JPRED=False). Setting default values.")
+
+    # Set default values for JPred columns
+    if "Helix fragments (Jpred)" not in database.columns:
+        database["Helix fragments (Jpred)"] = [[] for _ in range(len(database))]
+    if "Helix score (Jpred)" not in database.columns:
+        database["Helix score (Jpred)"] = -1
+    if "Helix (Jpred) uH" not in database.columns:
+        database["Helix (Jpred) uH"] = -1
 
 
 def perform_fibril_formation_prediction(database: pd.DataFrame, database_name: str, statistical_result_dict: dict):
@@ -138,9 +144,9 @@ def perform_fibril_formation_prediction(database: pd.DataFrame, database_name: s
     for _, row in database.iterrows():
         if row["SSW prediction"] == 1 and row["Hydrophobicity"] >= ssw_avg_H:
             ssw_ff.append("1")
-            cur_chameleon_score = row["Hydrophobicity"] + row["Beta full length uH"] + row["Full length uH"] + \
-                                  row["SSW score"]
-            ssw_score.append(cur_chameleon_score)
+            cur_ssw_score = row["Hydrophobicity"] + row["Beta full length uH"] + row["Full length uH"] + \
+                           row["SSW score"]
+            ssw_score.append(cur_ssw_score)
         else:
             ssw_ff.append(-1)
             ssw_score.append(-1)

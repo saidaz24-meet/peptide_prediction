@@ -13,8 +13,6 @@ export type SegmentTuple = [number, number];
 
 // ----- Prediction enums -----
 export type SSWPrediction = -1 | 0 | 1; // -1 = no/NA, 0 = uncertain, 1 = yes
-// Backward compatibility alias (deprecated, use SSWPrediction)
-export type ChameleonPrediction = SSWPrediction;
 
 // ----- Provider Status -----
 export type ProviderStatus = {
@@ -74,12 +72,10 @@ export type Peptide = {
 
   // Tango / SSW (Secondary Structure Switch)
   sswPrediction: SSWPrediction; // from "SSW prediction"
-  // Backward compatibility alias (deprecated, use sswPrediction)
-  chameleonPrediction?: SSWPrediction;
-  sswScore?: number;                        // "SSW score"
-  sswDiff?: number;                         // "SSW diff"
-  sswHelixPct?: number;                     // "SSW helix percentage"
-  sswBetaPct?: number;                      // "SSW beta percentage"
+  sswScore?: number;            // "SSW score"
+  sswDiff?: number;             // "SSW diff"
+  sswHelixPct?: number;         // "SSW helix percentage"
+  sswBetaPct?: number;          // "SSW beta percentage"
 
   // FF-Helix (from auxiliary)
   ffHelixPercent?: number;                                   // "FF-Helix %"
@@ -133,8 +129,6 @@ export type ColumnMapping = {
 
   // SSW (Secondary Structure Switch)
   ssw_prediction?: string;   // maps to Peptide.sswPrediction
-  // Backward compatibility alias (deprecated, use ssw_prediction)
-  chameleon_prediction?: string;
   ssw_score?: string;
   ssw_diff?: string;
   ssw_helix_percentage?: string;
@@ -172,9 +166,6 @@ export type DatasetStats = {
   jpredAvailable?: number;
   ffHelixAvailable?: number;
   sswAvailable?: number;
-  // Backward compatibility aliases (deprecated, use ssw*)
-  chameleonPositivePercent?: number | null;
-  chameleonAvailable?: number;
 };
 
 // ----- Raw CSV load shape -----

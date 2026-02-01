@@ -23,8 +23,8 @@ os.chdir(backend_dir)
 try:
     from fastapi import HTTPException
     from api.main import app
-    # Import functions from server for testing
-    from server import (
+    # Import DataFrame utility functions from services.dataframe_utils
+    from services.dataframe_utils import (
         read_any_table,
         require_cols,
         ensure_ff_cols,
@@ -510,13 +510,8 @@ def test_ssw_percent_matches_table():
     # Count positives using canonical sswPrediction field (matching UI logic)
     ssw_positives = 0
     for row_dict in rows_out:
-        # Use canonical sswPrediction field (legacy chameleonPrediction moved to extras.legacy)
+        # Use canonical sswPrediction field
         ssw_val = row_dict.get("sswPrediction")
-        # Fallback to legacy field in extras.legacy if needed (temporary, until 2025-04-01)
-        if ssw_val is None and "extras" in row_dict and isinstance(row_dict.get("extras"), dict):
-            legacy = row_dict["extras"].get("legacy", {})
-            if isinstance(legacy, dict):
-                ssw_val = legacy.get("chameleonPrediction")
         # Strict: only count as positive if exactly 1 (int/float)
         if isinstance(ssw_val, (int, float)) and ssw_val == 1:
             ssw_positives += 1

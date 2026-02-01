@@ -85,7 +85,7 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
 
   // SSW (Secondary Structure Switch) prediction evidence
   // Gate: Only show valid predictions when TANGO provider status is AVAILABLE
-  const sswPred = peptide.sswPrediction ?? (peptide as any).chameleonPrediction; // Backward compat
+  const sswPred = peptide.sswPrediction;
   const tangoAvailable = peptide.providerStatus?.tango?.status === "AVAILABLE";
   const hasValidSSW = sswPred !== null && sswPred !== undefined && sswPred !== "null";
   const sswEvidence = {
@@ -118,7 +118,7 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Chameleon Prediction - Featured */}
+        {/* SSW Prediction - Featured */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}

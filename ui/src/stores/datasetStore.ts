@@ -7,7 +7,7 @@ import type {
   DatasetMetadata,
 } from '../types/peptide';
 
-import { mapBackendRowToPeptide } from "@/lib/mappers";
+import { mapApiRowToPeptide } from "@/lib/peptideMapper";
 import type { Peptide, ThresholdConfig } from "@/types/peptide";
 
 // --- SMART RANKING (weights + scorer) ---
@@ -120,10 +120,9 @@ export const useDatasetStore = create<DatasetState>()(
           const debugRow = rows.find(r => String(r.id || r.entry || '').trim() === debugEntry.trim());
           if (debugRow) {
             console.log(`[DEBUG_TRACE][FRONTEND_RECEIVE] Found entry ${debugEntry}:`, debugRow);
-            console.log(`  Raw backend row keys (chameleon-related):`, 
-              Object.keys(debugRow).filter(k => k.toLowerCase().includes('ssw') || 
-                k.toLowerCase().includes('chameleon') || k.toLowerCase().includes('helix') || 
-                k.toLowerCase().includes('beta')));
+            console.log(`  Raw backend row keys (SSW-related):`,
+              Object.keys(debugRow).filter(k => k.toLowerCase().includes('ssw') ||
+                k.toLowerCase().includes('helix') || k.toLowerCase().includes('beta')));
             for (const key of ['id', 'sswPrediction', 'sswHelixPercentage', 
                              'sswBetaPercentage', 'ffHelixPercent']) {
               if (key in debugRow) {
@@ -138,7 +137,9 @@ export const useDatasetStore = create<DatasetState>()(
         const mapped: Peptide[] = rows
           .map((r: BackendRow, idx: number) => {
             try {
-              const mapped_pep = mapBackendRowToPeptide(r);
+              // Source is always from backend API (upload-csv, uniprot, or example)
+              const source = '/api/ingestBackendRows';
+              const mapped_pep = mapApiRowToPeptide(r, `${source}[${idx}]`);
               // Debug: Log mapping for traced entry
               if (debugEntry && String(mapped_pep.id).trim() === debugEntry.trim()) {
                 console.log(`[DEBUG_TRACE][FRONTEND_MAP] Entry ${debugEntry} after mapping:`, mapped_pep);
@@ -184,7 +185,7 @@ export const useDatasetStore = create<DatasetState>()(
         // Numerator: rows with sswPrediction === 1
         // If provider is OFF/UNAVAILABLE, denominator will be 0 → return null
         const sswValidPeptides = peptides.filter((p) => {
-          const sswVal = p.sswPrediction ?? (p as any).chameleonPrediction;
+          const sswVal = p.sswPrediction;
           // Only include rows with valid TANGO metrics (not null, not undefined, not NaN)
           if (sswVal === null || sswVal === undefined || sswVal === "null") {
             return false;
@@ -197,7 +198,7 @@ export const useDatasetStore = create<DatasetState>()(
         });
         const sswPositive = sswValidPeptides.filter(
           (p) => {
-            const sswVal = p.sswPrediction ?? (p as any).chameleonPrediction;
+            const sswVal = p.sswPrediction;
             return typeof sswVal === 'number' && sswVal === 1;
           }
         ).length;
@@ -215,7 +216,7 @@ export const useDatasetStore = create<DatasetState>()(
           const debugPep = peptides.find(p => String(p.id).trim() === debugEntry.trim());
           if (debugPep) {
             console.log(`[DEBUG_TRACE][FRONTEND_STATS] Entry ${debugEntry} in stats calculation:`);
-          const sswPred = debugPep.sswPrediction ?? (debugPep as any).chameleonPrediction;
+          const sswPred = debugPep.sswPrediction;
           console.log(`  sswPrediction: ${sswPred} (type: ${typeof sswPred})`);
           console.log(`  Is counted as positive: ${sswPred === 1}`);
           }
@@ -276,7 +277,7 @@ export const useDatasetStore = create<DatasetState>()(
         // SSW available: count rows with valid TANGO metrics (sswPrediction !== null/undefined)
         // Only count if provider is not OFF/UNAVAILABLE
         const sswAvailable = tangoUnavailable ? 0 : peptides.filter(p => {
-          const sswVal = p.sswPrediction ?? (p as any).chameleonPrediction;
+          const sswVal = p.sswPrediction;
           if (sswVal === null || sswVal === undefined || sswVal === "null") {
             return false;
           }
@@ -296,21 +297,18 @@ export const useDatasetStore = create<DatasetState>()(
           meanLength,
           // Add these for better UI display
           jpredAvailable,
-          ffHelixAvailable, 
+          ffHelixAvailable,
           sswAvailable,
-          // Backward compatibility aliases (deprecated)
-          chameleonPositivePercent: sswPositivePercent,
-          chameleonAvailable: sswAvailable,
         };
 
         // Regression check: verify table positives match stats positives
         // Count positives from actual peptides array (what table sees) - gate: only rows with valid TANGO metrics
         const tableValidPeptides = peptides.filter((p) => {
-          const sswVal = p.sswPrediction ?? (p as any).chameleonPrediction;
+          const sswVal = p.sswPrediction;
           return sswVal !== null && sswVal !== undefined && sswVal !== "null";
         });
         const tablePositives = tableValidPeptides.filter(p => {
-          const sswVal = p.sswPrediction ?? (p as any).chameleonPrediction;
+          const sswVal = p.sswPrediction;
           return typeof sswVal === 'number' && sswVal === 1;
         }).length;
         const tablePositivePercent = tableValidPeptides.length > 0 

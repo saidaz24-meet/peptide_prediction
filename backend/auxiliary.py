@@ -16,7 +16,7 @@ MIN_LENGTH = 5
 MAX_GAP = 3
 MIN_JPRED_SCORE = 7
 MIN_TANGO_SCORE = 0
-MAX_CHAMELEON_DIFFERENCE_TANGO = np.inf
+MAX_SSW_DIFFERENCE_TANGO = np.inf
 
 # --- FF-Helix helpers (pure Python; no external tools) ---
 
@@ -39,15 +39,23 @@ def ff_helix_percent(seq: str, core_len: Optional[int] = None, thr: Optional[flo
     Args:
         seq: Amino acid sequence
         core_len: Window size for helix core detection (default from FF_HELIX_CORE_LEN env, or 6)
-        thr: Threshold for helix propensity (default from FF_HELIX_THRESHOLD env, or 1.0)
+        thr: Threshold for helix propensity (default from config, or 1.0)
     
     Returns a value in [0.0, 100.0] (clamped to ensure valid range).
     """
-    # Get defaults from env vars (maintains backward compatibility)
+    # Get defaults from config (with fallback for backward compatibility)
     if core_len is None:
-        core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
+        try:
+            from config import settings
+            core_len = settings.FF_HELIX_CORE_LEN
+        except ImportError:
+            core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
     if thr is None:
-        thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
+        try:
+            from config import settings
+            thr = settings.FF_HELIX_THRESHOLD
+        except ImportError:
+            thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
     s = (seq or "").upper().strip()
     if len(s) < core_len:
         return 0.0
@@ -79,14 +87,22 @@ def ff_helix_cores(seq: str, core_len: Optional[int] = None, thr: Optional[float
     
     Args:
         seq: Amino acid sequence
-        core_len: Window size for helix core detection (default from FF_HELIX_CORE_LEN env, or 6)
-        thr: Threshold for helix propensity (default from FF_HELIX_THRESHOLD env, or 1.0)
+        core_len: Window size for helix core detection (default from config, or 6)
+        thr: Threshold for helix propensity (default from config, or 1.0)
     """
-    # Get defaults from env vars (maintains backward compatibility)
+    # Get defaults from config (with fallback for backward compatibility)
     if core_len is None:
-        core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
+        try:
+            from config import settings
+            core_len = settings.FF_HELIX_CORE_LEN
+        except ImportError:
+            core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
     if thr is None:
-        thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
+        try:
+            from config import settings
+            thr = settings.FF_HELIX_THRESHOLD
+        except ImportError:
+            thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
     s = (seq or "").upper().strip()
     if len(s) < core_len:
         return []
