@@ -8,7 +8,7 @@ Tests:
 """
 import pytest
 from fastapi.testclient import TestClient
-from server import app
+from api.main import app
 
 client = TestClient(app)
 
@@ -87,11 +87,10 @@ def test_uniprot_sort_invalid_blocked():
 
 def test_uniprot_sort_allowed_values():
     """Test that all allowed sort values are accepted."""
+    # Note: "reviewed" is NOT a valid UniProt sort field (it's a filter, not sortable)
     allowed_values = [
         "length_asc",
         "length_desc",
-        "reviewed_asc",
-        "reviewed_desc",
         "protein_name_asc",
         "protein_name_desc",
         "organism_name_asc",

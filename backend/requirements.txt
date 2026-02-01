@@ -6,3 +6,8 @@ openpyxl
 python-multipart
 httpx
 sentry-sdk[fastapi]
+pytest
+# Dev tools for linting, formatting, and type checking
+ruff
+mypy
+pre-commit

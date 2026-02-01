@@ -102,6 +102,45 @@ npm run dev   # open http://127.0.0.1:5173
 📤 Upload a UniProt table (CSV/TSV/XLSX) with Entry and Sequence (others optional).
 📊 You'll see cohort cards + ranking and a full table. Use Export CSV or Export shortlist.csv.
 
+## 🧪 How to Run Tests
+
+```bash
+make test       # Run all tests (fast, deterministic, no network)
+make test-unit  # Run fastest unit tests only
+make lint       # Run linters (Python + TypeScript)
+make typecheck  # Run type checkers (Python + TypeScript)
+make fmt        # Format code (Python + TypeScript)
+make ci         # Run lint + typecheck + test (CI pipeline)
+```
+
+## 🔒 Pre-commit Hooks
+
+Pre-commit hooks automatically run formatting, linting, and fast unit tests before each commit to prevent broken code.
+
+**Install:**
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+**What runs on commit:**
+- Python formatting (ruff format)
+- Python linting (ruff check)
+- TypeScript formatting (prettier)
+- TypeScript linting (eslint)
+- Fast unit tests (test-unit subset)
+
+**Run manually:**
+```bash
+pre-commit run --all-files  # Run on all files
+pre-commit run              # Run on staged files only
+```
+
+**Skip hooks (not recommended):**
+```bash
+git commit --no-verify  # Skip pre-commit hooks
+```
+
 ## 🔧 Tango & PSIPRED
 
 ### 🥭 Tango (macOS recommended)

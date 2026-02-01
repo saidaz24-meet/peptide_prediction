@@ -71,3 +71,14 @@ htmlcov/
 .pytest_cache/
 *.cover
 .hypothesis/
+
+# 🤖 DEVELOPMENT / AI GENERATED FILES
+# Generated documentation and temporary files from AI tools
+docs/**/*.generated.*
+docs/**/*.tmp.*
+docs/**/*.cache.*
+*.ai-temp.*
+*.claude-temp.*
+# Keep fixtures and active docs, but ignore generated content
+!backend/tests/fixtures/**
+!docs/active/**
