@@ -12,8 +12,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { MessageSquare, Image, X } from 'lucide-react';
 import { toast } from 'sonner';
-
-const API_BASE = (import.meta.env.VITE_API_BASE_URL as string) || 'http://127.0.0.1:8000';
+import { API_BASE } from '@/lib/api';
 
 interface FeedbackDialogProps {
   trigger?: React.ReactNode;

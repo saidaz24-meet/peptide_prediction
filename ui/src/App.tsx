@@ -20,6 +20,7 @@ import { useState, useCallback } from "react";
 // NEW
 import QuickAnalyze from "@/pages/QuickAnalyze";
 import ScreenTransition from "@/components/ScreenTransition";
+import { ValidationBanner } from "@/components/ValidationBanner";
 
 const queryClient = new QueryClient();
 
@@ -97,6 +98,8 @@ const App = () => (
       <Toaster />
       <Sonner />
       <HotToaster position="top-right" />
+      {/* Development-only validation banner */}
+      <ValidationBanner />
       <BrowserRouter>
         <ScrollToTop />
         <Routes>

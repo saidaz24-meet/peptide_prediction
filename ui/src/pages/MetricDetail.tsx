@@ -7,6 +7,7 @@ import { PeptideTable } from '@/components/PeptideTable';
 import { METRIC_DEFINITIONS, MetricId } from '@/types/metrics';
 import { useDatasetStore } from '@/stores/datasetStore';
 import { Peptide, DatasetStats } from '@/types/peptide';
+// mapApiRowsToPeptides removed - peptides from store are already mapped
 import { useMemo } from 'react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
@@ -43,37 +44,9 @@ export default function MetricDetail() {
     );
   }
 
-  // Normalize peptides (same logic as Results page)
-  const normalizePeptide = (p: any): Peptide => {
-    const sswRaw = p?.sswPrediction ?? p?.chameleonPrediction;
-    const ssw: -1 | 0 | 1 = sswRaw === 1 ? 1 : sswRaw === 0 ? 0 : -1;
-    const id = String(p.id ?? p.Entry ?? p.entry ?? p.Accession ?? p.accession ?? '').trim();
-    
-    return {
-      id,
-      name: p.name ?? p['Protein name'],
-      species: p.species ?? p.Organism,
-      sequence: String(p.sequence ?? p.Sequence ?? ''),
-      length: Number(p.length ?? p.Length ?? 0),
-      hydrophobicity: Number(p.hydrophobicity ?? p.Hydrophobicity ?? 0),
-      muH: typeof p.muH === 'number' ? p.muH : (typeof p['Full length uH'] === 'number' ? p['Full length uH'] : undefined),
-      charge: Number(p.charge ?? p.Charge ?? 0),
-      sswPrediction: ssw,
-      chameleonPrediction: ssw,
-      ffHelixPercent: typeof p.ffHelixPercent === 'number' ? p.ffHelixPercent
-        : (typeof p['FF-Helix %'] === 'number' ? p['FF-Helix %'] : undefined),
-      jpred: p.jpred ?? {
-        helixFragments: p['Helix fragments (Jpred)'] ?? undefined,
-        helixScore: typeof p['Helix score (Jpred)'] === 'number' ? p['Helix score (Jpred)'] : undefined,
-      },
-      extra: p.extra ?? {},
-    };
-  };
-
-  const peptidesTyped: Peptide[] = useMemo(
-    () => peptides.map(normalizePeptide),
-    [peptides]
-  );
+  // peptides from store is already Peptide[] (mapped by ingestBackendRows)
+  // No re-mapping needed - use directly
+  const peptidesTyped: Peptide[] = peptides;
 
   // Generate chart data based on metric type
   const chartData = useMemo(() => {

@@ -12,7 +12,12 @@ export type Segment = {
 export type SegmentTuple = [number, number];
 
 // ----- Prediction enums -----
-export type SSWPrediction = -1 | 0 | 1; // -1 = no/NA, 0 = uncertain, 1 = yes
+// SSWPrediction semantic values:
+// -1 = predicted NOT to undergo structural switch (valid prediction)
+//  0 = uncertain/unknown
+//  1 = predicted to undergo structural switch
+// null = no prediction available (provider didn't run or failed)
+export type SSWPrediction = -1 | 0 | 1 | null;
 
 // ----- Provider Status -----
 export type ProviderStatus = {
@@ -55,44 +60,49 @@ export type ProviderStatus = {
 };
 
 // ----- Core Peptide model used across the UI -----
+// NOTE: Fields that can be `null` from the backend are typed as `| null`.
+// `null` means "data is missing/unavailable" (provider didn't run or failed).
+// `undefined` means "field not present in response".
+// Actual zero values (0, 0.0) are valid data and should not be confused with null.
 export type Peptide = {
-  // identity & metadata
+  // identity & metadata (required)
   id: string;
-  name?: string;
-  species?: string;
+  name?: string | null;
+  species?: string | null;
 
-  // sequence
+  // sequence (required)
   sequence: string;
-  length: number;
+  length: number | null;  // null if not computed
 
-  // basic biophysics
-  hydrophobicity: number;
-  muH?: number; // hydrophobic moment if present
-  charge: number;
+  // basic biophysics (can be null if not computed)
+  hydrophobicity: number | null;
+  muH?: number | null;  // hydrophobic moment if present
+  charge: number | null;
 
   // Tango / SSW (Secondary Structure Switch)
-  sswPrediction: SSWPrediction; // from "SSW prediction"
-  sswScore?: number;            // "SSW score"
-  sswDiff?: number;             // "SSW diff"
-  sswHelixPct?: number;         // "SSW helix percentage"
-  sswBetaPct?: number;          // "SSW beta percentage"
+  // sswPrediction can be -1/0/1 (valid predictions) or null (no prediction available)
+  sswPrediction: SSWPrediction;  // from "SSW prediction"
+  sswScore?: number | null;      // "SSW score" - null if TANGO unavailable
+  sswDiff?: number | null;       // "SSW diff" - null if TANGO unavailable
+  sswHelixPct?: number | null;   // "SSW helix percentage" - null if TANGO unavailable
+  sswBetaPct?: number | null;    // "SSW beta percentage" - null if TANGO unavailable
 
-  // FF-Helix (from auxiliary)
-  ffHelixPercent?: number;                                   // "FF-Helix %"
+  // FF-Helix (from auxiliary - always computed locally)
+  ffHelixPercent?: number | null;                            // "FF-Helix %"
   ffHelixFragments?: Array<SegmentTuple> | Segment[];        // "FF Helix fragments"
 
-  // ----- NEW: unified secondary-structure percentages used by Results table -----
+  // ----- Unified secondary-structure percentages used by Results table -----
   // These are filled by the mapper from PSIPRED if present, otherwise Tango fallback.
-  helixPercent?: number;   // preferred: PSIPRED helix %; fallback: "SSW helix percentage"
-  betaPercent?: number;    // preferred: PSIPRED beta %;  fallback: "SSW beta percentage"
+  helixPercent?: number | null;   // preferred: PSIPRED helix %; fallback: "SSW helix percentage"
+  betaPercent?: number | null;    // preferred: PSIPRED beta %;  fallback: "SSW beta percentage"
 
   // Optional JPred block
   jpred?: {
     helixFragments?: Array<SegmentTuple> | Segment[];
-    helixScore?: number;
+    helixScore?: number | null;
   };
 
-  // --- NEW (optional) PSIPRED curves + segments
+  // --- Optional PSIPRED curves + segments
   psipred?: {
     pH?: number[]; // per-residue P(helix)
     pE?: number[]; // per-residue P(beta)
@@ -100,7 +110,7 @@ export type Peptide = {
     helixSegments?: Array<[number, number]>;
   };
 
-  // --- NEW (optional) Tango per-residue curves
+  // --- Optional Tango per-residue curves
   tango?: {
     agg?: number[];   // Aggregation curve
     beta?: number[];  // Beta curve

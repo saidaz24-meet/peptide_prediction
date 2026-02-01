@@ -35,10 +35,32 @@ type PsipredInfo = {
 };
 
 // ----- helpers -----
-const num = (v: any, allowUndefined = false): number | undefined => {
+/**
+ * Convert a value to number, preserving null semantics.
+ *
+ * @param v - Value to convert
+ * @param preserveNull - If true, null values are preserved as null (not converted to undefined)
+ * @returns number | null | undefined
+ *
+ * Null handling:
+ * - null from backend = "data is missing/unavailable" → preserve as null
+ * - undefined = "field not present" → return undefined
+ * - NaN/invalid = "parsing failed" → return null (treat as missing)
+ */
+const num = (v: any, preserveNull = false): number | null | undefined => {
+  // Explicit null from backend means "missing data" - preserve it
+  if (v === null) {
+    return preserveNull ? null : undefined;
+  }
+  // Undefined means field not present
+  if (v === undefined) {
+    return undefined;
+  }
+  // Convert string to number
   const n = typeof v === "string" ? Number(v) : v;
-  if (n === null || n === undefined || Number.isNaN(Number(n))) {
-    return allowUndefined ? undefined : 0;
+  // Invalid number → treat as null (missing)
+  if (Number.isNaN(Number(n))) {
+    return preserveNull ? null : undefined;
   }
   return Number(n);
 };
@@ -115,34 +137,42 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
   // Sequence (required)
   const sequence = String(row.sequence || row.Sequence || "");
 
-  // Basic biophysics
-  const length = num(row.length || row.Length, true) ?? 0;
-  const hydrophobicity = num(row.hydrophobicity || row.Hydrophobicity, true) ?? 0;
-  const charge = num(row.charge || row.Charge, true) ?? 0;
-  const muH = num(row.muH || row["Full length uH"] || row.uH, true);
+  // Basic biophysics - preserve null for missing data
+  const length = num(row.length ?? row.Length, true);
+  const hydrophobicity = num(row.hydrophobicity ?? row.Hydrophobicity, true);
+  const charge = num(row.charge ?? row.Charge, true);
+  const muH = num(row.muH ?? row["Full length uH"] ?? row.uH, true);
 
   // SSW (Secondary Structure Switch) - canonical field: sswPrediction
-  const sswPredictionRaw = row.sswPrediction ?? -1;
-  const numVal = Number(sswPredictionRaw);
-  const sswPrediction: SSWPrediction = (numVal === -1 || numVal === 0 || numVal === 1) 
-    ? (numVal as -1 | 0 | 1)
-    : -1;
+  // IMPORTANT: null from backend means "no prediction available" (TANGO didn't run)
+  // -1 from backend means "predicted NOT to switch" (valid prediction)
+  // Do NOT convert null to -1!
+  const sswPredictionRaw = row.sswPrediction;
+  let sswPrediction: SSWPrediction;
+  if (sswPredictionRaw === null || sswPredictionRaw === undefined) {
+    sswPrediction = null;  // Preserve null = no prediction available
+  } else {
+    const numVal = Number(sswPredictionRaw);
+    sswPrediction = (numVal === -1 || numVal === 0 || numVal === 1)
+      ? (numVal as -1 | 0 | 1)
+      : null;  // Invalid value → treat as no prediction
+  }
 
-  // SSW scores and percentages
-  const sswScore = num(row.sswScore || row["SSW score"], true);
-  const sswDiff = num(row.sswDiff || row["SSW diff"], true);
+  // SSW scores and percentages - preserve null for missing data
+  const sswScore = num(row.sswScore ?? row["SSW score"], true);
+  const sswDiff = num(row.sswDiff ?? row["SSW diff"], true);
   const sswHelixPct = num(
-    row.sswHelixPercentage || 
-    row.sswHelixPct || 
-    row["SSW helix percentage"] || 
-    row.helixPercent, 
+    row.sswHelixPercentage ??
+    row.sswHelixPct ??
+    row["SSW helix percentage"] ??
+    row.helixPercent,
     true
   );
   const sswBetaPct = num(
-    row.sswBetaPercentage || 
-    row.sswBetaPct || 
-    row["SSW beta percentage"] || 
-    row.betaPercent, 
+    row.sswBetaPercentage ??
+    row.sswBetaPct ??
+    row["SSW beta percentage"] ??
+    row.betaPercent,
     true
   );
 
@@ -195,22 +225,24 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
   const providerStatus = row.providerStatus || row.provider_status || undefined;
 
   // Build Peptide object
+  // Note: null values are preserved to indicate "missing data" from backend
   const peptide: Peptide = {
     id,
-    name: row.name || row["Protein name"] || row.Name || undefined,
-    species: row.species || row.Organism || row.Species || row.organism || undefined,
+    name: row.name ?? row["Protein name"] ?? row.Name ?? null,
+    species: row.species ?? row.Organism ?? row.Species ?? row.organism ?? null,
     sequence,
-    length: typeof length === "number" && !Number.isNaN(length) ? length : 0,
+    length: length ?? null,  // Preserve null for missing length
 
-    hydrophobicity,
-    charge,
+    hydrophobicity: hydrophobicity ?? null,  // Preserve null for missing data
+    charge: charge ?? null,  // Preserve null for missing data
     muH,
 
-    // FF
+    // FF-Helix (always computed locally, shouldn't be null unless error)
     ffHelixPercent,
     ffHelixFragments,
 
     // SSW (Secondary Structure Switch)
+    // sswPrediction: null = no prediction, -1/0/1 = valid predictions
     sswPrediction,
     sswScore,
     sswDiff,
