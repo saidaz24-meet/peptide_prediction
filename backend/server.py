@@ -37,6 +37,11 @@ from services.upload_service import (
     set_last_run_dir,
 )
 from services.predict_service import process_single_sequence
+from services.uniprot_service import (
+    ping_uniprot as uniprot_ping_service,
+    parse_query as parse_uniprot_query_service,
+    window_protein_sequences as window_sequences_service,
+)
 from services.uniprot_query import parse_uniprot_query, build_uniprot_export_url
 from schemas.uniprot_query import UniProtQueryParseRequest, UniProtQueryParseResponse, UniProtQueryExecuteRequest
 from services.logger import get_logger, set_trace_id, log_info, log_warning, log_error
@@ -418,107 +423,30 @@ async def diagnose_tango():
 async def uniprot_ping():
     """
     Debug endpoint to test UniProt API connectivity.
-    Executes a simple known-good query and returns status.
+    Core logic is in services/uniprot_service.py.
     """
-    try:
-        # Simple test query: get one reviewed human protein
-        test_url = build_uniprot_export_url(
-            query_string="organism_id:9606",
-            format="tsv",
-            reviewed=True,
-            size=1,
-        )
-        
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            headers = {
-                "User-Agent": "PeptideVisualLab/1.0 (https://github.com/your-org/peptide-prediction)"
-            }
-            response = await client.get(test_url, headers=headers)
-            response.raise_for_status()
-            
-            # Parse response
-            import io
-            raw_data = response.content
-            df = read_any_table(raw_data, "uniprot_test.tsv")
-            
-            return {
-                "status": "ok",
-                "message": "UniProt API is reachable",
-                "test_query": "organism_id:9606",
-                "rows_returned": len(df),
-                "sample_columns": list(df.columns) if len(df) > 0 else [],
-            }
-    except httpx.HTTPStatusError as e:
-        return {
-            "status": "error",
-            "message": f"UniProt API returned {e.response.status_code}",
-            "error": str(e),
-        }
-    except httpx.TimeoutException:
-        return {
-            "status": "error",
-            "message": "UniProt API request timed out",
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": f"Failed to connect to UniProt API: {str(e)}",
-        }
+    return await uniprot_ping_service()
+
 
 # @app.post("/api/uniprot/parse", response_model=UniProtQueryParseResponse)  # Moved to api/routes/uniprot.py
 async def parse_uniprot_query_endpoint(request: UniProtQueryParseRequest):
     """
     Parse a UniProt query string and detect its mode.
-    
-    Returns the detected mode (accession/keyword/organism/keyword_organism),
-    extracted components, and the final API query string that will be executed.
+    Core logic is in services/uniprot_service.py.
     """
-    parsed = parse_uniprot_query(request.query)
-    
-    return UniProtQueryParseResponse(
-        mode=parsed.mode.value,
-        accession=parsed.accession,
-        keyword=parsed.keyword,
-        organism_id=parsed.organism_id,
-        normalized_query=parsed.normalized_query,
-        api_query_string=parsed.api_query_string,
-        error=parsed.error,
-    )
+    return parse_uniprot_query_service(request)
 
 
 # @app.post("/api/uniprot/window")  # Moved to api/routes/uniprot.py
 async def window_sequences_endpoint(request: Dict):
     """
     Window protein sequences into peptides.
-    
-    Request body:
-    {
-        "sequences": [{"id": "P53_HUMAN", "sequence": "MEEPQSDPSV..."}],
-        "windowSize": 20,
-        "stepSize": 5
-    }
-    
-    Response:
-    {
-        "peptides": [{"id": "...", "name": "...", "sequence": "...", "start": 1, "end": 20}]
-    }
+    Core logic is in services/uniprot_service.py.
     """
-    from services.uniprot import window_sequences
-    
     sequences = request.get("sequences", [])
     window_size = int(request.get("windowSize", 20))
     step_size = int(request.get("stepSize", 5))
-    
-    peptides = window_sequences(sequences, window_size, step_size)
-    
-    log_info("uniprot_windowed", 
-             f"Windowed {len(sequences)} sequences into {len(peptides)} peptides",
-             sequences=len(sequences),
-             peptides=len(peptides),
-             window_size=window_size,
-             step_size=step_size)
-    
-    return {"peptides": peptides}
+    return window_sequences_service(sequences, window_size, step_size)
 
 
 # @app.post("/api/uniprot/execute", response_model=RowsResponse)  # Moved to api/routes/uniprot.py
