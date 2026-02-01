@@ -18,6 +18,7 @@ from auxiliary import ff_helix_percent, ff_helix_cores
 import math
 from schemas.peptide import PeptideSchema
 from schemas.api_models import RowsResponse, PredictResponse
+from schemas.feedback import FeedbackRequest
 from calculations.biochem import calculate_biochemical_features as calc_biochem
 from services.normalize import (
     canonicalize_headers,
@@ -67,10 +68,8 @@ from config import settings
 # Note: Sentry initialization and FastAPI app setup moved to api/main.py
 # SENTRY_INITIALIZED will be imported from api/main.py at the end of this file
 
-# Provider flags from config
-USE_JPRED = settings.USE_JPRED
-USE_TANGO = settings.USE_TANGO
-USE_PSIPRED = settings.USE_PSIPRED
+# Provider flags are read dynamically from settings to avoid caching issues
+# Use settings.USE_TANGO, settings.USE_PSIPRED, settings.USE_JPRED directly
 DEBUG_ENTRY = settings.DEBUG_ENTRY
 use_simple = settings.TANGO_MODE == "simple"
 
@@ -605,7 +604,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             # Provider execution tracking (initialize with deterministic flags)
             provider_status_meta = {
                 "tango": {
-                    "enabled": USE_TANGO,  # Will be updated if tango processing happens
+                    "enabled": settings.USE_TANGO,  # Will be updated if tango processing happens
                     "requested": False,  # Will be updated based on request.run_tango
                     "ran": False,
                     "status": "OFF",
@@ -628,7 +627,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             }
             
             # Secondary structure prediction via provider interface (only if explicitly requested)
-            if request.run_psipred and USE_PSIPRED:
+            if request.run_psipred and settings.USE_PSIPRED:
                 start_time = time.time()
                 try:
                     provider_status_meta["psipred"]["enabled"] = True
@@ -664,7 +663,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             else:
                 if not request.run_psipred:
                     provider_status_meta["psipred"]["skipped_reason"] = "Not requested (run_psipred=false)"
-                elif not USE_PSIPRED:
+                elif not settings.USE_PSIPRED:
                     provider_status_meta["psipred"]["skipped_reason"] = "PSIPRED disabled in environment"
                 log_info("uniprot_psipred_skip", f"PSIPRED skipped: {provider_status_meta['psipred']['skipped_reason']}")
             
@@ -675,7 +674,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             # To enable Tango for UniProt queries, client must explicitly set run_tango=True
             run_dir = None
             tango_start_time = None
-            tango_enabled_flag = USE_TANGO
+            tango_enabled_flag = settings.USE_TANGO
             tango_requested_flag = request.run_tango  # Use request flag directly (False=opt-in, True=run)
             try:
                 # Primary gate: ENV must be True
@@ -928,9 +927,9 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             rows_out = normalize_rows_for_ui(
                 df,
                 is_single_row=False,
-                tango_enabled=USE_TANGO,
-                psipred_enabled=USE_PSIPRED,
-                jpred_enabled=USE_JPRED
+                tango_enabled=settings.USE_TANGO,
+                psipred_enabled=settings.USE_PSIPRED,
+                jpred_enabled=settings.USE_JPRED
             )
             log_info("uniprot_normalize_ui_complete", f"Normalized {len(rows_out)} rows for UI", **{"row_count": len(rows_out)})
             
@@ -996,9 +995,9 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             
             # Compute config_hash from configuration flags
             config_dict = {
-                "USE_TANGO": USE_TANGO,
-                "USE_PSIPRED": USE_PSIPRED,
-                "USE_JPRED": USE_JPRED,
+                "USE_TANGO": settings.USE_TANGO,
+                "USE_PSIPRED": settings.USE_PSIPRED,
+                "USE_JPRED": settings.USE_JPRED,
             }
             config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
             config_hash = hashlib.sha256(config_str.encode('utf-8')).hexdigest()[:16]
@@ -1012,16 +1011,16 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                     "parsed_bad": provider_status_meta["tango"].get("stats", {}).get("parsed_bad", 0),
                 } if provider_status_meta["tango"]["enabled"] else None,
                 "psipred": {
-                    "status": "OFF" if not USE_PSIPRED else "UNKNOWN",
+                    "status": "OFF" if not settings.USE_PSIPRED else "UNKNOWN",
                 },
                 "jpred": {
                     "status": "OFF",
                 },
             }
-            
+
             # Resolve thresholds (deterministic computation based on mode)
             resolved_thresholds = resolve_thresholds(threshold_config_requested, df)
-            
+
             return {
                 "rows": rows_out,
                 "meta": ensure_trace_id_in_meta({
@@ -1033,10 +1032,10 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                     "row_count": len(df),
                     "size_requested": request.size or 500,
                     "size_returned": len(df),
-                    "use_jpred": USE_JPRED,
+                    "use_jpred": settings.USE_JPRED,
                     "jpred_rows": jpred_hits,
                     # Meta flags: use_tango reflects env setting, provider_status reflects actual runtime state
-                    "use_tango": USE_TANGO,  # Env setting (for UI fallback compatibility)
+                    "use_tango": settings.USE_TANGO,  # Env setting (for UI fallback compatibility)
                     "run_tango": request.run_tango,  # What was requested
                     "ssw_rows": ssw_hits,
                     "valid_seq_rows": len(df),
@@ -1293,12 +1292,7 @@ def _check_rate_limit(ip: str) -> bool:
     return True
 
 
-class FeedbackRequest(BaseModel):
-    message: str
-    pageUrl: Optional[str] = None
-    userAgent: Optional[str] = None
-    screenshot: Optional[str] = None  # Base64 encoded image
-
+# FeedbackRequest imported from schemas.feedback (removed duplicate class)
 
 # @app.post("/api/feedback")  # Moved to api/routes/feedback.py
 async def submit_feedback(request: Request, feedback_data: FeedbackRequest = Body(...)):

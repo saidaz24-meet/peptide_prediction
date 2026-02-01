@@ -131,7 +131,7 @@ class PeptideSchema(BaseModel):
         - sswHelixPercentage: numeric helix percentage (from ssw_helix_percentage)
         - sswBetaPercentage: numeric beta percentage (from ssw_beta_percentage)
         """
-        d = self.dict(by_alias=False, exclude_none=True)
+        d = self.model_dump(by_alias=False, exclude_none=True)
         out = {}
         for k, v in d.items():
             # explicit exceptions that should map to different frontend key names
@@ -150,8 +150,8 @@ class PeptideSchema(BaseModel):
             if k == "provider_status":
                 # Convert PeptideProviderStatus to dict (camelCase keys)
                 if v is not None:
-                    if hasattr(v, "dict"):
-                        provider_dict = v.dict()
+                    if hasattr(v, "model_dump"):
+                        provider_dict = v.model_dump()
                         # Convert nested keys to camelCase if needed
                         out["providerStatus"] = provider_dict
                     else:
