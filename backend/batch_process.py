@@ -7,8 +7,10 @@ For the web API server, see server.py instead.
 Usage:
     python batch_process.py
 
-Note: This script processes Excel files and runs Tango/JPred predictions
+Note: This script processes Excel files and runs Tango predictions
 in batch mode, different from the interactive web API.
+
+JPred support has been removed (USE_JPRED=False always).
 """
 import os
 import pandas as pd
@@ -23,7 +25,7 @@ from calculations.biochem import calculate_biochemical_features
 SEPARATOR = "\n********************************************************************************************************"
 
 LANDAU_LAB_PEPTIDES_FILEPATH = "Landau_lab_peptides_20230119.xlsx"
-JPRED_INPUT_FILEPATH = "Jpred/"
+# JPRED_INPUT_FILEPATH removed - JPred is disabled
 
 MIN_H_CONTENT = 0
 MIN_SSW_B_CONTENT = 0
@@ -87,20 +89,12 @@ def run_and_analyse_tango(database: pd.DataFrame, database_name: str, statistica
     tango.filter_by_avg_diff(database, database_name, statistical_result_dict)
 
 
-def run_and_analyse_jpred(database: pd.DataFrame, database_name: str):
+def _set_default_jpred_columns(database: pd.DataFrame):
     """
-    DEPRECATED: JPred is disabled (USE_JPRED=False always).
+    Set default JPred columns (JPred is disabled).
 
-    This function is kept for backward compatibility but does nothing.
-    JPred columns will be set to default values (-1 / empty).
-
-    :param database: database containing sequences.
-    :param database_name: database name
-    :return: Sets default JPred columns (empty/disabled)
+    These columns are kept for backward compatibility with downstream processing.
     """
-    print("     [SKIP] JPred is disabled (USE_JPRED=False). Setting default values.")
-
-    # Set default values for JPred columns
     if "Helix fragments (Jpred)" not in database.columns:
         database["Helix fragments (Jpred)"] = [[] for _ in range(len(database))]
     if "Helix score (Jpred)" not in database.columns:
@@ -265,7 +259,8 @@ def compare_to_lab_results(database: pd.DataFrame):
 
 if __name__ == "__main__":
     print("Gathering input files ...................................................................................\n")
-    # TODO: to allow the possibility of automatically downloading data from UniProt by keywords, add it here.
+    # Note: UniProt query integration is available via the web API (/api/uniprot/execute)
+    # For batch processing, manually download data from UniProt and save as .xlsx files
     if len(RUN_ONLY_DATABASE) > 0:
         input_file_list = RUN_ONLY_DATABASE
     else:
@@ -296,8 +291,8 @@ if __name__ == "__main__":
         print("     Running_and_analysing_tango.................................................")
         run_and_analyse_tango(cur_database, database_name, statistical_result_dict, existent_tango_results)
 
-        print("     Creating_jpred_input........................................................")
-        run_and_analyse_jpred(cur_database, database_name)
+        print("     Setting default JPred columns (JPred disabled)..............................")
+        _set_default_jpred_columns(cur_database)
 
         print("     Performing biochemical calculations.........................................")
         # use_strict_validation=False to match original batch processing behavior (no NaN for invalid sequences)
