@@ -10,8 +10,19 @@ from enum import Enum
 from dataclasses import dataclass
 from dataclasses import dataclass
 
-# UniProt accession pattern (e.g., P12345, A0A1B2C3D4, P12345-1)
-ACCESSION_PATTERN = re.compile(r'^[A-NR-Z][0-9]([A-Z][A-Z, 0-9][A-Z, 0-9][0-9]){1,2}(-[0-9]+)?$', re.IGNORECASE)
+# UniProt accession patterns (see https://www.uniprot.org/help/accession_numbers):
+# Classic (6 chars): [OPQ][0-9][A-Z0-9]{3}[0-9] e.g., P12345, Q9UNL2
+# Primary (6 chars): [A-NR-Z][0-9][A-Z][A-Z0-9]{2}[0-9] e.g., A2BC19
+# Extended (10 chars): [A-NR-Z][0-9][A-Z][A-Z0-9]{2}[0-9][A-Z][A-Z0-9]{2}[0-9] e.g., A0A024R1E1
+# Isoform suffix: -[0-9]+ e.g., P12345-1
+ACCESSION_PATTERN = re.compile(
+    r'^('
+    r'[OPQ][0-9][A-Z0-9]{3}[0-9]'  # Classic format (P12345, Q9UNL2)
+    r'|'
+    r'[A-NR-Z][0-9][A-Z][A-Z0-9]{2}[0-9]([A-Z][A-Z0-9]{2}[0-9])?'  # Primary/Extended format
+    r')(-[0-9]+)?$',  # Optional isoform suffix
+    re.IGNORECASE
+)
 
 # Organism ID pattern (taxonomy ID, e.g., 9606 for human)
 ORGANISM_ID_PATTERN = re.compile(r'^\d+$')
@@ -91,62 +102,91 @@ def detect_accession(text: str) -> Optional[str]:
 def detect_organism_id(text: str) -> Optional[str]:
     """
     Detect if text contains an organism taxonomy ID (numeric).
-    
+
     Args:
         text: Query text
-    
+
     Returns:
         Organism ID if detected, None otherwise
+
+    Examples:
+        "9606" -> "9606" (pure organism ID)
+        "amyloid 9606" -> "9606" (trailing organism ID)
+        "organism_id:9606" -> "9606" (explicit pattern)
     """
     normalized = normalize_query(text)
     if not normalized:
         return None
-    
+
     # Check if entire query is a number (organism ID)
     if ORGANISM_ID_PATTERN.match(normalized):
         return normalized
-    
+
     # Check for "organism_id:123" pattern
     organism_match = re.search(r'organism[_\s]*id[:\s]+(\d+)', normalized, re.IGNORECASE)
     if organism_match:
         return organism_match.group(1)
-    
+
+    # Check for trailing numeric (e.g., "amyloid 9606" -> 9606 is organism ID)
+    # Only match if there's text before the number (not just a number)
+    parts = normalized.split()
+    if len(parts) >= 2:
+        last_part = parts[-1]
+        if ORGANISM_ID_PATTERN.match(last_part):
+            # Verify it's a plausible taxonomy ID (4-7 digits typically)
+            if 3 <= len(last_part) <= 7:
+                return last_part
+
     return None
 
 
 def extract_keyword(text: str, exclude_patterns: Optional[List[str]] = None) -> Optional[str]:
     """
     Extract keyword from query text, excluding accession and organism patterns.
-    
+
     Args:
         text: Query text
         exclude_patterns: Patterns to exclude (e.g., organism_id:123)
-    
+
     Returns:
         Keyword string if found, None otherwise
+
+    Examples:
+        "amyloid" -> "amyloid"
+        "amyloid 9606" -> "amyloid" (strips trailing organism ID)
+        "9606" -> None (pure organism ID)
+        "P12345" -> None (accession)
     """
     normalized = normalize_query(text)
     if not normalized:
         return None
-    
-    # Remove organism_id patterns
+
+    # Remove organism_id patterns (explicit)
     normalized = re.sub(r'organism[_\s]*id[:\s]+\d+', '', normalized, flags=re.IGNORECASE)
     normalized = normalized.strip()
-    
+
+    # Remove trailing numeric that looks like organism ID (e.g., "amyloid 9606" -> "amyloid")
+    parts = normalized.split()
+    if len(parts) >= 2:
+        last_part = parts[-1]
+        if ORGANISM_ID_PATTERN.match(last_part) and 3 <= len(last_part) <= 7:
+            # Strip trailing organism ID
+            normalized = ' '.join(parts[:-1]).strip()
+
     # Remove accession if present (would be detected separately)
     # For now, if it looks like a single accession, return None for keyword
     if ACCESSION_PATTERN.match(normalized):
         return None
-    
+
     # If the remaining text is purely numeric, it's likely an organism ID, not a keyword
     # This prevents "9606" from being extracted as both keyword and organism_id
     if normalized and normalized.isdigit():
         return None
-    
+
     # Return remaining text as keyword (if not empty)
     if normalized and len(normalized) > 0:
         return normalized
-    
+
     return None
 
 
@@ -306,22 +346,33 @@ def build_uniprot_export_url(
     }
     
     # Add sorting with strict allowlist
-    # Frontend now sends UniProt format directly (e.g., "length asc"), so we validate against that
-    # Allowed sort values: "length asc", "length desc", "reviewed asc", "reviewed desc", 
-    # "protein_name asc", "protein_name desc", "organism_name asc", "organism_name desc"
+    # Accept both underscore format (length_asc) and space format (length asc)
+    # UniProt API expects space format, so we normalize underscore to space
+    # Allowed sort values per UniProt REST API documentation:
+    # - "length asc/desc" - sequence length
+    # - "protein_name asc/desc" - protein name
+    # - "organism_name asc/desc" - organism name
+    # Note: "reviewed" is NOT a valid sort field (it's a filter, not sortable)
     # Note: "score" (best match) should be omitted - UniProt defaults to score when sort is not provided
     ALLOWED_SORT_VALUES = {
         "length asc", "length desc",
-        "reviewed asc", "reviewed desc",
         "protein_name asc", "protein_name desc",
         "organism_name asc", "organism_name desc",
     }
-    
+
+    # Normalize underscore to space (length_asc -> length asc)
+    def normalize_sort(s: str) -> str:
+        # Replace trailing _asc/_desc with space format
+        s = re.sub(r'_asc$', ' asc', s)
+        s = re.sub(r'_desc$', ' desc', s)
+        return s
+
     # Only add sort parameter if it's not "score"/None and is in allowlist
     # (Validation should happen before calling this function, but we double-check here)
     if sort and sort != "score":
-        if sort in ALLOWED_SORT_VALUES:
-            params["sort"] = sort  # Already in correct format
+        normalized_sort = normalize_sort(sort)
+        if normalized_sort in ALLOWED_SORT_VALUES:
+            params["sort"] = normalized_sort  # Use normalized format
         else:
             # This should not happen if validation is correct, but raise to be safe
             raise ValueError(

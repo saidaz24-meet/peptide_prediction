@@ -9,8 +9,8 @@ from typing import Dict, List, Any, Optional
 
 import httpx
 
-from services.uniprot_query import parse_uniprot_query, build_uniprot_export_url
-from services.uniprot import window_sequences
+from services.uniprot_parser import parse_uniprot_query, build_uniprot_export_url
+from services.sequence_windowing import window_sequences
 from services.dataframe_utils import read_any_table
 from services.logger import log_info
 from schemas.uniprot_query import UniProtQueryParseRequest, UniProtQueryParseResponse

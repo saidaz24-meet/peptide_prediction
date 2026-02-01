@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import warnings
 
-import biochemCalculation
+import biochem_calculation
 
 PATH = os.getcwd()
 JPRED_INPUT_FILEPATH = "jpred_input.txt"
@@ -372,7 +372,7 @@ def get_avg_uH_by_segments(sequence: str, segments: list) -> float:
                 if 0 <= start < len(sequence) and start < end <= len(sequence):
                     seg_seq = sequence[start:end]
                     if seg_seq:  # Make sure segment is not empty
-                        muH = biochemCalculation.hydrophobic_moment(seg_seq)
+                        muH = biochem_calculation.hydrophobic_moment(seg_seq)
                         total_muH += muH * len(seg_seq)
                         total_length += len(seg_seq)
         

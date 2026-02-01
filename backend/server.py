@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-import auxiliary, biochemCalculation, tango
+import auxiliary, biochem_calculation, tango
 # JPred module kept for reference only - not used functionally
 # import jpred
 from auxiliary import ff_helix_percent, ff_helix_cores
@@ -42,7 +42,7 @@ from services.uniprot_service import (
     parse_query as parse_uniprot_query_service,
     window_protein_sequences as window_sequences_service,
 )
-from services.uniprot_query import parse_uniprot_query, build_uniprot_export_url
+from services.uniprot_parser import parse_uniprot_query, build_uniprot_export_url
 from schemas.uniprot_query import UniProtQueryParseRequest, UniProtQueryParseResponse, UniProtQueryExecuteRequest
 from services.logger import get_logger, set_trace_id, log_info, log_warning, log_error
 from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response

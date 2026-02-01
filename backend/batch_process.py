@@ -15,7 +15,7 @@ import pandas as pd
 import warnings
 
 import auxiliary
-import biochemCalculation
+import biochem_calculation
 # jpred module removed - JPred is disabled (USE_JPRED=False always)
 import tango
 from calculations.biochem import calculate_biochemical_features

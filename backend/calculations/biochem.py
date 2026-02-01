@@ -3,7 +3,7 @@ Biochemical calculation functions for peptide analysis.
 Extracted from server.py and batch_process.py to remove duplication.
 """
 import pandas as pd
-import biochemCalculation
+import biochem_calculation
 import auxiliary
 
 def sanitize_seq(s: str) -> str:
@@ -74,11 +74,11 @@ def calculate_biochemical_features(df: pd.DataFrame, use_strict_validation: bool
             seq = auxiliary.get_corrected_sequence(seq_raw)
             helix_frags = r.get("Helix fragments (Jpred)", [])
         
-        charges.append(biochemCalculation.total_charge(seq))
-        hydros.append(biochemCalculation.hydrophobicity(seq))
-        uh_full.append(biochemCalculation.hydrophobic_moment(seq))
+        charges.append(biochem_calculation.total_charge(seq))
+        hydros.append(biochem_calculation.hydrophobicity(seq))
+        uh_full.append(biochem_calculation.hydrophobic_moment(seq))
         uh_helix.append(auxiliary.get_avg_uH_by_segments(seq, helix_frags))
-        uh_beta.append(biochemCalculation.hydrophobic_moment(seq, angle=160))
+        uh_beta.append(biochem_calculation.hydrophobic_moment(seq, angle=160))
     
     df["Charge"] = charges
     df["Hydrophobicity"] = hydros
