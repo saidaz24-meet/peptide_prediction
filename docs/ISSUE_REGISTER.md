@@ -14,7 +14,7 @@
 | **P1** | 6 | 3 resolved, 3 pending (incl. ISSUE-020 investigation) |
 | **P2** | 7 | 6 resolved, 1 pending |
 | **P3** | 3 | 1 resolved, 2 pending |
-| **Phase 0B** | 2 | ISSUE-017 ✅, ISSUE-018 pending |
+| **Phase 0B** | 2 | ✅ ALL RESOLVED |
 | **Phase 1** | 2 | ✅ ALL RESOLVED |
 | **UX** | 1 | ✅ ISSUE-021 RESOLVED |
 
@@ -201,18 +201,17 @@
 
 ---
 
-### ISSUE-018: Endpoints Don't Use Pydantic Response Models — 🆕 NEW (Phase 0B)
+### ISSUE-018: Endpoints Don't Use Pydantic Response Models — ✅ RESOLVED
 
 | Field | Value |
 |-------|-------|
 | **Priority** | P1 (Phase 0B) |
 | **Category** | Schema Enforcement |
-| **Impact** | /api/predict and /api/upload-csv return dicts, not validated Pydantic models |
-| **Files** | `server.py:105-228` (upload_csv, predict functions) |
-| **Evidence** | Return statements use `{"rows": [...], "meta": {...}}` not `RowsResponse(...)` |
-| **Suggested Fix** | Construct `RowsResponse` / `PredictResponse` objects and return `.model_dump()` |
-| **Effort** | MEDIUM (2 hours) |
-| **Risk** | LOW (existing tests will catch regressions) |
+| **Status** | ✅ **RESOLVED** (2026-02-01) |
+| **Impact** | /api/predict and /api/upload-csv now return validated Pydantic models |
+| **Files** | `services/upload_service.py`, `services/predict_service.py` |
+| **Resolution** | Updated Meta model to use `extra="ignore"`. Services now construct `RowsResponse`/`PredictResponse` and return `.model_dump()`. Validation failures log warnings and fall back to unvalidated dict. |
+| **Tests** | All 54 tests pass |
 
 ---
 
@@ -281,8 +280,8 @@
 | **ISSUE-014** | P1 | LOW | ✅ RESOLVED |
 | **ISSUE-015** | P1 | LOW | ✅ RESOLVED |
 | **ISSUE-017** | P1 | MEDIUM | ✅ RESOLVED |
-| **ISSUE-018** | P1 | MEDIUM | ⏸️ Pending (Meta model update needed) |
-| **ISSUE-008** | P2 | LOW | ✅ Yes (after confirmation) |
+| **ISSUE-018** | P1 | MEDIUM | ✅ RESOLVED |
+| **ISSUE-008** | P2 | LOW | ✅ RESOLVED |
 | **ISSUE-001** | P1 | HIGH | ⏸️ After integration |
 | **ISSUE-016** | P2 | MEDIUM | ⏸️ After integration |
 

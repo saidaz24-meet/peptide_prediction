@@ -29,11 +29,10 @@ from services.dataframe_utils import (
     apply_ff_flags,
     fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
 )
+from schemas.api_models import PredictResponse, PeptideRow, Meta
 
-# Provider flags from config
-USE_JPRED = settings.USE_JPRED
-USE_TANGO = settings.USE_TANGO
-USE_PSIPRED = settings.USE_PSIPRED
+# Provider flags are read dynamically from settings to avoid caching issues
+# Use settings.USE_TANGO, settings.USE_PSIPRED, settings.USE_JPRED directly
 
 
 def _run_tango_for_single_sequence(df: pd.DataFrame, entry_id: str, seq: str) -> None:
@@ -87,17 +86,17 @@ def _build_provider_status_meta(ssw_hits: int, tango_ran: bool) -> Dict[str, Any
     """Build provider status metadata for single sequence prediction."""
     return {
         "tango": {
-            "enabled": USE_TANGO,
-            "requested": USE_TANGO,
+            "enabled": settings.USE_TANGO,
+            "requested": settings.USE_TANGO,
             "ran": tango_ran,
-            "status": "AVAILABLE" if ssw_hits > 0 else ("OFF" if not USE_TANGO else "UNAVAILABLE"),
-            "reason": None if ssw_hits > 0 else ("TANGO not enabled" if not USE_TANGO else "No TANGO output"),
-            "stats": {"requested": 1 if USE_TANGO else 0, "parsed_ok": ssw_hits, "parsed_bad": 0}
+            "status": "AVAILABLE" if ssw_hits > 0 else ("OFF" if not settings.USE_TANGO else "UNAVAILABLE"),
+            "reason": None if ssw_hits > 0 else ("TANGO not enabled" if not settings.USE_TANGO else "No TANGO output"),
+            "stats": {"requested": 1 if settings.USE_TANGO else 0, "parsed_ok": ssw_hits, "parsed_bad": 0}
         },
         "psipred": {
-            "enabled": USE_PSIPRED,
-            "requested": USE_PSIPRED,
-            "ran": USE_PSIPRED,  # Simplified - assume ran if enabled
+            "enabled": settings.USE_PSIPRED,
+            "requested": settings.USE_PSIPRED,
+            "ran": settings.USE_PSIPRED,  # Simplified - assume ran if enabled
             "status": "UNKNOWN",  # Would need to check actual output
             "reason": None,
         },
@@ -135,9 +134,9 @@ def _compute_reproducibility_primitives(
 
     # Compute config_hash from configuration flags
     config_dict = {
-        "USE_TANGO": USE_TANGO,
-        "USE_PSIPRED": USE_PSIPRED,
-        "USE_JPRED": USE_JPRED,
+        "USE_TANGO": settings.USE_TANGO,
+        "USE_PSIPRED": settings.USE_PSIPRED,
+        "USE_JPRED": settings.USE_JPRED,
     }
     config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
     config_hash = hashlib.sha256(config_str.encode('utf-8')).hexdigest()[:16]
@@ -145,13 +144,13 @@ def _compute_reproducibility_primitives(
     # Build provider status summary
     provider_status_summary = {
         "tango": {
-            "status": "AVAILABLE" if ssw_hits > 0 else ("OFF" if not USE_TANGO else "UNAVAILABLE"),
-            "requested": 1 if USE_TANGO else 0,
+            "status": "AVAILABLE" if ssw_hits > 0 else ("OFF" if not settings.USE_TANGO else "UNAVAILABLE"),
+            "requested": 1 if settings.USE_TANGO else 0,
             "parsed_ok": ssw_hits,
             "parsed_bad": 0,
-        } if USE_TANGO else None,
+        } if settings.USE_TANGO else None,
         "psipred": {
-            "status": "OFF" if not USE_PSIPRED else "UNKNOWN",
+            "status": "OFF" if not settings.USE_PSIPRED else "UNKNOWN",
         },
         "jpred": {
             "status": "OFF",
@@ -189,7 +188,7 @@ def process_single_sequence(
     ensure_computed_cols(df)
 
     # Run TANGO if enabled
-    if USE_TANGO:
+    if settings.USE_TANGO:
         _run_tango_for_single_sequence(df, entry_id, seq)
 
     # Secondary structure prediction
@@ -208,13 +207,13 @@ def process_single_sequence(
     row_data = normalize_rows_for_ui(
         df,
         is_single_row=True,
-        tango_enabled=USE_TANGO,
-        psipred_enabled=USE_PSIPRED,
-        jpred_enabled=USE_JPRED
+        tango_enabled=settings.USE_TANGO,
+        psipred_enabled=settings.USE_PSIPRED,
+        jpred_enabled=settings.USE_JPRED
     )
 
     # Compute provider status
-    tango_ran = USE_TANGO and "SSW prediction" in df.columns
+    tango_ran = settings.USE_TANGO and "SSW prediction" in df.columns
     ssw_hits = 1 if tango_ran and df.iloc[0].get("SSW prediction", -1) != -1 else 0
     jpred_hits = 0  # JPred always disabled
 
@@ -226,9 +225,9 @@ def process_single_sequence(
     )
 
     # Build complete meta structure
-    meta = ensure_trace_id_in_meta({
+    meta_dict = ensure_trace_id_in_meta({
         "use_jpred": False,
-        "use_tango": USE_TANGO,
+        "use_tango": settings.USE_TANGO,
         "jpred_rows": jpred_hits,
         "ssw_rows": ssw_hits,
         "valid_seq_rows": 1,
@@ -243,7 +242,21 @@ def process_single_sequence(
         "thresholds": resolved_thresholds,
     })
 
-    return {
-        "row": row_data,
-        "meta": meta,
-    }
+    # ISSUE-018: Validate response through Pydantic model
+    # This ensures the response matches the PredictResponse schema
+    try:
+        validated_meta = Meta.model_validate(meta_dict)
+        validated_row = PeptideRow.model_validate(row_data)
+
+        response = PredictResponse(
+            row=validated_row,
+            meta=validated_meta
+        )
+        return response.model_dump(exclude_none=True)
+    except Exception as e:
+        # Graceful fallback: log warning and return unvalidated dict
+        log_warning("response_validation_failed", f"PredictResponse validation failed: {e}")
+        return {
+            "row": row_data,
+            "meta": meta_dict,
+        }

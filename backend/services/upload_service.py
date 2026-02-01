@@ -34,11 +34,10 @@ from services.dataframe_utils import (
     apply_ff_flags,
     fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
 )
+from schemas.api_models import RowsResponse, PeptideRow, Meta, ProviderStatusSummary
 
-# Provider flags from config
-USE_JPRED = settings.USE_JPRED
-USE_TANGO = settings.USE_TANGO
-USE_PSIPRED = settings.USE_PSIPRED
+# Provider flags are read dynamically from settings to avoid caching issues
+# Use settings.USE_TANGO, settings.USE_PSIPRED, settings.USE_JPRED directly
 
 # Global state for provider status tracking (shared with server.py)
 _last_provider_status: Dict[str, Any] = {}
@@ -129,7 +128,7 @@ def _run_tango_processing(
     tango_stats = {"requested": 0, "parsed_ok": 0, "parsed_bad": 0}
     tango_provider_status = "OFF"
     tango_provider_reason = None
-    tango_enabled_flag = USE_TANGO
+    tango_enabled_flag = settings.USE_TANGO
     tango_requested_flag = True  # Upload CSV always requests Tango if enabled
     tango_ran = False
     run_dir = None
@@ -451,9 +450,9 @@ def _compute_reproducibility_primitives(
 
     # 4. Compute config_hash from configuration flags/options
     config_dict = {
-        "USE_TANGO": USE_TANGO,
-        "USE_PSIPRED": USE_PSIPRED,
-        "USE_JPRED": USE_JPRED,
+        "USE_TANGO": settings.USE_TANGO,
+        "USE_PSIPRED": settings.USE_PSIPRED,
+        "USE_JPRED": settings.USE_JPRED,
     }
     config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
     config_hash = hashlib.sha256(config_str.encode('utf-8')).hexdigest()[:16]
@@ -467,7 +466,7 @@ def _compute_reproducibility_primitives(
             "parsed_bad": tango_stats.get("parsed_bad", 0),
         } if tango_enabled_flag else None,
         "psipred": {
-            "status": "OFF" if not USE_PSIPRED else "UNKNOWN",
+            "status": "OFF" if not settings.USE_PSIPRED else "UNKNOWN",
         },
         "jpred": {
             "status": "OFF",
@@ -524,7 +523,7 @@ def process_upload_dataframe(
     tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = _run_tango_processing(
         df, trace_entry, sentry_initialized
     )
-    tango_enabled_flag = USE_TANGO
+    tango_enabled_flag = settings.USE_TANGO
     tango_requested_flag = True
 
     # JPred disabled - kept for reference only
@@ -580,9 +579,9 @@ def process_upload_dataframe(
     rows_out = normalize_rows_for_ui(
         df,
         is_single_row=False,
-        tango_enabled=USE_TANGO,
-        psipred_enabled=USE_PSIPRED,
-        jpred_enabled=USE_JPRED
+        tango_enabled=settings.USE_TANGO,
+        psipred_enabled=settings.USE_PSIPRED,
+        jpred_enabled=settings.USE_JPRED
     )
     normalize_ui_elapsed = (time.time() - normalize_ui_start_time) * 1000
     log_info("normalize_ui_complete", f"Normalized {len(rows_out)} rows for UI",
@@ -667,22 +666,41 @@ def process_upload_dataframe(
         df, threshold_config_requested, tango_stats, tango_enabled_flag, tango_provider_status
     )
 
-    return {
-        "rows": rows_out,
-        "meta": ensure_trace_id_in_meta({
-            "use_jpred": False, "use_tango": USE_TANGO,
-            "jpred_rows": jpred_hits, "ssw_rows": ssw_hits,
-            "valid_seq_rows": int(df["Sequence"].notna().sum()),
-            "provider_status": provider_status_meta,
-            # Reproducibility primitives
-            "runId": repro_run_id,
-            "traceId": trace_id,
-            "inputsHash": inputs_hash,
-            "configHash": config_hash,
-            "providerStatusSummary": provider_status_summary,
-            # Threshold configuration
-            "thresholdConfigRequested": threshold_config_requested,
-            "thresholdConfigResolved": threshold_config_resolved,
-            "thresholds": resolved_thresholds,
-        })
-    }
+    # Build meta dict (ISSUE-018: schema enforcement)
+    meta_dict = ensure_trace_id_in_meta({
+        "use_jpred": False, "use_tango": settings.USE_TANGO,
+        "jpred_rows": jpred_hits, "ssw_rows": ssw_hits,
+        "valid_seq_rows": int(df["Sequence"].notna().sum()),
+        "provider_status": provider_status_meta,
+        # Reproducibility primitives
+        "runId": repro_run_id,
+        "traceId": trace_id,
+        "inputsHash": inputs_hash,
+        "configHash": config_hash,
+        "providerStatusSummary": provider_status_summary,
+        # Threshold configuration
+        "thresholdConfigRequested": threshold_config_requested,
+        "thresholdConfigResolved": threshold_config_resolved,
+        "thresholds": resolved_thresholds,
+    })
+
+    # ISSUE-018: Validate response through Pydantic model
+    # This ensures the response matches the RowsResponse schema
+    try:
+        # Validate rows through PeptideRow model (already done in normalize_rows_for_ui)
+        # Validate meta through Meta model
+        validated_meta = Meta.model_validate(meta_dict)
+
+        # Construct and validate full response
+        response = RowsResponse(
+            rows=[PeptideRow.model_validate(row) for row in rows_out],
+            meta=validated_meta
+        )
+        return response.model_dump(exclude_none=True)
+    except Exception as e:
+        # Graceful fallback: log warning and return unvalidated dict
+        log_warning("response_validation_failed", f"RowsResponse validation failed: {e}")
+        return {
+            "rows": rows_out,
+            "meta": meta_dict,
+        }
