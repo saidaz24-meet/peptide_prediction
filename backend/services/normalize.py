@@ -9,6 +9,7 @@ from typing import Dict, List, Optional
 from fastapi import HTTPException
 from schemas.peptide import PeptideSchema
 from schemas.provider_status import PeptideProviderStatus
+from schemas.api_models import PeptideRow
 from services.provider_tracking import create_provider_status_for_row
 from services.logger import get_logger, get_trace_id, log_info, log_warning
 
@@ -160,13 +161,7 @@ def finalize_ui_aliases(df: pd.DataFrame) -> None:
     """
     Add UI-friendly alias columns for compatibility.
     Creates: FF Helix % (alias for FF-Helix %), FF Helix fragments
-    
-    NOTE: Do NOT create "Chameleon" column here - it conflicts with canonical chameleonPrediction.
-    The canonical field is chameleonPrediction (from PeptideSchema mapping of "SSW prediction").
     """
-    # REMOVED: "Chameleon" alias to avoid confusion with canonical chameleonPrediction field
-    # The canonical field is chameleonPrediction (from PeptideSchema.to_camel_dict())
-    # which correctly maps "SSW prediction" -> chameleonPrediction with -1/0/1 values
 
     # FF-Helix alias: some UIs use "FF Helix %" (no hyphen)
     if "FF-Helix %" in df.columns:
@@ -261,17 +256,15 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
     result = row_dict.copy()
     
     # TANGO fields: if TANGO is not available/failed/not_configured, nullify ALL TANGO fields
-    if provider_status.tango.status != "available":
-        # All TANGO/SSW fields (including all name variations) must be null
+    if provider_status.tango.status != "AVAILABLE":
+        # All TANGO/SSW fields must be null when provider not available
         tango_fields = [
-            "sswPrediction", "chameleonPrediction",  # Prediction fields
-            "sswScore", "sswDiff",  # Score/diff fields
-            "sswHelixPercentage", "sswBetaPercentage",  # Percentage fields (camelCase)
-            "sswHelixPct", "sswBetaPct",  # Alternative percentage field names
-            # Nested tango object fields (if present as top-level)
+            "sswPrediction", "sswScore", "sswDiff",
+            "sswHelixPercentage", "sswBetaPercentage",
+            "sswHelixPct", "sswBetaPct",
+            # Nested tango object fields
             "tangoAgg", "tangoBeta", "tangoHelix", "tangoTurn",
             "tangoAggregationCurve", "tangoBetaCurve", "tangoHelixCurve", "tangoTurnCurve",
-            # Additional field variations that might exist
             "sswFragments", "tangoFragments",
         ]
         for field in tango_fields:
@@ -315,7 +308,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
                 result["tango"] = None
     
     # PSIPRED fields: if PSIPRED is not available/failed/not_configured, nullify ALL PSIPRED fields
-    if provider_status.psipred.status != "available":
+    if provider_status.psipred.status != "AVAILABLE":
         # All PSIPRED fields must be null when provider not available
         psipred_fields = [
             "psipredHelixPercentage", "psipredBetaPercentage",  # Direct PSIPRED percentages
@@ -363,7 +356,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
                 result["psipred"] = None
     
     # JPred fields: if JPred is not available/failed/not_configured, nullify ALL JPred fields
-    if provider_status.jpred.status != "available":
+    if provider_status.jpred.status != "AVAILABLE":
         # All JPred fields must be null when provider not available
         jpred_fields = [
             "jpredHelixFragments", "jpredHelixScore",
@@ -417,12 +410,15 @@ def none_if_nan(x):
             return None
     return x
 
-def _sanitize_for_json(obj):
+def _sanitize_for_json(obj, field_name: str = None):
     """
     Recursively replace NaN/inf values, pandas NA, empty strings, and -1 markers
     with None so the resulting structure is JSON-serializable and follows strict
     null semantics.
-    
+
+    IMPORTANT: -1 is converted to None for all fields EXCEPT sswPrediction,
+    where -1 is a valid semantic value meaning "no structural switch predicted".
+
     Note: This runs AFTER _convert_fake_defaults_to_null, so most fake defaults
     should already be None. This function handles edge cases that might slip through.
     """
@@ -436,13 +432,18 @@ def _sanitize_for_json(obj):
     # primitives
     if isinstance(obj, float):
         if math.isfinite(obj):
-            # Check for -1 which might be a fake default (but preserve if legitimate)
-            # Most -1 fake defaults should already be converted by _convert_fake_defaults_to_null
+            # Convert -1.0 to None (fake default for missing numeric data)
+            # EXCEPT: never convert legitimate floats that happen to be -1.0
+            # In practice, -1.0 should not be a valid float value in this domain
+            if obj == -1.0:
+                return None
             return obj
         return None  # NaN/inf -> None
     if isinstance(obj, int):
-        # Preserve -1 for now (legitimate for sswPrediction), _convert_fake_defaults_to_null
-        # should have handled provider-owned fields
+        # Preserve -1 ONLY for sswPrediction (valid semantic value: "no switch")
+        # All other -1 values are fake defaults and should be None
+        if obj == -1 and field_name != "sswPrediction":
+            return None
         return obj
     if isinstance(obj, str):
         # Convert empty strings and "-" to None (should already be handled, but defensive)
@@ -456,9 +457,9 @@ def _sanitize_for_json(obj):
     if isinstance(obj, dict):
         out = {}
         for k, v in obj.items():
-            sanitized = _sanitize_for_json(v)
-            # Only include non-None values (or include None if explicitly set)
-            # Actually, we should preserve None values in dicts for JSON serialization
+            # Pass field name to allow sswPrediction exception
+            sanitized = _sanitize_for_json(v, field_name=k)
+            # Preserve None values in dicts for JSON serialization
             out[k] = sanitized
         return out
 
@@ -486,26 +487,136 @@ def normalize_rows_for_ui(
     """
     Normalize DataFrame rows for UI consumption.
     
+    ALWAYS returns camelCase format through PeptideSchema.to_camel_dict().
+    This ensures /api/predict and /api/upload-csv return the SAME canonical format.
+    
     Args:
         df: DataFrame with peptide data
-        is_single_row: If True, return single dict with capitalized keys (for /api/predict);
+        is_single_row: If True, return single dict with camelCase keys (for /api/predict);
                        If False, return list of dicts with camelCase keys (for CSV upload)
     
     Returns:
         Single dict (if is_single_row=True) or list of dicts (if is_single_row=False)
+        Both use camelCase keys (id, sequence, charge, etc.) - NOT capitalized (Entry, Sequence)
     """
+    # Shared normalization logic for both single and multi-row paths
+    def normalize_single_row(row: pd.Series) -> dict:
+        """
+        Normalize a single DataFrame row to camelCase dict.
+        
+        Uses PeptideSchema.parse_obj() and to_camel_dict() to ensure canonical format.
+        """
+        try:
+            # Convert row to dict with CSV header keys (PeptideSchema expects these aliases)
+            row_dict = row.to_dict()
+            
+            # Sanitize SSW-related fields: convert NaN/inf to None before Pydantic validation
+            ssw_fields = ["SSW prediction", "SSW score", "SSW diff", "SSW helix percentage", "SSW beta percentage"]
+            for field in ssw_fields:
+                if field in row_dict:
+                    row_dict[field] = none_if_nan(row_dict[field])
+
+            # Use PeptideSchema to validate and normalize
+            peptide_obj = PeptideSchema.parse_obj(row_dict)
+            
+            # Convert to camelCase for UI (canonical format)
+            normalized = peptide_obj.to_camel_dict()
+            
+            # Add provider status (Principle B: mandatory provider status)
+            # Determine status based on data presence in DataFrame row
+            provider_status = create_provider_status_for_row(
+                row,
+                tango_enabled=tango_enabled,
+                psipred_enabled=psipred_enabled,
+                jpred_enabled=jpred_enabled,
+                tango_output_available=row.get("SSW prediction", -1) != -1,
+                psipred_output_available=len(row.get("Helix fragments (Psipred)", [])) > 0,
+                jpred_output_available=len(row.get("Helix fragments (Jpred)", [])) > 0,
+            )
+            normalized["providerStatus"] = provider_status.model_dump()
+            
+            # Convert fake defaults to null (Principle C: no fake defaults)
+            normalized = _convert_fake_defaults_to_null(normalized, provider_status)
+
+            # Sanitize for JSON serialization
+            sanitized = _sanitize_for_json(normalized)
+
+            # Validate through PeptideRow model (ISSUE-017: schema enforcement)
+            try:
+                validated_row = PeptideRow.model_validate(sanitized)
+                # Return validated dict, excluding extras to maintain flat structure
+                return validated_row.model_dump(exclude_none=True, exclude={'extras'})
+            except Exception as e:
+                log_warning("peptide_row_validation_failed", f"Row validation failed: {e}", entry=str(row.get("Entry", "unknown")), **{"error": str(e)})
+                # Fall back to sanitized dict on validation failure
+                return sanitized
+        except Exception as e:
+            entry_id = str(row.get("Entry", "unknown"))
+            log_warning("normalize_row_failed", f"Failed to normalize row {entry_id}: {e}", entry=entry_id, **{"error": str(e)})
+            # Fallback: manually map common fields to ensure ID is present
+            # Create minimal provider status for fallback (assume no provider output available)
+            fallback_provider_status = create_provider_status_for_row(
+                row,
+                tango_enabled=tango_enabled,
+                psipred_enabled=psipred_enabled,
+                jpred_enabled=jpred_enabled,
+                tango_output_available=False,  # Fallback assumes no provider output
+                psipred_output_available=False,
+                jpred_output_available=False,
+            )
+            
+            # Fallback: ensure FF-Helix % is properly converted (handle both -1 and None)
+            ff_helix_raw = row.get("FF-Helix %")
+            ff_helix_val = None
+            if ff_helix_raw is not None and not pd.isna(ff_helix_raw):
+                try:
+                    ff_helix_val = float(ff_helix_raw)
+                    # Clamp to [0, 100] range (percent units)
+                    if ff_helix_val < 0 or ff_helix_val > 100:
+                        ff_helix_val = None
+                except (ValueError, TypeError):
+                    ff_helix_val = None
+            
+            fallback = {
+                "id": str(row.get("Entry", "")),
+                "sequence": str(row.get("Sequence", "")),
+                "length": int(row.get("Length", 0)),
+                "hydrophobicity": float(row.get("Hydrophobicity", 0)) if not pd.isna(row.get("Hydrophobicity", None)) else None,
+                "charge": float(row.get("Charge", 0)) if not pd.isna(row.get("Charge", None)) else None,
+                "muH": row.get("Full length uH"),
+                "ffHelixPercent": ff_helix_val,  # Use converted value (None if invalid, not -1)
+                "ffHelixFragments": row.get("FF Helix fragments", []),
+                "sswPrediction": none_if_nan(row.get("SSW prediction", None)),
+                "sswScore": none_if_nan(row.get("SSW score", None)),
+                "sswDiff": none_if_nan(row.get("SSW diff", None)),
+                "sswHelixPercentage": none_if_nan(row.get("SSW helix percentage", None)),
+                "sswBetaPercentage": none_if_nan(row.get("SSW beta percentage", None)),
+                "providerStatus": fallback_provider_status.model_dump(),
+            }
+            # Apply nullification to fallback as well
+            fallback = _convert_fake_defaults_to_null(fallback, fallback_provider_status)
+            sanitized_fallback = _sanitize_for_json({k: v for k, v in fallback.items() if v is not None})
+
+            # Validate fallback through PeptideRow model (ISSUE-017: schema enforcement)
+            try:
+                validated_row = PeptideRow.model_validate(sanitized_fallback)
+                return validated_row.model_dump(exclude_none=True, exclude={'extras'})
+            except Exception as e:
+                log_warning("peptide_row_fallback_validation_failed", f"Fallback row validation failed: {e}", entry=entry_id, **{"error": str(e)})
+                return sanitized_fallback
+    
     if is_single_row:
         # Single row normalization (for /api/predict)
-        # NOTE: QuickAnalyze.tsx expects capitalized keys (Entry, Sequence, Charge, etc.)
-        # NOT camelCase, so we return the raw DataFrame row dict format
+        # Use same normalization path as multi-row to ensure canonical camelCase format
         row = df.iloc[0]
-        result = row.to_dict()  # Convert row to dict (preserves column names)
-        
-        # Sanitize NaN/inf values
-        return _sanitize_for_json(result)
+        return normalize_single_row(row)
     else:
         # Multiple rows normalization (for /api/upload-csv, /api/example)
+        # OPTIMIZATION: Use to_dict('records') instead of iterrows() - much faster
+        # This converts DataFrame to list of dicts in one operation, avoiding Series creation per row
+        rows_dict_list = df.to_dict('records')
         rows_out = []
+        
         # Check for debug entry (avoid circular import)
         import os
         debug_entry = os.getenv("DEBUG_ENTRY", "").strip()
@@ -514,136 +625,161 @@ def normalize_rows_for_ui(
         log_first_n = 3
         rows_logged = 0
         
-        for _, row in df.iterrows():
+        # OPTIMIZATION: Pre-compute column access patterns to avoid repeated lookups
+        # Get column indices for faster access (if needed)
+        col_indices = {col: i for i, col in enumerate(df.columns)}
+        
+        for idx, row_dict in enumerate(rows_dict_list):
+            # OPTIMIZATION: row_dict is already a dict, no need to call to_dict()
+            # Convert to Series only when needed for provider status calculation
+            # (create_provider_status_for_row expects a Series, so we create it lazily)
+            row_series = None  # Lazy creation
+            
+            def get_row_series():
+                """Lazy creation of Series for provider status calculation"""
+                nonlocal row_series
+                if row_series is None:
+                    row_series = df.iloc[idx]
+                return row_series
+            
+            # Use row_dict directly for normalization (faster than Series)
             try:
-                # Convert row to dict with CSV header keys (PeptideSchema expects these aliases)
-                row_dict = row.to_dict()
-                
                 # Sanitize SSW-related fields: convert NaN/inf to None before Pydantic validation
                 ssw_fields = ["SSW prediction", "SSW score", "SSW diff", "SSW helix percentage", "SSW beta percentage"]
                 for field in ssw_fields:
                     if field in row_dict:
                         row_dict[field] = none_if_nan(row_dict[field])
                 
-                # Also sanitize chameleon/derived SSW fields if present
-                if "chameleonPrediction" in row_dict:
-                    row_dict["chameleonPrediction"] = none_if_nan(row_dict["chameleonPrediction"])
-                
-                # Debug: Log first N rows for CSV FF-Helix mapping diagnosis
-                entry_id = str(row.get("Entry", "")).strip()
-                trace_id = get_trace_id()
-                if rows_logged < log_first_n:
-                    ff_helix_val = row_dict.get("FF-Helix %")
-                    ff_helix_type = type(ff_helix_val).__name__ if ff_helix_val is not None else "None"
-                    # Avoid duplicate 'entry' kwarg: pass it explicitly, don't include in dict
-                    log_info("csv_normalize_sample", f"CSV normalization sample row {rows_logged + 1}/{log_first_n}", 
-                            entry=entry_id,
-                            ffHelixPercent_raw=str(ff_helix_val) if ff_helix_val is not None else "None",
-                            ffHelixPercent_type=ff_helix_type,
-                            ffHelixPercent_is_na=pd.isna(ff_helix_val) if ff_helix_val is not None else True,
-                            all_ff_keys=[k for k in row_dict.keys() if 'FF' in k or 'Helix' in k or 'helix' in k.lower()])
-                    rows_logged += 1
-                
-                # Debug: Log before PeptideSchema normalization
-                if debug_entry and entry_id == debug_entry:
-                    log_info("normalize_before", f"Before PeptideSchema normalization for entry {entry_id}", entry=entry_id, **{
-                        "ssw_keys": [k for k in row_dict.keys() if 'SSW' in k or 'Helix' in k or 'Beta' in k or 'FF' in k]
-                    })
-                    for key in ["SSW prediction", "SSW helix percentage", "SSW beta percentage"]:
-                        if key in row_dict:
-                            log_info("normalize_field", f"{key}: {row_dict[key]}", entry=entry_id, **{"field": key, "value": str(row_dict[key]), "type": type(row_dict[key]).__name__})
-                
                 # Use PeptideSchema to validate and normalize
                 peptide_obj = PeptideSchema.parse_obj(row_dict)
                 
-                # Convert to camelCase for UI
+                # Convert to camelCase for UI (canonical format)
                 normalized = peptide_obj.to_camel_dict()
-                
-                # Debug: Log first N rows after normalization for CSV FF-Helix mapping diagnosis
-                if rows_logged <= log_first_n:
-                    ff_helix_camel = normalized.get("ffHelixPercent")
-                    ff_helix_camel_type = type(ff_helix_camel).__name__ if ff_helix_camel is not None else "None"
-                    # Avoid duplicate 'entry' kwarg: pass it explicitly, don't include in dict
-                    log_info("csv_normalize_after", f"After PeptideSchema normalization (sample {rows_logged}/{log_first_n})", 
-                            entry=entry_id,
-                            ffHelixPercent=str(ff_helix_camel) if ff_helix_camel is not None else "None",
-                            ffHelixPercent_type=ff_helix_camel_type,
-                            ffHelixPercent_is_na=pd.isna(ff_helix_camel) if ff_helix_camel is not None else True,
-                            all_ff_keys_camel=[k for k in normalized.keys() if 'ff' in k.lower() or 'helix' in k.lower()])
-                
-                # Debug: Log after PeptideSchema normalization
-                if debug_entry and entry_id == debug_entry:
-                    log_info("normalize_after", f"After PeptideSchema normalization for entry {entry_id}", entry=entry_id, **{
-                        "ssw_keys": [k for k in normalized.keys() if 'ssw' in k.lower() or 'helix' in k.lower() or 'beta' in k.lower()]
-                    })
-                    for key in ["id", "sswPrediction", "sswHelixPercentage", "sswBetaPercentage"]:
-                        if key in normalized:
-                            log_info("normalize_field", f"{key}: {normalized[key]}", entry=entry_id, **{"field": key, "value": str(normalized[key]), "type": type(normalized[key]).__name__})
                 
                 # Add provider status (Principle B: mandatory provider status)
                 # Determine status based on data presence in DataFrame row
-                # Note: This is a simplified check - in production, we should check if output files exist
+                # OPTIMIZATION: Only create Series when needed for provider status
+                row_for_status = get_row_series()
                 provider_status = create_provider_status_for_row(
-                    row,
+                    row_for_status,
                     tango_enabled=tango_enabled,
                     psipred_enabled=psipred_enabled,
                     jpred_enabled=jpred_enabled,
-                    tango_output_available=row.get("SSW prediction", -1) != -1,
-                    psipred_output_available=len(row.get("Helix fragments (Psipred)", [])) > 0,
-                    jpred_output_available=len(row.get("Helix fragments (Jpred)", [])) > 0,
+                    tango_output_available=row_dict.get("SSW prediction", -1) != -1,
+                    psipred_output_available=len(row_dict.get("Helix fragments (Psipred)", [])) > 0,
+                    jpred_output_available=len(row_dict.get("Helix fragments (Jpred)", [])) > 0,
                 )
-                normalized["providerStatus"] = provider_status.dict()
+                normalized["providerStatus"] = provider_status.model_dump()
                 
                 # Convert fake defaults to null (Principle C: no fake defaults)
                 normalized = _convert_fake_defaults_to_null(normalized, provider_status)
-                
-                rows_out.append(_sanitize_for_json(normalized))
+
+                # Sanitize for JSON serialization
+                normalized = _sanitize_for_json(normalized)
+
+                # Validate through PeptideRow model (ISSUE-017: schema enforcement)
+                try:
+                    validated_row = PeptideRow.model_validate(normalized)
+                    normalized = validated_row.model_dump(exclude_none=True, exclude={'extras'})
+                except Exception as e:
+                    entry_id = str(row_dict.get("Entry", "unknown"))
+                    log_warning("peptide_row_validation_failed", f"Row validation failed: {e}", entry=entry_id, **{"error": str(e)})
+                    # Continue with sanitized dict on validation failure
             except Exception as e:
-                entry_id = str(row.get("Entry", "unknown"))
+                entry_id = str(row_dict.get("Entry", "unknown"))
                 log_warning("normalize_row_failed", f"Failed to normalize row {entry_id}: {e}", entry=entry_id, **{"error": str(e)})
                 # Fallback: manually map common fields to ensure ID is present
-                # Create minimal provider status for fallback (assume no provider output available)
+                row_for_status = get_row_series()
                 fallback_provider_status = create_provider_status_for_row(
-                    row,
+                    row_for_status,
                     tango_enabled=tango_enabled,
                     psipred_enabled=psipred_enabled,
                     jpred_enabled=jpred_enabled,
-                    tango_output_available=False,  # Fallback assumes no provider output
+                    tango_output_available=False,
                     psipred_output_available=False,
                     jpred_output_available=False,
                 )
                 
-                # Fallback: ensure FF-Helix % is properly converted (handle both -1 and None)
-                ff_helix_raw = row.get("FF-Helix %")
+                # Fallback: ensure FF-Helix % is properly converted
+                ff_helix_raw = row_dict.get("FF-Helix %")
                 ff_helix_val = None
                 if ff_helix_raw is not None and not pd.isna(ff_helix_raw):
                     try:
                         ff_helix_val = float(ff_helix_raw)
-                        # Clamp to [0, 100] range (percent units)
                         if ff_helix_val < 0 or ff_helix_val > 100:
                             ff_helix_val = None
                     except (ValueError, TypeError):
                         ff_helix_val = None
                 
                 fallback = {
-                    "id": str(row.get("Entry", "")),
-                    "sequence": str(row.get("Sequence", "")),
-                    "length": int(row.get("Length", 0)),
-                    "hydrophobicity": float(row.get("Hydrophobicity", 0)) if not pd.isna(row.get("Hydrophobicity", None)) else None,
-                    "charge": float(row.get("Charge", 0)) if not pd.isna(row.get("Charge", None)) else None,
-                    "muH": row.get("Full length uH"),
-                    "ffHelixPercent": ff_helix_val,  # Use converted value (None if invalid, not -1)
-                    "ffHelixFragments": row.get("FF Helix fragments", []),
-                    "sswPrediction": none_if_nan(row.get("SSW prediction", None)),
-                    "sswScore": none_if_nan(row.get("SSW score", None)),
-                    "sswDiff": none_if_nan(row.get("SSW diff", None)),
-                    "sswHelixPercentage": none_if_nan(row.get("SSW helix percentage", None)),
-                    "sswBetaPercentage": none_if_nan(row.get("SSW beta percentage", None)),
-                    "providerStatus": fallback_provider_status.dict(),
+                    "id": str(row_dict.get("Entry", "")),
+                    "sequence": str(row_dict.get("Sequence", "")),
+                    "length": int(row_dict.get("Length", 0)),
+                    "hydrophobicity": float(row_dict.get("Hydrophobicity", 0)) if not pd.isna(row_dict.get("Hydrophobicity", None)) else None,
+                    "charge": float(row_dict.get("Charge", 0)) if not pd.isna(row_dict.get("Charge", None)) else None,
+                    "muH": row_dict.get("Full length uH"),
+                    "ffHelixPercent": ff_helix_val,
+                    "ffHelixFragments": row_dict.get("FF Helix fragments", []),
+                    "sswPrediction": none_if_nan(row_dict.get("SSW prediction", None)),
+                    "sswScore": none_if_nan(row_dict.get("SSW score", None)),
+                    "sswDiff": none_if_nan(row_dict.get("SSW diff", None)),
+                    "sswHelixPercentage": none_if_nan(row_dict.get("SSW helix percentage", None)),
+                    "sswBetaPercentage": none_if_nan(row_dict.get("SSW beta percentage", None)),
+                    "providerStatus": fallback_provider_status.model_dump(),
                 }
-                # Apply nullification to fallback as well
                 fallback = _convert_fake_defaults_to_null(fallback, fallback_provider_status)
-                rows_out.append(_sanitize_for_json({k: v for k, v in fallback.items() if v is not None}))
+                sanitized_fallback = _sanitize_for_json({k: v for k, v in fallback.items() if v is not None})
+
+                # Validate fallback through PeptideRow model (ISSUE-017: schema enforcement)
+                try:
+                    validated_row = PeptideRow.model_validate(sanitized_fallback)
+                    normalized = validated_row.model_dump(exclude_none=True, exclude={'extras'})
+                except Exception as e:
+                    entry_id = str(row_dict.get("Entry", "unknown"))
+                    log_warning("peptide_row_fallback_validation_failed", f"Fallback row validation failed: {e}", entry=entry_id, **{"error": str(e)})
+                    normalized = sanitized_fallback
+            
+            # Debug logging for first N rows
+            entry_id = str(row_dict.get("Entry", "")).strip()
+            if rows_logged < log_first_n:
+                # OPTIMIZATION: row_dict already exists, no need to call to_dict()
+                ff_helix_val = row_dict.get("FF-Helix %")
+                ff_helix_type = type(ff_helix_val).__name__ if ff_helix_val is not None else "None"
+                log_info("csv_normalize_sample", f"CSV normalization sample row {rows_logged + 1}/{log_first_n}", 
+                        entry=entry_id,
+                        ffHelixPercent_raw=str(ff_helix_val) if ff_helix_val is not None else "None",
+                        ffHelixPercent_type=ff_helix_type,
+                        ffHelixPercent_is_na=pd.isna(ff_helix_val) if ff_helix_val is not None else True,
+                        all_ff_keys=[k for k in row_dict.keys() if 'FF' in k or 'Helix' in k or 'helix' in k.lower()])
+                
+                ff_helix_camel = normalized.get("ffHelixPercent")
+                ff_helix_camel_type = type(ff_helix_camel).__name__ if ff_helix_camel is not None else "None"
+                log_info("csv_normalize_after", f"After PeptideSchema normalization (sample {rows_logged + 1}/{log_first_n})", 
+                        entry=entry_id,
+                        ffHelixPercent=str(ff_helix_camel) if ff_helix_camel is not None else "None",
+                        ffHelixPercent_type=ff_helix_camel_type,
+                        ffHelixPercent_is_na=pd.isna(ff_helix_camel) if ff_helix_camel is not None else True,
+                        all_ff_keys_camel=[k for k in normalized.keys() if 'ff' in k.lower() or 'helix' in k.lower()])
+                rows_logged += 1
+            
+            # Debug: Log before/after PeptideSchema normalization for debug entry
+            if debug_entry and entry_id == debug_entry:
+                # OPTIMIZATION: row_dict already exists, no need to call to_dict()
+                log_info("normalize_before", f"Before PeptideSchema normalization for entry {entry_id}", entry=entry_id, **{
+                    "ssw_keys": [k for k in row_dict.keys() if 'SSW' in k or 'Helix' in k or 'Beta' in k or 'FF' in k]
+                })
+                for key in ["SSW prediction", "SSW helix percentage", "SSW beta percentage"]:
+                    if key in row_dict:
+                        log_info("normalize_field", f"{key}: {row_dict[key]}", entry=entry_id, **{"field": key, "value": str(row_dict[key]), "type": type(row_dict[key]).__name__})
+                
+                log_info("normalize_after", f"After PeptideSchema normalization for entry {entry_id}", entry=entry_id, **{
+                    "ssw_keys": [k for k in normalized.keys() if 'ssw' in k.lower() or 'helix' in k.lower() or 'beta' in k.lower()]
+                })
+                for key in ["id", "sswPrediction", "sswHelixPercentage", "sswBetaPercentage"]:
+                    if key in normalized:
+                        log_info("normalize_field", f"{key}: {normalized[key]}", entry=entry_id, **{"field": key, "value": str(normalized[key]), "type": type(normalized[key]).__name__})
+            
+            rows_out.append(normalized)
         
         return rows_out
 
