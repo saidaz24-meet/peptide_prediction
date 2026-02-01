@@ -146,7 +146,7 @@ class PeptideSchema(BaseModel):
                 out["sswPrediction"] = v
                 # NOTE: chameleonPrediction alias removed (2026-02-01)
                 continue
-            
+
             if k == "provider_status":
                 # Convert PeptideProviderStatus to dict (camelCase keys)
                 if v is not None:

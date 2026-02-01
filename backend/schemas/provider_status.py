@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 
 # Provider status values - MUST match frontend types/peptide.ts ProviderStatus type
 # Frontend expects: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE'
+# ISSUE-019: Fixed case mismatch - must be uppercase
 ProviderStatusValue = Literal["AVAILABLE", "UNAVAILABLE", "PARTIAL", "OFF"]
 
 
@@ -52,4 +53,3 @@ class PeptideProviderStatus(BaseModel):
                 "jpred": {"status": "OFF", "reason": "JPred disabled"}
             }
         }
-

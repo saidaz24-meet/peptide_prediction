@@ -7,10 +7,15 @@ For the web API server, see server.py instead.
 Usage:
     python batch_process.py
 
+<<<<<<<< HEAD:backend/_archive/batch_process.py
 Note: This script processes Excel files and runs Tango predictions
 in batch mode, different from the interactive web API.
 
 JPred support has been removed (USE_JPRED=False always).
+========
+Note: This script processes Excel files and runs Tango/JPred predictions
+in batch mode, different from the interactive web API.
+>>>>>>>> origin/main:backend/batch_process.py
 """
 import os
 import pandas as pd

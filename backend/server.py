@@ -11,9 +11,9 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-import auxiliary, biochem_calculation, tango
-# JPred module kept for reference only - not used functionally
-# import jpred
+import auxiliary, tango
+# JPred module removed (dead code)
+# biochem_calculation renamed to calculations/biochem.py
 from auxiliary import ff_helix_percent, ff_helix_cores
 import math
 from schemas.peptide import PeptideSchema
