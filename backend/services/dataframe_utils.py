@@ -44,7 +44,7 @@ def ensure_cols(df: pd.DataFrame) -> None:
             if col == "Helix fragments (Jpred)":
                 df[col] = pd.Series([[] for _ in range(len(df))], dtype=object)
             else:
-                df[col] = -1
+                df[col] = None  # Use None instead of -1 for missing data
 
 
 def ff_flags(df: pd.DataFrame) -> None:
@@ -52,9 +52,9 @@ def ff_flags(df: pd.DataFrame) -> None:
     # This function should compute your final FF flags
     # For now, just ensure the columns exist
     if "FF-Helix (Jpred)" not in df.columns:
-        df["FF-Helix (Jpred)"] = -1
+        df["FF-Helix (Jpred)"] = None  # Use None instead of -1 for missing data
     if "FF-Secondary structure switch" not in df.columns:
-        df["FF-Secondary structure switch"] = -1
+        df["FF-Secondary structure switch"] = None  # Use None instead of -1 for missing data
 
 
 def ensure_computed_cols(df: pd.DataFrame) -> None:
@@ -69,19 +69,21 @@ def ensure_computed_cols(df: pd.DataFrame) -> None:
                 # object dtype column of empty lists
                 df[c] = pd.Series([[] for _ in range(len(df))], dtype=object)
             else:
-                df[c] = -1
+                df[c] = None  # Use None instead of -1 for missing data
 
 
 def apply_ff_flags(df: pd.DataFrame) -> None:
     """Apply FF flags based on computed metrics."""
     ssw_avg_H = df[df["SSW prediction"] != 1]["Hydrophobicity"].mean()
-    jpred_avg_uH = df[df["Helix (Jpred) uH"] != -1]["Helix (Jpred) uH"].mean()
+    # Use pd.notna() to check for valid values instead of != -1
+    valid_jpred = df["Helix (Jpred) uH"].notna()
+    jpred_avg_uH = df.loc[valid_jpred, "Helix (Jpred) uH"].mean()
     df["FF-Secondary structure switch"] = [
-        1 if r["SSW prediction"] == 1 and r["Hydrophobicity"] >= ssw_avg_H else -1
+        1 if r["SSW prediction"] == 1 and r["Hydrophobicity"] >= ssw_avg_H else None
         for _, r in df.iterrows()
     ]
     df["FF-Helix (Jpred)"] = [
-        1 if r["Helix (Jpred) uH"] != -1 and r["Helix (Jpred) uH"] >= jpred_avg_uH else -1
+        1 if pd.notna(r["Helix (Jpred) uH"]) and r["Helix (Jpred) uH"] >= jpred_avg_uH else None
         for _, r in df.iterrows()
     ]
 
