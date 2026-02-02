@@ -152,4 +152,3 @@ docker-prod-up:
 
 docker-prod-down:
 	docker compose -f docker/docker-compose.prod.yml down
-
