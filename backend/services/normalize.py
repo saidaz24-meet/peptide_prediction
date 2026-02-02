@@ -471,9 +471,13 @@ def _sanitize_for_json(obj, field_name: str = None):
             return obj
         return None  # NaN/inf -> None
     if isinstance(obj, int):
-        # Preserve -1 ONLY for sswPrediction (valid semantic value: "no switch")
+        # Preserve -1 for prediction fields where it's a valid semantic value:
+        # - sswPrediction (TANGO): -1 = "no structural switch predicted"
+        # - s4predSswPrediction (S4PRED): -1 = "no SSW detected"
+        # - s4predHelixPrediction (S4PRED): -1 = "no helix detected"
         # All other -1 values are fake defaults and should be None
-        if obj == -1 and field_name != "sswPrediction":
+        prediction_fields = {"sswPrediction", "s4predSswPrediction", "s4predHelixPrediction"}
+        if obj == -1 and field_name not in prediction_fields:
             return None
         return obj
     if isinstance(obj, str):

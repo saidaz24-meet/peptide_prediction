@@ -600,14 +600,20 @@ def filter_by_s4pred_diff(
     comparison: str = "<"
 ) -> List[Optional[int]]:
     """
-    Generate S4PRED SSW predictions based on diff threshold.
+    Generate S4PRED SSW predictions based on whether SSW fragments exist.
 
-    Similar to TANGO filter_by_avg_diff but for S4PRED results.
+    Reference implementation semantics (260120_Alpha_and_SSW_FF_Predictor/s4pred.py):
+    - SSW prediction is positive (1) when SSW fragments exist (ssw_diff >= 0)
+    - SSW prediction is negative (-1) when S4PRED ran but no SSW overlap found
+    - SSW prediction is None when S4PRED didn't run for this row
+
+    The reference doesn't have an explicit "SSW prediction" column - it uses
+    SSW diff/fragments to determine switch presence. We replicate that logic here.
 
     Args:
         database: DataFrame with S4PRED columns
-        threshold: SSW diff threshold
-        comparison: '<' or '>' for comparison direction
+        threshold: Not used (kept for API compatibility)
+        comparison: Not used (kept for API compatibility)
 
     Returns:
         List of predictions (1=positive, -1=negative, None=unavailable)
@@ -616,28 +622,47 @@ def filter_by_s4pred_diff(
 
     for _, row in database.iterrows():
         ssw_diff = row.get(SSW_DIFF_S4PRED)
+        ssw_fragments = row.get(SSW_FRAGMENTS_S4PRED)
+        helix_pred = row.get(HELIX_PREDICTION_S4PRED)
         helix_pct = row.get(HELIX_PERCENTAGE_S4PRED)
-        beta_pct = row.get(SSW_BETA_PERCENTAGE_S4PRED)
 
-        # Check if S4PRED ran for this row
+        # Check if S4PRED ran for this row (helix_pred is -1 or 1 when S4PRED ran)
         s4pred_ran = (
-            (helix_pct is not None and not (isinstance(helix_pct, float) and pd.isna(helix_pct))) or
-            (beta_pct is not None and not (isinstance(beta_pct, float) and pd.isna(beta_pct)))
+            helix_pred is not None and
+            not (isinstance(helix_pred, float) and pd.isna(helix_pred)) and
+            helix_pred in [-1, 1]
         )
 
-        if ssw_diff is None or (isinstance(ssw_diff, float) and (pd.isna(ssw_diff) or ssw_diff < 0)):
-            if s4pred_ran:
-                # S4PRED ran but no SSW found → negative
-                predictions.append(-1)
-            else:
-                # S4PRED didn't run → unavailable
-                predictions.append(None)
+        # Fallback: check if helix_pct exists (0 is valid when no helix found)
+        if not s4pred_ran:
+            s4pred_ran = (
+                helix_pct is not None and
+                not (isinstance(helix_pct, float) and pd.isna(helix_pct))
+            )
+
+        # SSW prediction is positive when SSW fragments exist
+        # Reference: if len(ssw_fragments) > 0, SSW switch is detected
+        has_ssw_fragments = (
+            ssw_fragments is not None and
+            isinstance(ssw_fragments, list) and
+            len(ssw_fragments) > 0
+        )
+
+        # Alternative check: ssw_diff >= 0 indicates SSW segments were found
+        has_valid_ssw_diff = (
+            ssw_diff is not None and
+            not (isinstance(ssw_diff, float) and pd.isna(ssw_diff)) and
+            ssw_diff >= 0
+        )
+
+        if has_ssw_fragments or has_valid_ssw_diff:
+            # SSW segments exist → positive prediction
+            predictions.append(1)
+        elif s4pred_ran:
+            # S4PRED ran but no SSW overlap found → negative prediction
+            predictions.append(-1)
         else:
-            # Apply threshold comparison
-            if comparison == "<":
-                pred = 1 if ssw_diff < threshold else -1
-            else:
-                pred = 1 if ssw_diff > threshold else -1
-            predictions.append(pred)
+            # S4PRED didn't run → unavailable
+            predictions.append(None)
 
     return predictions

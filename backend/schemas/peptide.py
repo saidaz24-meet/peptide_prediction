@@ -146,7 +146,7 @@ class PeptideSchema(BaseModel):
     provider_status: Optional[PeptideProviderStatus] = Field(None)
 
     class Config:
-        allow_population_by_field_name = True
+        populate_by_name = True
         extra = "allow"
 
     def to_camel_dict(self) -> dict:
