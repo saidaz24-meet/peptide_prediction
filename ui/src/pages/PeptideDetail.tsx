@@ -4,9 +4,6 @@ import {
   ArrowLeft,
   Copy,
   Download,
-  CheckCircle,
-  XCircle,
-  Info,
 } from 'lucide-react';
 import {
   Card,
@@ -24,6 +21,7 @@ import { EvidencePanel } from '@/components/EvidencePanel';
 import { PeptideRadarChart } from '@/components/PeptideRadarChart';
 import { PositionBars } from '@/components/PositionBars';
 import { ProviderBadge } from '@/components/ProviderBadge';
+import { TangoBadge } from '@/components/TangoBadge';
 
 // NEW: small additions for sliding-window profiles
 import { useMemo, useState } from 'react';
@@ -85,46 +83,24 @@ export default function PeptideDetail() {
     toast.success('Peptide data downloaded');
   };
 
+  // Use centralized TangoBadge for consistent display semantics
   const getSSWBadge = () => {
-    const tangoStatus = peptide.providerStatus?.tango?.status;
-    const tangoRan = peptide.providerStatus?.tango?.ran ?? false;
-    // NO LYING UI: If TANGO didn't run or is OFF/UNAVAILABLE, show N/A
-    const isUnavailable = !tangoRan || (tangoStatus !== 'AVAILABLE' && tangoStatus !== 'PARTIAL' && tangoStatus !== undefined);
-    
-    const sswPred = peptide.sswPrediction;
-    
-    // If TANGO didn't run or is unavailable, always show N/A
-    if (isUnavailable || sswPred === null || sswPred === undefined) {
-      return (
-        <Badge variant="outline">
-          <Info className="w-3 h-3 mr-1" />
-          N/A
-        </Badge>
-      );
-    }
-    
-    if (sswPred === 1) {
-      return (
-        <Badge className="bg-chameleon-positive text-white">
-          <CheckCircle className="w-3 h-3 mr-1" />
-          SSW Positive
-        </Badge>
-      );
-    } else if (sswPred === -1) {
-      return (
-        <Badge variant="secondary">
-          <XCircle className="w-3 h-3 mr-1" />
-          SSW Negative
-        </Badge>
-      );
-    } else {
-      return (
-        <Badge variant="outline">
-          <Info className="w-3 h-3 mr-1" />
-          Not available
-        </Badge>
-      );
-    }
+    // Use canonical tangoHasData field from backend (preferred)
+    // Fallback to checking curves if tangoHasData not available
+    const hasTangoData = peptide.tangoHasData ?? Boolean(
+      peptide.tango?.beta?.length ||
+      peptide.tango?.helix?.length ||
+      peptide.extra?.['Tango Beta curve']?.length ||
+      peptide.extra?.['Tango Helix curve']?.length
+    );
+    return (
+      <TangoBadge
+        providerStatus={peptide.providerStatus?.tango}
+        sswPrediction={peptide.sswPrediction}
+        hasTangoData={hasTangoData}
+        showIcon={true}
+      />
+    );
   };
 
   // NEW: sliding-window profiles state + derived data (non-invasive)
@@ -171,20 +147,26 @@ export default function PeptideDetail() {
             <div className="flex items-center gap-2 flex-wrap">
               {/* Provider status pills */}
               {peptide.providerStatus?.tango && (
-                <ProviderBadge 
-                  name="Tango" 
+                <ProviderBadge
+                  name="Tango"
                   status={peptide.providerStatus.tango as any}
                 />
               )}
+              {peptide.providerStatus?.s4pred && (
+                <ProviderBadge
+                  name="S4PRED"
+                  status={peptide.providerStatus.s4pred as any}
+                />
+              )}
               {peptide.providerStatus?.psipred && (
-                <ProviderBadge 
-                  name="PSIPRED" 
+                <ProviderBadge
+                  name="PSIPRED"
                   status={peptide.providerStatus.psipred as any}
                 />
               )}
               {peptide.providerStatus?.jpred && (
-                <ProviderBadge 
-                  name="JPred" 
+                <ProviderBadge
+                  name="JPred"
                   status={peptide.providerStatus.jpred as any}
                 />
               )}
@@ -354,6 +336,77 @@ export default function PeptideDetail() {
                   <p className="text-xs">
                     Use windowing or open advanced view for detailed analysis.
                   </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* S4PRED Secondary Structure Predictions */}
+          {peptide.s4pred && (peptide.s4pred.pH?.length || peptide.s4pred.pE?.length) && peptide.length && peptide.length <= 200 && (
+            <Card className="shadow-medium">
+              <CardHeader>
+                <CardTitle>S4PRED Secondary Structure Probabilities</CardTitle>
+                <CardDescription>
+                  Per-residue helix (H), beta (E), and coil (C) probabilities from S4PRED neural network prediction.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Combined probability plot */}
+                <div className="space-y-2">
+                  <h3 className="text-sm font-semibold">Secondary Structure Probabilities</h3>
+                  <div className="h-64">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart
+                        data={(() => {
+                          const pH = peptide.s4pred?.pH || [];
+                          const pE = peptide.s4pred?.pE || [];
+                          const pC = peptide.s4pred?.pC || [];
+                          const maxLen = Math.max(pH.length, pE.length, pC.length);
+                          return Array.from({ length: maxLen }, (_, i) => ({
+                            x: i + 1,
+                            'P(Helix)': pH[i] ?? null,
+                            'P(Beta)': pE[i] ?? null,
+                            'P(Coil)': pC[i] ?? null,
+                          }));
+                        })()}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="x" tickCount={10} label={{ value: 'Residue', position: 'bottom' }} />
+                        <YAxis domain={[0, 1]} label={{ value: 'Probability', angle: -90, position: 'insideLeft' }} />
+                        <Tooltip />
+                        <Legend />
+                        <Line type="monotone" dataKey="P(Helix)" stroke="hsl(var(--helix))" dot={false} strokeWidth={2} />
+                        <Line type="monotone" dataKey="P(Beta)" stroke="hsl(var(--beta))" dot={false} strokeWidth={2} />
+                        <Line type="monotone" dataKey="P(Coil)" stroke="hsl(var(--muted-foreground))" dot={false} strokeWidth={1} strokeDasharray="3 3" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                {/* S4PRED summary stats */}
+                <div className="grid grid-cols-3 gap-4 text-sm">
+                  <div className="text-center p-2 rounded bg-muted/50">
+                    <div className="font-semibold text-helix">
+                      {typeof peptide.s4predHelixPercent === 'number' ? `${peptide.s4predHelixPercent.toFixed(1)}%` : 'N/A'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Helix %</div>
+                  </div>
+                  <div className="text-center p-2 rounded bg-muted/50">
+                    <div className="font-semibold">
+                      {peptide.s4predSswPrediction === 1 ? '✓ Yes' : peptide.s4predSswPrediction === -1 ? '✗ No' : 'N/A'}
+                    </div>
+                    <div className="text-xs text-muted-foreground">SSW Predicted</div>
+                  </div>
+                  <div className="text-center p-2 rounded bg-muted/50">
+                    <div className="font-semibold">
+                      {peptide.s4pred?.helixSegments?.length ?? 0}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Helix Segments</div>
+                  </div>
+                </div>
+
+                <div className="text-xs text-muted-foreground">
+                  S4PRED: Single Sequence Secondary Structure PREDiction (neural network ensemble).
                 </div>
               </CardContent>
             </Card>

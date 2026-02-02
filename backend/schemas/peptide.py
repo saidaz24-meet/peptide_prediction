@@ -71,7 +71,14 @@ class PeptideSchema(BaseModel):
     ssw_helix_percentage: Optional[float] = Field(None, alias="SSW helix percentage")
     ssw_beta_percentage: Optional[float] = Field(None, alias="SSW beta percentage")
 
-    @field_validator('ssw_score', 'ssw_diff', 'ssw_helix_percentage', 'ssw_beta_percentage', 'ff_helix_percent', 'hydrophobicity', 'charge', 'mu_h', mode='before')
+    # Canonical TANGO summary fields (derived from curves in tango.py)
+    # These provide a single source of truth for UI display
+    tango_agg_max: Optional[float] = Field(None, alias="Tango Aggregation max")
+    tango_beta_max: Optional[float] = Field(None, alias="Tango Beta max")
+    tango_helix_max: Optional[float] = Field(None, alias="Tango Helix max")
+    tango_has_data: Optional[bool] = Field(None, alias="Tango has data")
+
+    @field_validator('ssw_score', 'ssw_diff', 'ssw_helix_percentage', 'ssw_beta_percentage', 'ff_helix_percent', 'hydrophobicity', 'charge', 'mu_h', 'tango_agg_max', 'tango_beta_max', 'tango_helix_max', 's4pred_helix_score', 's4pred_helix_percent', 's4pred_ssw_score', 's4pred_ssw_diff', 's4pred_ssw_helix_percent', 's4pred_ssw_beta_percent', 's4pred_ssw_percent', mode='before')
     @classmethod
     def coerce_nan_to_none(cls, v: Any) -> Optional[float]:
         """Coerce NaN/inf to None for Optional[float] fields."""
@@ -90,7 +97,7 @@ class PeptideSchema(BaseModel):
                 return None
         return v
 
-    @field_validator('ssw_prediction', 'length', mode='before')
+    @field_validator('ssw_prediction', 'length', 's4pred_helix_prediction', 's4pred_ssw_prediction', mode='before')
     @classmethod
     def coerce_nan_to_none_int(cls, v: Any) -> Optional[int]:
         """Coerce NaN/inf to None for Optional[int] fields."""
@@ -112,7 +119,28 @@ class PeptideSchema(BaseModel):
     # FF-Helix
     ff_helix_percent: Optional[float] = Field(None, alias="FF-Helix %")
     ff_helix_fragments: Optional[List[Any]] = Field(None, alias="FF Helix fragments")
-    
+
+    # S4PRED secondary structure predictions
+    # Reference column names from 260120_Alpha_and_SSW_FF_Predictor/s4pred.py
+    s4pred_helix_prediction: Optional[int] = Field(None, alias="Helix prediction (S4PRED)")
+    s4pred_helix_fragments: Optional[List[Any]] = Field(None, alias="Helix fragments (S4PRED)")
+    s4pred_helix_score: Optional[float] = Field(None, alias="Helix score (S4PRED)")
+    s4pred_helix_percent: Optional[float] = Field(None, alias="Helix percentage (S4PRED)")
+    # S4PRED SSW predictions
+    s4pred_ssw_prediction: Optional[int] = Field(None, alias="SSW prediction (S4PRED)")
+    s4pred_ssw_fragments: Optional[List[Any]] = Field(None, alias="SSW fragments (S4PRED)")
+    s4pred_ssw_score: Optional[float] = Field(None, alias="SSW score (S4PRED)")
+    s4pred_ssw_diff: Optional[float] = Field(None, alias="SSW diff (S4PRED)")
+    s4pred_ssw_helix_percent: Optional[float] = Field(None, alias="SSW helix percentage (S4PRED)")
+    s4pred_ssw_beta_percent: Optional[float] = Field(None, alias="SSW beta percentage (S4PRED)")
+    s4pred_ssw_percent: Optional[float] = Field(None, alias="SSW percentage (S4PRED)")
+    s4pred_has_data: Optional[bool] = Field(None, alias="S4PRED has data")
+    # S4PRED per-residue curves
+    s4pred_p_h_curve: Optional[List[float]] = Field(None, alias="S4PRED P_H curve")
+    s4pred_p_e_curve: Optional[List[float]] = Field(None, alias="S4PRED P_E curve")
+    s4pred_p_c_curve: Optional[List[float]] = Field(None, alias="S4PRED P_C curve")
+    s4pred_ss_prediction: Optional[List[str]] = Field(None, alias="S4PRED SS prediction")
+
     # Provider status (Principle B: mandatory provider status)
     # Note: provider_status is NOT in CSV/DataFrame - it's added during normalization
     provider_status: Optional[PeptideProviderStatus] = Field(None)

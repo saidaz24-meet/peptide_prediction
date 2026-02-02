@@ -1,4 +1,14 @@
 // src/types/peptide.ts
+//
+// CONTRACT SOURCE: backend/schemas/api_models.py (PeptideRow)
+// This file must stay in sync with the backend Pydantic model.
+// Run `make contract-check` to verify alignment.
+//
+// SSW Semantics (LOCKED):
+//   sswPrediction: 1 = positive, -1 = negative, 0 = uncertain, null = missing
+// Provider Status (LOCKED):
+//   providerStatus.<provider>.status: "AVAILABLE" | "UNAVAILABLE" | "PARTIAL" | "OFF"
+//
 
 // ----- Segments -----
 // You previously used an object-style Segment. Keep it.
@@ -20,43 +30,25 @@ export type SegmentTuple = [number, number];
 export type SSWPrediction = -1 | 0 | 1 | null;
 
 // ----- Provider Status -----
+// Single provider status shape
+export type SingleProviderStatus = {
+  enabled?: boolean;
+  requested?: boolean;
+  ran?: boolean;
+  status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
+  reason?: string | null;
+  stats?: {
+    requested: number;
+    parsed_ok: number;
+    parsed_bad: number;
+  };
+};
+
 export type ProviderStatus = {
-  tango?: {
-    enabled?: boolean;
-    requested?: boolean;
-    ran?: boolean;
-    status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
-    reason?: string | null;
-    stats?: {
-      requested: number;
-      parsed_ok: number;
-      parsed_bad: number;
-    };
-  };
-  psipred?: {
-    enabled?: boolean;
-    requested?: boolean;
-    ran?: boolean;
-    status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
-    reason?: string | null;
-    stats?: {
-      requested: number;
-      parsed_ok: number;
-      parsed_bad: number;
-    };
-  };
-  jpred?: {
-    enabled?: boolean;
-    requested?: boolean;
-    ran?: boolean;
-    status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
-    reason?: string | null;
-    stats?: {
-      requested: number;
-      parsed_ok: number;
-      parsed_bad: number;
-    };
-  };
+  tango?: SingleProviderStatus;
+  s4pred?: SingleProviderStatus;
+  psipred?: SingleProviderStatus;
+  jpred?: SingleProviderStatus;
 };
 
 // ----- Core Peptide model used across the UI -----
@@ -116,6 +108,39 @@ export type Peptide = {
     beta?: number[];  // Beta curve
     helix?: number[]; // Helix curve
     turn?: number[];  // Turn curve
+  };
+
+  // Canonical Tango summary fields (from backend, preferred over computing from extras)
+  // These provide a single source of truth for UI display
+  tangoHasData?: boolean;        // True if any Tango curves are available
+  tangoAggMax?: number | null;   // Max value of Aggregation curve (risk indicator)
+  tangoBetaMax?: number | null;  // Max value of Beta curve
+  tangoHelixMax?: number | null; // Max value of Helix curve
+
+  // ----- S4PRED secondary structure predictions -----
+  // From backend/s4pred.py - matches reference 260120_Alpha_and_SSW_FF_Predictor/s4pred.py
+  // Helix predictions
+  s4predHelixPrediction?: number | null;              // -1 no helix, 1 helix found (alias: 'Helix prediction (S4PRED)')
+  s4predHelixFragments?: Array<SegmentTuple> | null;  // segment tuples (alias: 'Helix fragments (S4PRED)')
+  s4predHelixScore?: number | null;                   // avg helix score (alias: 'Helix score (S4PRED)')
+  s4predHelixPercent?: number | null;                 // helix percentage 0-100 (alias: 'Helix percentage (S4PRED)')
+  // SSW (Secondary Structure Switch) predictions
+  s4predSswPrediction?: number | null;                // -1/1 (alias: 'SSW prediction (S4PRED)')
+  s4predSswFragments?: Array<SegmentTuple> | null;    // SSW segment tuples (alias: 'SSW fragments (S4PRED)')
+  s4predSswScore?: number | null;                     // SSW score (alias: 'SSW score (S4PRED)')
+  s4predSswDiff?: number | null;                      // SSW diff (alias: 'SSW diff (S4PRED)')
+  s4predSswHelixPercent?: number | null;              // SSW helix % (alias: 'SSW helix percentage (S4PRED)')
+  s4predSswBetaPercent?: number | null;               // SSW beta % (alias: 'SSW beta percentage (S4PRED)')
+  s4predSswPercent?: number | null;                   // SSW overlap % (alias: 'SSW percentage (S4PRED)')
+  s4predHasData?: boolean;                            // True if S4PRED ran and produced results
+  // S4PRED per-residue curves (for PeptideDetail view)
+  s4pred?: {
+    pH?: number[];    // per-residue P(helix)
+    pE?: number[];    // per-residue P(beta)
+    pC?: number[];    // per-residue P(coil)
+    ssPrediction?: string[];  // per-residue SS prediction ('C', 'H', 'E')
+    helixSegments?: Array<[number, number]>;  // Helix segment tuples
+    betaSegments?: Array<[number, number]>;   // Beta segment tuples (from ssw fragments)
   };
 
   // Provider status (Principle B: mandatory provider status)
@@ -247,41 +272,9 @@ export type DatasetMetadata = {
   thresholdConfigResolved?: ThresholdConfig | null;
   providerStatusSummary?: any;  // Provider status summary from backend
   provider_status?: {
-    tango?: {
-      enabled?: boolean;
-      requested?: boolean;
-      ran?: boolean;
-      status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
-      reason?: string | null;
-      stats?: {
-        requested: number;
-        parsed_ok: number;
-        parsed_bad: number;
-      };
-    };
-    psipred?: {
-      enabled?: boolean;
-      requested?: boolean;
-      ran?: boolean;
-      status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
-      reason?: string | null;
-      stats?: {
-        requested: number;
-        parsed_ok: number;
-        parsed_bad: number;
-      };
-    };
-    jpred?: {
-      enabled?: boolean;
-      requested?: boolean;
-      ran?: boolean;
-      status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
-      reason?: string | null;
-      stats?: {
-        requested: number;
-        parsed_ok: number;
-        parsed_bad: number;
-      };
-    };
+    tango?: SingleProviderStatus;
+    s4pred?: SingleProviderStatus;
+    psipred?: SingleProviderStatus;
+    jpred?: SingleProviderStatus;
   };
 };
