@@ -17,6 +17,10 @@ import {
 
 interface ResultsChartsProps {
   peptides: Peptide[];
+  providerStatus?: {
+    tango?: { status: string; reason?: string | null; stats?: { requested: number; parsed_ok: number; parsed_bad: number } };
+    s4pred?: { status: string; reason?: string | null; stats?: { requested: number; parsed_ok: number; parsed_bad: number } };
+  };
 }
 
 const COLORS = {
@@ -37,7 +41,7 @@ function EmptyState({ title, subtitle }: { title: string; subtitle?: string }) {
   );
 }
 
-export function ResultsCharts({ peptides }: ResultsChartsProps) {
+export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) {
   // Scatter data: require μH
   const scatterData = peptides
     .filter(p => typeof p.muH === 'number' && Number.isFinite(p.muH))
@@ -100,6 +104,52 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
             negative: mean(negativeGroup.map(p => (typeof p.muH === 'number' ? p.muH : 0))) },
         ]
       : [];
+
+  // FF-Helix % vs SSW Prediction scatter data
+  const ffHelixSswData = peptides
+    .filter(p => typeof p.ffHelixPercent === 'number' && Number.isFinite(p.ffHelixPercent) && p.sswPrediction !== null)
+    .map(p => ({
+      ffHelix: p.ffHelixPercent as number,
+      ssw: p.sswPrediction as number,
+      id: p.id,
+    }));
+
+  // Sequence Length Distribution (histogram)
+  const lengths = peptides.map(p => p.length).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const minLen = lengths.length ? Math.min(...lengths) : 0;
+  const maxLen = lengths.length ? Math.max(...lengths) : 100;
+  const lenSpan = Math.max(1, maxLen - minLen);
+  const lenBinSize = Math.max(1, Math.ceil(lenSpan / 10));
+  const lengthBins = Array.from({ length: 10 }, (_, i) => {
+    const binStart = minLen + i * lenBinSize;
+    const binEnd = binStart + lenBinSize;
+    const count = peptides.filter(p => {
+      const v = p.length;
+      if (typeof v !== 'number') return false;
+      return i < 9 ? v >= binStart && v < binEnd : v >= binStart && v <= binEnd;
+    }).length;
+    return {
+      range: `${binStart}–${binEnd}`,
+      count,
+      binStart,
+    };
+  }).filter(bin => bin.count > 0 || bin.binStart <= maxLen);
+
+  // Provider status summary for dashboard
+  const providers = [
+    {
+      name: 'TANGO',
+      status: providerStatus?.tango?.status || 'OFF',
+      reason: providerStatus?.tango?.reason,
+      stats: providerStatus?.tango?.stats,
+    },
+    {
+      name: 'S4PRED',
+      status: providerStatus?.s4pred?.status || 'OFF',
+      reason: providerStatus?.s4pred?.reason,
+      stats: providerStatus?.s4pred?.stats,
+    },
+  ];
 
   const chartConfig = {
     hydrophobicity: { label: 'Hydrophobicity', color: COLORS.primary },
@@ -284,6 +334,190 @@ export function ResultsCharts({ peptides }: ResultsChartsProps) {
             </ChartContainer>
           )}
         </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* FF-Helix % vs SSW Prediction Scatter */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+        <Card className="shadow-medium">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>FF-Helix % vs SSW Prediction</CardTitle>
+                <CardDescription>Relationship between fibril-forming helix content and structural switching</CardDescription>
+              </div>
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-5 h-5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Scatter plot showing FF-Helix percentage vs SSW prediction. Positive SSW (green) indicates predicted structural switching; Negative SSW (red) indicates no switching predicted.
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {ffHelixSswData.length === 0 ? (
+              <EmptyState title="Insufficient data" subtitle="Requires FF-Helix % and SSW prediction values." />
+            ) : (
+              <ChartContainer config={chartConfig} className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      type="number"
+                      dataKey="ffHelix"
+                      name="FF-Helix %"
+                      domain={[0, 100]}
+                      tickFormatter={(v) => `${v}%`}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="ssw"
+                      name="SSW"
+                      domain={[-1.5, 1.5]}
+                      ticks={[-1, 0, 1]}
+                      tickFormatter={(v) => v === 1 ? '+' : v === -1 ? '−' : '?'}
+                    />
+                    <ChartTooltip
+                      content={({ payload }) => {
+                        if (payload && payload.length > 0) {
+                          const { ffHelix, ssw, id } = payload[0].payload;
+                          return (
+                            <div className="bg-background border border-border rounded p-2 text-xs">
+                              <p className="font-medium">{id}</p>
+                              <p>FF-Helix: {ffHelix.toFixed(1)}%</p>
+                              <p>SSW: {ssw === 1 ? 'Positive' : ssw === -1 ? 'Negative' : 'Uncertain'}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Scatter data={ffHelixSswData.filter(d => d.ssw === 1)} fill={COLORS.chameleonPositive} name="SSW +" />
+                    <Scatter data={ffHelixSswData.filter(d => d.ssw === -1)} fill={COLORS.chameleonNegative} name="SSW −" />
+                    <Scatter data={ffHelixSswData.filter(d => d.ssw === 0)} fill={COLORS.muted} name="Uncertain" />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Sequence Length Distribution */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.6 }}>
+        <Card className="shadow-medium">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Sequence Length Distribution</CardTitle>
+                <CardDescription>Distribution of peptide lengths in amino acids</CardDescription>
+              </div>
+              <TooltipProvider>
+                <UITooltip>
+                  <TooltipTrigger asChild>
+                    <Info className="w-5 h-5 text-muted-foreground cursor-help" />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Histogram showing the distribution of peptide sequence lengths. Useful for understanding the dataset composition and identifying outliers.
+                  </TooltipContent>
+                </UITooltip>
+              </TooltipProvider>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {lengths.length === 0 ? (
+              <EmptyState title="No length data" />
+            ) : (
+              <ChartContainer config={chartConfig} className="h-[300px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={lengthBins} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="range"
+                      tick={{ fontSize: 11 }}
+                      interval={0}
+                      angle={-45}
+                      textAnchor="end"
+                      height={70}
+                    />
+                    <YAxis allowDecimals={false} />
+                    <ChartTooltip
+                      content={({ payload }) => {
+                        if (payload && payload.length > 0) {
+                          const { range, count } = payload[0].payload;
+                          return (
+                            <div className="bg-background border border-border rounded p-2 text-xs">
+                              <p>Length: {range} aa</p>
+                              <p>Count: {count}</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <Bar dataKey="count" fill="hsl(var(--chart-2))" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </ChartContainer>
+            )}
+          </CardContent>
+        </Card>
+      </motion.div>
+
+      {/* Provider Status Dashboard */}
+      <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.7 }}>
+        <Card className="shadow-medium">
+          <CardHeader>
+            <CardTitle>Provider Status Dashboard</CardTitle>
+            <CardDescription>Status of prediction providers used in this analysis</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-4">
+              {providers.map((provider) => {
+                const statusColor =
+                  provider.status === 'AVAILABLE' ? 'bg-green-500' :
+                  provider.status === 'PARTIAL' ? 'bg-yellow-500' :
+                  provider.status === 'UNAVAILABLE' ? 'bg-red-500' :
+                  'bg-gray-400';
+
+                return (
+                  <div key={provider.name} className="border rounded-lg p-4 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{provider.name}</span>
+                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium text-white ${statusColor}`}>
+                        {provider.status}
+                      </span>
+                    </div>
+                    {provider.reason && (
+                      <p className="text-xs text-muted-foreground">{provider.reason}</p>
+                    )}
+                    {provider.stats && (
+                      <div className="text-xs text-muted-foreground space-y-1">
+                        <div className="flex justify-between">
+                          <span>Requested:</span>
+                          <span>{provider.stats.requested}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span>Successful:</span>
+                          <span className="text-green-600">{provider.stats.parsed_ok}</span>
+                        </div>
+                        {provider.stats.parsed_bad > 0 && (
+                          <div className="flex justify-between">
+                            <span>Failed:</span>
+                            <span className="text-red-600">{provider.stats.parsed_bad}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
         </Card>
       </motion.div>
     </div>

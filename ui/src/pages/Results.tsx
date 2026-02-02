@@ -161,7 +161,11 @@ export default function Results() {
         const val = (p as any)[c];
         if (val === undefined || val === null) return '';
         if (c === 'sswPrediction') {
-          return val === 1 ? 'Positive' : val === -1 ? 'N/A' : 'Negative';
+          // SSW semantics: 1 = switch predicted, -1 = no switch, 0 = uncertain, null = not computed
+          if (val === 1) return 'Positive';
+          if (val === -1) return 'Negative';
+          if (val === 0) return 'Uncertain';
+          return 'N/A';  // null or undefined
         }
         return val;
       })
@@ -213,24 +217,24 @@ export default function Results() {
             <div className="flex items-center space-x-3">
               {meta && (
                 <div className="flex gap-2">
-                  {meta.provider_status?.jpred ? (
-                    <ProviderBadge 
-                      name="JPred" 
-                      status={meta.provider_status.jpred as any}
-                    />
-                  ) : (
-                    <Badge variant={meta.use_jpred ? 'default' : 'outline'}>
-                      JPred: {meta.use_jpred ? `ON (${meta.jpred_rows})` : 'OFF'}
-                    </Badge>
-                  )}
                   {meta.provider_status?.tango ? (
-                    <ProviderBadge 
-                      name="Tango" 
+                    <ProviderBadge
+                      name="TANGO"
                       status={meta.provider_status.tango as any}
                     />
                   ) : (
                     <Badge variant="outline">
-                      Tango: {meta.use_tango ? 'ENABLED' : 'OFF'}
+                      TANGO: {meta.use_tango ? 'ENABLED' : 'OFF'}
+                    </Badge>
+                  )}
+                  {meta.provider_status?.s4pred ? (
+                    <ProviderBadge
+                      name="S4PRED"
+                      status={meta.provider_status.s4pred as any}
+                    />
+                  ) : (
+                    <Badge variant="outline">
+                      S4PRED: OFF
                     </Badge>
                   )}
                   <Badge variant="secondary">n = {peptidesTyped.length}</Badge>
@@ -396,7 +400,7 @@ export default function Results() {
 
             <TabsContent value="overview" className="space-y-6">
               {/* Charts use the full dataset */}
-              <ResultsCharts peptides={peptidesTyped} />
+              <ResultsCharts peptides={peptidesTyped} providerStatus={meta?.provider_status} />
               {/* cohort correlation heatmap */}
               <CorrelationCard peptides={peptidesTyped} />
             </TabsContent>
