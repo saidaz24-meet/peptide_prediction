@@ -397,7 +397,7 @@ def check_secondary_structure_prediction_content(secondary_structure_prediction_
     return (residues_with_secondary_structure_prediction / len(secondary_structure_prediction_conf)) * 100
 
 
-def get_corrected_sequence(sequence: str) -> str:
+def get_corrected_sequence(sequence) -> str:
     """
     Substitute letters for general amino acid to be compatible to Jpred input requirements:
     "X" -> "A"
@@ -405,9 +405,15 @@ def get_corrected_sequence(sequence: str) -> str:
     "B" -> D
     "U" -> C
 
-    :param sequence: The sequence to modify
-    :return: sequence with the substituted amino acids
+    :param sequence: The sequence to modify (handles NaN/None gracefully)
+    :return: sequence with the substituted amino acids, or empty string if invalid
     """
+    # Handle NaN, None, or non-string values
+    if sequence is None or (isinstance(sequence, float) and pd.isna(sequence)):
+        return ""
+    if not isinstance(sequence, str):
+        sequence = str(sequence)
+
     s1 = sequence.replace('X', 'A')
     s2 = s1.replace('Z', 'E')
     s3 = s2.replace('U', 'C')

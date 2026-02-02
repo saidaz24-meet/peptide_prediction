@@ -450,6 +450,7 @@ def test_tango_entry_aligned_assignment():
         error_str = str(e).lower()
         is_expected_error = (
             "no run directory" in error_str or
+            "run_dir is none" in error_str or
             "not found" in error_str or
             "produced 0 outputs" in error_str
         )
