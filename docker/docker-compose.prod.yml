@@ -1,28 +1,56 @@
+# =============================================================================
 # Peptide Visual Lab - Docker Compose (Production)
-# Run with: docker compose -f docker/docker-compose.prod.yml up -d
+# Strategy: Volume-mounted assets
+# =============================================================================
+# Usage:
+#   docker compose -f docker/docker-compose.prod.yml up -d
+#   docker compose -f docker/docker-compose.prod.yml logs -f
+#   docker compose -f docker/docker-compose.prod.yml down
+# =============================================================================
 
 services:
+  # ---------------------------------------------------------------------------
+  # Backend API Service
+  # ---------------------------------------------------------------------------
   backend:
     build:
       context: ..
       dockerfile: docker/Dockerfile.backend
+      args:
+        PYTHON_VERSION: "3.11"
+    image: pvl-backend:latest
+    container_name: pvl-backend
+    volumes:
+      # Persistent data volumes (NO source mounts in production)
+      - pvl-runs:/data/runs
+      - pvl-uploads:/data/uploads
+      # Tool assets (volume-mounted per Strategy A)
+      - ${TOOLS_HOST_PATH:-./tools}:/opt/tools:ro
+      # Runtime cache
+      - pvl-cache:/app/.run_cache
     environment:
+      # Server config
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8000
+      # Provider flags
       - USE_TANGO=${USE_TANGO:-0}
       - USE_S4PRED=${USE_S4PRED:-1}
       - USE_JPRED=0
+      # CORS
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
+      # Tool paths
+      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango
+      - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
+      # Sentry (optional)
       - SENTRY_DSN=${SENTRY_DSN:-}
-    volumes:
-      # Only persist cache in production, no source mounts
-      - backend-cache:/app/.run_cache
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 15s
+      start_period: 20s
     restart: always
     deploy:
       resources:
@@ -32,13 +60,23 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
+  # ---------------------------------------------------------------------------
+  # Frontend Service (Nginx)
+  # ---------------------------------------------------------------------------
   frontend:
     build:
       context: ..
       dockerfile: docker/Dockerfile.frontend
       args:
         VITE_API_URL: /api
+    image: pvl-frontend:latest
+    container_name: pvl-frontend
     ports:
       - "80:80"
     depends_on:
@@ -53,7 +91,26 @@ services:
         reservations:
           cpus: '0.1'
           memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
 
+# =============================================================================
+# Named Volumes
+# =============================================================================
 volumes:
-  backend-cache:
+  pvl-runs:
     driver: local
+  pvl-uploads:
+    driver: local
+  pvl-cache:
+    driver: local
+
+# =============================================================================
+# Networks (optional - for additional services like monitoring)
+# =============================================================================
+networks:
+  default:
+    name: pvl-network

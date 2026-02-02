@@ -1,71 +1,148 @@
-# Git
+# =============================================================================
+# Peptide Visual Lab - Production .dockerignore
+# Strategy: Volume-mounted assets (models/binaries outside image)
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Version Control
+# -----------------------------------------------------------------------------
 .git
 .gitignore
+.gitattributes
 
-# Documentation
+# -----------------------------------------------------------------------------
+# Documentation (not needed in runtime image)
+# -----------------------------------------------------------------------------
 docs/
 *.md
 !README.md
+CLAUDE.md
 
-# IDE and editors
+# -----------------------------------------------------------------------------
+# IDE and Editors
+# -----------------------------------------------------------------------------
 .idea/
 .vscode/
 *.swp
 *.swo
 *~
+.editorconfig
 
-# Python
+# -----------------------------------------------------------------------------
+# Python Virtual Environments & Caches
+# -----------------------------------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+.Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-.env
-.venv
-env/
-venv/
-ENV/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 *.egg-info/
 dist/
 build/
-
-# Node
-ui/node_modules/
-ui/.npm
-ui/.cache
-
-# Test and coverage
 .coverage
 htmlcov/
 .tox/
 .nox/
 
-# Build artifacts
-ui/dist/
-*.log
+# -----------------------------------------------------------------------------
+# Node.js
+# -----------------------------------------------------------------------------
+ui/node_modules/
+ui/.npm
+ui/.cache
+ui/.parcel-cache
 
-# Runtime caches
+# -----------------------------------------------------------------------------
+# Build Artifacts (rebuilt in container)
+# -----------------------------------------------------------------------------
+ui/dist/
+
+# -----------------------------------------------------------------------------
+# Runtime Caches & Generated Data (volume-mounted in production)
+# -----------------------------------------------------------------------------
 backend/.run_cache/
 .run_cache/
+*.log
+logs/
 
-# Local config (use .env.example as template)
-.env
-.env.local
-.env.*.local
+# -----------------------------------------------------------------------------
+# Tool Assets - EXCLUDED (volume-mounted per Strategy A)
+# These are mounted at runtime, not baked into image
+# -----------------------------------------------------------------------------
+# S4PRED models
+backend/s4pred_models/
+backend/tools/s4pred/model/
+models/
+*.pt
+*.pth
+*.onnx
+*.h5
 
-# OS files
-.DS_Store
-Thumbs.db
+# TANGO binary
+backend/Tango/
+backend/tango_binary
+*.bin
 
-# Archives
-_archive/
-backend/_archive/
-
-# Large files that shouldn't be in Docker context
+# -----------------------------------------------------------------------------
+# Data Files - EXCLUDED (volume-mounted)
+# -----------------------------------------------------------------------------
+data/
+uploads/
 *.csv
 *.xlsx
 *.xls
+*.tsv
+*.fasta
+*.fa
+
+# -----------------------------------------------------------------------------
+# Local Configuration & Secrets - NEVER include
+# -----------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+*.local
+secrets/
+credentials/
+*.pem
+*.key
+
+# -----------------------------------------------------------------------------
+# OS Files
+# -----------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# -----------------------------------------------------------------------------
+# Archives & Temp Files
+# -----------------------------------------------------------------------------
+_archive/
+backend/_archive/
+*.tar
+*.tar.gz
+*.zip
+*.7z
+tmp/
+temp/
+
+# -----------------------------------------------------------------------------
+# Large/Generated Files
+# -----------------------------------------------------------------------------
 repomix-output.xml
+*.bak
+*.orig
+
+# -----------------------------------------------------------------------------
+# CI/CD (not needed in image)
+# -----------------------------------------------------------------------------
+.github/
+.gitlab-ci.yml
+Makefile
