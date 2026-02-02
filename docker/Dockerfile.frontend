@@ -13,7 +13,7 @@ ARG NGINX_VERSION=alpine
 # =============================================================================
 # Stage 1: Dependencies - Install npm packages
 # =============================================================================
-FROM node:${NODE_VERSION}-alpine as deps
+FROM node:${NODE_VERSION}-alpine AS deps
 
 WORKDIR /app
 
@@ -28,7 +28,7 @@ RUN --mount=type=cache,target=/root/.npm \
 # =============================================================================
 # Stage 2: Builder - Build the application
 # =============================================================================
-FROM node:${NODE_VERSION}-alpine as builder
+FROM node:${NODE_VERSION}-alpine AS builder
 
 WORKDIR /app
 
@@ -48,7 +48,7 @@ RUN npm run build
 # =============================================================================
 # Stage 3: Production - Serve with Nginx
 # =============================================================================
-FROM nginx:${NGINX_VERSION} as runtime
+FROM nginx:${NGINX_VERSION} AS runtime
 
 # Copy custom nginx configuration
 COPY docker/nginx.conf /etc/nginx/conf.d/default.conf

@@ -15,14 +15,13 @@ ARG APP_GID=1000
 # =============================================================================
 # Stage 1: Builder - Install Python dependencies
 # =============================================================================
-FROM python:${PYTHON_VERSION}-slim as builder
+FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
 
 WORKDIR /build
 
 # Install build dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
-    gcc \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential gcc \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for layer caching
@@ -36,7 +35,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # =============================================================================
 # Stage 2: Production Runtime
 # =============================================================================
-FROM python:${PYTHON_VERSION}-slim as runtime
+FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
 
 ARG APP_USER
 ARG APP_UID
@@ -45,9 +44,8 @@ ARG APP_GID
 WORKDIR /app
 
 # Install minimal runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    tini \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl tini \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid ${APP_GID} ${APP_USER} \
     && useradd --uid ${APP_UID} --gid ${APP_GID} --create-home --shell /bin/bash ${APP_USER}
