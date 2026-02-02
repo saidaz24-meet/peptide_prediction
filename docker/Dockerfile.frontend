@@ -1,0 +1,41 @@
+# Peptide Visual Lab - Frontend Dockerfile
+# Multi-stage build: Node for building, Nginx for serving
+
+# Build stage
+FROM node:20-alpine as builder
+
+WORKDIR /app
+
+# Copy package files first for layer caching
+COPY ui/package.json ui/package-lock.json* ./
+
+# Install dependencies
+RUN npm ci --silent
+
+# Copy source code
+COPY ui/ .
+
+# Build the application
+ARG VITE_API_URL=/api
+ENV VITE_API_URL=$VITE_API_URL
+
+RUN npm run build
+
+# Production stage
+FROM nginx:alpine
+
+# Copy custom nginx config
+COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Copy built assets from builder
+COPY --from=builder /app/dist /usr/share/nginx/html
+
+# Add healthcheck
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:80/ || exit 1
+
+# Expose port
+EXPOSE 80
+
+# Run nginx
+CMD ["nginx", "-g", "daemon off;"]

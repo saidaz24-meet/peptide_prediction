@@ -1,0 +1,46 @@
+# Peptide Visual Lab - Docker Compose (Development)
+# Run with: docker compose -f docker/docker-compose.yml up --build
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount source for hot reload (development only)
+      - ../backend:/app
+      # Persist run cache
+      - backend-cache:/app/.run_cache
+    environment:
+      - ENVIRONMENT=development
+      - LOG_LEVEL=DEBUG
+      - USE_TANGO=${USE_TANGO:-0}
+      - USE_S4PRED=${USE_S4PRED:-1}
+      - USE_JPRED=0
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
+      # Optional: Sentry DSN for error tracking
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  backend-cache:
+    driver: local

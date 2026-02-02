@@ -1,0 +1,71 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# IDE and editors
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.env
+.venv
+env/
+venv/
+ENV/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node
+ui/node_modules/
+ui/.npm
+ui/.cache
+
+# Test and coverage
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Build artifacts
+ui/dist/
+*.log
+
+# Runtime caches
+backend/.run_cache/
+.run_cache/
+
+# Local config (use .env.example as template)
+.env
+.env.local
+.env.*.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Archives
+_archive/
+backend/_archive/
+
+# Large files that shouldn't be in Docker context
+*.csv
+*.xlsx
+*.xls
+repomix-output.xml

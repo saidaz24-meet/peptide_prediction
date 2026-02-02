@@ -1,0 +1,59 @@
+# Peptide Visual Lab - Docker Compose (Production)
+# Run with: docker compose -f docker/docker-compose.prod.yml up -d
+
+services:
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - USE_TANGO=${USE_TANGO:-0}
+      - USE_S4PRED=${USE_S4PRED:-1}
+      - USE_JPRED=0
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    volumes:
+      # Only persist cache in production, no source mounts
+      - backend-cache:/app/.run_cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_URL: /api
+    ports:
+      - "80:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+
+volumes:
+  backend-cache:
+    driver: local
