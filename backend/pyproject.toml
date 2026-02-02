@@ -2,6 +2,16 @@
 # Ruff configuration for fast Python linting
 line-length = 100
 target-version = "py39"
+# Exclude archived, vendored, and generated files
+exclude = [
+    "_archive",
+    ".venv",
+    "__pycache__",
+    ".run_cache",
+    "tools",  # Vendored S4PRED code
+]
+
+[tool.ruff.lint]
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
