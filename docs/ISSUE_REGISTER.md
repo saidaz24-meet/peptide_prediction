@@ -1,8 +1,8 @@
 # Issue Register — Peptide Visual Lab (PVL)
 
-**Last Updated**: 2026-02-01
+**Last Updated**: 2026-02-02
 **Auditor**: Claude Opus 4.5 (Architecture/Refactor Lead)
-**Status**: Active development - Phase 0B
+**Status**: Active development - Phase 3.2 (TANGO Runtime Triage)
 
 ---
 
@@ -10,12 +10,13 @@
 
 | Priority | Count | Status |
 |----------|-------|--------|
-| **P0** | 2 | ✅ ALL RESOLVED |
-| **P1** | 6 | 3 resolved, 3 pending (incl. ISSUE-020 investigation) |
+| **P0** | 3 | 2 resolved, 1 instrumented (ISSUE-022 needs prod verification) |
+| **P1** | 8 | 4 resolved, 4 pending (ISSUE-023 blocked by prod verification) |
 | **P2** | 7 | 6 resolved, 1 pending |
 | **P3** | 3 | 1 resolved, 2 pending |
 | **Phase 0B** | 2 | ✅ ALL RESOLVED |
 | **Phase 1** | 2 | ✅ ALL RESOLVED |
+| **Phase 3.2** | 3 | ✅ ISSUE-024 resolved, ISSUE-022 instrumented, ISSUE-023 blocked |
 | **UX** | 1 | ✅ ISSUE-021 RESOLVED |
 
 ---
@@ -260,6 +261,57 @@
 
 ---
 
+## Phase 3.2 — TANGO Runtime Investigation
+
+### ISSUE-022: TANGO Binary Produces 0 Output Files at Runtime — ✅ INSTRUMENTED
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P0 (blocks production TANGO use) |
+| **Category** | Provider Execution |
+| **Status** | ✅ **INSTRUMENTED** (2026-02-02) - Diagnostics added, local verification passes |
+| **Impact** | All TANGO/SSW features non-functional in production. API returns `null` for all SSW fields. |
+| **Symptom** | Sentry error: "TANGO produced 0 outputs for N inputs" |
+| **Files** | `backend/tango.py`, `backend/server.py`, `backend/scripts/smoke_tango.py` |
+| **Resolution** | Added: 1) `smoke_test_tango()` function for runtime verification, 2) Enhanced error logging with directory contents and expected files, 3) `make smoke-tango` target, 4) `/api/providers/diagnose/tango?run_smoke_test=true` endpoint |
+| **Local Test** | `make smoke-tango` passes - TANGO works locally |
+| **Production** | Requires deployment and running `smoke-tango` in production to verify environment |
+| **Triage Doc** | `docs/PHASE_3_2_TRIAGE.md` |
+| **Tests** | All 140 tests pass |
+
+---
+
+### ISSUE-023: UI Shows "N/A" Despite USE_TANGO=1 — 🟡 BLOCKED
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P1 (dependent on ISSUE-022) |
+| **Category** | User Experience |
+| **Status** | 🟡 **BLOCKED** by ISSUE-022 |
+| **Impact** | Users see "N/A" for Tango columns when expecting predictions |
+| **Symptom** | UI table shows "N/A" for sswPrediction, sswScore, sswDiff columns |
+| **Files** | `ui/src/lib/peptideMapper.ts:150-159`, `backend/services/normalize.py:259-276` |
+| **Root Cause** | ISSUE-022 - when TANGO binary fails, provider status becomes UNAVAILABLE, and normalize.py nullifies all TANGO fields |
+| **Resolution** | Will auto-resolve when ISSUE-022 is fixed |
+| **Effort** | N/A (blocked) |
+
+---
+
+### ISSUE-024: Missing Runtime Smoke Test for TANGO — ✅ RESOLVED
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P1 (testing gap) |
+| **Category** | Test Coverage |
+| **Status** | ✅ **RESOLVED** (2026-02-02) |
+| **Impact** | Tests pass but production fails - no runtime TANGO validation |
+| **Resolution** | Added `make smoke-tango` target that: 1) Runs `smoke_test_tango()` function, 2) Executes TANGO binary with test sequence, 3) Verifies output file creation and parsing, 4) Returns SSW values on success |
+| **Files Changed** | `backend/tango.py`, `backend/scripts/smoke_tango.py`, `Makefile` |
+| **Usage** | `make smoke-tango` (local), or `/api/providers/diagnose/tango?run_smoke_test=true` (API) |
+| **Tests** | All 140 tests pass, smoke test passes locally |
+
+---
+
 ## Deferred
 
 ### TANGO/S4Pred Integration — ⏸️ DEFERRED
@@ -277,6 +329,10 @@
 
 | Issue | Priority | Effort | Safe to Fix Now? |
 |-------|----------|--------|------------------|
+| **ISSUE-022** | P0 | HIGH | ✅ **INSTRUMENTED** - Deploy & verify in production |
+| **ISSUE-024** | P1 | MEDIUM | ✅ **RESOLVED** - `make smoke-tango` added |
+| **ISSUE-023** | P1 | N/A | 🟡 **BLOCKED** by ISSUE-022 (verify production) |
+| **ISSUE-020** | P1 | HIGH | 🔍 Merged into ISSUE-022 |
 | **ISSUE-014** | P1 | LOW | ✅ RESOLVED |
 | **ISSUE-015** | P1 | LOW | ✅ RESOLVED |
 | **ISSUE-017** | P1 | MEDIUM | ✅ RESOLVED |

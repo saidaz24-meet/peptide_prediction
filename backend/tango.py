@@ -1099,13 +1099,29 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
                 result["reason"] = reason
             else:
                 result["reason"] = "No run_meta.json; parser produced empty outputs"
-            
+
+            # Collect directory contents for diagnostics
+            dir_contents = []
+            expected_files = []
+            if run_dir and os.path.isdir(run_dir):
+                try:
+                    dir_contents = os.listdir(run_dir)
+                except Exception:
+                    dir_contents = ["<error listing directory>"]
+            for entry in entry_set:
+                expected_files.append(f"{_safe_id(entry)}.txt")
+
+            result["dir_contents"] = dir_contents
+            result["expected_files"] = expected_files[:10]  # First 10 for brevity
+
             # ✅ Fatal check: raise ValueError if 0 outputs for N inputs
             if len(entry_set) > 0:
                 error_msg = (
                     f"TANGO produced 0 outputs for {len(entry_set)} inputs. "
                     f"Run directory: {run_dir}. "
                     f"Reason: {result.get('reason', 'Unknown')}. "
+                    f"Dir contents: {dir_contents[:5]}. "
+                    f"Expected files: {expected_files[:3]}. "
                     f"Check run_meta.json for diagnostics."
                 )
                 log_error("tango_zero_outputs_fatal", error_msg, **{
@@ -1113,6 +1129,8 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
                     "parsed_ok": ok_ctr,
                     "run_dir": run_dir,
                     "reason": result.get("reason"),
+                    "dir_contents": dir_contents[:10],
+                    "expected_files": expected_files[:10],
                 })
                 raise ValueError(error_msg)
         return result
@@ -1276,6 +1294,101 @@ def _read_run_meta_reason(run_dir: Optional[str]) -> Optional[str]:
             return meta.get("reason")
     except Exception:
         return None
+
+
+# ---------------------------------------------------------------------
+# Public: TANGO smoke test for diagnostics
+# ---------------------------------------------------------------------
+def smoke_test_tango() -> Dict[str, Any]:
+    """
+    Run a minimal TANGO smoke test to verify the pipeline works.
+
+    Uses a test sequence (20 standard amino acids) and verifies:
+    1. Binary execution succeeds
+    2. Output file is created
+    3. Output can be parsed
+    4. SSW values are computed
+
+    Returns dict with:
+        success: bool - whether smoke test passed
+        stage: str - last successful stage ("init", "run", "parse", "complete")
+        error: str | None - error message if failed
+        run_dir: str | None - run directory path
+        output_file: str | None - output file path if created
+        ssw_values: dict | None - parsed SSW values if successful
+        duration_ms: int - execution time in milliseconds
+    """
+    import time
+    start = time.time()
+
+    result = {
+        "success": False,
+        "stage": "init",
+        "error": None,
+        "run_dir": None,
+        "output_file": None,
+        "ssw_values": None,
+        "duration_ms": 0,
+    }
+
+    # Test sequence: all 20 standard amino acids
+    test_entry = "_SMOKE_TEST_"
+    test_seq = "ACDEFGHIKLMNPQRSTVWY"
+
+    try:
+        # Stage 1: Run TANGO
+        records = [(test_entry, test_seq)]
+        run_dir = run_tango_simple(records)
+        result["run_dir"] = run_dir
+        result["stage"] = "run"
+
+        # Stage 2: Check output file exists
+        out_file = os.path.join(run_dir, f"{_safe_id(test_entry)}.txt")
+        result["output_file"] = out_file
+
+        if not os.path.exists(out_file):
+            # List directory contents for debugging
+            dir_contents = os.listdir(run_dir) if os.path.isdir(run_dir) else []
+            result["error"] = f"Output file not created. Dir contents: {dir_contents}"
+            result["duration_ms"] = int((time.time() - start) * 1000)
+            return result
+
+        result["stage"] = "file_created"
+
+        # Stage 3: Parse output file
+        parsed = __get_peptide_tango_result(out_file)
+        if not parsed:
+            result["error"] = "Output file exists but could not be parsed"
+            result["duration_ms"] = int((time.time() - start) * 1000)
+            return result
+
+        result["stage"] = "parse"
+
+        # Stage 4: Analyze results
+        analysed = __analyse_tango_results(parsed) or {}
+        result["ssw_values"] = {
+            "helix_pct": analysed.get("Helix_percentage"),
+            "beta_pct": analysed.get("Beta_percentage"),
+            "ssw_score": analysed.get("SSW_avg_score"),
+            "ssw_diff": analysed.get("Helix_and_beta_diff"),
+        }
+
+        result["stage"] = "complete"
+        result["success"] = True
+
+    except Exception as e:
+        result["error"] = f"{type(e).__name__}: {str(e)}"
+
+    result["duration_ms"] = int((time.time() - start) * 1000)
+
+    # Cleanup: remove smoke test output file (keep run_dir for other outputs)
+    if result.get("output_file") and os.path.exists(result["output_file"]):
+        try:
+            os.remove(result["output_file"])
+        except Exception:
+            pass
+
+    return result
 
 
 # ---------------------------------------------------------------------

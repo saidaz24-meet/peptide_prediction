@@ -298,14 +298,18 @@ async def providers_last_run():
     }
 
 # @app.get("/api/providers/diagnose/tango")  # Moved to api/routes/providers.py
-async def diagnose_tango():
+async def diagnose_tango(run_smoke_test: bool = False):
     """
     Diagnose TANGO binary/container availability.
     Returns actionable status for debugging TANGO execution failures.
+
+    Args:
+        run_smoke_test: If True, actually run TANGO with a test sequence to verify full pipeline.
+                       This takes ~1-2 seconds but provides definitive pass/fail.
     """
     import shutil
     import subprocess
-    
+
     # Check if Docker mode is enabled
     use_docker = settings.TANGO_MODE != "simple"
     docker_image = os.getenv("TANGO_DOCKER_IMAGE", "desy-tango")  # Not in config yet (optional)
@@ -414,8 +418,24 @@ async def diagnose_tango():
         result["reason"] = "Version check timed out (binary may be slow to start)"
     except Exception as e:
         result["reason"] = f"Version check failed: {str(e)}"
-    
+
     result["status"] = "found"
+
+    # Optional: run smoke test to verify full pipeline
+    if run_smoke_test:
+        try:
+            smoke_result = tango.smoke_test_tango()
+            result["smoke_test"] = smoke_result
+            if smoke_result.get("success"):
+                result["status"] = "verified"  # Upgrade status to verified
+            else:
+                result["status"] = "found-but-failing"
+                result["reason"] = f"Smoke test failed at stage '{smoke_result.get('stage')}': {smoke_result.get('error')}"
+        except Exception as e:
+            result["smoke_test"] = {"success": False, "error": f"Exception: {str(e)}"}
+            result["status"] = "found-but-failing"
+            result["reason"] = f"Smoke test exception: {str(e)}"
+
     return result
 
 # @app.get("/api/uniprot/ping")  # Moved to api/routes/uniprot.py
