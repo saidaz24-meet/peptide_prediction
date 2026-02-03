@@ -109,9 +109,15 @@ class Settings:
     
     USE_JPRED: bool = False
     """JPred is always disabled (kept for reference only)"""
-    
+
+    USE_S4PRED: bool = _env_bool("USE_S4PRED", True)
+    """Enable S4PRED provider (default: True, replaces PSIPRED)"""
+
     TANGO_MODE: str = os.getenv("TANGO_MODE", "simple").lower()
     """TANGO execution mode: 'simple' or 'host' (default: simple)"""
+
+    S4PRED_MODEL_PATH: Optional[str] = os.getenv("S4PRED_MODEL_PATH")
+    """Path to S4PRED model weights directory (required for S4PRED to run)"""
     
     # ============================================================================
     # Provider Runtime Directories
@@ -122,7 +128,10 @@ class Settings:
     
     PSIPRED_RUNTIME_DIR: Optional[str] = os.getenv("PSIPRED_RUNTIME_DIR")
     """PSIPRED runtime directory (default: backend/.run_cache/Psipred)"""
-    
+
+    S4PRED_RUNTIME_DIR: Optional[str] = os.getenv("S4PRED_RUNTIME_DIR")
+    """S4PRED runtime directory (default: backend/.run_cache/S4Pred)"""
+
     @property
     def tango_runtime_dir(self) -> str:
         """Get TANGO runtime directory with default fallback."""
@@ -136,7 +145,14 @@ class Settings:
         if self.PSIPRED_RUNTIME_DIR:
             return self.PSIPRED_RUNTIME_DIR
         return str(_BACKEND_DIR / ".run_cache" / "Psipred")
-    
+
+    @property
+    def s4pred_runtime_dir(self) -> str:
+        """Get S4PRED runtime directory with default fallback."""
+        if self.S4PRED_RUNTIME_DIR:
+            return self.S4PRED_RUNTIME_DIR
+        return str(_BACKEND_DIR / ".run_cache" / "S4Pred")
+
     # ============================================================================
     # PSIPRED Configuration
     # ============================================================================
@@ -170,7 +186,17 @@ class Settings:
     
     SSW_DIFF_THRESHOLD_FALLBACK: float = float(os.getenv("SSW_DIFF_THRESHOLD_FALLBACK", "0.0"))
     """Fallback SSW diff threshold when no valid diffs (default: 0.0)"""
-    
+
+    # S4PRED thresholds (from reference config.py)
+    MIN_S4PRED_SCORE: float = float(os.getenv("MIN_S4PRED_SCORE", "0.5"))
+    """Minimum S4PRED probability score for segment detection (default: 0.5)"""
+
+    MIN_SEGMENT_LENGTH: int = int(os.getenv("MIN_SEGMENT_LENGTH", "5"))
+    """Minimum segment length for secondary structure detection (default: 5)"""
+
+    MAX_GAP: int = int(os.getenv("MAX_GAP", "3"))
+    """Maximum gap to merge across in segment detection (default: 3)"""
+
     # ============================================================================
     # Debug Configuration
     # ============================================================================

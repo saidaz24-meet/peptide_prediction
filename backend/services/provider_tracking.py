@@ -118,30 +118,30 @@ def determine_jpred_status(
 ) -> ProviderStatus:
     """
     Determine JPred provider status for a single peptide row.
-    
+
     Args:
         row: DataFrame row with JPred columns
         jpred_enabled: Whether JPred is enabled/configured
         jpred_output_available: Whether JPred output files exist for this peptide
-    
+
     Returns:
         ProviderStatus indicating availability
     """
     # JPred is always disabled currently
     if not jpred_enabled:
         return ProviderStatus.not_configured("JPred disabled")
-    
+
     # Check if JPred columns have real values
     helix_frags = row.get("Helix fragments (Jpred)", None)
     helix_score = row.get("Helix score (Jpred)", None)
-    
+
     has_valid_data = False
     if helix_frags is not None:
         if isinstance(helix_frags, list) and len(helix_frags) > 0:
             has_valid_data = True
     if helix_score is not None and not pd.isna(helix_score) and helix_score != -1:
         has_valid_data = True
-    
+
     if has_valid_data:
         return ProviderStatus.available()
     elif jpred_output_available:
@@ -150,18 +150,62 @@ def determine_jpred_status(
         return ProviderStatus.unavailable("JPred output not available for this sequence")
 
 
+def determine_s4pred_status(
+    row: pd.Series,
+    s4pred_enabled: bool,
+    s4pred_output_available: bool
+) -> ProviderStatus:
+    """
+    Determine S4PRED provider status for a single peptide row.
+
+    Args:
+        row: DataFrame row with S4PRED columns
+        s4pred_enabled: Whether S4PRED is enabled/configured
+        s4pred_output_available: Whether S4PRED output is available for this peptide
+
+    Returns:
+        ProviderStatus indicating availability
+    """
+    if not s4pred_enabled:
+        return ProviderStatus.not_configured("S4PRED not enabled")
+
+    # Check if S4PRED columns have real values
+    # Reference column names from s4pred.py
+    helix_pred = row.get("Helix prediction (S4PRED)", None)
+    helix_pct = row.get("Helix percentage (S4PRED)", None)
+    ssw_pred = row.get("SSW prediction (S4PRED)", None)
+
+    has_valid_data = False
+    # Helix prediction can be -1 (no helix) or 1 (helix found) - both are valid
+    if helix_pred is not None and helix_pred in [-1, 1]:
+        has_valid_data = True
+    elif helix_pct is not None and not pd.isna(helix_pct) and helix_pct >= 0:
+        has_valid_data = True
+    elif ssw_pred is not None and ssw_pred in [-1, 1]:
+        has_valid_data = True
+
+    if has_valid_data:
+        return ProviderStatus.available()
+    elif s4pred_output_available:
+        return ProviderStatus.failed("S4PRED ran but parsing failed")
+    else:
+        return ProviderStatus.unavailable("S4PRED output not available for this sequence")
+
+
 def create_provider_status_for_row(
     row: pd.Series,
     tango_enabled: bool = False,
     psipred_enabled: bool = False,
     jpred_enabled: bool = False,
+    s4pred_enabled: bool = False,
     tango_output_available: bool = False,
     psipred_output_available: bool = False,
     jpred_output_available: bool = False,
+    s4pred_output_available: bool = False,
 ) -> PeptideProviderStatus:
     """
     Create PeptideProviderStatus for a DataFrame row.
-    
+
     This is a helper that determines status for all providers and returns
     a PeptideProviderStatus object.
     """
@@ -169,5 +213,6 @@ def create_provider_status_for_row(
         tango=determine_tango_status(row, tango_enabled, tango_output_available),
         psipred=determine_psipred_status(row, psipred_enabled, psipred_output_available),
         jpred=determine_jpred_status(row, jpred_enabled, jpred_output_available),
+        s4pred=determine_s4pred_status(row, s4pred_enabled, s4pred_output_available),
     )
 

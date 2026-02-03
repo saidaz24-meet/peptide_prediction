@@ -1,0 +1,64 @@
+# Backend Docker Ignore
+# Prevents context bloat during Docker builds
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+.Python
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
+eggs/
+*.egg
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Runtime files
+.run_cache/
+*.log
+
+# Environment files
+.env
+.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Test data (large files)
+tests/fixtures/large/

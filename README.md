@@ -73,9 +73,28 @@ Developed with guidance from **Dr. Aleksandr Golubev**.
 
 ---
 
-## 🚀 Quick Start (local)
+## 🚀 Quick Start
 
-### 1️⃣ Backend
+### Option 1: Docker (Recommended) 🐳
+
+The fastest way to get started:
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/peptide-prediction.git
+cd peptide-prediction
+
+# Start with Docker Compose
+docker compose -f docker/docker-compose.yml up --build
+
+# Access the app
+# Frontend: http://localhost:3000
+# Backend API: http://localhost:8000/api/health
+```
+
+### Option 2: Local Development
+
+#### 1️⃣ Backend
 
 ```bash
 cd backend
@@ -84,13 +103,14 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 # Feature flags (safe defaults)
-export USE_TANGO=1          # Tango on (works with mac binary today)
-export USE_PSIPRED=true     # OK if PSIPRED isn't installed; it will skip cleanly
+export USE_TANGO=0          # Set to 1 if you have the Tango binary
+export USE_S4PRED=1         # S4Pred secondary structure prediction
+export USE_JPRED=0          # Deprecated, always off
 
-uvicorn server:app --host 0.0.0.0 --port 8000 --reload
+uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-### 2️⃣ Frontend
+#### 2️⃣ Frontend
 
 ```bash
 cd ui
@@ -141,9 +161,44 @@ pre-commit run              # Run on staged files only
 git commit --no-verify  # Skip pre-commit hooks
 ```
 
-## 🔧 Tango & PSIPRED
+## 🐳 Docker Deployment
 
-### 🥭 Tango (macOS recommended)
+### Development Mode
+
+```bash
+# Build and start services with hot reload
+docker compose -f docker/docker-compose.yml up --build
+
+# Services:
+# - Backend:  http://localhost:8000 (with source mounted for hot reload)
+# - Frontend: http://localhost:3000 (Nginx serving built assets)
+```
+
+### Production Mode
+
+```bash
+# Build and start optimized containers
+docker compose -f docker/docker-compose.prod.yml up -d
+
+# Access at http://localhost (port 80)
+```
+
+### Environment Variables
+
+Copy `.env.example` to `.env` and configure:
+
+```bash
+USE_TANGO=0              # Enable TANGO aggregation prediction
+USE_S4PRED=1             # Enable S4PRED secondary structure
+SENTRY_DSN=              # Optional: Sentry error tracking
+CORS_ORIGINS=http://localhost:3000
+```
+
+---
+
+## 🔧 Prediction Tools
+
+### 🥭 TANGO (Aggregation Prediction)
 
 1. Put your mac binary at `backend/Tango/bin/tango`
 
@@ -157,11 +212,12 @@ chmod +x backend/Tango/bin/tango
 softwareupdate --install-rosetta --agree-to-license
 ```
 
-### 🧠 PSIPRED (optional; Docker)
+### 🧬 S4PRED (Secondary Structure)
 
-Build/pull an image tagged `psipred-hhblits` and set `PSIPRED_DB` to your Uniclust folder. If not available, backend prints a warning and continues.
-
-📖 Details are in `DEPLOYMENT.md`.
+S4PRED is included and runs automatically when `USE_S4PRED=1`. It provides:
+- Helix/Beta/Coil probability predictions
+- Secondary Structure Switch (SSW) detection
+- Per-residue confidence scores
 
 ## 🌍 Deployment (make it globally accessible)
 

@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
 
-import auxiliary, tango
+import auxiliary, tango, s4pred
 # JPred module removed (dead code)
 # biochem_calculation renamed to calculations/biochem.py
 from auxiliary import ff_helix_percent, ff_helix_cores
@@ -298,14 +298,18 @@ async def providers_last_run():
     }
 
 # @app.get("/api/providers/diagnose/tango")  # Moved to api/routes/providers.py
-async def diagnose_tango():
+async def diagnose_tango(run_smoke_test: bool = False):
     """
     Diagnose TANGO binary/container availability.
     Returns actionable status for debugging TANGO execution failures.
+
+    Args:
+        run_smoke_test: If True, actually run TANGO with a test sequence to verify full pipeline.
+                       This takes ~1-2 seconds but provides definitive pass/fail.
     """
     import shutil
     import subprocess
-    
+
     # Check if Docker mode is enabled
     use_docker = settings.TANGO_MODE != "simple"
     docker_image = os.getenv("TANGO_DOCKER_IMAGE", "desy-tango")  # Not in config yet (optional)
@@ -414,8 +418,24 @@ async def diagnose_tango():
         result["reason"] = "Version check timed out (binary may be slow to start)"
     except Exception as e:
         result["reason"] = f"Version check failed: {str(e)}"
-    
+
     result["status"] = "found"
+
+    # Optional: run smoke test to verify full pipeline
+    if run_smoke_test:
+        try:
+            smoke_result = tango.smoke_test_tango()
+            result["smoke_test"] = smoke_result
+            if smoke_result.get("success"):
+                result["status"] = "verified"  # Upgrade status to verified
+            else:
+                result["status"] = "found-but-failing"
+                result["reason"] = f"Smoke test failed at stage '{smoke_result.get('stage')}': {smoke_result.get('error')}"
+        except Exception as e:
+            result["smoke_test"] = {"success": False, "error": f"Exception: {str(e)}"}
+            result["status"] = "found-but-failing"
+            result["reason"] = f"Smoke test exception: {str(e)}"
+
     return result
 
 # @app.get("/api/uniprot/ping")  # Moved to api/routes/uniprot.py
@@ -620,6 +640,17 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                     "stats": {"requested": 0, "parsed_ok": 0, "parsed_bad": 0},
                     "enabled": False,
                     "ran": False,
+                    "skipped_reason": None,
+                    "runtime_ms": None,
+                    "sequences_processed": 0,
+                },
+                "s4pred": {
+                    "enabled": settings.USE_S4PRED,
+                    "requested": settings.USE_S4PRED,  # S4PRED runs automatically if enabled
+                    "ran": False,
+                    "status": "OFF",
+                    "reason": None,
+                    "stats": {"requested": 0, "parsed_ok": 0, "parsed_bad": 0},
                     "skipped_reason": None,
                     "runtime_ms": None,
                     "sequences_processed": 0,
@@ -913,7 +944,88 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             finally:
                 if tango_start_time:
                     provider_status_meta["tango"]["runtime_ms"] = int((time.time() - tango_start_time) * 1000)
-            
+
+            # --- S4PRED processing (runs automatically if enabled) ---
+            s4pred_start_time = None
+            s4pred_enabled_flag = settings.USE_S4PRED
+            try:
+                if s4pred_enabled_flag:
+                    # Check if S4PRED is available
+                    available, reason = s4pred.is_s4pred_available()
+                    if not available:
+                        log_info("uniprot_s4pred_unavailable", f"S4PRED not available: {reason}",
+                                **{"reason": reason})
+                        provider_status_meta["s4pred"]["status"] = "UNAVAILABLE"
+                        provider_status_meta["s4pred"]["skipped_reason"] = reason
+                    else:
+                        s4pred_start_time = time.time()
+
+                        # Build sequence list from DataFrame
+                        sequences = []
+                        for _, row in df.iterrows():
+                            entry_id = str(row.get('Entry', ''))
+                            sequence = str(row.get('Sequence', ''))
+                            if entry_id and sequence:
+                                sequences.append((entry_id, sequence))
+
+                        if sequences:
+                            provider_status_meta["s4pred"]["stats"]["requested"] = len(sequences)
+
+                            log_info("uniprot_s4pred_run_start", f"Running S4PRED for {len(sequences)} sequences",
+                                    stage="s4pred_run", **{"sequence_count": len(sequences)})
+
+                            # Run S4PRED
+                            from services.logger import get_trace_id
+                            success, stats = s4pred.run_s4pred_database(df, "uniprot", trace_id=get_trace_id())
+                            provider_status_meta["s4pred"]["ran"] = True
+                            provider_status_meta["s4pred"]["stats"].update(stats)
+                            provider_status_meta["s4pred"]["sequences_processed"] = stats.get("parsed_ok", 0)
+
+                            log_info("uniprot_s4pred_run_complete", f"S4PRED completed: {stats.get('parsed_ok', 0)}/{stats.get('requested', 0)} parsed",
+                                    stage="s4pred_run", **stats)
+
+                            # Generate S4PRED SSW predictions
+                            try:
+                                s4pred_predictions = s4pred.filter_by_s4pred_diff(df)
+                                df[s4pred.SSW_PREDICTION_S4PRED] = s4pred_predictions
+                                # Mark rows where S4PRED ran
+                                df["S4PRED has data"] = [pred is not None for pred in s4pred_predictions]
+                            except Exception as e:
+                                log_warning("uniprot_s4pred_filter_error", f"Error computing S4PRED SSW predictions: {e}")
+
+                            # Compute provider status
+                            parsed_ok = stats.get("parsed_ok", 0)
+                            requested = stats.get("requested", 0)
+
+                            if parsed_ok == 0 and requested > 0:
+                                provider_status_meta["s4pred"]["status"] = "UNAVAILABLE"
+                                provider_status_meta["s4pred"]["reason"] = f"S4PRED failed; {parsed_ok}/{requested} parsed"
+                            elif 0 < parsed_ok < requested:
+                                provider_status_meta["s4pred"]["status"] = "PARTIAL"
+                                provider_status_meta["s4pred"]["reason"] = f"Only {parsed_ok}/{requested} sequences processed"
+                            elif parsed_ok == requested and requested > 0:
+                                provider_status_meta["s4pred"]["status"] = "AVAILABLE"
+                                provider_status_meta["s4pred"]["reason"] = None
+                            else:
+                                provider_status_meta["s4pred"]["status"] = "OFF"
+                                provider_status_meta["s4pred"]["reason"] = "No S4PRED run attempted"
+                        else:
+                            log_warning("uniprot_s4pred_no_sequences", "No valid sequences for S4PRED")
+                            provider_status_meta["s4pred"]["status"] = "UNAVAILABLE"
+                            provider_status_meta["s4pred"]["skipped_reason"] = "No valid sequences to process"
+                else:
+                    log_info("uniprot_s4pred_disabled", "S4PRED disabled by USE_S4PRED env (USE_S4PRED=0)",
+                            **{"run_s4pred": False, "reason": "S4PRED disabled in environment"})
+                    provider_status_meta["s4pred"]["status"] = "OFF"
+                    provider_status_meta["s4pred"]["skipped_reason"] = "S4PRED disabled in environment (USE_S4PRED=0)"
+            except Exception as e:
+                provider_status_meta["s4pred"]["status"] = "UNAVAILABLE"
+                provider_status_meta["s4pred"]["skipped_reason"] = f"Exception: {str(e)}"
+                log_warning("uniprot_s4pred_error", f"S4PRED error: {e} (continuing without S4PRED)", **{"error": str(e)})
+            finally:
+                if s4pred_start_time:
+                    provider_status_meta["s4pred"]["runtime_ms"] = int((time.time() - s4pred_start_time) * 1000)
+
             # Compute biochemical features and flags
             log_info("uniprot_biochem_start", "Computing biochemical features (Charge, Hydrophobicity, μH)")
             calc_biochem(df)
@@ -929,7 +1041,8 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                 is_single_row=False,
                 tango_enabled=settings.USE_TANGO,
                 psipred_enabled=settings.USE_PSIPRED,
-                jpred_enabled=settings.USE_JPRED
+                jpred_enabled=settings.USE_JPRED,
+                s4pred_enabled=settings.USE_S4PRED
             )
             log_info("uniprot_normalize_ui_complete", f"Normalized {len(rows_out)} rows for UI", **{"row_count": len(rows_out)})
             
@@ -1186,6 +1299,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                                 tango_enabled=False,
                                 psipred_enabled=False,
                                 jpred_enabled=False,
+                                s4pred_enabled=False,
                             )
                             
                             return {

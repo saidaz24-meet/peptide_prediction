@@ -5,8 +5,11 @@ numpy
 openpyxl
 python-multipart
 httpx
+python-dotenv
 sentry-sdk[fastapi]
 pytest
+# S4PRED dependencies
+torch
 # Dev tools for linting, formatting, and type checking
 ruff
 mypy

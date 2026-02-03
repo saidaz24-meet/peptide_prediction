@@ -366,7 +366,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
         for field in jpred_fields:
             if field in result:
                 result[field] = None
-        
+
         # Handle nested jpred object
         if "jpred" in result and isinstance(result["jpred"], dict):
             result["jpred"] = None
@@ -383,7 +383,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
                 value = result[field]
                 if value in fake_values or _is_fake_default(value):
                     result[field] = None
-        
+
         # Handle nested jpred object: nullify if all fields are empty/None/fake defaults
         if "jpred" in result and isinstance(result["jpred"], dict):
             jpred_obj = result["jpred"]
@@ -395,7 +395,38 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
                     break
             if not has_real_data:
                 result["jpred"] = None
-    
+
+    # S4PRED fields: if S4PRED is not available/failed/not_configured, nullify ALL S4PRED fields
+    if provider_status.s4pred.status != "AVAILABLE":
+        # All S4PRED fields must be null when provider not available
+        s4pred_fields = [
+            "s4predHelixPrediction", "s4predHelixFragments", "s4predHelixScore", "s4predHelixPercent",
+            "s4predSswPrediction", "s4predSswFragments", "s4predSswScore", "s4predSswDiff",
+            "s4predSswHelixPercent", "s4predSswBetaPercent", "s4predSswPercent", "s4predHasData",
+        ]
+        for field in s4pred_fields:
+            if field in result:
+                result[field] = None
+    else:
+        # Provider is available: only nullify fake defaults, preserve real values
+        # Note: -1 for s4predHelixPrediction and s4predSswPrediction is valid (means "no helix/no switch")
+        s4pred_fake_defaults = {
+            "s4predHelixFragments": [-1, None, "", "-", []],
+            "s4predHelixScore": [-1],  # -1 is invalid for score
+            "s4predHelixPercent": [-1],  # -1 is invalid for percentages, but preserve 0.0
+            "s4predSswFragments": [-1, None, "", "-", []],
+            "s4predSswScore": [-1],
+            "s4predSswDiff": [-1],
+            "s4predSswHelixPercent": [-1],
+            "s4predSswBetaPercent": [-1],
+            "s4predSswPercent": [-1],
+        }
+        for field, fake_values in s4pred_fake_defaults.items():
+            if field in result:
+                value = result[field]
+                if value in fake_values or _is_fake_default(value):
+                    result[field] = None
+
     return result
 
 def none_if_nan(x):
@@ -440,9 +471,13 @@ def _sanitize_for_json(obj, field_name: str = None):
             return obj
         return None  # NaN/inf -> None
     if isinstance(obj, int):
-        # Preserve -1 ONLY for sswPrediction (valid semantic value: "no switch")
+        # Preserve -1 for prediction fields where it's a valid semantic value:
+        # - sswPrediction (TANGO): -1 = "no structural switch predicted"
+        # - s4predSswPrediction (S4PRED): -1 = "no SSW detected"
+        # - s4predHelixPrediction (S4PRED): -1 = "no helix detected"
         # All other -1 values are fake defaults and should be None
-        if obj == -1 and field_name != "sswPrediction":
+        prediction_fields = {"sswPrediction", "s4predSswPrediction", "s4predHelixPrediction"}
+        if obj == -1 and field_name not in prediction_fields:
             return None
         return obj
     if isinstance(obj, str):
@@ -482,7 +517,8 @@ def normalize_rows_for_ui(
     is_single_row: bool = False,
     tango_enabled: bool = True,
     psipred_enabled: bool = True,
-    jpred_enabled: bool = False
+    jpred_enabled: bool = False,
+    s4pred_enabled: bool = False
 ):
     """
     Normalize DataFrame rows for UI consumption.
@@ -524,14 +560,23 @@ def normalize_rows_for_ui(
             
             # Add provider status (Principle B: mandatory provider status)
             # Determine status based on data presence in DataFrame row
+            # Note: SSW prediction can be -1 (no switch), 0 (uncertain), or 1 (switch predicted)
+            # All three are valid prediction values. None means TANGO didn't run or no data available.
+            ssw_pred = row.get("SSW prediction", None)
+            tango_output_available = ssw_pred is not None and not pd.isna(ssw_pred)
+            s4pred_helix_pred = row.get("Helix prediction (S4PRED)", None)
+            s4pred_output_available = s4pred_helix_pred is not None and s4pred_helix_pred in [-1, 1]
+
             provider_status = create_provider_status_for_row(
                 row,
                 tango_enabled=tango_enabled,
                 psipred_enabled=psipred_enabled,
                 jpred_enabled=jpred_enabled,
-                tango_output_available=row.get("SSW prediction", -1) != -1,
+                s4pred_enabled=s4pred_enabled,
+                tango_output_available=tango_output_available,
                 psipred_output_available=len(row.get("Helix fragments (Psipred)", [])) > 0,
                 jpred_output_available=len(row.get("Helix fragments (Jpred)", [])) > 0,
+                s4pred_output_available=s4pred_output_available,
             )
             normalized["providerStatus"] = provider_status.model_dump()
             
@@ -560,11 +605,13 @@ def normalize_rows_for_ui(
                 tango_enabled=tango_enabled,
                 psipred_enabled=psipred_enabled,
                 jpred_enabled=jpred_enabled,
+                s4pred_enabled=s4pred_enabled,
                 tango_output_available=False,  # Fallback assumes no provider output
                 psipred_output_available=False,
                 jpred_output_available=False,
+                s4pred_output_available=False,
             )
-            
+
             # Fallback: ensure FF-Helix % is properly converted (handle both -1 and None)
             ff_helix_raw = row.get("FF-Helix %")
             ff_helix_val = None
@@ -658,6 +705,13 @@ def normalize_rows_for_ui(
                 
                 # Add provider status (Principle B: mandatory provider status)
                 # Determine status based on data presence in DataFrame row
+                # Note: SSW prediction can be -1 (no switch), 0 (uncertain), or 1 (switch predicted)
+                # All three are valid prediction values. None means TANGO didn't run or no data available.
+                ssw_pred = row_dict.get("SSW prediction", None)
+                tango_output_available = ssw_pred is not None and not (isinstance(ssw_pred, float) and pd.isna(ssw_pred))
+                s4pred_helix_pred = row_dict.get("Helix prediction (S4PRED)", None)
+                s4pred_output_available = s4pred_helix_pred is not None and s4pred_helix_pred in [-1, 1]
+
                 # OPTIMIZATION: Only create Series when needed for provider status
                 row_for_status = get_row_series()
                 provider_status = create_provider_status_for_row(
@@ -665,9 +719,11 @@ def normalize_rows_for_ui(
                     tango_enabled=tango_enabled,
                     psipred_enabled=psipred_enabled,
                     jpred_enabled=jpred_enabled,
-                    tango_output_available=row_dict.get("SSW prediction", -1) != -1,
+                    s4pred_enabled=s4pred_enabled,
+                    tango_output_available=tango_output_available,
                     psipred_output_available=len(row_dict.get("Helix fragments (Psipred)", [])) > 0,
                     jpred_output_available=len(row_dict.get("Helix fragments (Jpred)", [])) > 0,
+                    s4pred_output_available=s4pred_output_available,
                 )
                 normalized["providerStatus"] = provider_status.model_dump()
                 
@@ -695,11 +751,13 @@ def normalize_rows_for_ui(
                     tango_enabled=tango_enabled,
                     psipred_enabled=psipred_enabled,
                     jpred_enabled=jpred_enabled,
+                    s4pred_enabled=s4pred_enabled,
                     tango_output_available=False,
                     psipred_output_available=False,
                     jpred_output_available=False,
+                    s4pred_output_available=False,
                 )
-                
+
                 # Fallback: ensure FF-Helix % is properly converted
                 ff_helix_raw = row_dict.get("FF-Helix %")
                 ff_helix_val = None

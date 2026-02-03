@@ -27,20 +27,29 @@ _HELIX_PROP = {
     "H": 1.00, "C": 0.70, "N": 0.67, "D": 1.01, "G": 0.57, "P": 0.57,
 }
 
-def _hprop(seq: str):
-    """Get helix propensity for each residue in sequence."""
-    return [_HELIX_PROP.get(aa, 1.0) for aa in (seq or "").upper()]
+def _safe_seq_str(seq) -> str:
+    """Convert sequence to string, handling NaN/None/float values safely."""
+    if seq is None or (isinstance(seq, float) and pd.isna(seq)):
+        return ""
+    if not isinstance(seq, str):
+        return str(seq)
+    return seq
 
-def ff_helix_percent(seq: str, core_len: Optional[int] = None, thr: Optional[float] = None) -> float:
+def _hprop(seq):
+    """Get helix propensity for each residue in sequence."""
+    s = _safe_seq_str(seq).upper()
+    return [_HELIX_PROP.get(aa, 1.0) for aa in s]
+
+def ff_helix_percent(seq, core_len: Optional[int] = None, thr: Optional[float] = None) -> float:
     """
     Calculate percentage of residues that belong to ≥core_len window with mean helix propensity ≥ threshold.
     Uses a more realistic threshold of 1.0 (average helix propensity).
-    
+
     Args:
-        seq: Amino acid sequence
+        seq: Amino acid sequence (handles NaN/None gracefully)
         core_len: Window size for helix core detection (default from FF_HELIX_CORE_LEN env, or 6)
         thr: Threshold for helix propensity (default from config, or 1.0)
-    
+
     Returns a value in [0.0, 100.0] (clamped to ensure valid range).
     """
     # Get defaults from config (with fallback for backward compatibility)
@@ -56,7 +65,7 @@ def ff_helix_percent(seq: str, core_len: Optional[int] = None, thr: Optional[flo
             thr = settings.FF_HELIX_THRESHOLD
         except ImportError:
             thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
-    s = (seq or "").upper().strip()
+    s = _safe_seq_str(seq).upper().strip()
     if len(s) < core_len:
         return 0.0
     
@@ -80,13 +89,13 @@ def ff_helix_percent(seq: str, core_len: Optional[int] = None, thr: Optional[flo
     # Ensure result is in valid range [0.0, 100.0]
     return max(0.0, min(100.0, percent))
 
-def ff_helix_cores(seq: str, core_len: Optional[int] = None, thr: Optional[float] = None):
+def ff_helix_cores(seq, core_len: Optional[int] = None, thr: Optional[float] = None):
     """
     Find FF-Helix core segments as contiguous regions where sliding windows meet threshold.
     Returns list of [start, end] segments (1-indexed).
-    
+
     Args:
-        seq: Amino acid sequence
+        seq: Amino acid sequence (handles NaN/None gracefully)
         core_len: Window size for helix core detection (default from config, or 6)
         thr: Threshold for helix propensity (default from config, or 1.0)
     """
@@ -103,7 +112,7 @@ def ff_helix_cores(seq: str, core_len: Optional[int] = None, thr: Optional[float
             thr = settings.FF_HELIX_THRESHOLD
         except ImportError:
             thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
-    s = (seq or "").upper().strip()
+    s = _safe_seq_str(seq).upper().strip()
     if len(s) < core_len:
         return []
     
@@ -397,7 +406,7 @@ def check_secondary_structure_prediction_content(secondary_structure_prediction_
     return (residues_with_secondary_structure_prediction / len(secondary_structure_prediction_conf)) * 100
 
 
-def get_corrected_sequence(sequence: str) -> str:
+def get_corrected_sequence(sequence) -> str:
     """
     Substitute letters for general amino acid to be compatible to Jpred input requirements:
     "X" -> "A"
@@ -405,9 +414,15 @@ def get_corrected_sequence(sequence: str) -> str:
     "B" -> D
     "U" -> C
 
-    :param sequence: The sequence to modify
-    :return: sequence with the substituted amino acids
+    :param sequence: The sequence to modify (handles NaN/None gracefully)
+    :return: sequence with the substituted amino acids, or empty string if invalid
     """
+    # Handle NaN, None, or non-string values
+    if sequence is None or (isinstance(sequence, float) and pd.isna(sequence)):
+        return ""
+    if not isinstance(sequence, str):
+        sequence = str(sequence)
+
     s1 = sequence.replace('X', 'A')
     s2 = s1.replace('Z', 'E')
     s3 = s2.replace('U', 'C')

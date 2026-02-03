@@ -16,6 +16,7 @@ import sentry_sdk
 
 import auxiliary
 import tango
+import s4pred
 from config import settings
 from calculations.biochem import calculate_biochemical_features as calc_biochem
 from services.logger import log_info, log_warning, log_error, get_trace_id
@@ -203,15 +204,37 @@ def _run_tango_processing(
                     log_error("tango_zero_outputs_ui", f"TANGO zero outputs error: {e}", entry=trace_entry,
                             stage="tango_parse", **{"error": str(e), "run_dir": run_dir})
 
+                    # Read run_meta.json for full diagnostic context
+                    run_meta = {}
+                    if run_dir:
+                        meta_path = os.path.join(run_dir, "run_meta.json")
+                        if os.path.exists(meta_path):
+                            try:
+                                with open(meta_path) as f:
+                                    run_meta = json.load(f)
+                            except Exception:
+                                pass
+
                     if sentry_initialized:
                         with sentry_sdk.push_scope() as scope:
                             scope.set_tag("provider", "tango")
                             scope.set_tag("stage", "parse")
                             scope.set_tag("error_type", "zero_outputs")
-                            scope.set_context("tango_parse", {
+                            scope.set_tag("execution_mode", run_meta.get("execution_mode", "unknown"))
+                            scope.set_context("tango_execution", {
                                 "run_dir": run_dir if run_dir else None,
                                 "trace_id": trace_id,
                                 "entry": trace_entry,
+                                "execution_mode": run_meta.get("execution_mode"),
+                                "bin_path": run_meta.get("bin_path"),
+                                "cmd": run_meta.get("cmd"),
+                                "cwd": run_meta.get("cwd"),
+                                "exit_code": run_meta.get("exit_code"),
+                                "inputs_requested": run_meta.get("inputs_requested"),
+                                "outputs_found": run_meta.get("outputs_found"),
+                                "output_files": run_meta.get("output_files", [])[:10],
+                                "stderr_tail": run_meta.get("stderr_tail", "")[:500],
+                                "reason": run_meta.get("reason"),
                             })
                             sentry_sdk.capture_exception(e, level="error")
 
@@ -220,6 +243,9 @@ def _run_tango_processing(
                         "error": str(e),
                         "run_dir": run_dir if run_dir else None,
                         "suspected_cause": parse_stats.get("reason", "Unknown") if parse_stats else "Unknown",
+                        "execution_mode": run_meta.get("execution_mode"),
+                        "outputs_found": run_meta.get("outputs_found"),
+                        "output_files": run_meta.get("output_files", [])[:10],
                     }
                     raise UploadProcessingError(
                         message="TANGO produced 0 outputs",
@@ -379,6 +405,122 @@ def _run_tango_processing(
     return tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir
 
 
+def _run_s4pred_processing(
+    df: pd.DataFrame,
+    trace_entry: Optional[str],
+    sentry_initialized: bool
+) -> Tuple[Dict[str, Any], str, Optional[str], bool]:
+    """
+    Run S4PRED processing pipeline.
+
+    Returns:
+        Tuple of (s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran)
+    """
+    s4pred_stats = {"requested": 0, "parsed_ok": 0, "parsed_bad": 0}
+    s4pred_provider_status = "OFF"
+    s4pred_provider_reason = None
+    s4pred_enabled_flag = settings.USE_S4PRED
+    s4pred_ran = False
+
+    try:
+        if not s4pred_enabled_flag:
+            log_info("s4pred_disabled", "S4PRED disabled by USE_S4PRED env (USE_S4PRED=0)",
+                    **{"run_s4pred": False, "reason": "S4PRED disabled in environment"})
+            s4pred_provider_status = "OFF"
+            s4pred_provider_reason = "S4PRED disabled in environment (USE_S4PRED=0)"
+            return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
+
+        # Check if S4PRED is available
+        available, reason = s4pred.is_s4pred_available()
+        if not available:
+            log_info("s4pred_unavailable", f"S4PRED not available: {reason}",
+                    **{"reason": reason})
+            s4pred_provider_status = "UNAVAILABLE"
+            s4pred_provider_reason = reason
+            return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
+
+        # Build sequence list from DataFrame
+        sequences = []
+        for _, row in df.iterrows():
+            entry_id = str(row.get('Entry', ''))
+            sequence = str(row.get('Sequence', ''))
+            if entry_id and sequence:
+                sequences.append((entry_id, sequence))
+
+        if not sequences:
+            log_warning("s4pred_no_sequences", "No valid sequences for S4PRED")
+            s4pred_provider_status = "UNAVAILABLE"
+            s4pred_provider_reason = "No valid sequences to process"
+            return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
+
+        s4pred_stats["requested"] = len(sequences)
+
+        # Run S4PRED
+        s4pred_start_time = time.time()
+        log_info("s4pred_run_start", f"Running S4PRED for {len(sequences)} sequences",
+                stage="s4pred_run", **{"sequence_count": len(sequences)})
+
+        success, stats = s4pred.run_s4pred_database(df, "upload", trace_id=get_trace_id())
+        s4pred_ran = True
+        s4pred_stats.update(stats)
+
+        s4pred_elapsed = (time.time() - s4pred_start_time) * 1000
+        log_info("s4pred_run_complete", f"S4PRED completed: {s4pred_stats['parsed_ok']}/{s4pred_stats['requested']} parsed",
+                stage="s4pred_run", **{**s4pred_stats, "s4pred_time_ms": round(s4pred_elapsed, 2)})
+
+        # Generate S4PRED SSW predictions
+        try:
+            s4pred_predictions = s4pred.filter_by_s4pred_diff(df)
+            df[s4pred.SSW_PREDICTION_S4PRED] = s4pred_predictions
+            # Mark rows where S4PRED ran
+            df["S4PRED has data"] = [pred is not None for pred in s4pred_predictions]
+        except Exception as e:
+            log_warning("s4pred_filter_error", f"Error computing S4PRED SSW predictions: {e}")
+
+        # Compute provider status
+        parsed_ok = s4pred_stats.get("parsed_ok", 0)
+        requested = s4pred_stats.get("requested", 0)
+
+        if parsed_ok == 0 and requested > 0:
+            s4pred_provider_status = "UNAVAILABLE"
+            s4pred_provider_reason = f"S4PRED failed; {parsed_ok}/{requested} parsed"
+        elif 0 < parsed_ok < requested:
+            s4pred_provider_status = "PARTIAL"
+            s4pred_provider_reason = f"Only {parsed_ok}/{requested} sequences processed successfully"
+        elif parsed_ok == requested and requested > 0:
+            s4pred_provider_status = "AVAILABLE"
+            s4pred_provider_reason = None
+        else:
+            s4pred_provider_status = "OFF"
+            s4pred_provider_reason = "No S4PRED run attempted"
+
+        log_info("s4pred_stats", f"S4PRED provider status: {s4pred_provider_status}", **{
+            "status": s4pred_provider_status,
+            "reason": s4pred_provider_reason,
+            **s4pred_stats,
+        })
+
+    except Exception as e:
+        trace_id = get_trace_id()
+        log_error("s4pred_error", f"S4PRED error: {e} (continuing without S4PRED)",
+                entry=trace_entry, stage="s4pred", **{"error": str(e)})
+
+        if sentry_initialized:
+            with sentry_sdk.push_scope() as scope:
+                scope.set_tag("provider", "s4pred")
+                scope.set_tag("stage", "general")
+                scope.set_context("s4pred_error", {
+                    "trace_id": trace_id,
+                    "entry": trace_entry,
+                })
+                sentry_sdk.capture_exception(e, level="error")
+
+        s4pred_provider_status = "UNAVAILABLE"
+        s4pred_provider_reason = f"S4PRED execution error: {str(e)}"
+
+    return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
+
+
 def _compute_ssw_stats(rows_out: List[Dict[str, Any]], trace_entry: Optional[str]) -> Tuple[int, int, float]:
     """
     Compute SSW positive statistics from final normalized rows.
@@ -421,7 +563,10 @@ def _compute_reproducibility_primitives(
     threshold_config_requested: Optional[Dict[str, Any]],
     tango_stats: Dict[str, Any],
     tango_enabled_flag: bool,
-    tango_provider_status: str
+    tango_provider_status: str,
+    s4pred_stats: Optional[Dict[str, Any]] = None,
+    s4pred_enabled_flag: bool = False,
+    s4pred_provider_status: str = "OFF"
 ) -> Tuple[str, str, str, str, Dict[str, Any], Dict[str, float]]:
     """
     Compute reproducibility primitives for the response.
@@ -453,11 +598,13 @@ def _compute_reproducibility_primitives(
         "USE_TANGO": settings.USE_TANGO,
         "USE_PSIPRED": settings.USE_PSIPRED,
         "USE_JPRED": settings.USE_JPRED,
+        "USE_S4PRED": settings.USE_S4PRED,
     }
     config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
     config_hash = hashlib.sha256(config_str.encode('utf-8')).hexdigest()[:16]
 
     # 5. Compute provider status summary counts
+    s4pred_stats = s4pred_stats or {}
     provider_status_summary = {
         "tango": {
             "status": tango_provider_status,
@@ -465,6 +612,12 @@ def _compute_reproducibility_primitives(
             "parsed_ok": tango_stats.get("parsed_ok", 0),
             "parsed_bad": tango_stats.get("parsed_bad", 0),
         } if tango_enabled_flag else None,
+        "s4pred": {
+            "status": s4pred_provider_status,
+            "requested": s4pred_stats.get("requested", 0),
+            "parsed_ok": s4pred_stats.get("parsed_ok", 0),
+            "parsed_bad": s4pred_stats.get("parsed_bad", 0),
+        } if s4pred_enabled_flag else None,
         "psipred": {
             "status": "OFF" if not settings.USE_PSIPRED else "UNKNOWN",
         },
@@ -526,6 +679,12 @@ def process_upload_dataframe(
     tango_enabled_flag = settings.USE_TANGO
     tango_requested_flag = True
 
+    # --- S4PRED processing ---
+    s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = _run_s4pred_processing(
+        df, trace_entry, sentry_initialized
+    )
+    s4pred_enabled_flag = settings.USE_S4PRED
+
     # JPred disabled - kept for reference only
     jpred_hits = 0
     if "SSW prediction" in df.columns:
@@ -581,7 +740,8 @@ def process_upload_dataframe(
         is_single_row=False,
         tango_enabled=settings.USE_TANGO,
         psipred_enabled=settings.USE_PSIPRED,
-        jpred_enabled=settings.USE_JPRED
+        jpred_enabled=settings.USE_JPRED,
+        s4pred_enabled=settings.USE_S4PRED
     )
     normalize_ui_elapsed = (time.time() - normalize_ui_start_time) * 1000
     log_info("normalize_ui_complete", f"Normalized {len(rows_out)} rows for UI",
@@ -643,6 +803,14 @@ def process_upload_dataframe(
             "reason": tango_provider_reason,
             "stats": tango_stats,
         },
+        "s4pred": {
+            "enabled": s4pred_enabled_flag,
+            "requested": s4pred_enabled_flag,  # S4PRED is requested if enabled
+            "ran": s4pred_ran,
+            "status": s4pred_provider_status,
+            "reason": s4pred_provider_reason,
+            "stats": s4pred_stats,
+        },
         "psipred": {
             "status": "OFF",
             "reason": "PSIPRED not enabled",
@@ -663,7 +831,8 @@ def process_upload_dataframe(
 
     # Compute reproducibility primitives
     repro_run_id, trace_id, inputs_hash, config_hash, provider_status_summary, resolved_thresholds = _compute_reproducibility_primitives(
-        df, threshold_config_requested, tango_stats, tango_enabled_flag, tango_provider_status
+        df, threshold_config_requested, tango_stats, tango_enabled_flag, tango_provider_status,
+        s4pred_stats=s4pred_stats, s4pred_enabled_flag=s4pred_enabled_flag, s4pred_provider_status=s4pred_provider_status
     )
 
     # Build meta dict (ISSUE-018: schema enforcement)

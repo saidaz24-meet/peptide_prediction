@@ -47,14 +47,22 @@ def hydrophobic_moment(peptide_sequence, angle=100) -> float:
     return math.sqrt(sum_cos ** 2 + sum_sin ** 2) / len(hydro)
 
 
-def total_charge(sequence) -> int:
+def total_charge(sequence) -> float:
     """
-    calculates total peptid charge at pH=7.4
+    Calculate total peptide charge at pH=7.4.
+
+    Charge contributions:
+    - K (Lysine): +1
+    - R (Arginine): +1
+    - D (Aspartate): -1
+    - E (Glutamate): -1
+    - H (Histidine): +0.1 (partially protonated at pH 7.4, pKa ~6.0)
 
     :param sequence: peptide sequence
-    :return: total charge
+    :return: total charge (float to account for partial H charge)
     """
-    aa_charge = {'E': -1, 'D': -1, 'K': 1, 'R': 1}  # at PH = 7.4   
+    # Reference: 260120_Alpha_and_SSW_FF_Predictor/biochemCalculation.py
+    aa_charge = {'E': -1, 'D': -1, 'K': 1, 'R': 1, 'H': 0.1}  # at pH = 7.4
 
     sc_charges = [aa_charge.get(aa, 0) for aa in sequence]
     return sum(sc_charges)

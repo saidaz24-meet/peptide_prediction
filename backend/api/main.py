@@ -129,7 +129,7 @@ app.include_router(uniprot.router)
 app.include_router(feedback.router)
 
 # Log boot message
-log_info("boot", f"USE_JPRED={settings.USE_JPRED} • USE_TANGO={settings.USE_TANGO}")
+log_info("boot", f"USE_JPRED={settings.USE_JPRED} • USE_TANGO={settings.USE_TANGO} • USE_S4PRED={settings.USE_S4PRED}")
 
 # Export app and SENTRY_INITIALIZED for use in server.py
 __all__ = ["app", "SENTRY_INITIALIZED"]

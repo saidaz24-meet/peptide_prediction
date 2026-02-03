@@ -1,0 +1,113 @@
+# =============================================================================
+# Peptide Visual Lab - Backend Dockerfile
+# Strategy: Volume-mounted assets (models/binaries mounted at runtime)
+# =============================================================================
+# syntax=docker/dockerfile:1.4
+
+# -----------------------------------------------------------------------------
+# Build Arguments
+# -----------------------------------------------------------------------------
+ARG PYTHON_VERSION=3.11
+ARG APP_USER=pvl
+ARG APP_UID=1000
+ARG APP_GID=1000
+
+# =============================================================================
+# Stage 1: Builder - Install Python dependencies
+# =============================================================================
+FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
+
+WORKDIR /build
+
+# Install build dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends build-essential gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements first for layer caching
+COPY backend/requirements.txt .
+
+# Install Python dependencies with BuildKit cache mount
+# This caches pip downloads across builds for faster rebuilds
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --user -r requirements.txt
+
+# =============================================================================
+# Stage 2: Production Runtime
+# =============================================================================
+FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+
+ARG APP_USER
+ARG APP_UID
+ARG APP_GID
+
+WORKDIR /app
+
+# Install minimal runtime dependencies
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl tini \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid ${APP_GID} ${APP_USER} \
+    && useradd --uid ${APP_UID} --gid ${APP_GID} --create-home --shell /bin/bash ${APP_USER}
+
+# Copy Python packages from builder
+COPY --from=builder /root/.local /home/${APP_USER}/.local
+
+# Copy application code
+COPY backend/ .
+
+# Create volume mount points with correct ownership
+# These directories will be mounted at runtime
+RUN mkdir -p \
+    /data/runs \
+    /data/uploads \
+    /opt/tools \
+    /app/.run_cache \
+    && chown -R ${APP_USER}:${APP_USER} /data /opt/tools /app
+
+# Set PATH for user-installed packages
+ENV PATH=/home/${APP_USER}/.local/bin:$PATH
+
+# Environment variables (non-secret defaults)
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONFAULTHANDLER=1 \
+    # Application config
+    ENVIRONMENT=production \
+    HOST=0.0.0.0 \
+    PORT=8000 \
+    # Volume paths (can be overridden)
+    DATA_RUNS_PATH=/data/runs \
+    DATA_UPLOADS_PATH=/data/uploads \
+    TOOLS_PATH=/opt/tools \
+    # Tool paths (mounted at runtime)
+    TANGO_BINARY_PATH=/opt/tools/tango/bin/tango \
+    S4PRED_MODEL_PATH=/opt/tools/s4pred/models \
+    # Provider flags (safe defaults)
+    USE_TANGO=0 \
+    USE_S4PRED=1 \
+    USE_JPRED=0
+
+# Switch to non-root user
+USER ${APP_USER}
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
+    CMD curl -f http://localhost:${PORT}/api/health || exit 1
+
+# Expose port
+EXPOSE ${PORT}
+
+# Use tini as init system for proper signal handling
+ENTRYPOINT ["/usr/bin/tini", "--"]
+
+# Run with uvicorn
+CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+
+# =============================================================================
+# Labels for image metadata
+# =============================================================================
+LABEL org.opencontainers.image.title="Peptide Visual Lab - Backend" \
+      org.opencontainers.image.description="FastAPI backend for peptide prediction" \
+      org.opencontainers.image.vendor="DESY Landau Group" \
+      org.opencontainers.image.source="https://github.com/desy-landau/peptide-prediction"

@@ -12,13 +12,13 @@ import {
 } from '@tanstack/react-table';
 import { ArrowUpDown, ChevronLeft, ChevronRight, Download, Eye } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Peptide } from '@/types/peptide';
 import { toast } from 'react-hot-toast';
+import { TangoBadge } from '@/components/TangoBadge';
+import { S4PredBadge } from '@/components/S4PredBadge';
 
 interface PeptideTableProps {
   peptides: Peptide[];
@@ -105,9 +105,14 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: (info) => (
-          <span className="font-mono">{info.getValue().toFixed(2)}</span>
-        ),
+        cell: (info) => {
+          const value = info.getValue();
+          return (
+            <span className="font-mono">
+              {value != null ? value.toFixed(2) : '-'}
+            </span>
+          );
+        },
       }),
       columnHelper.accessor('muH', {
         header: 'μH',
@@ -130,6 +135,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         ),
         cell: (info) => {
           const charge = info.getValue();
+          if (charge == null) return <span className="font-mono">-</span>;
           return (
             <span className="font-mono">
               {charge > 0 ? '+' : ''}{charge.toFixed(1)}
@@ -138,52 +144,67 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         },
       }),
       columnHelper.accessor('sswPrediction', {
-        header: 'SSW',
+        header: 'TANGO SSW',
         cell: (info) => {
           const peptide = info.row.original;
           const prediction = info.getValue();
-          const tangoStatus = peptide.providerStatus?.tango?.status;
-          const tangoRan = peptide.providerStatus?.tango?.ran ?? false;
-          // NO LYING UI: If TANGO didn't run or is OFF/UNAVAILABLE, show N/A
-          const isUnavailable = !tangoRan || (tangoStatus !== 'AVAILABLE' && tangoStatus !== 'PARTIAL' && tangoStatus !== undefined);
-          
-          // If provider didn't run or is not AVAILABLE/PARTIAL, show N/A with tooltip
-          if (isUnavailable || prediction === null || prediction === undefined) {
-            return (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Badge variant="outline">
-                      N/A
-                    </Badge>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>TANGO output not available</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            );
-          }
-          
-          if (prediction === 1) {
-            return (
-              <Badge className="bg-chameleon-positive text-white">
-                Positive
-              </Badge>
-            );
-          } else if (prediction === -1) {
-            return (
-              <Badge variant="secondary">
-                Negative
-              </Badge>
-            );
-          } else {
-            return (
-              <Badge variant="outline">
-                Not available
-              </Badge>
-            );
-          }
+          // Use canonical tangoHasData field from backend (preferred)
+          // Fallback to checking curves if tangoHasData not available
+          const hasTangoData = peptide.tangoHasData ?? Boolean(
+            peptide.tango?.beta?.length ||
+            peptide.tango?.helix?.length ||
+            peptide.extra?.['Tango Beta curve']?.length ||
+            peptide.extra?.['Tango Helix curve']?.length
+          );
+          // Use centralized TangoBadge for consistent display semantics
+          return (
+            <TangoBadge
+              providerStatus={peptide.providerStatus?.tango}
+              sswPrediction={prediction}
+              hasTangoData={hasTangoData}
+              showIcon={false}
+            />
+          );
+        },
+      }),
+      columnHelper.accessor('s4predSswPrediction', {
+        header: 'S4PRED SSW',
+        cell: (info) => {
+          const peptide = info.row.original;
+          const prediction = info.getValue();
+          // Use canonical s4predHasData field from backend (preferred)
+          const hasS4PredData = peptide.s4predHasData ?? Boolean(
+            peptide.s4pred?.pH?.length ||
+            peptide.s4pred?.pE?.length
+          );
+          return (
+            <S4PredBadge
+              providerStatus={peptide.providerStatus?.s4pred}
+              sswPrediction={prediction}
+              hasS4PredData={hasS4PredData}
+              showIcon={false}
+            />
+          );
+        },
+      }),
+      columnHelper.accessor('s4predHelixPercent', {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="h-8 p-0 font-medium"
+          >
+            S4PRED Helix %
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const value = info.getValue();
+          return (
+            <span className="font-mono">
+              {value != null ? `${value.toFixed(1)}%` : '-'}
+            </span>
+          );
         },
       }),
       columnHelper.accessor('ffHelixPercent', {
@@ -192,7 +213,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           const value = info.getValue();
           return (
             <span className="font-mono">
-              {value !== undefined ? `${value.toFixed(1)}%` : 'Not available'}
+              {value != null ? `${value.toFixed(1)}%` : '-'}
             </span>
           );
         },
@@ -255,10 +276,12 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
       'Hydrophobicity',
       'Hydrophobic_Moment',
       'Charge',
-      'SSW_Prediction',
+      'TANGO_SSW_Prediction',
+      'S4PRED_SSW_Prediction',
+      'S4PRED_Helix_Percent',
       'FF_Helix_Percent',
     ];
-    
+
     const csvContent = [
       headers.join(','),
       ...filteredData.map(peptide => [
@@ -269,8 +292,10 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         peptide.hydrophobicity,
         peptide.muH || '',
         peptide.charge,
-        peptide.sswPrediction,
-        peptide.ffHelixPercent || '',
+        peptide.sswPrediction ?? '',
+        peptide.s4predSswPrediction ?? '',
+        peptide.s4predHelixPercent ?? '',
+        peptide.ffHelixPercent ?? '',
       ].join(','))
     ].join('\n');
     

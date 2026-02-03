@@ -1,0 +1,133 @@
+# Peptide Visual Lab - CI Pipeline
+# Runs tests and linting on pull requests and pushes to main
+
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+# Cancel in-progress runs when a new commit is pushed
+# This saves CI minutes and ensures only the latest code is tested
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: '3.11'
+  NODE_VERSION: '20'
+
+jobs:
+  # Backend tests and linting
+  backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run linting (ruff)
+        run: ruff check . || true
+        continue-on-error: true
+
+      - name: Run type checking (mypy)
+        run: mypy . --ignore-missing-imports || true
+        continue-on-error: true
+
+      - name: Run tests
+        env:
+          USE_TANGO: '0'
+          USE_S4PRED: '0'
+          USE_JPRED: '0'
+        run: pytest tests/ -v --tb=short
+
+  # Frontend build and lint
+  frontend:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: ui
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Show npm cache info
+        run: npm cache ls 2>/dev/null || echo "Cache info not available"
+        continue-on-error: true
+
+      - name: Install dependencies
+        run: |
+          echo "Starting npm ci at $(date)"
+          npm ci --loglevel=warn
+          echo "Finished npm ci at $(date)"
+
+      - name: Run linting
+        run: npm run lint || true
+        continue-on-error: true
+
+      - name: Build
+        run: |
+          echo "Starting build at $(date)"
+          npm run build
+          echo "Finished build at $(date)"
+
+  # Docker build verification (on all PRs and main)
+  docker:
+    name: Docker Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.backend
+          push: false
+          tags: pvl-backend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.frontend
+          push: false
+          tags: pvl-frontend:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

@@ -34,6 +34,15 @@ type PsipredInfo = {
   helixSegments?: Array<[number, number]>;
 };
 
+type S4predInfo = {
+  pH?: number[];
+  pE?: number[];
+  pC?: number[];
+  ssPrediction?: string[];
+  helixSegments?: Array<[number, number]>;
+  betaSegments?: Array<[number, number]>;
+};
+
 // ----- helpers -----
 /**
  * Convert a value to number, preserving null semantics.
@@ -197,14 +206,38 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
       : undefined;
 
   // Optional per-residue curves (Tango)
+  // Look in multiple locations: top-level, legacy keys, and extra
+  const extra = row.extras || row.extra || {};
   const tango: TangoCurves | undefined = (() => {
-    const agg = (row.tangoAgg || row["Tango Aggregation curve"]) as number[] | undefined;
-    const beta = (row.tangoBeta || row["Tango Beta curve"]) as number[] | undefined;
-    const helix = (row.tangoHelix || row["Tango Helix curve"]) as number[] | undefined;
-    const turn = (row.tangoTurn || row["Tango Turn curve"]) as number[] | undefined;
+    const agg = (
+      row.tangoAgg ||
+      row["Tango Aggregation curve"] ||
+      extra["Tango Aggregation curve"]
+    ) as number[] | undefined;
+    const beta = (
+      row.tangoBeta ||
+      row["Tango Beta curve"] ||
+      extra["Tango Beta curve"]
+    ) as number[] | undefined;
+    const helix = (
+      row.tangoHelix ||
+      row["Tango Helix curve"] ||
+      extra["Tango Helix curve"]
+    ) as number[] | undefined;
+    const turn = (
+      row.tangoTurn ||
+      row["Tango Turn curve"] ||
+      extra["Tango Turn curve"]
+    ) as number[] | undefined;
     if (agg || beta || helix || turn) return { agg, beta, helix, turn };
     return undefined;
   })();
+
+  // Canonical Tango summary fields (from backend, preferred over computing from extras)
+  const tangoHasData = row.tangoHasData ?? (tango !== undefined);
+  const tangoAggMax = num(row.tangoAggMax, true);
+  const tangoBetaMax = num(row.tangoBetaMax, true);
+  const tangoHelixMax = num(row.tangoHelixMax, true);
 
   // Optional per-residue curves (PSIPRED)
   const psipred: PsipredInfo | undefined = (() => {
@@ -219,6 +252,48 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
     }
     return undefined;
   })();
+
+  // Optional per-residue curves (S4PRED)
+  const s4pred: S4predInfo | undefined = (() => {
+    const pH = (
+      row.s4predPHCurve ||
+      row["S4PRED P_H curve"] ||
+      extra["S4PRED P_H curve"]
+    ) as number[] | undefined;
+    const pE = (
+      row.s4predPECurve ||
+      row["S4PRED P_E curve"] ||
+      extra["S4PRED P_E curve"]
+    ) as number[] | undefined;
+    const pC = (
+      row.s4predPCCurve ||
+      row["S4PRED P_C curve"] ||
+      extra["S4PRED P_C curve"]
+    ) as number[] | undefined;
+    const ssPrediction = (
+      row.s4predSsPrediction ||
+      row["S4PRED SS prediction"] ||
+      extra["S4PRED SS prediction"]
+    ) as string[] | undefined;
+    const helixSegments = toSegments(
+      row.s4predHelixFragments || row["Helix fragments (S4PRED)"]
+    );
+    const betaSegments = toSegments(
+      row.s4predSswFragments || row["SSW fragments (S4PRED)"]
+    );
+    if ((pH && pH.length) || (pE && pE.length) || (pC && pC.length) ||
+        (ssPrediction && ssPrediction.length) ||
+        (helixSegments?.length ?? 0) > 0 || (betaSegments?.length ?? 0) > 0) {
+      return { pH, pE, pC, ssPrediction, helixSegments, betaSegments };
+    }
+    return undefined;
+  })();
+
+  // S4PRED summary fields
+  const s4predHelixPrediction = num(row.s4predHelixPrediction ?? row["Helix prediction (S4PRED)"], true);
+  const s4predHelixPercent = num(row.s4predHelixPercent ?? row["Helix percentage (S4PRED)"], true);
+  const s4predSswPrediction = num(row.s4predSswPrediction ?? row["SSW prediction (S4PRED)"], true);
+  const s4predHasData = row.s4predHasData ?? (s4pred !== undefined);
 
   // Provider status: pass through from backend row
   // Do not fabricate provider status; only pass through what backend provides
@@ -253,12 +328,25 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
     jpred,
     tango,
     psipred,
+    s4pred,
+
+    // Canonical Tango summary fields (from backend)
+    tangoHasData,
+    tangoAggMax,
+    tangoBetaMax,
+    tangoHelixMax,
+
+    // S4PRED summary fields
+    s4predHelixPrediction,
+    s4predHelixPercent,
+    s4predSswPrediction,
+    s4predHasData,
 
     // Provider status (Principle B: mandatory provider status)
     providerStatus,
 
     // Pass through extras (including legacy fields)
-    extra: row.extras || row.extra || {},
+    extra,
   };
 
   return peptide;

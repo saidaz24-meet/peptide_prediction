@@ -57,6 +57,30 @@ make test
 
 **Note**: Tests run with `USE_TANGO=0 USE_PSIPRED=0` to avoid external dependencies.
 
+### Golden Tests (Reference Implementation Validation)
+
+Golden tests validate PVL against the reference implementation (`260120_Alpha_and_SSW_FF_Predictor`).
+
+**Run Golden Tests**:
+```bash
+cd backend
+python -m pytest tests/test_*_golden.py -v
+```
+
+**Golden Test Files**:
+| File | Coverage |
+|------|----------|
+| `test_ssw_golden.py` | SSW algorithm (segment detection, overlap, score/diff) |
+| `test_biochem_golden.py` | μH, charge, hydrophobicity calculations |
+| `test_sentinel_values.py` | Null semantics for missing data |
+| `test_preprocessing_golden.py` | Sequence preprocessing (B→D, Z→E mapping) |
+
+**What They Validate**:
+- SSW threshold: `diff < avg → 1` (IS SSW), `diff >= avg → -1` (NOT SSW)
+- Segment detection thresholds: MIN_SEGMENT_LENGTH=5, MAX_GAP=3
+- B/Z ambiguous codes: B→D (aspartate), Z→E (glutamate)
+- Null semantics: Missing data returns `null` (not `-1`)
+
 ---
 
 ## Frontend Tests
