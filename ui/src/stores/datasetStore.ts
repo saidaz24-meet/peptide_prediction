@@ -267,9 +267,9 @@ export const useDatasetStore = create<DatasetState>()(
         }
 
         // Count availability of different prediction types
-        const jpredAvailable = peptides.filter(p => 
-          p.providerStatus?.jpred?.status === "available" && 
-          p.jpred?.helixFragments && p.jpred.helixFragments.length > 0
+        const s4predAvailable = peptides.filter(p =>
+          p.providerStatus?.s4pred?.status === "available" &&
+          p.s4pred?.helixSegments && p.s4pred.helixSegments.length > 0
         ).length;
         const ffHelixAvailable = peptides.filter(p => 
           typeof p.ffHelixPercent === 'number' && !Number.isNaN(p.ffHelixPercent)
@@ -296,7 +296,7 @@ export const useDatasetStore = create<DatasetState>()(
           meanFFHelixPercent,
           meanLength,
           // Add these for better UI display
-          jpredAvailable,
+          s4predAvailable,
           ffHelixAvailable,
           sswAvailable,
         };

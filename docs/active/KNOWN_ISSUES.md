@@ -1,6 +1,6 @@
 # Known Issues — Prioritized Backlog
 
-**Last Updated**: 2025-01-31
+**Last Updated**: 2026-02-05
 
 ## Priority Definitions
 
@@ -18,6 +18,15 @@
 |----|----------|-------|-------------|--------------|-------------|--------|
 | ISSUE-001 | **P0** | Missing `await` breaks UniProt parse endpoint | `backend/api/routes/uniprot.py` | LOW | `test_uniprot_parse_endpoint` | ✅ FIXED |
 | ISSUE-002 | **P2** | Double-mapping + undefined var in frontend | `ui/src/stores/datasetStore.ts` | LOW | `TestUploadCsvErrorHandling` | ✅ FIXED |
+| ISSUE-003 | **P2** | CONTRACTS.md missing S4PRED fields | `docs/active/CONTRACTS.md` | LOW | — | ✅ FIXED |
+| ISSUE-004 | **P2** | DEV_CONTEXT.md duplicate of ACTIVE_CONTEXT | `docs/DEV_CONTEXT.md` | LOW | — | ✅ FIXED (deleted) |
+| ISSUE-005 | **P2** | REFACTOR_PLAN.md stale migration status | `docs/REFACTOR_PLAN.md` | LOW | — | ✅ FIXED (deleted) |
+| ISSUE-006 | **P2** | ROADMAP.md uncommitted changes | `docs/active/ROADMAP.md` | LOW | — | ✅ FIXED (kept) |
+| ISSUE-007 | **P2** | Switch Nginx → Caddy for auto-HTTPS | `docker/Caddyfile` | MEDIUM | — | ✅ READY (set DOMAIN in .env) |
+| ISSUE-008 | **P1** | Remove PSIPRED/JPred dead code | 49 files | LOW | — | ✅ DONE |
+| ISSUE-009 | **P1** | Simplify tango.py (1527 → 1306 lines) | `backend/tango.py` | MEDIUM | — | ✅ DONE |
+| ISSUE-010 | **P1** | Simplify auxiliary.py (540 → 377 lines) | `backend/auxiliary.py` | LOW | — | ✅ DONE |
+| ISSUE-011 | **P2** | Optimize Docker image (3GB → <1GB) | `docker/Dockerfile.*` | LOW | — | ✅ DONE (CPU-only torch + split deps) |
 
 ---
 
@@ -138,7 +147,102 @@ _No issues documented yet._
 
 # P2 — Cleanup/Refactor
 
-_No issues documented yet._
+## ISSUE-003: CONTRACTS.md missing S4PRED fields
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P2 |
+| **Status** | ✅ **FIXED** (2026-02-05) |
+| **Blast Radius** | LOW |
+| **Root Module** | `docs/active/CONTRACTS.md` |
+
+### Fix Applied
+- Added S4PRED fields to PeptideRow example
+- Added SSW Semantics section explaining 1/-1/0/null values
+- Updated providerStatus to use UPPERCASE status values
+- Added s4pred to providerStatusSummary example
+
+---
+
+## ISSUE-004: DEV_CONTEXT.md is duplicate of ACTIVE_CONTEXT.md
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P2 |
+| **Status** | ✅ **FIXED** (2026-02-05) |
+| **Blast Radius** | LOW |
+| **Root Module** | `docs/DEV_CONTEXT.md` |
+
+### Fix Applied
+- Deleted `docs/DEV_CONTEXT.md` (duplicate)
+- ACTIVE_CONTEXT.md is now the single authoritative source
+
+---
+
+## ISSUE-005: REFACTOR_PLAN.md may have stale migration status
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P2 |
+| **Status** | ✅ **FIXED** (2026-02-05) |
+| **Blast Radius** | LOW |
+| **Root Module** | `docs/REFACTOR_PLAN.md` |
+
+### Fix Applied
+- Deleted `docs/REFACTOR_PLAN.md` (superseded by ROADMAP.md)
+- Migration status now tracked in ACTIVE_CONTEXT.md
+
+---
+
+## ISSUE-006: ROADMAP.md has uncommitted changes
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P2 |
+| **Status** | ✅ **FIXED** (2026-02-05) |
+| **Blast Radius** | LOW |
+| **Root Module** | `docs/active/ROADMAP.md` |
+
+### Fix Applied
+- Kept ROADMAP.md as authoritative project roadmap
+- Deleted redundant task files (NEXT_10_STEPS.md, etc.)
+
+---
+
+## ISSUE-007: Switch Nginx → Caddy for automatic HTTPS
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P2 |
+| **Status** | **READY** (2026-02-07) — Set DOMAIN in .env to activate |
+| **Blast Radius** | MEDIUM |
+| **Root Module** | `docker/nginx.conf`, `docker/docker-compose.prod.yml` |
+
+### Problem
+- Current setup uses Nginx with manual HTTPS configuration required
+- Certificate renewal requires certbot + cron setup
+- More operational overhead for research deployment
+
+### Proposed Fix
+1. Create `docker/Caddyfile` (~15 lines)
+2. Replace nginx container with caddy in `docker-compose.prod.yml`
+3. Caddy auto-provisions Let's Encrypt certs + handles renewal
+
+### Benefits
+- Automatic HTTPS with zero configuration
+- Built-in HTTP/2, HTTP/3 support
+- Simpler config (15 lines vs 58)
+
+### Risks
+- Slightly larger image (~40MB vs ~25MB)
+- Different config syntax (learning curve)
+
+### Implementation Checklist
+- [x] Create `docker/Caddyfile` (uses $DOMAIN env var)
+- [x] Create `docker/docker-compose.caddy.yml` (separate from nginx prod)
+- [ ] Set DOMAIN=x.desy.de in .env
+- [ ] Test with staging domain
+- [ ] Update DOCKER_RUNBOOK.md
 
 ---
 

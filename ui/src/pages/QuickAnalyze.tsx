@@ -24,7 +24,7 @@ type PredictResponse = {
   // Flags & FF
   sswPrediction: number;   // (-1 | 0 | 1) as number from backend
   ffHelixPercent: number;        // camelCase copy from server
-  "FF-Helix (Jpred)": number;    // 1 or -1
+  s4predHelixPercent: number | null;  // S4PRED helix percentage
 };
 
 // Use centralized API function and mapper - no duplicate normalization logic
@@ -45,7 +45,7 @@ async function predictOne(sequence: string, entry?: string) {
     "Beta full length uH": 0, // Not available in current schema
     sswPrediction: peptide.sswPrediction,
     ffHelixPercent: peptide.ffHelixPercent ?? 0,
-    "FF-Helix (Jpred)": -1, // Not available in current schema
+    s4predHelixPercent: peptide.s4predHelixPercent ?? null,
   };
 
   return shaped;
@@ -246,7 +246,11 @@ export default function QuickAnalyze() {
                     <div className="flex flex-wrap gap-2 mt-3">
                       {flagBadge(data.sswPrediction, "SSW")}
                       {ffHelixDisplay(data.ffHelixPercent)}
-                      {flagBadge(data["FF-Helix (Jpred)"], "JPred")}
+                      {data.s4predHelixPercent !== null && (
+                        <Badge variant="outline" className="text-helix border-helix">
+                          S4PRED: {data.s4predHelixPercent.toFixed(1)}%
+                        </Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -291,7 +295,7 @@ export default function QuickAnalyze() {
                       helical segments and membrane activity.
                     </p>
                     <p className="text-muted-foreground">
-                      JPred/Tango columns will read "not available" if those providers aren't wired for single-sequence
+                      TANGO/S4PRED columns will read "not available" if those providers aren't wired for single-sequence
                       runs on your machine.
                     </p>
                   </CardContent>

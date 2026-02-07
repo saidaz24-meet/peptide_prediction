@@ -180,7 +180,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
           </CardHeader>
           <CardContent>
             {scatterData.length === 0 ? (
-              <EmptyState title="μH not available" subtitle="Upload a dataset or enable JPred/Tango so μH can be computed." />
+              <EmptyState title="μH not available" subtitle="Upload a dataset or enable TANGO/S4PRED so μH can be computed." />
             ) : (
               <ChartContainer config={chartConfig} className="h-[300px]">
                 <ResponsiveContainer width="100%" height="100%">

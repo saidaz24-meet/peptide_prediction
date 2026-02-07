@@ -1,16 +1,21 @@
+# Core web framework
 fastapi
 uvicorn[standard]
+
+# Data processing
 pandas
 numpy
 openpyxl
+
+# HTTP & middleware
 python-multipart
 httpx
 python-dotenv
+
+# Observability
 sentry-sdk[fastapi]
-pytest
-# S4PRED dependencies
+
+# S4PRED neural network inference
+# Note: In Docker, use CPU-only torch via --extra-index-url
+# (see Dockerfile.backend for details)
 torch
-# Dev tools for linting, formatting, and type checking
-ruff
-mypy
-pre-commit

@@ -75,9 +75,9 @@ export const METRIC_DEFINITIONS: Record<MetricId, MetricDefinition> = {
     id: 'ff-helix-flag',
     title: 'Fibril Formation (Helix)',
     description: 'Peptides predicted to form fibrils via alpha-helical mechanism',
-    definition: 'FF-Helix flag indicates peptides predicted to form fibrils through an alpha-helical mechanism. This is determined by the presence of JPred-predicted helix segments with average hydrophobic moment (μH) above the cohort threshold. These peptides have helix-forming regions that can aggregate into fibrillar structures.',
+    definition: 'FF-Helix flag indicates peptides predicted to form fibrils through an alpha-helical mechanism. This is determined by the presence of helix segments with average hydrophobic moment (μH) above the cohort threshold. These peptides have helix-forming regions that can aggregate into fibrillar structures.',
     chartType: 'pie',
-    tableColumns: ['id', 'name', 'ffHelixPercent', 'ffHelixFragments', 'muH', 'jpred', 'hydrophobicity', 'charge'],
+    tableColumns: ['id', 'name', 'ffHelixPercent', 'ffHelixFragments', 'muH', 'hydrophobicity', 'charge'],
   },
 };
 

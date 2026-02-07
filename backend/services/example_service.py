@@ -22,7 +22,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent.parent  # backend/ -> project 
 EXAMPLE_PATH = BASE_DIR / "ui" / "public" / "Final_Staphylococcus_2023_new.xlsx"
 
 # Provider flags are read dynamically from settings to avoid caching issues
-# Use settings.USE_TANGO, settings.USE_PSIPRED, settings.USE_JPRED directly
+# Use settings.USE_TANGO, settings.USE_S4PRED directly
 
 
 def load_example_data(recalc: int = 0) -> dict:
@@ -96,31 +96,30 @@ def load_example_data(recalc: int = 0) -> dict:
     ff_flags(df)
 
     # build meta so the UI can show provenance pills
+    ssw_rows = int((df.get("SSW prediction", pd.Series([-1]*len(df))) != -1).sum())
     meta = ensure_trace_id_in_meta({
-        "use_jpred": False,  # JPred disabled - kept for reference only
         "use_tango": settings.USE_TANGO or already_has_tango,
-        "jpred_rows": int((df.get("Helix fragments (Jpred)", pd.Series([-1]*len(df))) != -1).sum()),
-        "ssw_rows":   int((df.get("SSW prediction", pd.Series([-1]*len(df))) != -1).sum()),
+        "use_s4pred": settings.USE_S4PRED,
+        "ssw_rows": ssw_rows,
         "valid_seq_rows": int(df["Sequence"].notna().sum()),
         "provider_status": {},
         "runId": str(uuid.uuid4()),
         "traceId": get_trace_id_for_response(),
         "inputsHash": "",
         "configHash": "",
-        "providerStatusSummary": {"tango": None, "psipred": None, "jpred": None},
+        "providerStatusSummary": {"tango": None, "s4pred": None},
         "thresholdConfigRequested": None,
         "thresholdConfigResolved": {"mode": "default", "version": "1.0.0"},
         "thresholds": {},
     })
-    print(f"[EXAMPLE] rows={len(df)} • JPred rows={meta['jpred_rows']} • Tango rows={meta['ssw_rows']} • recalc={recalc}")
+    print(f"[EXAMPLE] rows={len(df)} • Tango rows={ssw_rows} • recalc={recalc}")
 
     # Normalize to canonical camelCase using PeptideSchema (with provider status - Principle B)
     rows_out = normalize_rows_for_ui(
         df,
         is_single_row=False,
         tango_enabled=settings.USE_TANGO or already_has_tango,
-        psipred_enabled=settings.USE_PSIPRED,
-        jpred_enabled=False  # JPred disabled
+        s4pred_enabled=settings.USE_S4PRED
     )
 
     return {"rows": rows_out, "meta": meta}

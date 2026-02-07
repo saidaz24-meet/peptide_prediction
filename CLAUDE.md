@@ -1,54 +1,57 @@
 # Claude Agent Instructions
 
+## Project Context
+
+**Peptide Visual Lab (PVL)**: Web tool for peptide aggregation prediction.
+- **Primary predictor**: S4PRED (secondary structure). NOT PSIPRED (deprecated, delete all references).
+- **Secondary predictor**: TANGO (aggregation via SSW detection).
+- **Deployment**: DESY Kubernetes (free). No paid cloud services.
+- **Status**: Preparing for paper publication, then public release.
+
+## Current Priorities
+
+1. **S4PRED full implementation** — Match Tango outputs (SSW fragments, score, diff, curves, thresholds)
+2. **Documentation consolidation** — Merge learning docs into one MASTER_GUIDE.md
+3. **FF-Helix verification** — Confirm biochemical calculations match Peleg's requirements
+4. **Visualizations** — Per-residue profile viewer is highest value (after core complete)
+
 ## Documentation Access Rule
 
-**STRICT**: Default read only `CLAUDE.md` + `docs/active/*`. These are the ONLY authoritative documentation files.
+**STRICT**: Read only `CLAUDE.md` + `docs/active/*` by default.
 
 **Active Context Pack** (docs/active/):
-- **ACTIVE_CONTEXT.md** — Architecture overview, entrypoints, data flow, key modules
-- **TESTING_GUIDE.md** — Test commands, local setup, known failures
-- **CONTRACTS.md** — API endpoints, request/response shapes, UI requirements
-- **KNOWN_ISSUES.md** — Known bugs, limitations, workarounds
-- **FILES_TO_TOUCH.md** — Hot files most likely to be edited
+- **ACTIVE_CONTEXT.md** — Architecture, entrypoints, data flow
+- **TESTING_GUIDE.md** — Test commands, setup, known failures
+- **CONTRACTS.md** — API endpoints, request/response shapes
+- **KNOWN_ISSUES.md** — Bugs, limitations, workarounds
+- **FILES_TO_TOUCH.md** — Hot files for current work
 
-**DO NOT READ**:
-- `docs/_archive/**` — Historical/archived docs (ignored)
-- `docs/legacy/**` — Legacy docs (ignored)
-- `docs/reference/**` — Reference docs (use active context instead)
-- `docs/user/**` — User-specific docs (ignored)
-- Any markdown files outside `docs/active/` (unless explicitly requested)
+**DO NOT READ** without permission:
+- `docs/_archive/**`, `docs/legacy/**`, `docs/reference/**`, `docs/user/**`
+- Any markdown outside `docs/active/`
 
-**Before opening new files outside docs/active/**:
-1. Propose top 3 files you want to read
-2. Explain why each is needed for the task
-3. Wait for user approval before reading
+**Before opening new files**: Propose top 3, explain why, wait for approval.
+
+## Architecture Constraints
+
+| Constraint | Rule |
+|------------|------|
+| Database | Postgres on DESY K8s (free). No Supabase (cost). |
+| Auth/caching | Parked until paper published. |
+| Predictors | S4PRED = primary. TANGO = secondary. PSIPRED = DELETE. |
+| Execution | Tango has 3 modes: simple (dev), docker (deploy), host (DESY pre-installed). |
+| Precompute | Future goal: 250M UniProt sequences. Not implemented yet. |
 
 ## TDD Workflow
 
-1. **Write failing test first** — Test must fail for the right reason
-2. **Minimal implementation** — Smallest change to make test pass
-3. **Refactor** — Clean up while keeping tests green
-4. **Edge tests** — Add boundary cases and error paths
-
-**Test commands:**
-- `make test` — All tests (deterministic, no network)
-- `make test-unit` — Fast unit tests only
-- `make ci` — Full pipeline (lint + typecheck + test)
+1. **Write failing test first** — Must fail for the right reason
+2. **Minimal implementation** — Smallest change to pass
+3. **Refactor** — Clean up, keep tests green
+4. **Edge tests** — Boundary cases and error paths
 
 ## Output Policy
 
-After every change, provide:
-
-1. **Files changed** — List all modified/created files
-2. **Verification commands** — Exact commands to verify:
-   ```bash
-   make test        # If tests changed
-   make lint        # If code changed
-   make typecheck   # If types changed
-   make ci          # For significant changes
-   ```
-
-**Example:**
+After every change:
 ```
 Files changed:
 - backend/services/normalize.py
@@ -56,62 +59,52 @@ Files changed:
 
 Verify:
 make test
+make lint
+```
+
+## Safety Rules
+
+1. **Public APIs protected** — Do not change:
+   - `backend/schemas/api_models.py`
+   - API endpoint signatures
+   - Response formats (camelCase, Entry alignment)
+
+2. **Smallest diffs** — Fix only what's broken, add features incrementally
+
+3. **Invariants**:
+   - Entry IDs must align input/output
+   - Response keys = camelCase
+   - FF-Helix% always computed (no external dependency)
+   - S4PRED is primary predictor (not PSIPRED)
+
+## Key Files Reference
+
+| File | Purpose | Lines | Notes |
+|------|---------|-------|-------|
+| `backend/server.py` | Main orchestrator | ~1470 | HTTP + business logic |
+| `backend/tango.py` | TANGO runner/parser | ~1600 | 3 execution modes |
+| `backend/s4pred.py` | S4PRED runner/parser | ~??? | PRIMARY predictor |
+| `backend/auxiliary.py` | FF-Helix + helpers | ~??? | Biochemical calcs |
+| `backend/biochemCalculation.py` | Charge, hydrophobicity, μH | ~??? | Core metrics |
+
+## Quick Reference
+```bash
+# Development
+make test       # All tests (deterministic, no network)
+make test-unit  # Fast unit tests
+make lint       # Code quality
+make typecheck  # Type checking
+make fmt        # Format code
+make ci         # Full pipeline
+
+# Predictor flags
+USE_TANGO=1     # Enable TANGO
+USE_S4PRED=1    # Enable S4PRED (primary)
+USE_JPRED=0     # Deprecated, always off
 ```
 
 ## Context Management
 
-- **Short file lists** — Read only necessary files, not entire directories
-- **Summarize after milestones** — After completing a logical unit, summarize what was done
-- **Recommend `/compact`** — Suggest using compact mode for large codebases when appropriate
-
-## Safety Rules
-
-1. **Public APIs are protected** — Do not change:
-   - `backend/schemas/api_models.py` (response schemas)
-   - API endpoint signatures in `backend/api/routes/`
-   - Response formats (camelCase keys, Entry alignment)
-
-2. **Smallest diffs** — Prefer minimal changes:
-   - Fix only what's broken
-   - Add features incrementally
-   - Avoid refactoring unless requested
-
-3. **Invariants** (from DEV_CONTEXT.md):
-   - Entry IDs must align between input and output
-   - Response keys must be camelCase
-   - FF-Helix% always computed (no external dependency)
-
-## Code Quality
-
-- **Linting**: `make lint` must pass
-- **Type checking**: `make typecheck` should pass (warnings acceptable for existing code)
-- **Tests**: `make test` must pass before considering work complete
-
-## File Organization
-
-- Backend: `backend/` (FastAPI, services, calculations, tests)
-- Frontend: `ui/` (React, TypeScript, pages, components)
-- Tests: `backend/tests/test_*.py`
-- Schemas: `backend/schemas/api_models.py`
-
-## Quick Reference
-
-```bash
-# Setup
-cd backend && pip install -r requirements.txt
-cd ../ui && npm install
-
-# Development
-make test       # Run tests
-make lint       # Check code quality
-make fmt        # Format code
-make ci         # Full CI pipeline
-
-# Context
-docs/active/ACTIVE_CONTEXT.md  # Architecture overview
-docs/active/CONTRACTS.md       # API contracts
-docs/active/TESTING_GUIDE.md  # Testing commands
-docs/active/FILES_TO_TOUCH.md # Hot files reference
-docs/active/KNOWN_ISSUES.md    # Known issues
-```
-
+- Read only necessary files, not entire directories
+- Summarize after completing logical units
+- Recommend `/compact` for large operations

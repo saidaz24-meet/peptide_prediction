@@ -596,73 +596,78 @@ def run_s4pred_database(
 
 def filter_by_s4pred_diff(
     database: pd.DataFrame,
-    threshold: float = 0.0,
-    comparison: str = "<"
 ) -> List[Optional[int]]:
     """
-    Generate S4PRED SSW predictions based on whether SSW fragments exist.
+    Generate S4PRED SSW predictions using database-average SSW diff threshold.
 
-    Reference implementation semantics (260120_Alpha_and_SSW_FF_Predictor/s4pred.py):
-    - SSW prediction is positive (1) when SSW fragments exist (ssw_diff >= 0)
-    - SSW prediction is negative (-1) when S4PRED ran but no SSW overlap found
-    - SSW prediction is None when S4PRED didn't run for this row
+    Matches reference: auxiliary.py:calc_ssw_prediction_by_database_avg_value
+    with a bugfix for sequences without SSW fragments.
 
-    The reference doesn't have an explicit "SSW prediction" column - it uses
-    SSW diff/fragments to determine switch presence. We replicate that logic here.
+    Algorithm:
+    1. Compute avg_diff = mean of SSW diff values for rows that HAVE SSW fragments
+       (diff != -1 in reference; diff > 0 here since -1.0 is the no-data sentinel)
+    2. For each sequence:
+       - If S4PRED didn't run → None
+       - If no SSW fragments (diff == -1) → -1 (no SSW detected)
+       - If diff < avg_diff → 1 (SSW positive: helix/beta are close → switching)
+       - If diff >= avg_diff → -1 (SSW negative: one structure dominates)
+
+    Reference bug fixed: sequences with diff=-1 (no SSW fragments) were classified
+    as positive because -1 < avg_diff. We now correctly classify them as -1.
 
     Args:
         database: DataFrame with S4PRED columns
-        threshold: Not used (kept for API compatibility)
-        comparison: Not used (kept for API compatibility)
 
     Returns:
         List of predictions (1=positive, -1=negative, None=unavailable)
     """
-    predictions = []
+    # Step 1: Compute average SSW diff across sequences WITH SSW fragments
+    valid_diffs = []
+    for _, row in database.iterrows():
+        ssw_diff = row.get(SSW_DIFF_S4PRED)
+        if (
+            ssw_diff is not None
+            and not (isinstance(ssw_diff, float) and pd.isna(ssw_diff))
+            and ssw_diff >= 0  # -1.0 is the no-data sentinel
+        ):
+            valid_diffs.append(ssw_diff)
+
+    # Compute threshold: mean of valid diffs, or 0.0 if no valid diffs
+    avg_diff = sum(valid_diffs) / len(valid_diffs) if valid_diffs else 0.0
+
+    # Step 2: Classify each sequence
+    predictions: List[Optional[int]] = []
 
     for _, row in database.iterrows():
         ssw_diff = row.get(SSW_DIFF_S4PRED)
-        ssw_fragments = row.get(SSW_FRAGMENTS_S4PRED)
         helix_pred = row.get(HELIX_PREDICTION_S4PRED)
-        helix_pct = row.get(HELIX_PERCENTAGE_S4PRED)
 
-        # Check if S4PRED ran for this row (helix_pred is -1 or 1 when S4PRED ran)
+        # Check if S4PRED ran for this row
         s4pred_ran = (
-            helix_pred is not None and
-            not (isinstance(helix_pred, float) and pd.isna(helix_pred)) and
-            helix_pred in [-1, 1]
+            helix_pred is not None
+            and not (isinstance(helix_pred, float) and pd.isna(helix_pred))
+            and helix_pred in [-1, 1]
         )
 
-        # Fallback: check if helix_pct exists (0 is valid when no helix found)
         if not s4pred_ran:
-            s4pred_ran = (
-                helix_pct is not None and
-                not (isinstance(helix_pct, float) and pd.isna(helix_pct))
-            )
-
-        # SSW prediction is positive when SSW fragments exist
-        # Reference: if len(ssw_fragments) > 0, SSW switch is detected
-        has_ssw_fragments = (
-            ssw_fragments is not None and
-            isinstance(ssw_fragments, list) and
-            len(ssw_fragments) > 0
-        )
-
-        # Alternative check: ssw_diff >= 0 indicates SSW segments were found
-        has_valid_ssw_diff = (
-            ssw_diff is not None and
-            not (isinstance(ssw_diff, float) and pd.isna(ssw_diff)) and
-            ssw_diff >= 0
-        )
-
-        if has_ssw_fragments or has_valid_ssw_diff:
-            # SSW segments exist → positive prediction
-            predictions.append(1)
-        elif s4pred_ran:
-            # S4PRED ran but no SSW overlap found → negative prediction
-            predictions.append(-1)
-        else:
-            # S4PRED didn't run → unavailable
             predictions.append(None)
+            continue
+
+        # Check if SSW fragments exist (diff >= 0 means SSW was found)
+        has_valid_diff = (
+            ssw_diff is not None
+            and not (isinstance(ssw_diff, float) and pd.isna(ssw_diff))
+            and ssw_diff >= 0
+        )
+
+        if not has_valid_diff:
+            # No SSW fragments → negative prediction
+            predictions.append(-1)
+        elif ssw_diff < avg_diff:
+            # SSW diff below average → positive (helix/beta switching)
+            predictions.append(1)
+        else:
+            # SSW diff at or above average → negative (one dominates)
+            predictions.append(-1)
 
     return predictions

@@ -47,8 +47,6 @@ export type SingleProviderStatus = {
 export type ProviderStatus = {
   tango?: SingleProviderStatus;
   s4pred?: SingleProviderStatus;
-  psipred?: SingleProviderStatus;
-  jpred?: SingleProviderStatus;
 };
 
 // ----- Core Peptide model used across the UI -----
@@ -84,23 +82,9 @@ export type Peptide = {
   ffHelixFragments?: Array<SegmentTuple> | Segment[];        // "FF Helix fragments"
 
   // ----- Unified secondary-structure percentages used by Results table -----
-  // These are filled by the mapper from PSIPRED if present, otherwise Tango fallback.
-  helixPercent?: number | null;   // preferred: PSIPRED helix %; fallback: "SSW helix percentage"
-  betaPercent?: number | null;    // preferred: PSIPRED beta %;  fallback: "SSW beta percentage"
-
-  // Optional JPred block
-  jpred?: {
-    helixFragments?: Array<SegmentTuple> | Segment[];
-    helixScore?: number | null;
-  };
-
-  // --- Optional PSIPRED curves + segments
-  psipred?: {
-    pH?: number[]; // per-residue P(helix)
-    pE?: number[]; // per-residue P(beta)
-    pC?: number[]; // per-residue P(coil)
-    helixSegments?: Array<[number, number]>;
-  };
+  // These are filled by the mapper from S4PRED if present, otherwise Tango fallback.
+  helixPercent?: number | null;   // preferred: S4PRED helix %; fallback: "SSW helix percentage"
+  betaPercent?: number | null;    // preferred: S4PRED beta %;  fallback: "SSW beta percentage"
 
   // --- Optional Tango per-residue curves
   tango?: {
@@ -198,7 +182,7 @@ export type DatasetStats = {
   meanLength: number;
 
   // availability counts for better UI display
-  jpredAvailable?: number;
+  s4predAvailable?: number;
   ffHelixAvailable?: number;
   sswAvailable?: number;
 };
@@ -258,9 +242,8 @@ export type DatasetMetadata = {
   traceId?: string;
   inputsHash?: string;
   configHash?: string;
-  use_jpred?: boolean;
-  jpred_rows?: number;
   use_tango?: boolean;
+  use_s4pred?: boolean;
   ssw_rows?: number;
   valid_seq_rows?: number;
   thresholds?: {
@@ -274,7 +257,5 @@ export type DatasetMetadata = {
   provider_status?: {
     tango?: SingleProviderStatus;
     s4pred?: SingleProviderStatus;
-    psipred?: SingleProviderStatus;
-    jpred?: SingleProviderStatus;
   };
 };

@@ -1,5 +1,5 @@
 """
-Provider status tracking for S4PRED, TANGO, PSIPRED, JPRED.
+Provider status tracking for TANGO and S4PRED.
 
 Principle B: Every result must indicate provider availability.
 No fake defaults - missing outputs become null + providerStatus explains why.
@@ -43,15 +43,11 @@ class PeptideProviderStatus(BaseModel):
     """Provider statuses for all prediction tools for a single peptide"""
     tango: ProviderStatus = Field(default_factory=lambda: ProviderStatus.not_configured("TANGO not enabled"))
     s4pred: ProviderStatus = Field(default_factory=lambda: ProviderStatus.not_configured("S4PRED not enabled"))
-    psipred: ProviderStatus = Field(default_factory=lambda: ProviderStatus.not_configured("PSIPRED not enabled"))
-    jpred: ProviderStatus = Field(default_factory=lambda: ProviderStatus.not_configured("JPred disabled"))
 
     class Config:
         json_schema_extra = {
             "example": {
                 "tango": {"status": "AVAILABLE", "reason": None},
-                "s4pred": {"status": "AVAILABLE", "reason": None},
-                "psipred": {"status": "UNAVAILABLE", "reason": "Docker image not found"},
-                "jpred": {"status": "OFF", "reason": "JPred disabled"}
+                "s4pred": {"status": "AVAILABLE", "reason": None}
             }
         }

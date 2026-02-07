@@ -115,7 +115,7 @@ export default function About() {
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p>
                 Explore peptide properties and fibril-forming predictions. Upload UniProt exports (TSV/CSV/XLSX), compute
-                hydrophobicity, charge, μH, and visualize JPred/Tango outputs when available.
+                hydrophobicity, charge, μH, and visualize TANGO/S4PRED outputs when available.
               </p>
             </CardContent>
           </Card>
@@ -128,7 +128,7 @@ export default function About() {
             <CardContent className="space-y-2 text-sm">
               <p><b>Frontend design & implementation:</b> Said Azaizah</p>
               <p><b>Algorithmic approach & backend code:</b> provided by <b>Dr. Aleksandr Golubev</b></p>
-              <p><b>JPred / Tango predictions:</b> courtesy of the lab’s existing pipelines</p>
+              <p><b>TANGO / S4PRED predictions:</b> courtesy of the lab's existing pipelines</p>
             </CardContent>
           </Card>
 
@@ -153,12 +153,13 @@ export default function About() {
 
           {/* JPred / Tango note */}
           <Card className="shadow-medium">
-            <CardHeader><CardTitle>JPred / Tango</CardTitle></CardHeader>
+            <CardHeader><CardTitle>TANGO / S4PRED Providers</CardTitle></CardHeader>
             <CardContent className="text-sm text-muted-foreground">
               <p>
-                The app reads local result files from <code>backend/Jpred/</code> and <code>backend/Tango/</code>. Set{" "}
-                <code>USE_JPRED=1</code> / <code>USE_TANGO=1</code> before starting the API. Without these assets, related
-                metrics display <em>Not available</em>.
+                Prediction providers are controlled via environment variables in <code>backend/.env</code>:{" "}
+                <code>USE_TANGO=1</code> enables TANGO aggregation prediction,{" "}
+                <code>USE_S4PRED=1</code> enables S4PRED secondary structure prediction.
+                Without these providers enabled, related metrics display <em>Not available</em>.
               </p>
             </CardContent>
           </Card>

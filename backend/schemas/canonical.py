@@ -82,10 +82,7 @@ class ProviderStatus(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
     tango: SingleProviderStatus = Field(..., description="TANGO aggregation predictor status")
-    # Note: PSIPRED and JPred are disabled in current deployment
-    # Keeping fields for future extensibility
-    psipred: Optional[SingleProviderStatus] = Field(None, description="PSIPRED secondary structure (disabled)")
-    jpred: Optional[SingleProviderStatus] = Field(None, description="JPred secondary structure (disabled)")
+    s4pred: Optional[SingleProviderStatus] = Field(None, description="S4PRED secondary structure predictor status")
 
 
 # =============================================================================
@@ -167,9 +164,9 @@ class SecondaryStructureResult(BaseModel):
     """
     Secondary structure prediction results.
 
-    Contains FF-Helix (local calculation) and optional PSIPRED results.
+    Contains FF-Helix (local calculation) and optional S4PRED results.
     FF-Helix is always computed (no external dependency).
-    PSIPRED requires Docker and is optional.
+    S4PRED requires PyTorch model weights.
     """
     model_config = ConfigDict(
         populate_by_name=True,
@@ -197,28 +194,28 @@ class SecondaryStructureResult(BaseModel):
         description="Whether peptide is predicted to undergo structure switch"
     )
 
-    # PSIPRED results (optional - requires Docker)
-    psipred_helix_percent: Optional[float] = Field(
+    # S4PRED results (requires model weights)
+    s4pred_helix_percent: Optional[float] = Field(
         None,
         ge=0,
         le=100,
-        description="PSIPRED helix percentage (if available)"
+        description="S4PRED helix percentage (if available)"
     )
-    psipred_beta_percent: Optional[float] = Field(
+    s4pred_beta_percent: Optional[float] = Field(
         None,
         ge=0,
         le=100,
-        description="PSIPRED beta percentage (if available)"
+        description="S4PRED beta percentage (if available)"
     )
-    psipred_coil_percent: Optional[float] = Field(
+    s4pred_coil_percent: Optional[float] = Field(
         None,
         ge=0,
         le=100,
-        description="PSIPRED coil percentage (if available)"
+        description="S4PRED coil percentage (if available)"
     )
-    psipred_helix_segments: Optional[List[List[int]]] = Field(
+    s4pred_helix_segments: Optional[List[List[int]]] = Field(
         None,
-        description="PSIPRED helix segments (if available)"
+        description="S4PRED helix segments (if available)"
     )
 
 

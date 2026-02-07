@@ -31,10 +31,11 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
   }
 
   // Determine availability for each KPI based on provider status
-  // NO LYING UI rule: If TANGO didn't run (ran=false) or is OFF/UNAVAILABLE, show N/A
-  const tangoRan = meta?.provider_status?.tango?.ran ?? false;
+  // NO LYING UI rule: If TANGO is OFF or UNAVAILABLE, show N/A
+  // AVAILABLE or PARTIAL means TANGO ran and produced output
+  // Note: We don't check 'ran' field - 'status' is authoritative
   const tangoStatus = meta?.provider_status?.tango?.status;
-  const tangoAvailable = tangoRan && (tangoStatus === 'AVAILABLE' || tangoStatus === 'PARTIAL');
+  const tangoAvailable = tangoStatus === 'AVAILABLE' || tangoStatus === 'PARTIAL';
   
   const ffAvailable = (stats.ffHelixAvailable ?? 0) > 0;
   const sswAvailable = (stats.sswAvailable ?? 0) > 0;

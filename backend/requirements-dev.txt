@@ -1,0 +1,14 @@
+# Development dependencies (not needed in production Docker image)
+-r requirements.txt
+
+# Testing
+pytest
+
+# Linting and formatting
+ruff
+
+# Type checking
+mypy
+
+# Git hooks
+pre-commit

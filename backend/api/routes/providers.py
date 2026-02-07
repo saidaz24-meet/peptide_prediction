@@ -46,19 +46,17 @@ async def providers_last_run():
         return {
             "note": "No dataset processed yet. Load a dataset via /api/upload-csv or /api/uniprot/execute first.",
             "tango": None,
-            "psipred": None,
-            "jpred": None,
+            "s4pred": None,
             "run_dirs": {
                 "tango": None,
             }
         }
-    
+
     latest_tango_dir = get_last_run_dir() or tango._latest_run_dir()
-    
+
     return {
         "tango": last_status.get("tango"),
-        "psipred": last_status.get("psipred"),
-        "jpred": last_status.get("jpred"),
+        "s4pred": last_status.get("s4pred"),
         "run_dirs": {
             "tango": latest_tango_dir,
         },

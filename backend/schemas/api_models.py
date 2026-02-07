@@ -93,7 +93,7 @@ class PeptideRow(BaseModel):
     # Provider status (Principle B: mandatory provider status)
     # Produced by: backend/services/provider_tracking.py:create_provider_status_for_row()
     # Added during normalization: backend/services/normalize.py:normalize_rows_for_ui()
-    providerStatus: Optional[PeptideProviderStatus] = Field(None, description="Provider status for TANGO/PSIPRED/JPRED")
+    providerStatus: Optional[PeptideProviderStatus] = Field(None, description="Provider status for TANGO/S4PRED")
     
     # Unknown/extra fields
     # Any fields not in the canonical schema go here
@@ -157,8 +157,6 @@ class ProviderStatusSummary(BaseModel):
 
     tango: Optional[Dict[str, Any]] = Field(None, description="TANGO provider status summary with keys: status, requested, parsed_ok, parsed_bad")
     s4pred: Optional[Dict[str, Any]] = Field(None, description="S4PRED provider status summary with keys: status, requested, parsed_ok, parsed_bad")
-    psipred: Optional[Dict[str, Any]] = Field(None, description="PSIPRED provider status summary with keys: status")
-    jpred: Optional[Dict[str, Any]] = Field(None, description="JPRED provider status summary (always OFF) with keys: status")
 
 
 class Meta(BaseModel):
@@ -172,9 +170,8 @@ class Meta(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
     # Provider flags
-    use_jpred: bool = Field(..., description="JPred enabled flag (always False, JPred disabled)")
     use_tango: bool = Field(..., description="TANGO enabled flag (from USE_TANGO env var)")
-    jpred_rows: int = Field(..., description="Number of rows with JPred data (always 0)")
+    use_s4pred: bool = Field(default=True, description="S4PRED enabled flag (from USE_S4PRED env var)")
     ssw_rows: int = Field(..., description="Number of rows with SSW/TANGO data")
     valid_seq_rows: int = Field(..., description="Number of rows with valid sequences")
     

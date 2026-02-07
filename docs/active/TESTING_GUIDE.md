@@ -24,7 +24,7 @@ make ci         # Full CI pipeline (lint + typecheck + test)
 **Run Fast Unit Tests**:
 ```bash
 cd backend
-USE_TANGO=0 USE_PSIPRED=0 python -m pytest tests/test_api_contracts.py tests/test_uniprot_query_parsing.py tests/test_uniprot_sort.py tests/test_trace_id.py -v --tb=short
+USE_TANGO=0 USE_S4PRED=0 python -m pytest tests/test_api_contracts.py tests/test_uniprot_query_parsing.py tests/test_uniprot_sort.py tests/test_trace_id.py -v --tb=short
 ```
 
 **Or via Makefile**:
@@ -43,7 +43,7 @@ make test-unit
 **Run All Tests**:
 ```bash
 cd backend
-USE_TANGO=0 USE_PSIPRED=0 python -m pytest tests/ -v --tb=short
+USE_TANGO=0 USE_S4PRED=0 python -m pytest tests/ -v --tb=short
 ```
 
 **Or via Makefile**:
@@ -55,7 +55,7 @@ make test
 - `test_golden_pipeline.py` - End-to-end pipeline with golden inputs
 - `test_tango_scaling.py` - TANGO runner scaling tests
 
-**Note**: Tests run with `USE_TANGO=0 USE_PSIPRED=0` to avoid external dependencies.
+**Note**: Tests run with `USE_TANGO=0 USE_S4PRED=0` to avoid external dependencies.
 
 ### Golden Tests (Reference Implementation Validation)
 
@@ -108,7 +108,7 @@ pip install -r requirements.txt
 
 # Feature flags (optional)
 export USE_TANGO=1          # Enable TANGO
-export USE_PSIPRED=true     # Enable PSIPRED (optional)
+export USE_S4PRED=1         # Enable S4PRED (primary predictor)
 
 # Start server
 uvicorn server:app --host 0.0.0.0 --port 8000 --reload
@@ -156,12 +156,31 @@ npm run dev
 
 ---
 
+## Tango Display Semantics Verification
+
+**Manual check after any `tangoDisplaySemantics.ts` change:**
+
+1. Start frontend and backend
+2. Load example dataset (click "Load Example")
+3. Navigate to Results page
+4. Verify badge meanings in SSW column:
+   - **Positive** (green) = `sswPrediction === 1` (switch predicted)
+   - **Negative** (gray) = `sswPrediction === -1` (no switch predicted)
+   - **Uncertain** (outline) = `sswPrediction === 0` (rare edge case)
+   - **Missing** (outline) = `sswPrediction === null` (TANGO didn't run)
+5. Verify NO "Unknown" badges appear
+6. Click on a row to open PeptideDetail — verify TangoBadge renders correctly
+
+**Known regression (2026-02-02)**: If "Uncertain" appears for ~30% of results when it shouldn't, check `tangoDisplaySemantics.ts` for buggy `hasTangoData` logic.
+
+---
+
 ## Known Test Failures
 
 **Status**: No known failures documented.
 
 **If tests fail**:
-1. Check `USE_TANGO=0 USE_PSIPRED=0` is set (tests don't require external tools)
+1. Check `USE_TANGO=0 USE_S4PRED=0` is set (tests don't require external tools)
 2. Verify Python dependencies: `pip install -r requirements.txt`
 3. Check pytest version: `pytest --version` (should be 7.0+)
 

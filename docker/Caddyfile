@@ -1,0 +1,58 @@
+# Peptide Visual Lab - Caddy Configuration
+# Auto-HTTPS with Let's Encrypt (zero config)
+#
+# Usage:
+#   1. Set DOMAIN in .env (e.g., DOMAIN=pvl.desy.de)
+#   2. Run: docker compose -f docker/docker-compose.caddy.yml up -d
+#   Caddy will automatically provision and renew TLS certificates.
+#
+# For local dev without HTTPS, set DOMAIN=localhost
+
+{$DOMAIN:localhost} {
+    # API proxy - forward to backend service
+    handle /api/* {
+        reverse_proxy backend:8000 {
+            # Timeout settings for long-running predictions
+            transport http {
+                dial_timeout 60s
+                read_timeout 120s
+                write_timeout 120s
+            }
+        }
+    }
+
+    # Health check endpoint
+    handle /health {
+        respond "healthy" 200
+    }
+
+    # Static assets with caching
+    handle /assets/* {
+        header Cache-Control "public, max-age=31536000, immutable"
+        root * /srv
+        file_server
+    }
+
+    # SPA fallback - serve index.html for client-side routing
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
+
+    # Security headers
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+    }
+
+    # Gzip compression
+    encode gzip
+
+    # Access logging
+    log {
+        output stdout
+        format json
+    }
+}

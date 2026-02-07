@@ -70,10 +70,8 @@ export interface SingleProviderStatus {
 export interface ProviderStatus {
   /** TANGO aggregation predictor status */
   tango: SingleProviderStatus;
-  /** PSIPRED secondary structure (disabled) */
-  psipred?: SingleProviderStatus | null;
-  /** JPred secondary structure (disabled) */
-  jpred?: SingleProviderStatus | null;
+  /** S4PRED secondary structure prediction */
+  s4pred?: SingleProviderStatus | null;
 }
 
 // =============================================================================
@@ -128,9 +126,9 @@ export type Segment = [number, number];
 /**
  * Secondary structure prediction results.
  *
- * Contains FF-Helix (local calculation) and optional PSIPRED results.
+ * Contains FF-Helix (local calculation) and optional S4PRED results.
  * FF-Helix is always computed (no external dependency).
- * PSIPRED requires Docker and is optional.
+ * S4PRED requires model weights and is optional.
  */
 export interface SecondaryStructureResult {
   /** FF-Helix percentage (0-100), locally computed from propensity scale */
@@ -142,17 +140,17 @@ export interface SecondaryStructureResult {
   /** Whether peptide is predicted to undergo structure switch */
   isStructureSwitch?: boolean | null;
 
-  /** PSIPRED helix percentage (if available) */
-  psipredHelixPercent?: number | null;
+  /** S4PRED helix percentage (if available) */
+  s4predHelixPercent?: number | null;
 
-  /** PSIPRED beta percentage (if available) */
-  psipredBetaPercent?: number | null;
+  /** S4PRED beta percentage (if available) */
+  s4predBetaPercent?: number | null;
 
-  /** PSIPRED coil percentage (if available) */
-  psipredCoilPercent?: number | null;
+  /** S4PRED coil percentage (if available) */
+  s4predCoilPercent?: number | null;
 
-  /** PSIPRED helix segments (if available) */
-  psipredHelixSegments?: Segment[] | null;
+  /** S4PRED helix segments (if available) */
+  s4predHelixSegments?: Segment[] | null;
 }
 
 /**

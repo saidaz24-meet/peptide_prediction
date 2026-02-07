@@ -1,7 +1,25 @@
 # Active Context: Architecture Overview
 
-**Last Updated**: 2025-01-14  
-**Purpose**: Single source of truth for AI coding agents working on this codebase.
+**Last Updated**: 2026-02-05
+**Purpose**: Single entry point for developers and AI agents working on this codebase.
+
+---
+
+## Quick Start
+
+**What is PVL?** Peptide Visual Lab — a web app for predicting fibril-forming properties of peptides. Upload sequences, get biophysical calculations (charge, hydrophobicity, μH) and structural predictions (TANGO, S4PRED).
+
+**Run locally:**
+```bash
+# Backend
+cd backend && pip install -r requirements.txt
+uvicorn server:app --reload --port 8000
+
+# Frontend (separate terminal)
+cd ui && npm install && npm run dev
+```
+
+**Verify:** `curl http://localhost:8000/api/health` → `{"ok": true}`
 
 ---
 
@@ -58,7 +76,7 @@
    ↓
 7. backend/tango.py:run_tango() - Run TANGO predictions (if USE_TANGO=1)
    ↓
-8. backend/services/secondary_structure.py - Run PSIPRED (if USE_PSIPRED=true)
+8. backend/s4pred.py:run_s4pred_database() - Run S4PRED predictions (if USE_S4PRED=1)
    ↓
 9. backend/services/normalize.py:normalize_rows_for_ui() - Convert to camelCase, add providerStatus
    ↓
@@ -116,10 +134,9 @@
 | **predict_service** | `services/predict_service.py` | Single sequence prediction (currently imports from server.py) |
 | **uniprot_service** | `services/uniprot_service.py` | UniProt API integration, query execution |
 | **uniprot_query** | `services/uniprot_query.py` | UniProt query string parsing, mode detection |
-| **provider_tracking** | `services/provider_tracking.py` | TANGO/PSIPRED/JPRED status tracking |
+| **provider_tracking** | `services/provider_tracking.py` | TANGO/S4PRED status tracking |
 | **provider_state** | `services/provider_state.py` | Global provider state management |
 | **thresholds** | `services/thresholds.py` | FF flag threshold resolution |
-| **secondary_structure** | `services/secondary_structure.py` | PSIPRED provider interface |
 | **logger** | `services/logger.py` | Structured JSON logging |
 | **trace_helpers** | `services/trace_helpers.py` | Trace ID management |
 
@@ -128,8 +145,7 @@
 | Tool | Module | Location | Status |
 |------|--------|---------|--------|
 | **TANGO** | `backend/tango.py` | `backend/Tango/bin/tango` | Active (USE_TANGO=1) |
-| **PSIPRED** | `backend/services/secondary_structure.py` | Docker: `psipred-hhblits` | Optional (USE_PSIPRED=true) |
-| **JPred** | `backend/jpred.py` | N/A | Disabled (kept for reference only) |
+| **S4PRED** | `backend/s4pred.py` | PyTorch model weights | Primary (USE_S4PRED=1) |
 
 ### Frontend Core
 
@@ -178,8 +194,7 @@
 
 **Key Flags**:
 - `USE_TANGO=1` - Enable TANGO predictions
-- `USE_PSIPRED=true` - Enable PSIPRED (Docker)
-- `USE_JPRED=0` - JPred disabled (always)
+- `USE_S4PRED=1` - Enable S4PRED secondary structure prediction (primary)
 - `TANGO_MODE=simple` - TANGO runner mode (simple/host/docker)
 - `CORS_ORIGINS` - Allowed frontend origins
 - `SENTRY_DSN` - Sentry error tracking (optional)
@@ -198,16 +213,26 @@
 
 ## Migration Status
 
-**Current State**: Endpoints are being migrated from `server.py` to `api/routes/` + `services/`
+**Current State**: Route handlers migrated; business logic extraction in progress.
 
-**Completed**:
-- ✅ Health, example, upload, predict, uniprot, providers, feedback routes moved to `api/routes/`
-- ✅ App setup moved to `api/main.py`
+| Component | Status | Notes |
+|-----------|--------|-------|
+| Route handlers (`api/routes/`) | ✅ Complete | All endpoints have thin route handlers |
+| App setup (`api/main.py`) | ✅ Complete | Middleware, CORS, Sentry configured |
+| Upload service | 🔄 Partial | Still imports from `server.py` |
+| Predict service | 🔄 Partial | Still imports from `server.py` |
+| `server.py` cleanup | ⏳ Pending | ~2,500 lines → target ~500 |
 
-**In Progress**:
-- 🔄 `upload_service.py` and `predict_service.py` still import from `server.py` (temporary)
+---
 
-**Remaining**:
-- ⏳ Extract business logic from `server.py` into service modules
-- ⏳ Reduce `server.py` size (currently 2,526 lines)
+## Deep Dive Resources
+
+| Resource | Purpose |
+|----------|---------|
+| `docs/BACKEND_LEARNING_PLAN.md` | 8-lesson curriculum to master the backend |
+| `docs/learning/` | Reference implementation docs (for understanding TANGO/S4PRED algorithms) |
+| `docs/active/CONTRACTS.md` | API request/response shapes |
+| `docs/active/TESTING_GUIDE.md` | Test commands and setup |
+| `docs/active/KNOWN_ISSUES.md` | Issue backlog |
+| `docs/DOCKER_RUNBOOK.md` | Container deployment |
 

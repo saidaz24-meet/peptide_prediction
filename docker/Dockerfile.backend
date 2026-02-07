@@ -1,6 +1,13 @@
 # =============================================================================
 # Peptide Visual Lab - Backend Dockerfile
 # Strategy: Volume-mounted assets (models/binaries mounted at runtime)
+#
+# Size optimization:
+#   - Multi-stage build (builder → runtime)
+#   - CPU-only PyTorch (~200MB vs ~2GB with CUDA)
+#   - No dev dependencies (pytest, ruff, mypy) in image
+#   - BuildKit cache mounts for fast rebuilds
+#   Target: ~800MB (vs ~3GB without optimization)
 # =============================================================================
 # syntax=docker/dockerfile:1.4
 
@@ -28,9 +35,11 @@ RUN apt-get update \
 COPY backend/requirements.txt .
 
 # Install Python dependencies with BuildKit cache mount
-# This caches pip downloads across builds for faster rebuilds
+# Key optimization: CPU-only PyTorch via --extra-index-url saves ~1.8GB
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --user -r requirements.txt
+    pip install --user \
+    --extra-index-url https://download.pytorch.org/whl/cpu \
+    -r requirements.txt
 
 # =============================================================================
 # Stage 2: Production Runtime
@@ -85,8 +94,7 @@ ENV PYTHONUNBUFFERED=1 \
     S4PRED_MODEL_PATH=/opt/tools/s4pred/models \
     # Provider flags (safe defaults)
     USE_TANGO=0 \
-    USE_S4PRED=1 \
-    USE_JPRED=0
+    USE_S4PRED=1
 
 # Switch to non-root user
 USER ${APP_USER}

@@ -110,8 +110,8 @@ export default function PeptideDetail() {
     [peptide.sequence, win]
   );
   const helixBands = useMemo(
-    () => helixRanges(peptide.jpred?.helixFragments as [number, number][] | undefined, win),
-    [peptide.jpred, win]
+    () => helixRanges(peptide.s4pred?.helixSegments as [number, number][] | undefined, win),
+    [peptide.s4pred, win]
   );
 
   return (
@@ -158,18 +158,6 @@ export default function PeptideDetail() {
                   status={peptide.providerStatus.s4pred as any}
                 />
               )}
-              {peptide.providerStatus?.psipred && (
-                <ProviderBadge
-                  name="PSIPRED"
-                  status={peptide.providerStatus.psipred as any}
-                />
-              )}
-              {peptide.providerStatus?.jpred && (
-                <ProviderBadge
-                  name="JPred"
-                  status={peptide.providerStatus.jpred as any}
-                />
-              )}
               
               <div className="flex items-center space-x-2">
                 <Button variant="outline" size="sm" onClick={handleCopySequence}>
@@ -213,16 +201,16 @@ export default function PeptideDetail() {
                 </div>
               </div>
 
-              {/* Secondary structure track (JPred) */}
+              {/* Secondary structure track (S4PRED) */}
               <div>
-                <h3 className="font-semibold mb-2">Secondary Structure</h3>
-                {peptide.jpred?.helixFragments?.length ? (
+                <h3 className="font-semibold mb-2">Secondary Structure Segments</h3>
+                {peptide.s4pred?.helixSegments?.length ? (
                   <SegmentTrack
                     sequence={peptide.sequence}
-                    helixFragments={peptide.jpred.helixFragments}
+                    helixFragments={peptide.s4pred.helixSegments}
                   />
                 ) : (
-                  <div className="text-sm text-muted-foreground">JPred segments not available</div>
+                  <div className="text-sm text-muted-foreground">S4PRED helix segments not available</div>
                 )}
               </div>
             </CardContent>
@@ -316,7 +304,7 @@ export default function PeptideDetail() {
                 </div>
 
                 <div className="text-xs text-muted-foreground">
-                  Shaded regions = JPred helix segments (if available).
+                  Shaded regions = helix segments (if available).
                 </div>
               </CardContent>
             </Card>

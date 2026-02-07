@@ -28,8 +28,8 @@ const optionalFields = [
   { key: 'length', label: 'Length', description: 'Sequence length (auto-calculated if not provided)' },
   { key: 'hydrophobic_moment', label: 'Hydrophobic Moment (μH)', description: 'Amphipathic character measure' },
   { key: 'ff_helix_percent', label: 'FF-Helix %', description: 'Predicted helix percentage' },
-  { key: 'jpred_helix_percent', label: 'JPred Helix %', description: 'Alternative helix prediction' },
-  { key: 'jpred_helix_score', label: 'JPred Helix Score', description: 'Confidence score for helix prediction' },
+  { key: 's4pred_helix_percent', label: 'S4PRED Helix %', description: 'S4PRED secondary structure prediction' },
+  { key: 's4pred_ssw_prediction', label: 'S4PRED SSW', description: 'S4PRED structure switch prediction' },
   { key: 'species', label: 'Species', description: 'Source organism' },
   { key: 'hydrophobicity', label: 'Hydrophobicity', description: 'Hydrophobicity value (auto-calculated if not provided)' },
   { key: 'charge', label: 'Charge', description: 'Net charge at physiological pH (auto-calculated if not provided)' },
@@ -65,7 +65,7 @@ export function ColumnMapper({ headers, onMappingComplete }: ColumnMapperProps) 
       else if (s.includes('ssw') || s.includes('switch')) auto.ssw_prediction = h;
       else if (s.includes('length') || s.includes('len')) auto.length = h;
       else if (s.includes('helix') && (s.includes('ff') || s.includes('fold'))) auto.ff_helix_percent = h;
-      else if (s.includes('jpred') && s.includes('helix')) auto.jpred_helix_percent = h;
+      else if (s.includes('s4pred') && s.includes('helix')) auto.s4pred_helix_percent = h;
       else if (s.includes('species') || s.includes('organism')) auto.species = h;
       else if (s.includes('name') || s.includes('protein')) auto.name = h;
     });

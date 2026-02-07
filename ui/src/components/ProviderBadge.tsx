@@ -1,5 +1,16 @@
+/**
+ * ProviderBadge - Display provider run status in header/summary context
+ *
+ * Uses consistent semantics with status normalization:
+ * - OFF/disabled/not_configured → "Name: OFF" (outline)
+ * - UNAVAILABLE/unavailable → "Name: FAILED (0/N)" (destructive)
+ * - PARTIAL/partial/running → "Name: PARTIAL (M/N)" (secondary)
+ * - AVAILABLE/available → "Name: OK (N/N)" (default)
+ */
+
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { normalizeProviderStatus } from '@/lib/tangoDisplaySemantics';
 
 interface ProviderStats {
   requested: number;
@@ -8,7 +19,7 @@ interface ProviderStats {
 }
 
 interface ProviderStatus {
-  status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
+  status: string;  // Accept any string, we'll normalize it
   reason?: string | null;
   stats?: ProviderStats;
 }
@@ -20,38 +31,41 @@ interface ProviderBadgeProps {
 }
 
 export function ProviderBadge({ name, status, variant = 'default' }: ProviderBadgeProps) {
-  const { status: providerStatus, reason, stats } = status;
-  
+  const { status: rawStatus, reason, stats } = status;
+  const normalizedStatus = normalizeProviderStatus(rawStatus);
+
   let label: string;
   let badgeVariant: 'default' | 'outline' | 'secondary' | 'destructive' = variant;
   let tooltipText: string;
-  
-  if (providerStatus === 'OFF') {
+
+  if (normalizedStatus === 'OFF') {
     label = `${name}: OFF`;
     badgeVariant = 'outline';
     tooltipText = reason || `${name} is disabled in settings`;
-  } else if (providerStatus === 'UNAVAILABLE') {
+  } else if (normalizedStatus === 'UNAVAILABLE') {
     const requested = stats?.requested || 0;
     label = `${name}: FAILED (0/${requested})`;
     badgeVariant = 'destructive';
-    tooltipText = reason || `${name} output not available`;
-  } else if (providerStatus === 'PARTIAL') {
+    tooltipText = reason || `${name} execution failed - check run_meta.json`;
+  } else if (normalizedStatus === 'PARTIAL') {
     const parsed_ok = stats?.parsed_ok || 0;
     const requested = stats?.requested || 0;
     label = `${name}: PARTIAL (${parsed_ok}/${requested})`;
     badgeVariant = 'secondary';
-    tooltipText = reason || `Only ${parsed_ok} of ${requested} sequences processed successfully`;
-  } else if (providerStatus === 'AVAILABLE') {
+    tooltipText = reason || `Only ${parsed_ok} of ${requested} peptides processed`;
+  } else if (normalizedStatus === 'AVAILABLE') {
+    const parsed_ok = stats?.parsed_ok || stats?.requested || 0;
     const requested = stats?.requested || 0;
-    label = `${name}: ON (${requested}/${requested})`;
+    label = `${name}: OK (${parsed_ok}/${requested})`;
     badgeVariant = 'default';
     tooltipText = `${name} processing completed successfully`;
   } else {
+    // Unknown status - show raw value for debugging
     label = `${name}: UNKNOWN`;
     badgeVariant = 'outline';
-    tooltipText = `${name} status unknown`;
+    tooltipText = `${name} status unknown (raw: "${rawStatus}") - check backend logs`;
   }
-  
+
   return (
     <TooltipProvider>
       <Tooltip>

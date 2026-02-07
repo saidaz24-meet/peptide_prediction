@@ -39,7 +39,6 @@ services:
       # Provider flags
       - USE_TANGO=${USE_TANGO:-0}
       - USE_S4PRED=${USE_S4PRED:-1}
-      - USE_JPRED=0
       # CORS (allow frontend dev server)
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173
       # Tool paths (in mounted volumes)

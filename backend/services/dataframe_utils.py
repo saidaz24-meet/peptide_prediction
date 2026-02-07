@@ -73,19 +73,102 @@ def ensure_computed_cols(df: pd.DataFrame) -> None:
 
 
 def apply_ff_flags(df: pd.DataFrame) -> None:
-    """Apply FF flags based on computed metrics."""
-    ssw_avg_H = df[df["SSW prediction"] != 1]["Hydrophobicity"].mean()
-    # Use pd.notna() to check for valid values instead of != -1
-    valid_jpred = df["Helix (Jpred) uH"].notna()
-    jpred_avg_uH = df.loc[valid_jpred, "Helix (Jpred) uH"].mean()
-    df["FF-Secondary structure switch"] = [
-        1 if r["SSW prediction"] == 1 and r["Hydrophobicity"] >= ssw_avg_H else None
-        for _, r in df.iterrows()
-    ]
-    df["FF-Helix (Jpred)"] = [
-        1 if pd.notna(r["Helix (Jpred) uH"]) and r["Helix (Jpred) uH"] >= jpred_avg_uH else None
-        for _, r in df.iterrows()
-    ]
+    """
+    Apply fibril-forming (FF) flags based on computed metrics.
+
+    Reference: 260120_Alpha_and_SSW_FF_Predictor/main.py
+    - ssw_fibril_formation_prediction_by_method (FF-SSW)
+    - helix_fibril_formation_prediction_by_method (FF-Helix)
+
+    FF-SSW: SSW prediction == 1 AND Hydrophobicity >= avg_H (of SSW-positive rows)
+    FF-Helix: helix_prediction != -1 AND helix_uH >= avg_uH (of helix-positive rows)
+    """
+    # --- FF-SSW flag ---
+    # Reference: avg hydrophobicity of rows WITH valid SSW prediction (not -1)
+    ssw_col = "SSW prediction"
+    if ssw_col in df.columns:
+        valid_ssw_mask = df[ssw_col].notna() & (df[ssw_col] != -1)
+        if valid_ssw_mask.any() and "Hydrophobicity" in df.columns:
+            ssw_avg_H = pd.to_numeric(
+                df.loc[valid_ssw_mask, "Hydrophobicity"], errors="coerce"
+            ).mean()
+        else:
+            ssw_avg_H = float("nan")
+
+        df["FF-Secondary structure switch"] = [
+            1 if (pd.notna(r.get(ssw_col)) and r[ssw_col] == 1
+                  and pd.notna(ssw_avg_H)
+                  and pd.notna(r.get("Hydrophobicity"))
+                  and r["Hydrophobicity"] >= ssw_avg_H)
+            else None
+            for _, r in df.iterrows()
+        ]
+    else:
+        df["FF-Secondary structure switch"] = None
+
+    # --- FF-Helix flag ---
+    # Prefer S4PRED helix data; fall back to Jpred columns if present.
+    # Reference: uses helix segment uH vs database-average uH threshold.
+    helix_pred_col = None
+    helix_uh_col = None
+
+    # Check for S4PRED helix data
+    if "Helix prediction (S4PRED)" in df.columns:
+        helix_pred_col = "Helix prediction (S4PRED)"
+        # Compute S4PRED helix uH if not already present
+        if "Helix (s4pred) uH" not in df.columns:
+            _compute_helix_uh(df, "Helix fragments (S4PRED)", "Helix (s4pred) uH")
+        helix_uh_col = "Helix (s4pred) uH"
+    elif "Helix (Jpred) uH" in df.columns:
+        helix_pred_col = "Helix score (Jpred)" if "Helix score (Jpred)" in df.columns else None
+        helix_uh_col = "Helix (Jpred) uH"
+
+    if helix_pred_col and helix_uh_col and helix_uh_col in df.columns:
+        # Reference: avg uH of rows where helix_prediction != -1
+        valid_helix_mask = df[helix_pred_col].notna() & (df[helix_pred_col] != -1)
+        valid_uh_mask = valid_helix_mask & df[helix_uh_col].notna()
+        if valid_uh_mask.any():
+            helix_avg_uH = pd.to_numeric(
+                df.loc[valid_uh_mask, helix_uh_col], errors="coerce"
+            ).mean()
+        else:
+            helix_avg_uH = float("nan")
+
+        df["FF-Helix (Jpred)"] = [
+            1 if (pd.notna(r.get(helix_pred_col)) and r[helix_pred_col] != -1
+                  and pd.notna(r.get(helix_uh_col))
+                  and pd.notna(helix_avg_uH)
+                  and r[helix_uh_col] >= helix_avg_uH)
+            else None
+            for _, r in df.iterrows()
+        ]
+    else:
+        df["FF-Helix (Jpred)"] = None
+
+
+def _compute_helix_uh(df: pd.DataFrame, fragments_col: str, uh_col: str) -> None:
+    """
+    Compute average hydrophobic moment (μH) of helix segments for each row.
+
+    Reference: main.py calculate_biochemical_features (lines 104-105):
+        uH_helix_s4pred.append(auxiliary.get_avg_uH_by_segments(sequence, row[HELIX_FRAGMENTS_S4PRED]))
+    """
+    from auxiliary import get_avg_uH_by_segments, get_corrected_sequence
+
+    uh_values = []
+    for _, row in df.iterrows():
+        seq = row.get("Sequence", "")
+        fragments = row.get(fragments_col)
+        if (seq and isinstance(seq, str) and not pd.isna(seq)
+                and fragments is not None
+                and not (isinstance(fragments, float) and pd.isna(fragments))
+                and isinstance(fragments, list) and len(fragments) > 0):
+            corrected_seq = get_corrected_sequence(seq)
+            uh = get_avg_uH_by_segments(corrected_seq, fragments)
+            uh_values.append(uh)
+        else:
+            uh_values.append(None)
+    df[uh_col] = uh_values
 
 
 def fill_percent_from_tango_if_missing(df: pd.DataFrame) -> None:

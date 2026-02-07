@@ -113,7 +113,7 @@ class TestPredictContract:
         
         # Assert meta has required fields
         meta = data["meta"]
-        assert "use_jpred" in meta, "meta must have 'use_jpred' field"
+        assert "use_s4pred" in meta, "meta must have 'use_s4pred' field"
         assert "use_tango" in meta, "meta must have 'use_tango' field"
         assert "thresholds" in meta, "meta must have 'thresholds' field"
     
@@ -718,3 +718,62 @@ class TestNullSemantics:
         assert row["id"] != "", "id field must not be empty string"
         assert row["sequence"] != "", "sequence field must not be empty string"
 
+
+class TestHealthEndpoints:
+    """Tests for health check endpoints."""
+
+    def test_health_returns_ok(self):
+        """Basic health check returns ok."""
+        response = client.get("/api/health")
+        assert response.status_code == 200
+        data = response.json()
+        assert data.get("ok") is True
+
+    def test_health_dependencies_returns_status(self):
+        """Dependencies health check returns structured status."""
+        response = client.get("/api/health/dependencies")
+        assert response.status_code == 200
+        data = response.json()
+
+        # Required fields
+        assert "status" in data
+        assert data["status"] in ["ready", "degraded", "unavailable"]
+        assert "providers_available" in data
+        assert isinstance(data["providers_available"], int)
+
+        # Provider status fields
+        assert "tango" in data
+        assert "s4pred" in data
+        assert "ff_helix" in data
+
+        # Each provider has enabled/available/reason
+        for provider in ["tango", "s4pred", "ff_helix"]:
+            assert "enabled" in data[provider]
+            assert "available" in data[provider]
+            assert "reason" in data[provider]
+
+    def test_health_dependencies_ff_helix_always_available(self):
+        """FF-Helix is always available (pure Python, no deps)."""
+        response = client.get("/api/health/dependencies")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["ff_helix"]["enabled"] is True
+        assert data["ff_helix"]["available"] is True
+        assert data["ff_helix"]["reason"] is None
+
+    def test_health_dependencies_uniprot_optional(self):
+        """UniProt check is optional and not included by default."""
+        # Without check_uniprot parameter
+        response = client.get("/api/health/dependencies")
+        assert response.status_code == 200
+        data = response.json()
+        assert "uniprot" not in data
+
+        # With check_uniprot=true (may fail offline, but should not error)
+        response = client.get("/api/health/dependencies?check_uniprot=true")
+        assert response.status_code == 200
+        data = response.json()
+        assert "uniprot" in data
+        assert "available" in data["uniprot"]
+        assert "reason" in data["uniprot"]

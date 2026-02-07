@@ -21,11 +21,11 @@ export interface ProviderStatusSummary {
     parsed_ok?: number;
     parsed_bad?: number;
   } | null;
-  psipred?: {
+  s4pred?: {
     status: string;
-  } | null;
-  jpred?: {
-    status: string;
+    requested?: number;
+    parsed_ok?: number;
+    parsed_bad?: number;
   } | null;
 }
 
@@ -36,9 +36,8 @@ export interface ProviderStatusSummary {
  */
 export interface Meta {
   // Provider flags
-  use_jpred: boolean;
   use_tango: boolean;
-  jpred_rows: number;
+  use_s4pred?: boolean;
   ssw_rows: number;
   valid_seq_rows: number;
   

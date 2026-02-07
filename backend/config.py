@@ -103,15 +103,9 @@ class Settings:
     
     USE_TANGO: bool = _env_bool("USE_TANGO", True)
     """Enable TANGO provider (default: True)"""
-    
-    USE_PSIPRED: bool = _env_bool("USE_PSIPRED", True)
-    """Enable PSIPRED provider (default: True, reference only)"""
-    
-    USE_JPRED: bool = False
-    """JPred is always disabled (kept for reference only)"""
 
     USE_S4PRED: bool = _env_bool("USE_S4PRED", True)
-    """Enable S4PRED provider (default: True, replaces PSIPRED)"""
+    """Enable S4PRED secondary structure prediction (default: True)"""
 
     TANGO_MODE: str = os.getenv("TANGO_MODE", "simple").lower()
     """TANGO execution mode: 'simple' or 'host' (default: simple)"""
@@ -125,9 +119,6 @@ class Settings:
     
     TANGO_RUNTIME_DIR: Optional[str] = os.getenv("TANGO_RUNTIME_DIR")
     """TANGO runtime directory (default: backend/.run_cache/Tango)"""
-    
-    PSIPRED_RUNTIME_DIR: Optional[str] = os.getenv("PSIPRED_RUNTIME_DIR")
-    """PSIPRED runtime directory (default: backend/.run_cache/Psipred)"""
 
     S4PRED_RUNTIME_DIR: Optional[str] = os.getenv("S4PRED_RUNTIME_DIR")
     """S4PRED runtime directory (default: backend/.run_cache/S4Pred)"""
@@ -138,13 +129,6 @@ class Settings:
         if self.TANGO_RUNTIME_DIR:
             return self.TANGO_RUNTIME_DIR
         return str(_BACKEND_DIR / ".run_cache" / "Tango")
-    
-    @property
-    def psipred_runtime_dir(self) -> str:
-        """Get PSIPRED runtime directory with default fallback."""
-        if self.PSIPRED_RUNTIME_DIR:
-            return self.PSIPRED_RUNTIME_DIR
-        return str(_BACKEND_DIR / ".run_cache" / "Psipred")
 
     @property
     def s4pred_runtime_dir(self) -> str:
@@ -153,16 +137,6 @@ class Settings:
             return self.S4PRED_RUNTIME_DIR
         return str(_BACKEND_DIR / ".run_cache" / "S4Pred")
 
-    # ============================================================================
-    # PSIPRED Configuration
-    # ============================================================================
-    
-    PSIPRED_IMAGE: str = os.getenv("PSIPRED_IMAGE", "psipred-hhblits")
-    """Docker image name for PSIPRED (default: psipred-hhblits)"""
-    
-    PSIPRED_DB: Optional[str] = os.getenv("PSIPRED_DB")
-    """Path to PSIPRED database directory (required for PSIPRED to run)"""
-    
     # ============================================================================
     # Threshold Configuration
     # ============================================================================

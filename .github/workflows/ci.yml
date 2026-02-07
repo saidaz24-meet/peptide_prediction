@@ -41,7 +41,7 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements-dev.txt
 
       - name: Run linting (ruff)
         run: ruff check . || true
@@ -55,7 +55,6 @@ jobs:
         env:
           USE_TANGO: '0'
           USE_S4PRED: '0'
-          USE_JPRED: '0'
         run: pytest tests/ -v --tb=short
 
   # Frontend build and lint

@@ -38,7 +38,7 @@ from services.dataframe_utils import (
 from schemas.api_models import RowsResponse, PeptideRow, Meta, ProviderStatusSummary
 
 # Provider flags are read dynamically from settings to avoid caching issues
-# Use settings.USE_TANGO, settings.USE_PSIPRED, settings.USE_JPRED directly
+# Use settings.USE_TANGO, settings.USE_S4PRED directly
 
 # Global state for provider status tracking (shared with server.py)
 _last_provider_status: Dict[str, Any] = {}
@@ -76,28 +76,38 @@ class UploadProcessingError(Exception):
         self.status_code = status_code
 
 
-def _run_secondary_structure_provider(df: pd.DataFrame, trace_entry: Optional[str], sentry_initialized: bool) -> None:
-    """Run secondary structure prediction via provider interface."""
-    psipred_start_time = time.time()
-    from services.secondary_structure import get_provider
+def _run_s4pred_provider(df: pd.DataFrame, trace_entry: Optional[str], sentry_initialized: bool) -> None:
+    """Run S4PRED secondary structure prediction."""
+    s4pred_start_time = time.time()
     try:
-        provider = get_provider()
-        log_info("secondary_structure_start", f"Starting {provider.get_name()} processing")
-        provider.run(df)
-        psipred_elapsed = (time.time() - psipred_start_time) * 1000
-        log_info("secondary_structure_complete", f"{provider.get_name()} processing complete",
-                **{"psipred_time_ms": round(psipred_elapsed, 2)})
+        # Extract sequences for S4PRED
+        sequences = []
+        for _, row in df.iterrows():
+            entry_id = str(row.get('Entry', ''))
+            sequence = str(row.get('Sequence', ''))
+            if entry_id and sequence:
+                sequences.append((entry_id, sequence))
+
+        if not sequences:
+            log_warning("s4pred_no_sequences", "No valid sequences for S4PRED")
+            return
+
+        # Run S4PRED
+        success, stats = s4pred.run_s4pred_database(df, "upload", trace_id=get_trace_id())
+        s4pred_elapsed = (time.time() - s4pred_start_time) * 1000
+        log_info("s4pred_complete", f"S4PRED processing complete: {stats.get('parsed_ok', 0)}/{stats.get('requested', 0)}",
+                **{"s4pred_time_ms": round(s4pred_elapsed, 2), **stats})
     except Exception as e:
         trace_id = get_trace_id()
-        log_error("secondary_structure_error", f"Secondary structure provider error: {e}",
-                stage="psipred", **{"error": str(e), "entry": trace_entry})
+        log_error("s4pred_error", f"S4PRED provider error: {e}",
+                stage="s4pred", **{"error": str(e), "entry": trace_entry})
 
         if sentry_initialized:
             with sentry_sdk.push_scope() as scope:
-                scope.set_tag("provider", "psipred")
+                scope.set_tag("provider", "s4pred")
                 scope.set_tag("stage", "execution")
                 scope.set_tag("endpoint", "upload-csv")
-                scope.set_context("psipred_error", {
+                scope.set_context("s4pred_error", {
                     "trace_id": trace_id,
                     "entry": trace_entry,
                 })
@@ -137,8 +147,7 @@ def _run_tango_processing(
     try:
         if tango_enabled_flag:
             # Build fresh records (Entry, Sequence) from df
-            existed = tango.get_all_existed_tango_results_entries()
-            records = tango.create_tango_input(df, existed_tango_results=existed, force=True)
+            records = tango.build_records_from_dataframe(df)
             requested = len(records) if records else 0
             tango_stats["requested"] = requested
 
@@ -293,7 +302,7 @@ def _run_tango_processing(
                 tango_provider_reason = f"Unexpected error: {str(e)}"
                 _set_ssw_fields_to_none(df)
 
-            # Step 3: ensure %Helix / %β present from Tango if PSIPRED is off
+            # Step 3: ensure %Helix / %β present from Tango if S4PRED is off
             _fill_percent_from_tango_if_missing(df)
 
             # Produce SSW prediction column used by the SSW badge
@@ -596,8 +605,6 @@ def _compute_reproducibility_primitives(
     # 4. Compute config_hash from configuration flags/options
     config_dict = {
         "USE_TANGO": settings.USE_TANGO,
-        "USE_PSIPRED": settings.USE_PSIPRED,
-        "USE_JPRED": settings.USE_JPRED,
         "USE_S4PRED": settings.USE_S4PRED,
     }
     config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
@@ -618,12 +625,6 @@ def _compute_reproducibility_primitives(
             "parsed_ok": s4pred_stats.get("parsed_ok", 0),
             "parsed_bad": s4pred_stats.get("parsed_bad", 0),
         } if s4pred_enabled_flag else None,
-        "psipred": {
-            "status": "OFF" if not settings.USE_PSIPRED else "UNKNOWN",
-        },
-        "jpred": {
-            "status": "OFF",
-        },
     }
 
     # 6. Resolve thresholds (deterministic computation based on mode)
@@ -670,7 +671,7 @@ def process_upload_dataframe(
             **{"ff_helix_time_ms": round(ff_helix_elapsed, 2)})
 
     # Secondary structure prediction via provider interface
-    _run_secondary_structure_provider(df, trace_entry, sentry_initialized)
+    _run_s4pred_provider(df, trace_entry, sentry_initialized)
 
     # --- TANGO processing ---
     tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = _run_tango_processing(
@@ -685,8 +686,7 @@ def process_upload_dataframe(
     )
     s4pred_enabled_flag = settings.USE_S4PRED
 
-    # JPred disabled - kept for reference only
-    jpred_hits = 0
+    # Count SSW hits (rows with valid TANGO predictions)
     if "SSW prediction" in df.columns:
         ssw_hits = int(df["SSW prediction"].notna().sum())
     else:
@@ -739,8 +739,6 @@ def process_upload_dataframe(
         df,
         is_single_row=False,
         tango_enabled=settings.USE_TANGO,
-        psipred_enabled=settings.USE_PSIPRED,
-        jpred_enabled=settings.USE_JPRED,
         s4pred_enabled=settings.USE_S4PRED
     )
     normalize_ui_elapsed = (time.time() - normalize_ui_start_time) * 1000
@@ -786,7 +784,6 @@ def process_upload_dataframe(
 
     log_info("upload_complete", f"Upload processing complete", stage="response", run_id=tango_run_dir_basename, **{
         "total_rows": len(df),
-        "jpred_hits": jpred_hits,
         "ssw_hits": ssw_hits,
         "ssw_positive_percent": ssw_percent,
         "ssw_positives": ssw_positives,
@@ -811,16 +808,6 @@ def process_upload_dataframe(
             "reason": s4pred_provider_reason,
             "stats": s4pred_stats,
         },
-        "psipred": {
-            "status": "OFF",
-            "reason": "PSIPRED not enabled",
-            "stats": {"requested": 0, "parsed_ok": 0, "parsed_bad": 0},
-        },
-        "jpred": {
-            "status": "OFF",
-            "reason": "JPred disabled",
-            "stats": {"requested": 0, "parsed_ok": 0, "parsed_bad": 0},
-        },
     }
 
     # Update global state for /api/providers/last-run endpoint
@@ -837,8 +824,9 @@ def process_upload_dataframe(
 
     # Build meta dict (ISSUE-018: schema enforcement)
     meta_dict = ensure_trace_id_in_meta({
-        "use_jpred": False, "use_tango": settings.USE_TANGO,
-        "jpred_rows": jpred_hits, "ssw_rows": ssw_hits,
+        "use_tango": settings.USE_TANGO,
+        "use_s4pred": settings.USE_S4PRED,
+        "ssw_rows": ssw_hits,
         "valid_seq_rows": int(df["Sequence"].notna().sum()),
         "provider_status": provider_status_meta,
         # Reproducibility primitives

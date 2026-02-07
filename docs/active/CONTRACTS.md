@@ -1,17 +1,34 @@
 # API Contracts
 
-**Last Updated**: 2025-01-14  
+**Last Updated**: 2026-02-05
 **Purpose**: Exact request/response shapes for all API endpoints.
 
 ---
 
 ## Response Format Standard
 
-**All endpoints return camelCase keys** (e.g., `id`, `sequence`, `sswPrediction`).  
-**Forbidden**: Capitalized keys (e.g., `Entry`, `Sequence`, `FF-Helix %`) - these are CSV format only.
+**All endpoints return camelCase keys** (e.g., `id`, `sequence`, `sswPrediction`).
+**Forbidden**: Capitalized keys (e.g., `Entry`, `Sequence`, `FF-Helix %`) — CSV format only.
 
-**Schema**: `backend/schemas/api_models.py:PeptideRow`  
+**Schema**: `backend/schemas/api_models.py:PeptideRow`
 **Validation**: `ui/src/lib/apiValidator.ts` (development mode only)
+
+---
+
+## SSW Semantics (TANGO Predictions)
+
+The `sswPrediction` field indicates structural switch propensity:
+
+| Value | Meaning | When It Occurs |
+|-------|---------|----------------|
+| `1` | **Positive** — structural switch predicted | `SSW diff < avg_diff` |
+| `-1` | **Negative** — no structural switch predicted | `SSW diff >= avg_diff` |
+| `0` | **Uncertain** — algorithm couldn't determine | Rare edge case |
+| `null` | **Missing** — TANGO didn't run or failed | Provider unavailable |
+
+**Key invariant**: `-1` is a valid prediction (not a sentinel). Only `null` means "no data".
+
+**Threshold source**: `backend/tango.py:filter_by_avg_diff()`
 
 ---
 
@@ -45,10 +62,17 @@
       "sswBetaPercentage": 28.1,
       "ffHelixPercent": 42.5,
       "ffHelixFragments": [[5, 12], [20, 28]],
+      "tangoHasData": true,
+      "tangoAggMax": 15.2,
+      "s4predHelixPrediction": 1,
+      "s4predHelixPercent": 40.5,
+      "s4predSswPrediction": 1,
+      "s4predHasData": true,
       "providerStatus": {
-        "tango": {"status": "available"},
-        "psipred": {"status": "unavailable", "reason": "Docker not configured"},
-        "jpred": {"status": "not_configured"}
+        "tango": {"status": "AVAILABLE"},
+        "s4pred": {"status": "AVAILABLE"},
+        "psipred": {"status": "OFF", "reason": "PSIPRED not enabled"},
+        "jpred": {"status": "OFF", "reason": "JPred disabled"}
       },
       "name": "Protein name",
       "species": "Homo sapiens"
@@ -62,9 +86,10 @@
     "valid_seq_rows": 150,
     "provider_status": {...},
     "providerStatusSummary": {
-      "tango": {"status": "available", "requested": 150, "parsed_ok": 120, "parsed_bad": 0},
-      "psipred": {"status": "unavailable"},
-      "jpred": {"status": "not_configured"}
+      "tango": {"status": "AVAILABLE", "requested": 150, "parsed_ok": 120, "parsed_bad": 0},
+      "s4pred": {"status": "AVAILABLE", "requested": 150, "parsed_ok": 150, "parsed_bad": 0},
+      "psipred": {"status": "OFF"},
+      "jpred": {"status": "OFF"}
     },
     "runId": "uuid4",
     "traceId": "uuid4",
@@ -393,21 +418,34 @@
 {
   "providerStatus": {
     "tango": {
-      "status": "available" | "unavailable" | "partial" | "not_configured",
+      "status": "AVAILABLE" | "UNAVAILABLE" | "PARTIAL" | "OFF",
+      "reason": string | null
+    },
+    "s4pred": {
+      "status": "AVAILABLE" | "UNAVAILABLE" | "OFF",
       "reason": string | null
     },
     "psipred": {
-      "status": "available" | "unavailable" | "not_configured",
+      "status": "AVAILABLE" | "UNAVAILABLE" | "OFF",
       "reason": string | null
     },
     "jpred": {
-      "status": "not_configured"
+      "status": "OFF",
+      "reason": "JPred disabled"
     }
   }
 }
 ```
 
-**Source**: `backend/services/provider_tracking.py:create_provider_status_for_row()`
+**Status values** (UPPERCASE):
+| Status | Meaning |
+|--------|---------|
+| `AVAILABLE` | Provider ran and produced valid results |
+| `UNAVAILABLE` | Provider enabled but failed (see `reason`) |
+| `PARTIAL` | Provider ran but some rows failed |
+| `OFF` | Provider disabled in config |
+
+**Source**: `backend/schemas/provider_status.py`, `backend/services/provider_tracking.py`
 
 ---
 

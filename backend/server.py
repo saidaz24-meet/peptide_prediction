@@ -69,7 +69,7 @@ from config import settings
 # SENTRY_INITIALIZED will be imported from api/main.py at the end of this file
 
 # Provider flags are read dynamically from settings to avoid caching issues
-# Use settings.USE_TANGO, settings.USE_PSIPRED, settings.USE_JPRED directly
+# Use settings.USE_TANGO, settings.USE_S4PRED directly
 DEBUG_ENTRY = settings.DEBUG_ENTRY
 use_simple = settings.TANGO_MODE == "simple"
 
@@ -91,7 +91,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent  # adjust one/two levels as ne
 EXAMPLE_PATH = BASE_DIR / "ui" / "public" / "Final_Staphylococcus_2023_new.xlsx"
 
 # Column constants for checking pre-existing results
-JPRED_COLS = ["Helix fragments (Jpred)", "Helix score (Jpred)"]
 TANGO_COLS = ["SSW prediction", "SSW score"]
 BIOCHEM_COLS = ["Charge", "Hydrophobicity", "Full length uH"]
 
@@ -274,8 +273,7 @@ async def providers_last_run():
         return {
             "note": "No dataset processed yet. Load a dataset via /api/upload-csv or /api/uniprot/execute first.",
             "tango": None,
-            "psipred": None,
-            "jpred": None,
+            "s4pred": None,
             "run_dirs": {
                 "tango": None,
             }
@@ -286,8 +284,7 @@ async def providers_last_run():
 
     return {
         "tango": last_status.get("tango"),
-        "psipred": last_status.get("psipred"),
-        "jpred": last_status.get("jpred"),
+        "s4pred": last_status.get("s4pred"),
         "run_dirs": {
             "tango": latest_tango_dir,
         },
@@ -598,7 +595,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                 }
             
             # Run the same analysis pipeline as /api/upload-csv
-            # This ensures computed metrics (FF-Helix, Charge, Hydrophobicity, μH, TANGO, PSIPRED) are available
+            # This ensures computed metrics (FF-Helix, Charge, Hydrophobicity, μH, TANGO, S4PRED) are available
             log_info("uniprot_analysis_start", "Running analysis pipeline on UniProt results")
             
             # Normalize columns first
@@ -634,16 +631,6 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                     "runtime_ms": None,
                     "sequences_processed": 0,
                 },
-                "psipred": {
-                    "status": "OFF",
-                    "reason": None,
-                    "stats": {"requested": 0, "parsed_ok": 0, "parsed_bad": 0},
-                    "enabled": False,
-                    "ran": False,
-                    "skipped_reason": None,
-                    "runtime_ms": None,
-                    "sequences_processed": 0,
-                },
                 "s4pred": {
                     "enabled": settings.USE_S4PRED,
                     "requested": settings.USE_S4PRED,  # S4PRED runs automatically if enabled
@@ -656,47 +643,6 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                     "sequences_processed": 0,
                 },
             }
-            
-            # Secondary structure prediction via provider interface (only if explicitly requested)
-            if request.run_psipred and settings.USE_PSIPRED:
-                start_time = time.time()
-                try:
-                    provider_status_meta["psipred"]["enabled"] = True
-                    from services.secondary_structure import get_provider
-                    provider = get_provider()
-                    
-                    # Limit sequences for provider processing
-                    max_seqs = request.max_provider_sequences or 50
-                    if len(df) > max_seqs:
-                        log_info("uniprot_psipred_limit", f"Limiting PSIPRED to first {max_seqs} sequences (requested {len(df)})", **{"requested": len(df), "limited": max_seqs})
-                        df_for_provider = df.head(max_seqs).copy()
-                    else:
-                        df_for_provider = df
-                    
-                    log_info("uniprot_secondary_structure_start", f"Starting {provider.get_name()} processing for UniProt results", **{"sequence_count": len(df_for_provider)})
-                    provider.run(df_for_provider)
-                    
-                    # Merge results back if we processed a subset
-                    if len(df) > max_seqs:
-                        # Copy computed columns back to full dataframe
-                        for col in ["Helix fragments (Psipred)", "Psipred helix %", "Psipred beta %", "FF-Helix %"]:
-                            if col in df_for_provider.columns:
-                                df[col] = df_for_provider[col].reindex(df.index, fill_value=df_for_provider[col].iloc[0] if len(df_for_provider) > 0 else None)
-                    
-                    provider_status_meta["psipred"]["ran"] = True
-                    provider_status_meta["psipred"]["sequences_processed"] = len(df_for_provider)
-                    log_info("uniprot_secondary_structure_complete", f"{provider.get_name()} processing complete")
-                except Exception as e:
-                    provider_status_meta["psipred"]["skipped_reason"] = str(e)
-                    log_warning("uniprot_secondary_structure_error", f"Secondary structure provider error: {e}", **{"error": str(e)})
-                finally:
-                    provider_status_meta["psipred"]["runtime_ms"] = int((time.time() - start_time) * 1000)
-            else:
-                if not request.run_psipred:
-                    provider_status_meta["psipred"]["skipped_reason"] = "Not requested (run_psipred=false)"
-                elif not settings.USE_PSIPRED:
-                    provider_status_meta["psipred"]["skipped_reason"] = "PSIPRED disabled in environment"
-                log_info("uniprot_psipred_skip", f"PSIPRED skipped: {provider_status_meta['psipred']['skipped_reason']}")
             
             # TANGO processing with deterministic toggle precedence:
             # 1. ENV USE_TANGO (if False, always skip regardless of request - PRIMARY GATE)
@@ -717,8 +663,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                     provider_status_meta["tango"]["requested"] = tango_requested_flag
                     # Process all sequences - no limit for TANGO
                     log_info("uniprot_tango_start", f"Running TANGO for UniProt sequences", **{"sequence_count": len(df), "total_sequences": len(df)})
-                    existed = tango.get_all_existed_tango_results_entries()
-                    records = tango.create_tango_input(df, existed_tango_results=existed, force=True)
+                    records = tango.build_records_from_dataframe(df)
                     
                     if records:
                         log_info("uniprot_tango_run_start", f"Running TANGO for {len(records)} sequences", **{"sequence_count": len(records)})
@@ -831,7 +776,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                             provider_status_meta["tango"]["skipped_reason"] = f"Unexpected error: {str(e)}"
                             provider_status_meta["tango"]["stats"] = {"requested": len(records) if records else 0, "parsed_ok": 0, "parsed_bad": len(records) if records else 0}
                         
-                        # Ensure %Helix / %β present from Tango if PSIPRED is off
+                        # Ensure %Helix / %β present from Tango if S4PRED is off
                         _fill_percent_from_tango_if_missing(df)
                         
                         # Produce SSW prediction column
@@ -1040,14 +985,11 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                 df,
                 is_single_row=False,
                 tango_enabled=settings.USE_TANGO,
-                psipred_enabled=settings.USE_PSIPRED,
-                jpred_enabled=settings.USE_JPRED,
                 s4pred_enabled=settings.USE_S4PRED
             )
             log_info("uniprot_normalize_ui_complete", f"Normalized {len(rows_out)} rows for UI", **{"row_count": len(rows_out)})
             
             # Calculate metadata (similar to upload-csv)
-            jpred_hits = 0
             # Count rows with valid TANGO metrics (sswPrediction is not None/null)
             if "SSW prediction" in df.columns:
                 ssw_hits = int(df["SSW prediction"].notna().sum())
@@ -1071,17 +1013,16 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             
             # Determine what actually ran (not just env flags)
             tango_actually_ran = provider_status_meta["tango"]["ran"]
-            psipred_actually_ran = provider_status_meta["psipred"]["ran"]
-            
+            s4pred_actually_ran = provider_status_meta["s4pred"]["ran"]
+
             log_info("uniprot_analysis_complete", f"UniProt analysis complete", **{
                 "total_rows": len(df),
-                "jpred_hits": jpred_hits,
                 "ssw_hits": ssw_hits,
                 "ssw_positive_percent": ssw_percent,
                 "ssw_positives": ssw_positives,
                 "ff_helix_available": ff_avail,
                 "tango_ran": tango_actually_ran,
-                "psipred_ran": psipred_actually_ran,
+                "s4pred_ran": s4pred_actually_ran,
             })
             
             # Update global state for /api/providers/last-run endpoint
@@ -1109,8 +1050,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
             # Compute config_hash from configuration flags
             config_dict = {
                 "USE_TANGO": settings.USE_TANGO,
-                "USE_PSIPRED": settings.USE_PSIPRED,
-                "USE_JPRED": settings.USE_JPRED,
+                "USE_S4PRED": settings.USE_S4PRED,
             }
             config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
             config_hash = hashlib.sha256(config_str.encode('utf-8')).hexdigest()[:16]
@@ -1123,12 +1063,12 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                     "parsed_ok": provider_status_meta["tango"].get("stats", {}).get("parsed_ok", 0),
                     "parsed_bad": provider_status_meta["tango"].get("stats", {}).get("parsed_bad", 0),
                 } if provider_status_meta["tango"]["enabled"] else None,
-                "psipred": {
-                    "status": "OFF" if not settings.USE_PSIPRED else "UNKNOWN",
-                },
-                "jpred": {
-                    "status": "OFF",
-                },
+                "s4pred": {
+                    "status": provider_status_meta["s4pred"]["status"],
+                    "requested": provider_status_meta["s4pred"].get("stats", {}).get("requested", 0),
+                    "parsed_ok": provider_status_meta["s4pred"].get("stats", {}).get("parsed_ok", 0),
+                    "parsed_bad": provider_status_meta["s4pred"].get("stats", {}).get("parsed_bad", 0),
+                } if provider_status_meta["s4pred"]["enabled"] else None,
             }
 
             # Resolve thresholds (deterministic computation based on mode)
@@ -1145,8 +1085,7 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                     "row_count": len(df),
                     "size_requested": request.size or 500,
                     "size_returned": len(df),
-                    "use_jpred": settings.USE_JPRED,
-                    "jpred_rows": jpred_hits,
+                    "use_s4pred": settings.USE_S4PRED,
                     # Meta flags: use_tango reflects env setting, provider_status reflects actual runtime state
                     "use_tango": settings.USE_TANGO,  # Env setting (for UI fallback compatibility)
                     "run_tango": request.run_tango,  # What was requested
@@ -1297,8 +1236,6 @@ async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
                                 df_minimal,
                                 is_single_row=False,
                                 tango_enabled=False,
-                                psipred_enabled=False,
-                                jpred_enabled=False,
                                 s4pred_enabled=False,
                             )
                             

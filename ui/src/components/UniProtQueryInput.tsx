@@ -41,7 +41,7 @@ interface QueryControls {
   includeIsoforms: boolean;
   size: number;
   runTango: boolean;
-  runPsipred: boolean;
+  runS4pred: boolean;
 }
 
 export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQueryInputProps) {
@@ -61,7 +61,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
     includeIsoforms: false,
     size: 500,
     runTango: false, // Default: OFF for fast response
-    runPsipred: false, // Default: OFF for fast response
+    runS4pred: false, // Default: OFF for fast response
   });
 
   // Auto-parse query when it changes (debounced)
@@ -163,7 +163,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
         include_isoforms: controls.includeIsoforms,
         size: controls.size,
         run_tango: controls.runTango,  // Use UI toggle state
-        run_psipred: controls.runPsipred,  // Use UI toggle state
+        run_s4pred: controls.runS4pred,  // Use UI toggle state
         max_provider_sequences: 50,  // Limit if providers are enabled
       };
       
@@ -214,7 +214,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
           const ps = result.meta.provider_status;
           console.log('[UNIPROT][UI] Provider status:', {
             tango: ps.tango?.skipped_reason || (ps.tango?.ran ? 'completed' : 'not run'),
-            psipred: ps.psipred?.skipped_reason || (ps.psipred?.ran ? 'completed' : 'not run'),
+            s4pred: ps.s4pred?.skipped_reason || (ps.s4pred?.ran ? 'completed' : 'not run'),
           });
         }
 
@@ -222,10 +222,10 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
         
         // Show provider status in toast if providers were skipped
         const ps = result.meta?.provider_status;
-        if (ps?.tango?.skipped_reason || ps?.psipred?.skipped_reason) {
+        if (ps?.tango?.skipped_reason || ps?.s4pred?.skipped_reason) {
           const reasons = [];
-          if (ps.tango?.skipped_reason) reasons.push(`Tango: ${ps.tango.skipped_reason}`);
-          if (ps.psipred?.skipped_reason) reasons.push(`PSIPRED: ${ps.psipred.skipped_reason}`);
+          if (ps.tango?.skipped_reason) reasons.push(`TANGO: ${ps.tango.skipped_reason}`);
+          if (ps.s4pred?.skipped_reason) reasons.push(`S4PRED: ${ps.s4pred.skipped_reason}`);
           if (reasons.length > 0) {
             toast(`Providers not computed: ${reasons.join(', ')}`);
           }
@@ -512,8 +512,8 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
-                    <Label htmlFor="run-psipred" className="text-sm font-medium">
-                      Run PSIPRED (Secondary Structure)
+                    <Label htmlFor="run-s4pred" className="text-sm font-medium">
+                      Run S4PRED (Secondary Structure)
                     </Label>
                     <p className="text-xs text-muted-foreground">
                       Predicts Helix/Sheet/Coil. Limited to first 50 sequences.
@@ -521,9 +521,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                   </div>
                   <input
                     type="checkbox"
-                    id="run-psipred"
-                    checked={controls.runPsipred}
-                    onChange={(e) => setControls(prev => ({ ...prev, runPsipred: e.target.checked }))}
+                    id="run-s4pred"
+                    checked={controls.runS4pred}
+                    onChange={(e) => setControls(prev => ({ ...prev, runS4pred: e.target.checked }))}
                     disabled={isExecuting}
                     className="h-4 w-4 rounded border-gray-300 cursor-pointer disabled:cursor-not-allowed"
                   />

@@ -4,19 +4,13 @@ from statistics import median
 from typing import Optional
 import numpy as np
 import pandas as pd
-import warnings
 
 import biochem_calculation
 
-PATH = os.getcwd()
-JPRED_INPUT_FILEPATH = "jpred_input.txt"
-MINIMAL_PEPTIDE_LENGTH = 40
-
+# SSW segment detection thresholds
 MIN_LENGTH = 5
 MAX_GAP = 3
-MIN_JPRED_SCORE = 7
 MIN_TANGO_SCORE = 0
-MAX_SSW_DIFFERENCE_TANGO = np.inf
 
 # --- FF-Helix helpers (pure Python; no external tools) ---
 
@@ -146,56 +140,6 @@ def ff_helix_cores(seq, core_len: Optional[int] = None, thr: Optional[float] = N
     return segments
 
 
-def get_input_files(run_job: str) -> list:
-    """
-    This function get all input files for the current job running, by the 'run_job' variable indicating the name of the
-    folder to search for databases.
-    :param run_job: Name of folder that will contain databases to run
-    :return: list of files
-    """
-    input_files = []
-    for root, dirs, files in os.walk(PATH + '/' + run_job + '/Database'):
-        for file in files:
-            input_files.append(run_job + '/Database/' + file)
-    return input_files
-
-
-def filter_uncertain_and_long_sequences(database: pd.DataFrame):
-    """
-    This function removes all entries in the database that are longer than MINIMAL_PEPTIDE_LENGTH and all sequences
-    that have sequence caution, sequence conflict or sequence uncertainty.
-    :param database:
-    :return: Nothing. changes the given database
-    """
-    database_indexes = set(database.index)
-
-    long_sequences_idx = set(database[database["Length"] > MINIMAL_PEPTIDE_LENGTH].index)
-
-    no_caution_sequence_idx = set(database[database["Sequence caution"].isnull()].index)
-    no_sequence_conflict_idx = set(database[database["Sequence conflict"].isnull()].index)
-    no_sequence_uncertainty_idx = set(database[database["Sequence uncertainty"].isnull()].index)
-
-    caution_sequence_idx = database_indexes.difference(no_caution_sequence_idx)
-    sequence_conflict_idx = database_indexes.difference(no_sequence_conflict_idx)
-    sequence_uncertainty_idx = database_indexes.difference(no_sequence_uncertainty_idx)
-
-    drop_indexes = list(long_sequences_idx.union(caution_sequence_idx, sequence_conflict_idx, sequence_uncertainty_idx))
-    database.drop(drop_indexes, inplace=True)
-
-
-def __check_subsegment_without_the_end(prediction, start, original_end, min_length, min_score):
-    cur_end = original_end - 1
-    while len(prediction[start:(cur_end + 1)]) >= min_length:
-        segment_length = cur_end - start + 1
-        good_segment = good_segment = segment_length >= min_length and \
-                                      (mean(prediction[start:cur_end + 1]) >= min_score or
-                                       median(prediction[start:cur_end + 1]) >= min_score)
-        if good_segment:
-            return cur_end
-        cur_end -= 1
-    return None  # No valid segment found
-
-
 def __check_subsegment(prediction: list, start: int, end: int) -> tuple:
     all_possible_length = [i for i in range(MIN_LENGTH, (end - start + 1 + 1))]
     max_start = -1
@@ -215,21 +159,15 @@ def __check_subsegment(prediction: list, start: int, end: int) -> tuple:
 
 def get_secondary_structure_segments(prediction: list, prediction_method: str) -> list:
     """
-    This function calculates the segments that are predicted to have above the threshold secondary structure prediction.
-    For each secondary structure prediction method the threshold is determined different:
-    Jpred = MIN_JPRED_SCORE
-    Tango = MIN_TANGO_SCORE
-    which are global variables that can be manually change.
+    Calculate segments predicted to have above-threshold secondary structure.
 
-    :param prediction_method: name of the tool the prediction came from: Tango\Jpred
+    :param prediction_method: name of the tool the prediction came from (e.g. "Tango")
     :param prediction: list of float numbers indicating the prediction score for each residue
     :return: list of tuples with start and end indexes of segments predicted to have secondary structure
     """
     min_score = - np.inf
     if prediction_method == "Tango":
         min_score = MIN_TANGO_SCORE
-    elif prediction_method == "Jpred":
-        min_score = MIN_JPRED_SCORE
 
     segments = []
     i = 0
@@ -408,7 +346,7 @@ def check_secondary_structure_prediction_content(secondary_structure_prediction_
 
 def get_corrected_sequence(sequence) -> str:
     """
-    Substitute letters for general amino acid to be compatible to Jpred input requirements:
+    Substitute letters for general amino acid to be compatible with prediction tools:
     "X" -> "A"
     "Z" -> "E"
     "B" -> D
@@ -430,111 +368,3 @@ def get_corrected_sequence(sequence) -> str:
     if '-' in s4:
         return s4.split('-')[0].upper()
     return s4.upper()
-
-
-def __get_sequence_without_modification(sequence: str) -> str:
-    modification_count = sequence.count("-")
-    if modification_count == 2:
-        return sequence.split("-")[1]
-    elif modification_count == 1:
-        if sequence.find("-") > len(sequence) / 2:
-            return sequence.split("-")[0]
-        else:
-            return sequence.split("-")[1]
-    else:
-        return sequence
-
-
-def get_sequences_without_modifications(peptides_list: list) -> list:
-    peptides_without_modifications = []
-    for sequence in peptides_list:
-        if pd.isna(sequence):
-            continue
-        peptides_without_modifications.append(__get_sequence_without_modification(sequence))
-    return peptides_without_modifications
-
-
-def list_string_to_float(num_string_list: list):
-    """
-    converting a list of strings to list of float's
-    :param num_string_list: list of strings to convert
-    :return: list of floats numbers
-    """
-    """
-    list_string_to_float -  .
-        input: l - list of strings.
-        output: list of float's.
-    """
-    float_list = list()
-    for i in range(len(num_string_list)):
-        if num_string_list[i] == "-1.#IO":
-            return list()
-        float_list.append(float(num_string_list[i]))
-    return float_list
-
-
-def get_all_antibacterial_entries() -> list:
-    with warnings.catch_warnings(record=True):
-        warnings.simplefilter("always")
-        original_database = pd.read_excel("uniprot-keyword__Antimicrobial+[KW-0929]_.xlsx", engine="openpyxl")
-    return list(original_database["Entry"])
-
-
-def add_duplications_with_antimicrobial_entrys(cur_database: pd.DataFrame, database_name: str,
-                                               statistical_result_dict: dict, antimicrobial_entries: list):
-    if database_name == "Antimicrobial+":
-        statistical_result_dict[database_name]["Antimicrobial entries"] = len(antimicrobial_entries)
-        return
-    count_antimicrobial_entries = 0
-    for _, entry in cur_database["Entry"].items():
-        if entry in antimicrobial_entries:
-            count_antimicrobial_entries += 1
-    statistical_result_dict[database_name]["Antimicrobial entries"] = count_antimicrobial_entries
-
-
-def add_database_info_to_statistical_results(statistical_result_dict: dict):
-    # C:/Users/peleg/PycharmProjects/Alpha_and_Chameleon_Peptides/
-    uniprot_kb_databases_info = pd.read_excel('Uniprot_KB/Uniprot_KB_databases_info.xlsx', engine='openpyxl')
-    uniprot_kb_info_dict = {}
-    for _, row in uniprot_kb_databases_info.iterrows():
-        if row['Organism ID'] > 0:
-            uniprot_kb_info_dict[str(int(row['Organism ID']))] = {'# Proteins': row['Total number of proteins'],
-                                                                  '# 40< Proteins': row['Short proteins (up to 40 aa)']}
-
-    for db in statistical_result_dict.keys():
-        cur_db_info = uniprot_kb_info_dict[str(db)]
-        statistical_result_dict[str(db)]['1 # Proteins'] = cur_db_info['# Proteins']
-        statistical_result_dict[str(db)]['2 # 40< Proteins'] = cur_db_info['# 40< Proteins']
-        statistical_result_dict[str(db)].pop('Original length')
-        statistical_result_dict[str(db)].pop('After filter')
-        statistical_result_dict[str(db)].pop('Antimicrobial Fibril Forming prediction')
-
-        sorted_cur_db_dict = dict(sorted(statistical_result_dict[str(db)].items()))
-        statistical_result_dict[str(db)] = sorted_cur_db_dict
-
-
-def get_database_name_from_file(file_name: str) -> str:
-    """
-    This function gets a database file name in UniProt format and return the database name.
-    :param file_name: The file name from which to extract the database name.
-    :return: database name
-    """
-    database_file_split = file_name.split('_')
-    return database_file_split[4] + '_' + database_file_split[5]
-
-
-def filter_entries_without_Jpred_result(database: pd.DataFrame) -> pd.DataFrame:
-    """
-    This function filters out of the given database entries that do not have Jpred results, due to Jpred restrictions.
-    :param database: database to filter
-    :return: new database without Jpred-less result entries
-    """
-    filtered_database = database.drop(database[database['Entry'] == 'A0A3D2B8F4'].index)
-    filtered_database = filtered_database.drop(filtered_database[filtered_database['Entry'] == 'A0A6B2FE55'].index)
-    filtered_database = filtered_database.drop(filtered_database[filtered_database['Entry'] == 'A0A1X4JA79'].index)
-    filtered_database = filtered_database.drop(filtered_database[filtered_database['Entry'] == 'A0A1X4JF71'].index)
-    filtered_database = filtered_database.drop(filtered_database[filtered_database['Entry'] == 'A0A0E1PXY5'].index)
-    filtered_database = filtered_database.drop(filtered_database[filtered_database['Entry'] == 'A4NWW5'].index)
-    filtered_database = filtered_database.drop(filtered_database[filtered_database['Entry'] == 'A5UHP6'].index)
-    filtered_database = filtered_database.drop(filtered_database[filtered_database['Entry'] == 'A0A377Z9E9'].index)
-    return filtered_database

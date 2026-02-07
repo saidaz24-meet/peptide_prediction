@@ -38,7 +38,7 @@ const metrics = [
   {
     icon: Layers,
     name: 'FF-Helix Percentage',
-    description: 'Predicted percentage of helical secondary structure (JPred)',
+    description: 'Predicted percentage of helical secondary structure (S4PRED/TANGO)',
     interpretation: 'Higher percentages indicate more structured peptides. Range: 0-100%',
     color: 'text-helix',
   },
