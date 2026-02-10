@@ -164,12 +164,7 @@ export type ColumnMapping = {
   ff_helix_percent?: string;       // maps to Peptide.ffHelixPercent
   ff_helix_fragments?: string;
 
-  // JPred
-  jpred_helix_percent?: string;    // (if you ever store it)
-  jpred_helix_fragments?: string;
-  jpred_helix_score?: string;
-
-  // ----- NEW: optional direct mapping for unified columns -----
+  // ----- Optional direct mapping for unified columns -----
   helix_percent?: string;          // maps to Peptide.helixPercent
   beta_percent?: string;           // maps to Peptide.betaPercent
 

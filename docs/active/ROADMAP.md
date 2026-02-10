@@ -86,13 +86,13 @@ FF-Helix verified. Key findings and changes:
 ### Step 3: Documentation Consolidation
 **Priority**: HIGH | **Status**: DONE (2026-02-07)
 
-Created `docs/MASTER_GUIDE.md` (~300 lines) with:
+Created `docs/MASTER_GUIDE.md` (~420 lines) with:
 1. User Journey (3 paths: CSV upload, Quick Analyze, UniProt query)
 2. File-by-File Explanation (all backend + frontend core files)
 3. Code Flow Walkthrough (upload pipeline, S4PRED flow, normalization pipeline)
 4. The Science (FF-Helix, FF-SSW, S4PRED neural network)
 5. Configuration & Deployment guide (env vars, Docker, S4PRED weights)
-6. Testing section (202 tests, categories)
+6. Testing section (214 tests, categories)
 7. Future Roadmap summary
 
 ### Step 4: Meeting Walkthrough Document
@@ -104,6 +104,25 @@ Created `docs/MEETING_WALKTHROUGH.md` (~200 lines) for biologist/PhD audience:
 - Demo walkthrough (Upload → Results → Detail → Export)
 - Output column dictionary (all metrics explained)
 - Discussion questions for supervisor meeting
+
+### Step 5: FF Flags/Scores in API
+**Priority**: HIGH | **Status**: DONE (2026-02-07)
+
+Added 4 new fields to API response:
+- `ffHelixFlag`: 1 (candidate), -1 (not candidate), null (no data). S4PRED-based.
+- `ffHelixScore`: helix_uH + helix_score
+- `ffSswFlag`: 1 (candidate), -1 (not candidate), null (no data)
+- `ffSswScore`: Hydrophobicity + Beta_uH(160°) + Full_length_uH(100°) + SSW_prediction
+
+**Files changed**: `dataframe_utils.py`, `peptide.py`, `api_models.py`, `normalize.py`, `peptide.ts`, `test_ff_helix_golden.py`
+
+### Step 6: Documentation Suite
+**Priority**: MEDIUM | **Status**: DONE (2026-02-07)
+
+Created 3 audience-specific docs:
+- `docs/TEAM_GUIDE.md` — Non-technical (restaurant metaphor, troubleshooting, glossary)
+- `docs/DEVELOPER_REFERENCE.md` — Developers (call graphs, debugging workflows, function signatures)
+- `docs/SYSTEM_OVERVIEW.md` — Technical stakeholders (design decisions, scalability, deployment)
 
 ---
 
@@ -160,7 +179,7 @@ Created `docs/MEETING_WALKTHROUGH.md` (~200 lines) for biologist/PhD audience:
 
 | Feature | Current State | Priority |
 |---------|--------------|----------|
-| Data table search | Renders but non-functional | MEDIUM |
+| Data table search | Working (globalFilter in PeptideTable.tsx) | DONE |
 | Data table filters | Button renders, not functional | MEDIUM |
 | ColumnMapper component | Exists unused (auto-detect works) | LOW |
 | Cloud save/load | Listed in About, not implemented | LOW (post-paper) |
@@ -267,7 +286,7 @@ Required infrastructure:
 ## Testing Strategy
 
 ### Current Test Coverage
-- 202 tests passing (all deterministic, no network)
+- 214 tests passing (all deterministic, no network)
 - Golden tests for SSW algorithm, biochem calculations, preprocessing
 - S4PRED golden tests (24 tests: segments, analysis, SSW, filter_by_diff)
 - API contract tests for response schema validation
@@ -298,9 +317,9 @@ make ci          # Full pipeline
 | TD-02 | server.py is ~1500 lines (target ~500) | MEDIUM | Maintainability |
 | TD-03 | normalize.py has duplicate fallback logic (~700 lines) | MEDIUM | Maintainability |
 | TD-04 | Mixed import patterns (some local, some top-level) | LOW | Consistency |
-| TD-05 | Data table search/filter not functional in Results.tsx | MEDIUM | User experience |
+| TD-05 | Data table filter button non-functional in Results.tsx | MEDIUM | User experience |
 | TD-06 | ColumnMapper component unused but still in codebase | LOW | Cleanup |
-| TD-07 | Cloud save/load promised in About.tsx but not implemented | LOW | Remove from About or implement |
+| TD-07 | Cloud save/load removed from About.tsx (was unimplemented) | LOW | ✅ DONE |
 
 ---
 

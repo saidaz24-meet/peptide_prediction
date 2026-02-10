@@ -146,7 +146,7 @@ export default function About() {
                 <li>Smart ranking & Top-N shortlist</li>
                 <li>CSV & PDF report export</li>
                 <li>UniProt & AlphaFold quick links</li>
-                <li>Optional cloud save/load</li>
+                <li>Per-residue probability curves (S4PRED)</li>
               </ul>
             </CardContent>
           </Card>

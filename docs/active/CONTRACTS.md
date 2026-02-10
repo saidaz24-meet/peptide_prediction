@@ -68,28 +68,27 @@ The `sswPrediction` field indicates structural switch propensity:
       "s4predHelixPercent": 40.5,
       "s4predSswPrediction": 1,
       "s4predHasData": true,
+      "ffHelixFlag": 1,
+      "ffHelixScore": 1.45,
+      "ffSswFlag": -1,
+      "ffSswScore": null,
       "providerStatus": {
         "tango": {"status": "AVAILABLE"},
-        "s4pred": {"status": "AVAILABLE"},
-        "psipred": {"status": "OFF", "reason": "PSIPRED not enabled"},
-        "jpred": {"status": "OFF", "reason": "JPred disabled"}
+        "s4pred": {"status": "AVAILABLE"}
       },
       "name": "Protein name",
       "species": "Homo sapiens"
     }
   ],
   "meta": {
-    "use_jpred": false,
     "use_tango": true,
-    "jpred_rows": 0,
+    "use_s4pred": true,
     "ssw_rows": 120,
     "valid_seq_rows": 150,
     "provider_status": {...},
     "providerStatusSummary": {
       "tango": {"status": "AVAILABLE", "requested": 150, "parsed_ok": 120, "parsed_bad": 0},
-      "s4pred": {"status": "AVAILABLE", "requested": 150, "parsed_ok": 150, "parsed_bad": 0},
-      "psipred": {"status": "OFF"},
-      "jpred": {"status": "OFF"}
+      "s4pred": {"status": "AVAILABLE", "requested": 150, "parsed_ok": 150, "parsed_bad": 0}
     },
     "runId": "uuid4",
     "traceId": "uuid4",
@@ -144,9 +143,8 @@ The `sswPrediction` field indicates structural switch propensity:
     "providerStatus": {...}
   },
   "meta": {
-    "use_jpred": false,
     "use_tango": true,
-    "jpred_rows": 0,
+    "use_s4pred": true,
     "ssw_rows": 1,
     "valid_seq_rows": 1,
     "provider_status": {...},
@@ -424,14 +422,6 @@ The `sswPrediction` field indicates structural switch propensity:
     "s4pred": {
       "status": "AVAILABLE" | "UNAVAILABLE" | "OFF",
       "reason": string | null
-    },
-    "psipred": {
-      "status": "AVAILABLE" | "UNAVAILABLE" | "OFF",
-      "reason": string | null
-    },
-    "jpred": {
-      "status": "OFF",
-      "reason": "JPred disabled"
     }
   }
 }

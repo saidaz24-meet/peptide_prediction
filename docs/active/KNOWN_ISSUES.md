@@ -1,6 +1,6 @@
 # Known Issues — Prioritized Backlog
 
-**Last Updated**: 2026-02-05
+**Last Updated**: 2026-02-07
 
 ## Priority Definitions
 
@@ -141,7 +141,31 @@ cd ui && npm run build  # Should succeed
 
 # P1 — Incorrect Results
 
-_No issues documented yet._
+_No open P1 issues._
+
+---
+
+## ISSUE-012: Data table filter button is decorative (non-functional)
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P2 |
+| **Status** | **Open** |
+| **Blast Radius** | LOW |
+| **Root Module** | `ui/src/pages/Results.tsx` (lines ~418-425) |
+
+### Symptom
+Filter button renders in Results page but has no onClick handler or filter panel.
+
+### Analysis
+- **Expected**: Clicking filter button opens column-specific filter dropdowns/range sliders
+- **Actual**: Button is decorative, no filter UI implemented
+- **Note**: Global search IS working (PeptideTable.tsx uses TanStack globalFilter)
+
+### Fix Required
+- Add filter state to PeptideTable
+- Implement column filter UI (dropdowns for categorical, range sliders for numeric)
+- Wire TanStack Table's column filtering API
 
 ---
 
