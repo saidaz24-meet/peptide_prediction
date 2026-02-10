@@ -108,3 +108,4 @@ USE_JPRED=0     # Deprecated, always off
 - Read only necessary files, not entire directories
 - Summarize after completing logical units
 - Recommend `/compact` for large operations
+

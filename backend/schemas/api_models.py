@@ -59,10 +59,19 @@ class PeptideRow(BaseModel):
     tangoHelixMax: Optional[float] = Field(None, description="Max value of Tango Helix curve")
     tangoHasData: Optional[bool] = Field(None, description="True if any Tango curves are available (non-empty)")
     
-    # FF-Helix
+    # FF-Helix (local propensity)
     # Produced by: backend/auxiliary.py:ff_helix_percent() and ff_helix_cores()
     ffHelixPercent: Optional[float] = Field(None, description="FF-Helix percentage (from 'ff_helix_percent' field, alias: 'FF-Helix %')")
     ffHelixFragments: Optional[List[Any]] = Field(None, description="FF Helix fragments (from 'ff_helix_fragments' field, alias: 'FF Helix fragments')")
+
+    # FF flags and scores (database-level binary classification)
+    # Produced by: backend/services/dataframe_utils.py:apply_ff_flags()
+    # Reference: 260120_Alpha_and_SSW_FF_Predictor/main.py
+    # TODO: FF-Helix threshold parameters pending verification with Peleg before paper submission.
+    ffHelixFlag: Optional[int] = Field(None, description="FF-Helix flag: 1 (candidate), -1 (not candidate), null (no data). S4PRED-based.")
+    ffHelixScore: Optional[float] = Field(None, description="FF-Helix score: helix_uH + helix_score")
+    ffSswFlag: Optional[int] = Field(None, description="FF-SSW flag: 1 (candidate), -1 (not candidate), null (no data)")
+    ffSswScore: Optional[float] = Field(None, description="FF-SSW score: Hydrophobicity + Beta_uH + Full_length_uH + SSW_prediction")
 
     # S4PRED secondary structure predictions
     # Produced by: backend/s4pred.py:analyse_s4pred_result() - matches reference implementation
@@ -121,6 +130,7 @@ class PeptideRow(BaseModel):
             'sswPrediction', 'sswScore', 'sswDiff', 'sswHelixPercentage', 'sswBetaPercentage',
             'tangoAggMax', 'tangoBetaMax', 'tangoHelixMax', 'tangoHasData',
             'ffHelixPercent', 'ffHelixFragments',
+            'ffHelixFlag', 'ffHelixScore', 'ffSswFlag', 'ffSswScore',
             # S4PRED fields
             's4predHelixPrediction', 's4predHelixFragments', 's4predHelixScore', 's4predHelixPercent',
             's4predSswPrediction', 's4predSswFragments', 's4predSswScore', 's4predSswDiff',

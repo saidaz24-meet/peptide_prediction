@@ -81,6 +81,13 @@ export type Peptide = {
   ffHelixPercent?: number | null;                            // "FF-Helix %"
   ffHelixFragments?: Array<SegmentTuple> | Segment[];        // "FF Helix fragments"
 
+  // FF flags (database-level binary classification from reference implementation)
+  // TODO: FF-Helix threshold parameters pending verification with Peleg before paper submission.
+  ffHelixFlag?: number | null;    // 1 (candidate), -1 (not candidate), null (no data). S4PRED-based.
+  ffHelixScore?: number | null;   // helix_uH + helix_score
+  ffSswFlag?: number | null;      // 1 (candidate), -1 (not candidate), null (no data)
+  ffSswScore?: number | null;     // Hydrophobicity + Beta_uH + Full_length_uH + SSW_prediction
+
   // ----- Unified secondary-structure percentages used by Results table -----
   // These are filled by the mapper from S4PRED if present, otherwise Tango fallback.
   helixPercent?: number | null;   // preferred: S4PRED helix %; fallback: "SSW helix percentage"

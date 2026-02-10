@@ -180,8 +180,8 @@ class TestApplyFfFlags:
     def test_ssw_flag_positive(self):
         """Row with SSW prediction=1 and high hydrophobicity → FF-SSW = 1."""
         df = self._make_df([
-            {"SSW prediction": 1, "Hydrophobicity": 0.8, "Helix (Jpred) uH": None},
-            {"SSW prediction": -1, "Hydrophobicity": 0.2, "Helix (Jpred) uH": None},
+            {"SSW prediction": 1, "Hydrophobicity": 0.8, "Sequence": "AELQKRMFVW"},
+            {"SSW prediction": -1, "Hydrophobicity": 0.2, "Sequence": "GGGGGGGGG"},
         ])
         apply_ff_flags(df)
         # Only row with SSW prediction != -1 contributes to avg → avg_H = 0.8
@@ -189,29 +189,37 @@ class TestApplyFfFlags:
         assert df.iloc[0]["FF-Secondary structure switch"] == 1
 
     def test_ssw_flag_negative(self):
-        """Row with SSW prediction=-1 → FF-SSW = None/NaN."""
+        """Row with SSW prediction=-1 → FF-SSW = -1 (not candidate)."""
         df = self._make_df([
-            {"SSW prediction": -1, "Hydrophobicity": 0.8, "Helix (Jpred) uH": None},
+            {"SSW prediction": -1, "Hydrophobicity": 0.8, "Sequence": "AELQKRMFVW"},
+        ])
+        apply_ff_flags(df)
+        assert df.iloc[0]["FF-Secondary structure switch"] == -1
+
+    def test_ssw_flag_null_when_no_data(self):
+        """Row with SSW prediction=None → FF-SSW = None (no data)."""
+        df = self._make_df([
+            {"SSW prediction": None, "Hydrophobicity": 0.8, "Sequence": "AELQKRMFVW"},
         ])
         apply_ff_flags(df)
         val = df.iloc[0]["FF-Secondary structure switch"]
-        assert val is None or pd.isna(val)
+        assert val is None
 
     def test_ssw_threshold_uses_ssw_positive_rows(self):
         """SSW avg hydrophobicity threshold computed from SSW-positive rows only."""
         df = self._make_df([
-            {"SSW prediction": 1, "Hydrophobicity": 0.5, "Helix (Jpred) uH": None},
-            {"SSW prediction": 1, "Hydrophobicity": 0.9, "Helix (Jpred) uH": None},
-            {"SSW prediction": -1, "Hydrophobicity": 100.0, "Helix (Jpred) uH": None},
+            {"SSW prediction": 1, "Hydrophobicity": 0.5, "Sequence": "AELQKRMFVW"},
+            {"SSW prediction": 1, "Hydrophobicity": 0.9, "Sequence": "AELQKRMFVW"},
+            {"SSW prediction": -1, "Hydrophobicity": 100.0, "Sequence": "GGGGGGGGG"},
         ])
         apply_ff_flags(df)
         # avg_H from SSW=1 rows: (0.5 + 0.9) / 2 = 0.7
-        # Row 0: SSW=1, H=0.5 < 0.7 → None (below avg)
+        # Row 0: SSW=1, H=0.5 < 0.7 → -1 (below avg)
         # Row 1: SSW=1, H=0.9 >= 0.7 → 1
-        # Row 2: SSW=-1 → None
-        assert pd.isna(df.iloc[0]["FF-Secondary structure switch"]) or df.iloc[0]["FF-Secondary structure switch"] is None
+        # Row 2: SSW=-1 → -1
+        assert df.iloc[0]["FF-Secondary structure switch"] == -1
         assert df.iloc[1]["FF-Secondary structure switch"] == 1
-        assert pd.isna(df.iloc[2]["FF-Secondary structure switch"]) or df.iloc[2]["FF-Secondary structure switch"] is None
+        assert df.iloc[2]["FF-Secondary structure switch"] == -1
 
     def test_ff_helix_with_s4pred_data(self):
         """FF-Helix should use S4PRED data when available."""
@@ -231,27 +239,28 @@ class TestApplyFfFlags:
         ])
         apply_ff_flags(df)
         # Row 0 has helix prediction=1 → should get FF-Helix evaluated
-        # Row 1 has helix prediction=-1 → FF-Helix = None/NaN
-        val = df.iloc[1]["FF-Helix (Jpred)"]
-        assert val is None or pd.isna(val)
+        # Row 1 has helix prediction=-1 → FF-Helix = -1 (no helix)
+        assert df.iloc[1]["FF-Helix (Jpred)"] == -1
 
     def test_no_helix_data_gives_none(self):
         """No helix prediction columns → all FF-Helix = None/NaN."""
         df = self._make_df([
-            {"SSW prediction": 1, "Hydrophobicity": 0.5},
+            {"SSW prediction": 1, "Hydrophobicity": 0.5, "Sequence": "AELQKRMFVW"},
         ])
         apply_ff_flags(df)
         val = df.iloc[0]["FF-Helix (Jpred)"]
         assert val is None or pd.isna(val)
 
     def test_columns_always_created(self):
-        """apply_ff_flags always creates both FF flag columns."""
+        """apply_ff_flags always creates all FF flag and score columns."""
         df = self._make_df([
-            {"SSW prediction": -1, "Hydrophobicity": 0.5},
+            {"SSW prediction": -1, "Hydrophobicity": 0.5, "Sequence": "AELQKRMFVW"},
         ])
         apply_ff_flags(df)
         assert "FF-Secondary structure switch" in df.columns
         assert "FF-Helix (Jpred)" in df.columns
+        assert "FF-SSW score" in df.columns
+        assert "FF-Helix score" in df.columns
 
 
 # ============================================================
@@ -309,3 +318,174 @@ class TestGetAvgUhBySegments:
         result = get_avg_uH_by_segments("AELQKRMFVW", [(1, 5)])
         assert isinstance(result, float)
         assert result >= 0
+
+
+# ============================================================
+# FF-SSW score tests
+# ============================================================
+
+class TestFfSswScore:
+    """Test FF-SSW score computation in apply_ff_flags."""
+
+    def _make_df(self, rows):
+        return pd.DataFrame(rows)
+
+    def test_ssw_score_formula(self):
+        """FF-SSW score = Hydrophobicity + Beta_uH + Full_length_uH + SSW_prediction."""
+        df = self._make_df([
+            {
+                "SSW prediction": 1,
+                "Hydrophobicity": 0.5,
+                "Full length uH": 0.3,
+                "Sequence": "AELQKRMFVW",
+            },
+        ])
+        apply_ff_flags(df)
+        score = df.iloc[0]["FF-SSW score"]
+        assert score is not None
+        # Score = 0.5 + Beta_uH + 0.3 + 1
+        # Beta_uH is computed from sequence with angle=160
+        assert isinstance(score, float)
+        # Verify components: H=0.5, Full_uH=0.3, SSW=1, Beta_uH > 0
+        beta_uh = df.iloc[0]["Beta full length uH"]
+        expected = 0.5 + beta_uh + 0.3 + 1.0
+        assert abs(score - expected) < 1e-9
+
+    def test_ssw_score_null_when_no_data(self):
+        """FF-SSW score = None when SSW prediction is None."""
+        df = self._make_df([
+            {"SSW prediction": None, "Hydrophobicity": 0.5, "Sequence": "AELQKRMFVW"},
+        ])
+        apply_ff_flags(df)
+        assert df.iloc[0]["FF-SSW score"] is None
+
+    def test_ssw_score_null_when_missing_components(self):
+        """FF-SSW score = None when a required component is missing."""
+        df = self._make_df([
+            {"SSW prediction": 1, "Hydrophobicity": 0.5, "Sequence": "AELQKRMFVW"},
+            # No "Full length uH" column
+        ])
+        apply_ff_flags(df)
+        assert df.iloc[0]["FF-SSW score"] is None
+
+    def test_ssw_score_with_negative_ssw(self):
+        """FF-SSW score computed even when SSW prediction = -1."""
+        df = self._make_df([
+            {
+                "SSW prediction": -1,
+                "Hydrophobicity": 0.5,
+                "Full length uH": 0.3,
+                "Sequence": "AELQKRMFVW",
+            },
+        ])
+        apply_ff_flags(df)
+        score = df.iloc[0]["FF-SSW score"]
+        assert score is not None
+        beta_uh = df.iloc[0]["Beta full length uH"]
+        expected = 0.5 + beta_uh + 0.3 + (-1.0)
+        assert abs(score - expected) < 1e-9
+
+
+# ============================================================
+# FF-Helix score tests
+# ============================================================
+
+class TestFfHelixScore:
+    """Test FF-Helix score computation in apply_ff_flags."""
+
+    def _make_df(self, rows):
+        return pd.DataFrame(rows)
+
+    def test_helix_score_formula(self):
+        """FF-Helix score = helix_uH + helix_score."""
+        df = self._make_df([
+            {
+                "Sequence": "AELQKRMFVWAELQKR",
+                "SSW prediction": -1,
+                "Hydrophobicity": 0.5,
+                "Helix prediction (S4PRED)": 1,
+                "Helix fragments (S4PRED)": [(1, 10)],
+                "Helix score (S4PRED)": 0.85,
+            },
+        ])
+        apply_ff_flags(df)
+        score = df.iloc[0]["FF-Helix score"]
+        assert score is not None
+        helix_uh = df.iloc[0]["Helix (s4pred) uH"]
+        expected = helix_uh + 0.85
+        assert abs(score - expected) < 1e-9
+
+    def test_helix_score_null_when_no_helix(self):
+        """FF-Helix score = None when no helix detected."""
+        df = self._make_df([
+            {
+                "Sequence": "GGGGGGGGGGGGGG",
+                "SSW prediction": -1,
+                "Hydrophobicity": 0.3,
+                "Helix prediction (S4PRED)": -1,
+                "Helix fragments (S4PRED)": [],
+            },
+        ])
+        apply_ff_flags(df)
+        assert df.iloc[0]["FF-Helix score"] is None
+
+    def test_helix_score_null_without_helix_score_col(self):
+        """FF-Helix score = None when Helix score column missing."""
+        df = self._make_df([
+            {
+                "Sequence": "AELQKRAAELQKR",
+                "SSW prediction": -1,
+                "Hydrophobicity": 0.5,
+                "Helix prediction (S4PRED)": 1,
+                "Helix fragments (S4PRED)": [(1, 10)],
+                # No "Helix score (S4PRED)" column
+            },
+        ])
+        apply_ff_flags(df)
+        assert df.iloc[0]["FF-Helix score"] is None
+
+
+# ============================================================
+# Beta full length uH computation tests
+# ============================================================
+
+class TestBetaUhComputation:
+    """Test _compute_beta_uh (beta-sheet hydrophobic moment, angle=160)."""
+
+    def _make_df(self, rows):
+        return pd.DataFrame(rows)
+
+    def test_beta_uh_computed(self):
+        """Beta full length uH should be computed for valid sequences."""
+        from services.dataframe_utils import _compute_beta_uh
+        df = self._make_df([{"Sequence": "AELQKRMFVW"}])
+        _compute_beta_uh(df)
+        assert "Beta full length uH" in df.columns
+        assert df.iloc[0]["Beta full length uH"] is not None
+        assert isinstance(df.iloc[0]["Beta full length uH"], float)
+        assert df.iloc[0]["Beta full length uH"] >= 0
+
+    def test_beta_uh_different_from_alpha(self):
+        """Beta uH (angle=160) should differ from alpha uH (angle=100)."""
+        from biochem_calculation import hydrophobic_moment
+        seq = "AELQKRMFVW"
+        alpha_uh = hydrophobic_moment(seq, angle=100)
+        beta_uh = hydrophobic_moment(seq, angle=160)
+        assert alpha_uh != beta_uh  # Different angles → different moments
+
+    def test_beta_uh_none_for_empty(self):
+        """Empty/NaN sequence → None Beta uH."""
+        from services.dataframe_utils import _compute_beta_uh
+        df = self._make_df([{"Sequence": ""}])
+        _compute_beta_uh(df)
+        assert df.iloc[0]["Beta full length uH"] is None
+
+    def test_beta_uh_auto_computed_by_apply_ff_flags(self):
+        """apply_ff_flags should auto-compute Beta uH if missing."""
+        df = self._make_df([
+            {"SSW prediction": 1, "Hydrophobicity": 0.5, "Sequence": "AELQKRMFVW"},
+        ])
+        assert "Beta full length uH" not in df.columns
+        apply_ff_flags(df)
+        assert "Beta full length uH" in df.columns
+        assert df.iloc[0]["Beta full length uH"] is not None

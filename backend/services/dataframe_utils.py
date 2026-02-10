@@ -74,16 +74,32 @@ def ensure_computed_cols(df: pd.DataFrame) -> None:
 
 def apply_ff_flags(df: pd.DataFrame) -> None:
     """
-    Apply fibril-forming (FF) flags based on computed metrics.
+    Apply fibril-forming (FF) flags and scores based on computed metrics.
 
     Reference: 260120_Alpha_and_SSW_FF_Predictor/main.py
     - ssw_fibril_formation_prediction_by_method (FF-SSW)
     - helix_fibril_formation_prediction_by_method (FF-Helix)
 
-    FF-SSW: SSW prediction == 1 AND Hydrophobicity >= avg_H (of SSW-positive rows)
-    FF-Helix: helix_prediction != -1 AND helix_uH >= avg_uH (of helix-positive rows)
+    Outputs (DataFrame columns):
+    - FF-Secondary structure switch: 1 (candidate) / -1 (not candidate) / None (no data)
+    - FF-SSW score: Hydrophobicity + Beta_full_length_uH + Full_length_uH + SSW_prediction
+    - FF-Helix (Jpred): 1 (candidate) / -1 (not candidate) / None (no data)
+    - FF-Helix score: helix_uH + helix_score
+
+    Flag semantics (matching sswPrediction convention):
+    -  1 = peptide IS a fibrillar candidate
+    - -1 = peptide is NOT a fibrillar candidate (data available but below threshold)
+    - None/null = data unavailable (provider didn't run)
+
+    TODO: FF-Helix threshold parameters pending verification with Peleg before paper submission.
     """
-    # --- FF-SSW flag ---
+    # --- Compute Beta full length uH if not present ---
+    # Beta uH = hydrophobic_moment(seq, angle=160) — beta-sheet geometry
+    # Needed for FF-SSW score formula
+    if "Beta full length uH" not in df.columns and "Sequence" in df.columns:
+        _compute_beta_uh(df)
+
+    # --- FF-SSW flag and score ---
     # Reference: avg hydrophobicity of rows WITH valid SSW prediction (not -1)
     ssw_col = "SSW prediction"
     if ssw_col in df.columns:
@@ -95,22 +111,54 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
         else:
             ssw_avg_H = float("nan")
 
-        df["FF-Secondary structure switch"] = [
-            1 if (pd.notna(r.get(ssw_col)) and r[ssw_col] == 1
-                  and pd.notna(ssw_avg_H)
-                  and pd.notna(r.get("Hydrophobicity"))
-                  and r["Hydrophobicity"] >= ssw_avg_H)
-            else None
-            for _, r in df.iterrows()
-        ]
+        ff_ssw_flags = []
+        ff_ssw_scores = []
+        for _, r in df.iterrows():
+            ssw_val = r.get(ssw_col)
+
+            # No SSW data → null
+            if ssw_val is None or (isinstance(ssw_val, float) and pd.isna(ssw_val)):
+                ff_ssw_flags.append(None)
+                ff_ssw_scores.append(None)
+                continue
+
+            # SSW data available — compute flag
+            if ssw_val != -1 and pd.notna(ssw_avg_H):
+                h = r.get("Hydrophobicity")
+                if pd.notna(h) and h >= ssw_avg_H:
+                    ff_ssw_flags.append(1)
+                else:
+                    ff_ssw_flags.append(-1)
+            else:
+                ff_ssw_flags.append(-1)
+
+            # Score: Hydrophobicity + Beta_uH + Full_length_uH + SSW_prediction
+            h = r.get("Hydrophobicity")
+            beta_uh = r.get("Beta full length uH")
+            full_uh = r.get("Full length uH")
+            components = [h, beta_uh, full_uh]
+            if all(x is not None and not (isinstance(x, float) and pd.isna(x)) for x in components):
+                try:
+                    ff_ssw_scores.append(
+                        float(h) + float(beta_uh) + float(full_uh) + float(ssw_val)
+                    )
+                except (TypeError, ValueError):
+                    ff_ssw_scores.append(None)
+            else:
+                ff_ssw_scores.append(None)
+
+        df["FF-Secondary structure switch"] = ff_ssw_flags
+        df["FF-SSW score"] = ff_ssw_scores
     else:
         df["FF-Secondary structure switch"] = None
+        df["FF-SSW score"] = None
 
-    # --- FF-Helix flag ---
+    # --- FF-Helix flag and score ---
     # Prefer S4PRED helix data; fall back to Jpred columns if present.
     # Reference: uses helix segment uH vs database-average uH threshold.
     helix_pred_col = None
     helix_uh_col = None
+    helix_score_col = None
 
     # Check for S4PRED helix data
     if "Helix prediction (S4PRED)" in df.columns:
@@ -119,9 +167,11 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
         if "Helix (s4pred) uH" not in df.columns:
             _compute_helix_uh(df, "Helix fragments (S4PRED)", "Helix (s4pred) uH")
         helix_uh_col = "Helix (s4pred) uH"
+        helix_score_col = "Helix score (S4PRED)" if "Helix score (S4PRED)" in df.columns else None
     elif "Helix (Jpred) uH" in df.columns:
         helix_pred_col = "Helix score (Jpred)" if "Helix score (Jpred)" in df.columns else None
         helix_uh_col = "Helix (Jpred) uH"
+        helix_score_col = "Helix score (Jpred)" if "Helix score (Jpred)" in df.columns else None
 
     if helix_pred_col and helix_uh_col and helix_uh_col in df.columns:
         # Reference: avg uH of rows where helix_prediction != -1
@@ -134,16 +184,65 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
         else:
             helix_avg_uH = float("nan")
 
-        df["FF-Helix (Jpred)"] = [
-            1 if (pd.notna(r.get(helix_pred_col)) and r[helix_pred_col] != -1
-                  and pd.notna(r.get(helix_uh_col))
-                  and pd.notna(helix_avg_uH)
-                  and r[helix_uh_col] >= helix_avg_uH)
-            else None
-            for _, r in df.iterrows()
-        ]
+        ff_helix_flags = []
+        ff_helix_scores = []
+        for _, r in df.iterrows():
+            pred_val = r.get(helix_pred_col)
+            uh_val = r.get(helix_uh_col)
+
+            # No helix data → null
+            if pred_val is None or (isinstance(pred_val, float) and pd.isna(pred_val)):
+                ff_helix_flags.append(None)
+                ff_helix_scores.append(None)
+                continue
+
+            # Helix data available — compute flag
+            if pred_val != -1 and pd.notna(helix_avg_uH) and pd.notna(uh_val):
+                if uh_val >= helix_avg_uH:
+                    ff_helix_flags.append(1)
+                else:
+                    ff_helix_flags.append(-1)
+            else:
+                ff_helix_flags.append(-1)
+
+            # Score: helix_uH + helix_score
+            score_val = r.get(helix_score_col) if helix_score_col else None
+            if (uh_val is not None and not (isinstance(uh_val, float) and pd.isna(uh_val))
+                    and score_val is not None and not (isinstance(score_val, float) and pd.isna(score_val))):
+                try:
+                    ff_helix_scores.append(float(uh_val) + float(score_val))
+                except (TypeError, ValueError):
+                    ff_helix_scores.append(None)
+            else:
+                ff_helix_scores.append(None)
+
+        df["FF-Helix (Jpred)"] = ff_helix_flags
+        df["FF-Helix score"] = ff_helix_scores
     else:
         df["FF-Helix (Jpred)"] = None
+        df["FF-Helix score"] = None
+
+
+def _compute_beta_uh(df: pd.DataFrame) -> None:
+    """
+    Compute beta-sheet hydrophobic moment (μH with angle=160°) for each row.
+    Used in FF-SSW score formula: Hydrophobicity + Beta_uH + Full_uH + SSW_prediction.
+    """
+    from biochem_calculation import hydrophobic_moment
+    from auxiliary import get_corrected_sequence
+
+    beta_uh_values = []
+    for _, row in df.iterrows():
+        seq = row.get("Sequence", "")
+        if seq and isinstance(seq, str) and not pd.isna(seq) and len(seq) > 0:
+            try:
+                corrected = get_corrected_sequence(seq)
+                beta_uh_values.append(hydrophobic_moment(corrected, angle=160))
+            except Exception:
+                beta_uh_values.append(None)
+        else:
+            beta_uh_values.append(None)
+    df["Beta full length uH"] = beta_uh_values
 
 
 def _compute_helix_uh(df: pd.DataFrame, fragments_col: str, uh_col: str) -> None:

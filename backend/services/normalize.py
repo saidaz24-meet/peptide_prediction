@@ -387,7 +387,7 @@ def _sanitize_for_json(obj, field_name: str = None):
         # - s4predSswPrediction (S4PRED): -1 = "no SSW detected"
         # - s4predHelixPrediction (S4PRED): -1 = "no helix detected"
         # All other -1 values are fake defaults and should be None
-        prediction_fields = {"sswPrediction", "s4predSswPrediction", "s4predHelixPrediction"}
+        prediction_fields = {"sswPrediction", "s4predSswPrediction", "s4predHelixPrediction", "ffHelixFlag", "ffSswFlag"}
         if obj == -1 and field_name not in prediction_fields:
             return None
         return obj
