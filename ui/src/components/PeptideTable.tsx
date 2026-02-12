@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import {
   useReactTable,
@@ -10,15 +10,78 @@ import {
   createColumnHelper,
   flexRender,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Download, Eye } from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, ChevronRight, Download, Eye, Filter, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { Peptide } from '@/types/peptide';
 import { toast } from 'react-hot-toast';
 import { TangoBadge } from '@/components/TangoBadge';
 import { S4PredBadge } from '@/components/S4PredBadge';
+
+// --- Column filter types ---
+type CategoricalFilterValue = 'all' | '1' | '-1' | '0' | 'null';
+
+interface ColumnFilters {
+  sswPrediction: CategoricalFilterValue;
+  ffHelixFlag: CategoricalFilterValue;
+  ffSswFlag: CategoricalFilterValue;
+  s4predHelixPrediction: CategoricalFilterValue;
+  chargeMin: string;
+  chargeMax: string;
+  hydrophobicityMin: string;
+  hydrophobicityMax: string;
+  muHMin: string;
+  muHMax: string;
+  ffHelixPercentMin: string;
+  ffHelixPercentMax: string;
+  lengthMin: string;
+  lengthMax: string;
+  species: string;
+}
+
+const EMPTY_FILTERS: ColumnFilters = {
+  sswPrediction: 'all',
+  ffHelixFlag: 'all',
+  ffSswFlag: 'all',
+  s4predHelixPrediction: 'all',
+  chargeMin: '', chargeMax: '',
+  hydrophobicityMin: '', hydrophobicityMax: '',
+  muHMin: '', muHMax: '',
+  ffHelixPercentMin: '', ffHelixPercentMax: '',
+  lengthMin: '', lengthMax: '',
+  species: '',
+};
+
+function matchesCategorical(value: number | null | undefined, filter: CategoricalFilterValue): boolean {
+  if (filter === 'all') return true;
+  if (filter === 'null') return value == null;
+  return value === Number(filter);
+}
+
+function matchesRange(value: number | null | undefined, min: string, max: string): boolean {
+  if (value == null) return true; // show null values unless explicitly excluded
+  if (min !== '' && value < Number(min)) return false;
+  if (max !== '' && value > Number(max)) return false;
+  return true;
+}
+
+function countActiveFilters(filters: ColumnFilters): number {
+  let count = 0;
+  if (filters.sswPrediction !== 'all') count++;
+  if (filters.ffHelixFlag !== 'all') count++;
+  if (filters.ffSswFlag !== 'all') count++;
+  if (filters.s4predHelixPrediction !== 'all') count++;
+  if (filters.chargeMin || filters.chargeMax) count++;
+  if (filters.hydrophobicityMin || filters.hydrophobicityMax) count++;
+  if (filters.muHMin || filters.muHMax) count++;
+  if (filters.ffHelixPercentMin || filters.ffHelixPercentMax) count++;
+  if (filters.lengthMin || filters.lengthMax) count++;
+  if (filters.species) count++;
+  return count;
+}
 
 interface PeptideTableProps {
   peptides: Peptide[];
@@ -28,7 +91,28 @@ const columnHelper = createColumnHelper<Peptide>();
 
 export function PeptideTable({ peptides }: PeptideTableProps) {
   const [globalFilter, setGlobalFilter] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [columnFilters, setColumnFilters] = useState<ColumnFilters>(EMPTY_FILTERS);
   const navigate = useNavigate();
+
+  const activeFilterCount = useMemo(() => countActiveFilters(columnFilters), [columnFilters]);
+
+  // Apply column filters before passing to TanStack (handles hidden columns like ffHelixFlag)
+  const filteredByColumns = useMemo(() => {
+    return peptides.filter(p => {
+      if (!matchesCategorical(p.sswPrediction, columnFilters.sswPrediction)) return false;
+      if (!matchesCategorical(p.ffHelixFlag, columnFilters.ffHelixFlag)) return false;
+      if (!matchesCategorical(p.ffSswFlag, columnFilters.ffSswFlag)) return false;
+      if (!matchesCategorical(p.s4predHelixPrediction, columnFilters.s4predHelixPrediction)) return false;
+      if (!matchesRange(p.charge, columnFilters.chargeMin, columnFilters.chargeMax)) return false;
+      if (!matchesRange(p.hydrophobicity, columnFilters.hydrophobicityMin, columnFilters.hydrophobicityMax)) return false;
+      if (!matchesRange(p.muH, columnFilters.muHMin, columnFilters.muHMax)) return false;
+      if (!matchesRange(p.ffHelixPercent, columnFilters.ffHelixPercentMin, columnFilters.ffHelixPercentMax)) return false;
+      if (!matchesRange(p.length, columnFilters.lengthMin, columnFilters.lengthMax)) return false;
+      if (columnFilters.species && !(p.species || '').toLowerCase().includes(columnFilters.species.toLowerCase())) return false;
+      return true;
+    });
+  }, [peptides, columnFilters]);
 
   const columns = useMemo(
     () => [
@@ -247,7 +331,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
   );
 
   const table = useReactTable({
-    data: peptides,
+    data: filteredByColumns,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -344,11 +428,263 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           </Select>
         </div>
 
-        <Button onClick={exportToCSV} size="sm">
-          <Download className="w-4 h-4 mr-2" />
-          Export CSV
-        </Button>
+        <div className="flex items-center space-x-2">
+          <Button
+            variant={showFilters ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            Filters
+            {activeFilterCount > 0 && (
+              <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
+                {activeFilterCount}
+              </Badge>
+            )}
+          </Button>
+          <Button onClick={exportToCSV} size="sm">
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV
+          </Button>
+        </div>
       </div>
+
+      {/* Filter Panel */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="rounded-md border bg-muted/30 p-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Column Filters</span>
+                {activeFilterCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setColumnFilters(EMPTY_FILTERS)}
+                  >
+                    <X className="w-3 h-3 mr-1" />
+                    Clear all
+                  </Button>
+                )}
+              </div>
+
+              {/* Row 1: Categorical filters */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {/* SSW Prediction */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">SSW Prediction</label>
+                  <Select
+                    value={columnFilters.sswPrediction}
+                    onValueChange={(v) => setColumnFilters(f => ({ ...f, sswPrediction: v as CategoricalFilterValue }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="1">Positive</SelectItem>
+                      <SelectItem value="-1">Negative</SelectItem>
+                      <SelectItem value="0">Uncertain</SelectItem>
+                      <SelectItem value="null">Missing</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* FF-Helix Flag */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">FF-Helix Flag</label>
+                  <Select
+                    value={columnFilters.ffHelixFlag}
+                    onValueChange={(v) => setColumnFilters(f => ({ ...f, ffHelixFlag: v as CategoricalFilterValue }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="1">Candidate</SelectItem>
+                      <SelectItem value="-1">Not Candidate</SelectItem>
+                      <SelectItem value="null">No Data</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* FF-SSW Flag */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">FF-SSW Flag</label>
+                  <Select
+                    value={columnFilters.ffSswFlag}
+                    onValueChange={(v) => setColumnFilters(f => ({ ...f, ffSswFlag: v as CategoricalFilterValue }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="1">Candidate</SelectItem>
+                      <SelectItem value="-1">Not Candidate</SelectItem>
+                      <SelectItem value="null">No Data</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* S4PRED Helix */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">S4PRED Helix</label>
+                  <Select
+                    value={columnFilters.s4predHelixPrediction}
+                    onValueChange={(v) => setColumnFilters(f => ({ ...f, s4predHelixPrediction: v as CategoricalFilterValue }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="1">Positive</SelectItem>
+                      <SelectItem value="-1">Negative</SelectItem>
+                      <SelectItem value="0">Uncertain</SelectItem>
+                      <SelectItem value="null">Missing</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Row 2: Numeric range filters + species */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+                {/* Charge */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Charge</label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      placeholder="Min"
+                      value={columnFilters.chargeMin}
+                      onChange={(e) => setColumnFilters(f => ({ ...f, chargeMin: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      type="number"
+                      placeholder="Max"
+                      value={columnFilters.chargeMax}
+                      onChange={(e) => setColumnFilters(f => ({ ...f, chargeMax: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Hydrophobicity */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Hydrophobicity</label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Min"
+                      value={columnFilters.hydrophobicityMin}
+                      onChange={(e) => setColumnFilters(f => ({ ...f, hydrophobicityMin: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Max"
+                      value={columnFilters.hydrophobicityMax}
+                      onChange={(e) => setColumnFilters(f => ({ ...f, hydrophobicityMax: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* μH */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">μH</label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Min"
+                      value={columnFilters.muHMin}
+                      onChange={(e) => setColumnFilters(f => ({ ...f, muHMin: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      type="number"
+                      step="0.01"
+                      placeholder="Max"
+                      value={columnFilters.muHMax}
+                      onChange={(e) => setColumnFilters(f => ({ ...f, muHMax: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* FF-Helix % */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">FF-Helix %</label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="1"
+                      placeholder="Min"
+                      value={columnFilters.ffHelixPercentMin}
+                      onChange={(e) => setColumnFilters(f => ({ ...f, ffHelixPercentMin: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      type="number"
+                      step="1"
+                      placeholder="Max"
+                      value={columnFilters.ffHelixPercentMax}
+                      onChange={(e) => setColumnFilters(f => ({ ...f, ffHelixPercentMax: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Length */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Length</label>
+                  <div className="flex gap-1">
+                    <Input
+                      type="number"
+                      step="1"
+                      placeholder="Min"
+                      value={columnFilters.lengthMin}
+                      onChange={(e) => setColumnFilters(f => ({ ...f, lengthMin: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                    <Input
+                      type="number"
+                      step="1"
+                      placeholder="Max"
+                      value={columnFilters.lengthMax}
+                      onChange={(e) => setColumnFilters(f => ({ ...f, lengthMax: e.target.value }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                </div>
+
+                {/* Species */}
+                <div className="space-y-1">
+                  <label className="text-xs text-muted-foreground">Species</label>
+                  <Input
+                    placeholder="Search..."
+                    value={columnFilters.species}
+                    onChange={(e) => setColumnFilters(f => ({ ...f, species: e.target.value }))}
+                    className="h-8 text-xs"
+                  />
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Table */}
       <div className="rounded-md border">
@@ -414,6 +750,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         <div className="text-sm text-muted-foreground">
           Showing {table.getRowModel().rows.length} of{' '}
           {table.getFilteredRowModel().rows.length} peptides
+          {activeFilterCount > 0 && ` (${peptides.length} total, ${filteredByColumns.length} matched filters)`}
         </div>
         
         <div className="flex items-center space-x-2">

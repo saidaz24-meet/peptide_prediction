@@ -150,22 +150,18 @@ _No open P1 issues._
 | Field | Value |
 |-------|-------|
 | **Priority** | P2 |
-| **Status** | **Open** |
+| **Status** | ✅ **FIXED** (2026-02-07) |
 | **Blast Radius** | LOW |
-| **Root Module** | `ui/src/pages/Results.tsx` (lines ~418-425) |
+| **Root Module** | `ui/src/components/PeptideTable.tsx` |
 
-### Symptom
-Filter button renders in Results page but has no onClick handler or filter panel.
-
-### Analysis
-- **Expected**: Clicking filter button opens column-specific filter dropdowns/range sliders
-- **Actual**: Button is decorative, no filter UI implemented
-- **Note**: Global search IS working (PeptideTable.tsx uses TanStack globalFilter)
-
-### Fix Required
-- Add filter state to PeptideTable
-- Implement column filter UI (dropdowns for categorical, range sliders for numeric)
-- Wire TanStack Table's column filtering API
+### Fix Applied
+- Added collapsible filter panel with 10 column filters:
+  - 4 categorical dropdowns: SSW Prediction, FF-Helix Flag, FF-SSW Flag, S4PRED Helix
+  - 5 numeric range inputs: Charge, Hydrophobicity, μH, FF-Helix %, Length
+  - 1 text search: Species
+- Pre-filters data before TanStack table (handles hidden columns like ffHelixFlag)
+- Filter button shows active count badge, "Clear all" resets all filters
+- Animated panel open/close with framer-motion
 
 ---
 

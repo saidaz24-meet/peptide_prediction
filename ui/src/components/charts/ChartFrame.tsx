@@ -18,7 +18,7 @@ interface ChartFrameProps {
  *     <BarChart>...</BarChart>
  *   </ChartFrame>
  * 
- *   <ChartFrame>  {/* Uses ResponsiveContainer with 100% width/height */}
+ *   <ChartFrame>  // Uses ResponsiveContainer with 100% width/height
  *     <BarChart>...</BarChart>
  *   </ChartFrame>
  */
