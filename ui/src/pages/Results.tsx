@@ -380,11 +380,11 @@ export default function Results() {
               {/* Quick live counts */}
               <div className="grid grid-cols-2 gap-3 pt-2">
                 <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">FF-Helix (view) = 1</div>
+                  <div className="text-xs text-muted-foreground">FF-Helix Candidates</div>
                   <div className="text-lg font-semibold">{ffHelixOnCount}</div>
                 </div>
                 <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">SSW (view) = 1</div>
+                  <div className="text-xs text-muted-foreground">SSW Candidates</div>
                   <div className="text-lg font-semibold">{chamOnCount}</div>
                 </div>
               </div>

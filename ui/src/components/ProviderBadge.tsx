@@ -44,19 +44,19 @@ export function ProviderBadge({ name, status, variant = 'default' }: ProviderBad
     tooltipText = reason || `${name} is disabled in settings`;
   } else if (normalizedStatus === 'UNAVAILABLE') {
     const requested = stats?.requested || 0;
-    label = `${name}: FAILED (0/${requested})`;
+    label = requested > 0 ? `${name}: FAILED (0/${requested})` : `${name}: FAILED`;
     badgeVariant = 'destructive';
     tooltipText = reason || `${name} execution failed - check run_meta.json`;
   } else if (normalizedStatus === 'PARTIAL') {
     const parsed_ok = stats?.parsed_ok || 0;
     const requested = stats?.requested || 0;
-    label = `${name}: PARTIAL (${parsed_ok}/${requested})`;
+    label = requested > 0 ? `${name}: PARTIAL (${parsed_ok}/${requested})` : `${name}: PARTIAL`;
     badgeVariant = 'secondary';
     tooltipText = reason || `Only ${parsed_ok} of ${requested} peptides processed`;
   } else if (normalizedStatus === 'AVAILABLE') {
     const parsed_ok = stats?.parsed_ok || stats?.requested || 0;
     const requested = stats?.requested || 0;
-    label = `${name}: OK (${parsed_ok}/${requested})`;
+    label = requested > 0 ? `${name}: OK (${parsed_ok}/${requested})` : `${name}: OK`;
     badgeVariant = 'default';
     tooltipText = `${name} processing completed successfully`;
   } else {

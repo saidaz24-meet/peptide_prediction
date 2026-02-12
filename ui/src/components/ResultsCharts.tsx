@@ -288,7 +288,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
         <Card className="shadow-medium">
           <CardHeader>
             <CardTitle>SSW Prediction Distribution</CardTitle>
-            <CardDescription>Proportion of membrane-active predictions</CardDescription>
+            <CardDescription>Proportion of structural switch predictions</CardDescription>
           </CardHeader>
           <CardContent>
             {sswDistribution.length === 0 ? (
@@ -379,7 +379,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
                       name="SSW"
                       domain={[-1.5, 1.5]}
                       ticks={[-1, 0, 1]}
-                      tickFormatter={(v) => v === 1 ? '+' : v === -1 ? '−' : '?'}
+                      tickFormatter={(v: number) => v === 1 ? 'Positive' : v === -1 ? 'Negative' : 'Uncertain'}
                     />
                     <ChartTooltip
                       content={({ payload }) => {
