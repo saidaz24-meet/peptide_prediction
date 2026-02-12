@@ -1,6 +1,6 @@
 // src/pages/Results.tsx
 import { motion } from 'framer-motion';
-import { Download, Filter, Search } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 
@@ -335,15 +335,19 @@ export default function Results() {
                   <span>μH cutoff</span>
                   <span className="text-muted-foreground">{resolvedThresholds.muHCutoff.toFixed(2)}</span>
                 </div>
-                <Slider 
-                  min={-5} 
-                  max={5} 
-                  step={0.1} 
-                  value={[resolvedThresholds.muHCutoff]} 
+                <Slider
+                  min={-5}
+                  max={5}
+                  step={0.1}
+                  value={[resolvedThresholds.muHCutoff]}
                   disabled
                   className="opacity-60"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Read-only: set via threshold mode in upload</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {resolvedThresholds.muHCutoff === 0
+                    ? 'No μH cutoff applied (default mode)'
+                    : 'Computed from dataset averages'}
+                </p>
               </div>
 
               <div>
@@ -359,7 +363,11 @@ export default function Results() {
                   disabled
                   className="opacity-60"
                 />
-                <p className="text-xs text-muted-foreground mt-1">Read-only: set via threshold mode in upload</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {resolvedThresholds.hydroCutoff === 0
+                    ? 'No hydrophobicity cutoff applied (default mode)'
+                    : 'Computed from dataset averages'}
+                </p>
               </div>
 
               <div>
@@ -408,26 +416,10 @@ export default function Results() {
             <TabsContent value="data" className="space-y-6">
               <Card className="shadow-medium">
                 <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle>Peptide Dataset</CardTitle>
-                      <CardDescription>Interactive table with filtering and sorting capabilities</CardDescription>
-                    </div>
-
-                    <div className="flex items-center space-x-2">
-                      <div className="relative">
-                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
-                        <Input placeholder="Search peptides..." className="pl-9 w-64" />
-                      </div>
-                      <Button variant="outline" size="sm">
-                        <Filter className="w-4 h-4 mr-2" />
-                        Filters
-                      </Button>
-                    </div>
-                  </div>
+                  <CardTitle>Peptide Dataset</CardTitle>
+                  <CardDescription>Interactive table with search, column filters, sorting, and export</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {/* Show full dataset in the table */}
                   <PeptideTable peptides={peptidesTyped} />
                 </CardContent>
               </Card>

@@ -359,10 +359,24 @@ export default function PeptideDetail() {
                         })()}
                       >
                         <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="x" tickCount={10} label={{ value: 'Residue', position: 'bottom' }} />
+                        <XAxis dataKey="x" tickCount={10} />
                         <YAxis domain={[0, 1]} label={{ value: 'Probability', angle: -90, position: 'insideLeft' }} />
-                        <Tooltip formatter={(value: number) => value.toFixed(3)} />
-                        <Legend wrapperStyle={{ paddingTop: '8px' }} />
+                        <Tooltip
+                          content={({ payload, label }) => {
+                            if (!payload?.length) return null;
+                            return (
+                              <div className="bg-background border border-border rounded p-2 text-xs space-y-1">
+                                <p className="font-medium">Residue {label}</p>
+                                {payload.map((entry: any) => (
+                                  <p key={entry.dataKey} style={{ color: entry.color }}>
+                                    {entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(3) : entry.value}
+                                  </p>
+                                ))}
+                              </div>
+                            );
+                          }}
+                        />
+                        <Legend wrapperStyle={{ paddingTop: '4px' }} />
                         <Line type="monotone" dataKey="P(Helix)" stroke="hsl(var(--helix))" dot={false} strokeWidth={2} />
                         <Line type="monotone" dataKey="P(Beta)" stroke="hsl(var(--beta))" dot={false} strokeWidth={2} />
                         <Line type="monotone" dataKey="P(Coil)" stroke="hsl(var(--muted-foreground))" dot={false} strokeWidth={1} strokeDasharray="3 3" />

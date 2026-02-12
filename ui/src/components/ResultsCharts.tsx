@@ -325,7 +325,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
                 <RadarChart data={radarData}>
                   <PolarGrid />
                   <PolarAngleAxis dataKey="metric" />
-                  <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} />
+                  <PolarRadiusAxis angle={90} domain={[0, 'dataMax']} tickFormatter={(v: number) => Number(v).toFixed(1)} />
                   <Radar name="SSW +" dataKey="positive" stroke={COLORS.chameleonPositive} fill={COLORS.chameleonPositive} fillOpacity={0.1} />
                   <Radar name="SSW −" dataKey="negative" stroke={COLORS.chameleonNegative} fill={COLORS.chameleonNegative} fillOpacity={0.1} />
                   <RechartsLegend />

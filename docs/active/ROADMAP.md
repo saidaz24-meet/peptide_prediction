@@ -27,7 +27,7 @@
 ### What's Missing
 - No Kubernetes manifests
 - No database layer (Postgres planned)
-- Data table search/filter not fully functional
+- Data table search/filter: DONE (search + 10-column filters)
 - Cloud save/load not implemented
 - Per-residue profile viewer as standalone visualization (partially in PeptideDetail)
 
@@ -180,7 +180,7 @@ Created 3 audience-specific docs:
 | Feature | Current State | Priority |
 |---------|--------------|----------|
 | Data table search | Working (globalFilter in PeptideTable.tsx) | DONE |
-| Data table filters | Button renders, not functional | MEDIUM |
+| Data table filters | DONE (10 columns: categorical, range, text) | DONE |
 | ColumnMapper component | Exists unused (auto-detect works) | LOW |
 | Cloud save/load | Listed in About, not implemented | LOW (post-paper) |
 | FeedbackDialog integration | Component exists, unclear usage | LOW |
@@ -317,7 +317,7 @@ make ci          # Full pipeline
 | TD-02 | server.py is ~1500 lines (target ~500) | MEDIUM | Maintainability |
 | TD-03 | normalize.py has duplicate fallback logic (~700 lines) | MEDIUM | Maintainability |
 | TD-04 | Mixed import patterns (some local, some top-level) | LOW | Consistency |
-| TD-05 | Data table filter button non-functional in Results.tsx | MEDIUM | User experience |
+| TD-05 | ~~Data table filter button non-functional~~ | ~~MEDIUM~~ | ✅ DONE |
 | TD-06 | ColumnMapper component unused but still in codebase | LOW | Cleanup |
 | TD-07 | Cloud save/load removed from About.tsx (was unimplemented) | LOW | ✅ DONE |
 
