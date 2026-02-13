@@ -30,6 +30,7 @@ from services.dataframe_utils import (
     fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
 )
 from schemas.api_models import PredictResponse, PeptideRow, Meta
+from services.provider_status_builder import build_provider_meta
 
 # Provider flags are read dynamically from settings to avoid caching issues
 # Use settings.USE_TANGO, settings.USE_S4PRED directly
@@ -49,22 +50,20 @@ def _run_tango_for_single_sequence(df: pd.DataFrame, entry_id: str, seq: str) ->
         try:
             tango.process_tango_output(df, run_dir=run_dir)
         except ValueError as e:
-            print(f"[TANGO][ERROR] {e}")
-            print("[TANGO] Provider status: FAILED - continuing without Tango results")
+            log_warning("tango_parse_error", f"TANGO parse error: {e}")
         except Exception as e:
-            print(f"[TANGO][WARN] Unexpected error during output processing: {e}")
+            log_warning("tango_parse_unexpected", f"Unexpected error during TANGO output processing: {e}")
 
         _fill_percent_from_tango_if_missing(df)
 
         try:
             tango.filter_by_avg_diff(df, "single", {"single": {}})
         except ValueError as e:
-            print(f"[TANGO][ERROR] {e}")
-            print("[TANGO] Provider status: FAILED - SSW prediction computation failed")
+            log_warning("tango_filter_error", f"SSW prediction computation failed: {e}")
         except Exception as e:
-            print(f"[PREDICT][WARN] Tango filter failed: {e}")
+            log_warning("tango_filter_unexpected", f"TANGO filter failed: {e}")
     except Exception as e:
-        print(f"[PREDICT][WARN] Tango failed: {e}")
+        log_warning("tango_run_error", f"TANGO execution failed: {e}")
 
 
 def _run_s4pred_provider(df: pd.DataFrame) -> None:
@@ -88,23 +87,22 @@ def _run_s4pred_provider(df: pd.DataFrame) -> None:
 
 def _build_provider_status_meta(ssw_hits: int, tango_ran: bool, s4pred_ran: bool = False) -> Dict[str, Any]:
     """Build provider status metadata for single sequence prediction."""
-    return {
-        "tango": {
-            "enabled": settings.USE_TANGO,
-            "requested": settings.USE_TANGO,
-            "ran": tango_ran,
-            "status": "AVAILABLE" if ssw_hits > 0 else ("OFF" if not settings.USE_TANGO else "UNAVAILABLE"),
-            "reason": None if ssw_hits > 0 else ("TANGO not enabled" if not settings.USE_TANGO else "No TANGO output"),
-            "stats": {"requested": 1 if settings.USE_TANGO else 0, "parsed_ok": ssw_hits, "parsed_bad": 0}
-        },
-        "s4pred": {
-            "enabled": settings.USE_S4PRED,
-            "requested": settings.USE_S4PRED,
-            "ran": s4pred_ran,
-            "status": "AVAILABLE" if s4pred_ran else ("OFF" if not settings.USE_S4PRED else "UNAVAILABLE"),
-            "reason": None if s4pred_ran else ("S4PRED not enabled" if not settings.USE_S4PRED else "No S4PRED output"),
-        }
-    }
+    tango_status = "AVAILABLE" if ssw_hits > 0 else ("OFF" if not settings.USE_TANGO else "UNAVAILABLE")
+    tango_reason = None if ssw_hits > 0 else ("TANGO not enabled" if not settings.USE_TANGO else "No TANGO output")
+    s4pred_status = "AVAILABLE" if s4pred_ran else ("OFF" if not settings.USE_S4PRED else "UNAVAILABLE")
+    s4pred_reason = None if s4pred_ran else ("S4PRED not enabled" if not settings.USE_S4PRED else "No S4PRED output")
+
+    return build_provider_meta(
+        tango_enabled=settings.USE_TANGO,
+        tango_ran=tango_ran,
+        tango_status=tango_status,
+        tango_reason=tango_reason,
+        tango_stats={"requested": 1 if settings.USE_TANGO else 0, "parsed_ok": ssw_hits, "parsed_bad": 0},
+        s4pred_enabled=settings.USE_S4PRED,
+        s4pred_ran=s4pred_ran,
+        s4pred_status=s4pred_status,
+        s4pred_reason=s4pred_reason,
+    )
 
 
 def _compute_reproducibility_primitives(

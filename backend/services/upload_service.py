@@ -36,6 +36,7 @@ from services.dataframe_utils import (
     fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
 )
 from schemas.api_models import RowsResponse, PeptideRow, Meta, ProviderStatusSummary
+from services.provider_status_builder import build_provider_meta
 
 # Provider flags are read dynamically from settings to avoid caching issues
 # Use settings.USE_TANGO, settings.USE_S4PRED directly
@@ -791,24 +792,19 @@ def process_upload_dataframe(
     })
 
     # Build provider status metadata
-    provider_status_meta = {
-        "tango": {
-            "enabled": tango_enabled_flag,
-            "requested": tango_requested_flag,
-            "ran": tango_ran,
-            "status": tango_provider_status,
-            "reason": tango_provider_reason,
-            "stats": tango_stats,
-        },
-        "s4pred": {
-            "enabled": s4pred_enabled_flag,
-            "requested": s4pred_enabled_flag,  # S4PRED is requested if enabled
-            "ran": s4pred_ran,
-            "status": s4pred_provider_status,
-            "reason": s4pred_provider_reason,
-            "stats": s4pred_stats,
-        },
-    }
+    provider_status_meta = build_provider_meta(
+        tango_enabled=tango_enabled_flag,
+        tango_ran=tango_ran,
+        tango_status=tango_provider_status,
+        tango_reason=tango_provider_reason,
+        tango_stats=tango_stats,
+        tango_requested=tango_requested_flag,
+        s4pred_enabled=s4pred_enabled_flag,
+        s4pred_ran=s4pred_ran,
+        s4pred_status=s4pred_provider_status,
+        s4pred_reason=s4pred_provider_reason,
+        s4pred_stats=s4pred_stats,
+    )
 
     # Update global state for /api/providers/last-run endpoint
     _last_provider_status = provider_status_meta.copy()

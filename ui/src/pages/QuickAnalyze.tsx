@@ -1,54 +1,36 @@
 import { useState } from "react";
 import { motion, cubicBezier } from "framer-motion";
-import { FlaskConical, ChevronRight, Activity, ShieldCheck, LineChart } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { FlaskConical, ChevronRight, Copy, Download } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { toast } from "react-hot-toast";
-import { predictOne as apiPredictOne, API_BASE } from "@/lib/api";
+import { predictOne as apiPredictOne } from "@/lib/api";
 import { mapApiRowToPeptide } from "@/lib/peptideMapper";
+import { Peptide } from "@/types/peptide";
+import { TangoBadge } from "@/components/TangoBadge";
+import { SequenceTrack } from "@/components/SequenceTrack";
+import { HelicalWheel } from "@/components/HelicalWheel";
+import { AggregationHeatmap } from "@/components/AggregationHeatmap";
+import { ChartExportButtons } from "@/components/ChartExportButtons";
+import { AlphaFoldViewer } from "@/components/AlphaFoldViewer";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from "recharts";
 
-// --- Shape of /api/predict response we actually use here ---
-type PredictResponse = {
-  Entry: string;
-  Sequence: string;
-  Length: number;
-  Charge: number;
-  Hydrophobicity: number;
-  "Full length uH": number;
-  "Beta full length uH": number;
-
-  // Flags & FF
-  sswPrediction: number;   // (-1 | 0 | 1) as number from backend
-  ffHelixPercent: number;        // camelCase copy from server
-  s4predHelixPercent: number | null;  // S4PRED helix percentage
-};
-
-// Use centralized API function and mapper - no duplicate normalization logic
-async function predictOne(sequence: string, entry?: string) {
+async function predictSequence(sequence: string, entry?: string): Promise<Peptide> {
   const response = await apiPredictOne(sequence, entry);
-  // Map backend response to UI model using single mapper
-  const peptide = mapApiRowToPeptide(response.row, '/api/predict');
-  
-  // Convert to legacy PredictResponse format for backward compatibility
-  // TODO: Update QuickAnalyze to use Peptide type directly
-  const shaped: PredictResponse = {
-    Entry: peptide.id,
-    Sequence: peptide.sequence,
-    Length: peptide.length ?? 0,
-    Charge: peptide.charge ?? 0,
-    Hydrophobicity: peptide.hydrophobicity ?? 0,
-    "Full length uH": peptide.muH ?? 0,
-    "Beta full length uH": 0, // Not available in current schema
-    sswPrediction: peptide.sswPrediction,
-    ffHelixPercent: peptide.ffHelixPercent ?? 0,
-    s4predHelixPercent: peptide.s4predHelixPercent ?? null,
-  };
-
-  return shaped;
+  return mapApiRowToPeptide(response.row, "/api/predict");
 }
 
 /** ---------- ScreenTransition (local, no extra files) ---------- */
@@ -66,7 +48,6 @@ function ScreenTransition({
 }) {
   if (phase === "idle") return null;
 
-  // compute max radius so the circle covers the whole viewport
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const dx = Math.max(clickPosition.x, vw - clickPosition.x);
@@ -83,7 +64,6 @@ function ScreenTransition({
       animate={{ clipPath: `circle(${isEntering ? to : from}px at ${clickPosition.x}px ${clickPosition.y}px)` }}
       transition={{ duration: 0.6, ease: cubicBezier(0.22, 1, 0.36, 1) }}
       onUpdate={(latest) => {
-        // fire halfway when radius crosses ~50%
         const m = /circle\((\d+\.?\d*)px/.exec(String((latest as any).clipPath));
         if (m) {
           const r = parseFloat(m[1]);
@@ -104,10 +84,9 @@ export default function QuickAnalyze() {
   const [sequence, setSequence] = useState("");
   const [entry, setEntry] = useState("");
   const [loading, setLoading] = useState(false);
-  const [data, setData] = useState<PredictResponse | null>(null);
+  const [peptide, setPeptide] = useState<Peptide | null>(null);
   const navigate = useNavigate();
 
-  // NEW: transition state
   const [phase, setPhase] = useState<Phase>("idle");
   const [clickPos, setClickPos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
@@ -118,10 +97,10 @@ export default function QuickAnalyze() {
       return;
     }
     setLoading(true);
-    setData(null);
+    setPeptide(null);
     try {
-      const res = await predictOne(sequence, entry);
-      setData(res);
+      const res = await predictSequence(sequence, entry);
+      setPeptide(res);
       toast.success("Prediction ready");
     } catch (err: any) {
       toast.error(err?.message || "Prediction failed");
@@ -130,34 +109,35 @@ export default function QuickAnalyze() {
     }
   };
 
-  const flagBadge = (v: number, label: string) => {
-    if (v === 1) {
-      return <Badge className="bg-emerald-600 hover:bg-emerald-600">{label}: Positive</Badge>;
-    } else if (v === -1) {
-      return <Badge variant="outline">{label}: N/A</Badge>;
-    } else {
-      return <Badge variant="secondary">{label}: Negative</Badge>;
-    }
+  const handleCopySequence = () => {
+    if (!peptide) return;
+    navigator.clipboard.writeText(peptide.sequence);
+    toast.success("Sequence copied to clipboard");
   };
 
-  const ffHelixDisplay = (percent: number) => {
-    if (percent === -1 || percent === undefined) {
-      return <Badge variant="outline">FF-Helix: N/A</Badge>;
-    } else if (percent > 0) {
-      return <Badge className="bg-blue-600 hover:bg-blue-600">FF-Helix: {percent.toFixed(1)}%</Badge>;
-    } else {
-      return <Badge variant="secondary">FF-Helix: 0%</Badge>;
-    }
+  const handleDownloadFASTA = () => {
+    if (!peptide) return;
+    const header = `>${peptide.id}`;
+    const wrapped = peptide.sequence.match(/.{1,80}/g)?.join("\n") ?? peptide.sequence;
+    const fasta = `${header}\n${wrapped}\n`;
+    const blob = new Blob([fasta], { type: "text/plain;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${peptide.id}.fasta`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success("FASTA downloaded");
   };
+
+  const p = peptide; // alias for brevity in JSX
 
   return (
     <>
-      {/* TRANSITION OVERLAY */}
       <ScreenTransition
         phase={phase}
         clickPosition={clickPos}
         onHalfway={() => {
-          // navigate at the midpoint of the animation
           navigate("/upload");
           setPhase("exit");
         }}
@@ -168,152 +148,322 @@ export default function QuickAnalyze() {
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.35, ease: cubicBezier(0.22, 1, 0.36, 1) }}
-        className="max-w-4xl mx-auto p-6"
+        className="max-w-5xl mx-auto p-6 space-y-8"
       >
-        <div className="max-w-5xl mx-auto p-6 space-y-8">
-          <div className="flex items-center gap-3">
-            <FlaskConical className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-semibold">Quick Analyze (single peptide)</h1>
-          </div>
+        <div className="flex items-center gap-3">
+          <FlaskConical className="h-6 w-6 text-primary" />
+          <h1 className="text-2xl font-semibold">Quick Analyze (single peptide)</h1>
+        </div>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Paste a sequence (A–Z amino-acid letters)</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={onSubmit} className="space-y-4">
-                <div className="grid md:grid-cols-4 gap-4">
-                  <div className="md:col-span-3">
-                    <Label htmlFor="seq">Sequence</Label>
-                    <Input
-                      id="seq"
-                      value={sequence}
-                      onChange={(e) => setSequence(e.target.value)}
-                      placeholder="e.g. MRWQEMGYIFYPRKLR"
-                    />
-                  </div>
-                  <div className="md:col-span-1">
-                    <Label htmlFor="entry">Label (optional)</Label>
-                    <Input
-                      id="entry"
-                      value={entry}
-                      onChange={(e) => setEntry(e.target.value)}
-                      placeholder="e.g. custom-1"
-                    />
-                  </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>Paste a sequence (A-Z amino-acid letters)</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={onSubmit} className="space-y-4">
+              <div className="grid md:grid-cols-4 gap-4">
+                <div className="md:col-span-3">
+                  <Label htmlFor="seq">Sequence</Label>
+                  <Input
+                    id="seq"
+                    value={sequence}
+                    onChange={(e) => setSequence(e.target.value)}
+                    placeholder="e.g. MRWQEMGYIFYPRKLR"
+                  />
                 </div>
-
-                <div className="flex gap-3">
-                  <Button type="submit" disabled={loading}>
-                    {loading ? "Analyzing…" : "Analyze"}
-                    <ChevronRight className="ml-2 h-4 w-4" />
-                  </Button>
-
-                  {/* UPDATED: radial transition to /upload */}
-                  <Button
-                    variant="ghost"
-                    onClick={(e) => {
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      setClickPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-                      setPhase("enter");
-                    }}
-                  >
-                    Batch mode
-                  </Button>
+                <div className="md:col-span-1">
+                  <Label htmlFor="entry">Label (optional)</Label>
+                  <Input
+                    id="entry"
+                    value={entry}
+                    onChange={(e) => setEntry(e.target.value)}
+                    placeholder="e.g. custom-1"
+                  />
                 </div>
-              </form>
-            </CardContent>
-          </Card>
-
-          {data && (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
-              <div className="grid lg:grid-cols-3 gap-6">
-                {/* Left: Identity & Flags */}
-                <Card className="lg:col-span-1">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <ShieldCheck className="h-5 w-5" />
-                      Result
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="text-sm text-muted-foreground">Entry</div>
-                    <div className="font-mono">{data.Entry}</div>
-
-                    <div className="text-sm text-muted-foreground mt-2">Length</div>
-                    <div className="font-medium">{data.Length} aa</div>
-
-                    <div className="flex flex-wrap gap-2 mt-3">
-                      {flagBadge(data.sswPrediction, "SSW")}
-                      {ffHelixDisplay(data.ffHelixPercent)}
-                      {data.s4predHelixPercent !== null && (
-                        <Badge variant="outline" className="text-helix border-helix">
-                          S4PRED: {data.s4predHelixPercent.toFixed(1)}%
-                        </Badge>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Middle: KPIs */}
-                <Card className="lg:col-span-1">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Activity className="h-5 w-5" />
-                      Biochemical KPIs
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="grid grid-cols-2 gap-4">
-                    <div>
-                      <div className="text-sm text-muted-foreground">Charge</div>
-                      <div className="text-xl font-semibold">{data.Charge.toFixed(2)}</div>
-                    </div>
-                    <div>
-                      <div className="text-sm text-muted-foreground">Hydrophobicity (H)</div>
-                      <div className="text-xl font-semibold">{data.Hydrophobicity.toFixed(3)}</div>
-                    </div>
-                    {/* Removed hydrophobic moment (μH) from single-sequence view - not meaningful for individual peptides */}
-                    {/* μH is more useful in batch comparisons, not single-sequence analysis */}
-                  </CardContent>
-                </Card>
-
-                {/* Right: Guidance */}
-                <Card className="lg:col-span-1">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <LineChart className="h-5 w-5" />
-                      Interpretation
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-2 text-sm">
-                    <p>
-                      <strong>Charge</strong> and <strong>hydrophobicity</strong> help screen antimicrobial and
-                      amyloid-prone candidates. Higher hydrophobicity with positive charge can suggest membrane activity.
-                    </p>
-                    <p>
-                      <strong>Hydrophobicity</strong> measures peptide's preference for nonpolar environments; higher values often align with
-                      helical segments and membrane activity.
-                    </p>
-                    <p className="text-muted-foreground">
-                      TANGO and S4PRED predictions will show "N/A" if those tools are not installed on the server.
-                      Biochemical properties (charge, hydrophobicity, FF-Helix) are always computed.
-                    </p>
-                  </CardContent>
-                </Card>
               </div>
 
-              {/* Sequence box */}
-              <Card className="mt-6">
-                <CardHeader>
-                  <CardTitle>Sequence</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="font-mono text-sm break-all">{data.Sequence}</div>
+              <div className="flex gap-3">
+                <Button type="submit" disabled={loading}>
+                  {loading ? "Analyzing..." : "Analyze"}
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+
+                <Button
+                  variant="ghost"
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setClickPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+                    setPhase("enter");
+                  }}
+                >
+                  Batch mode
+                </Button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+
+        {/* ==================== RESULTS ==================== */}
+        {p && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+            {/* ── Header: Entry + Length + Badges + Actions ── */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between flex-wrap gap-4">
+                  <div>
+                    <CardTitle className="text-xl">
+                      {/^[A-Z][0-9][A-Z0-9]{3}[0-9](-\d+)?$/i.test(p.id) ? (
+                        <a
+                          href={`https://www.uniprot.org/uniprotkb/${p.id}/entry`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          {p.id}
+                        </a>
+                      ) : (
+                        p.id
+                      )}
+                    </CardTitle>
+                    <CardDescription>{p.length ?? "?"} amino acids</CardDescription>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <TangoBadge
+                      providerStatus={p.providerStatus?.tango}
+                      sswPrediction={p.sswPrediction}
+                      hasTangoData={p.tangoHasData ?? false}
+                      showIcon
+                    />
+                    <Badge variant="outline" className="text-helix border-helix">
+                      {typeof p.ffHelixPercent === "number"
+                        ? `FF-Helix: ${p.ffHelixPercent.toFixed(1)}%`
+                        : "FF-Helix: N/A"}
+                    </Badge>
+                    {typeof p.s4predHelixPercent === "number" && (
+                      <Badge variant="outline" className="text-helix border-helix">
+                        S4PRED: {p.s4predHelixPercent.toFixed(1)}%
+                      </Badge>
+                    )}
+                    <Button variant="outline" size="sm" onClick={handleCopySequence}>
+                      <Copy className="w-4 h-4 mr-1" />
+                      Copy
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={handleDownloadFASTA}>
+                      <Download className="w-4 h-4 mr-1" />
+                      FASTA
+                    </Button>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <SequenceTrack peptide={p} />
+              </CardContent>
+            </Card>
+
+            {/* ── KPI tiles ── */}
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-primary">
+                    {p.charge !== null ? `${p.charge > 0 ? "+" : ""}${p.charge.toFixed(1)}` : "N/A"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Charge</div>
                 </CardContent>
               </Card>
-            </motion.div>
-          )}
-        </div>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-primary">
+                    {p.hydrophobicity !== null ? p.hydrophobicity.toFixed(2) : "N/A"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Hydrophobicity</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-primary">
+                    {p.muH != null ? p.muH.toFixed(2) : "N/A"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">Hydrophobic moment</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-helix">
+                    {typeof p.ffHelixPercent === "number" ? `${p.ffHelixPercent.toFixed(0)}%` : "N/A"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">FF-Helix</div>
+                  <div className="text-[10px] text-muted-foreground/60">intrinsic propensity</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
+                  <div className="text-2xl font-bold text-helix">
+                    {typeof p.s4predHelixPercent === "number" ? `${p.s4predHelixPercent.toFixed(0)}%` : "N/A"}
+                  </div>
+                  <div className="text-sm text-muted-foreground">S4PRED Helix</div>
+                  <div className="text-[10px] text-muted-foreground/60">context-dependent</div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* ── Helical Wheel + Biochem side by side ── */}
+            {p.length != null && p.length <= 40 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Helical Wheel Projection</CardTitle>
+                  <CardDescription>
+                    Schiffer-Edmundson axial view. The red arrow shows the hydrophobic moment direction.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex justify-center">
+                  <HelicalWheel sequence={p.sequence} />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── S4PRED Per-Residue Probabilities ── */}
+            {p.s4pred && (p.s4pred.pH?.length || p.s4pred.pE?.length) && p.length != null && p.length <= 200 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>S4PRED Secondary Structure Probabilities</CardTitle>
+                  <CardDescription>
+                    Per-residue helix (H), beta (E), and coil (C) probabilities.
+                  </CardDescription>
+                  {/* Dominant structure summary */}
+                  {(() => {
+                    const pH = p.s4pred?.pH || [];
+                    const pE = p.s4pred?.pE || [];
+                    const pC = p.s4pred?.pC || [];
+                    const n = Math.max(pH.length, pE.length, pC.length);
+                    if (n === 0) return null;
+                    const meanH = pH.reduce((a, b) => a + b, 0) / n;
+                    const meanE = pE.reduce((a, b) => a + b, 0) / n;
+                    const meanC = pC.reduce((a, b) => a + b, 0) / n;
+                    const parts = [
+                      { label: "Coil", pct: meanC * 100, cls: "text-muted-foreground" },
+                      { label: "Beta", pct: meanE * 100, cls: "text-beta" },
+                      { label: "Helix", pct: meanH * 100, cls: "text-helix" },
+                    ].sort((a, b) => b.pct - a.pct);
+                    return (
+                      <div className="flex items-center gap-2 mt-2 text-sm">
+                        <span className="text-muted-foreground">Avg composition:</span>
+                        {parts.map((pt, i) => (
+                          <span key={pt.label}>
+                            <span className={`font-medium ${pt.cls}`}>{pt.label} {pt.pct.toFixed(0)}%</span>
+                            {i < parts.length - 1 && <span className="text-muted-foreground/40 mx-1">/</span>}
+                          </span>
+                        ))}
+                      </div>
+                    );
+                  })()}
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2" data-chart-export>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart
+                          data={(() => {
+                            const pH = p.s4pred?.pH || [];
+                            const pE = p.s4pred?.pE || [];
+                            const pC = p.s4pred?.pC || [];
+                            const maxLen = Math.max(pH.length, pE.length, pC.length);
+                            return Array.from({ length: maxLen }, (_, i) => ({
+                              x: i + 1,
+                              "P(Helix)": pH[i] ?? null,
+                              "P(Beta)": pE[i] ?? null,
+                              "P(Coil)": pC[i] ?? null,
+                            }));
+                          })()}
+                        >
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="x" tickCount={10} />
+                          <YAxis domain={[0, 1]} label={{ value: "Probability", angle: -90, position: "insideLeft" }} />
+                          <Tooltip
+                            content={({ payload, label }) => {
+                              if (!payload?.length) return null;
+                              return (
+                                <div className="bg-background border border-border rounded p-2 text-xs space-y-1">
+                                  <p className="font-medium">Residue {label}</p>
+                                  {payload.map((e: any) => (
+                                    <p key={e.dataKey} style={{ color: e.color }}>
+                                      {e.name}: {typeof e.value === "number" ? e.value.toFixed(3) : e.value}
+                                    </p>
+                                  ))}
+                                </div>
+                              );
+                            }}
+                          />
+                          <Legend wrapperStyle={{ paddingTop: "4px" }} />
+                          <Line type="monotone" dataKey="P(Helix)" stroke="hsl(var(--helix))" dot={false} strokeWidth={2} />
+                          <Line type="monotone" dataKey="P(Beta)" stroke="hsl(var(--beta))" dot={false} strokeWidth={2} />
+                          <Line type="monotone" dataKey="P(Coil)" stroke="hsl(var(--muted-foreground))" dot={false} strokeWidth={1} strokeDasharray="3 3" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <ChartExportButtons filename={`${p.id}-s4pred-probabilities`} />
+                  </div>
+
+                  {/* FF-Helix vs S4PRED context note */}
+                  {typeof p.s4predHelixPercent === "number" &&
+                   p.s4predHelixPercent < 5 &&
+                   typeof p.ffHelixPercent === "number" &&
+                   p.ffHelixPercent > 20 && (
+                    <p className="text-xs text-muted-foreground px-1 leading-relaxed">
+                      S4PRED finds no stable helix segments (requires 5+ residues with P(Helix) &ge; 0.5).
+                      FF-Helix ({p.ffHelixPercent.toFixed(0)}%) reflects intrinsic amino acid propensity, not predicted structure.
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── TANGO Aggregation Heatmap ── */}
+            {p.tango?.agg && p.tango.agg.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>TANGO Aggregation Profile</CardTitle>
+                  <CardDescription>
+                    Per-residue aggregation propensity. High scores indicate amyloid-forming regions.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <AggregationHeatmap
+                    sequence={p.sequence}
+                    aggCurve={p.tango.agg}
+                    betaCurve={p.tango.beta}
+                    helixCurve={p.tango.helix}
+                    peptideId={p.id}
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* ── AlphaFold Viewer ── */}
+            <AlphaFoldViewer peptideId={p.id} />
+
+            {/* ── Interpretation guidance ── */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Interpretation Notes</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  <strong className="text-foreground">Charge</strong> and{" "}
+                  <strong className="text-foreground">hydrophobicity</strong> help screen antimicrobial and
+                  amyloid-prone candidates. Higher hydrophobicity with positive charge can suggest membrane activity.
+                </p>
+                <p>
+                  <strong className="text-foreground">Hydrophobic moment</strong> measures amphipathicity —
+                  the asymmetry of hydrophobic residue distribution around a helix axis.
+                </p>
+                <p>
+                  TANGO and S4PRED predictions show "N/A" if those tools are not installed on the server.
+                  Biochemical properties (charge, hydrophobicity, FF-Helix) are always computed.
+                </p>
+              </CardContent>
+            </Card>
+          </motion.div>
+        )}
       </motion.div>
     </>
   );

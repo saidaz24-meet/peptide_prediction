@@ -68,8 +68,10 @@
 **Details**: Auto-fetches structure metadata for valid UniProt accessions. Shows pLDDT confidence metrics + distribution bars. Lazy-loads EBI Mol* 3D viewer via iframe (zero npm deps). PDB download link included.
 
 ### B5. Server.py Refactor
-**Status**: NOT STARTED | **Effort**: 16h | **Blocked**: No
-**What**: Extract the 1,500-line monolith into focused service modules.
+**Status**: PARTIAL (2026-02-13) | **Effort**: 16h | **Blocked**: No
+**What**: Extract the ~1,500-line monolith into focused service modules.
+**Done**: Dead code removed (process_row, duplicate diagnose_tango/debug_providers/providers_last_run), unused imports cleaned, provider status builder extracted, predict_service print→log. Server.py reduced from 1501 to ~1300 LOC.
+**Remaining**: 814-line `execute_uniprot_query` monolith needs dedicated plan (touches 5 external APIs + complex error recovery).
 **Target**:
 ```
 server.py (100 LOC) — Only imports and mounts routers
@@ -79,6 +81,12 @@ services/predict_pipeline.py — Single sequence pipeline
 services/uniprot_pipeline.py — UniProt query execution
 ```
 **Risk**: High — touches core orchestration. Needs comprehensive test coverage first.
+
+### B9. QuickAnalyze Single-Sequence Upgrade
+**Status**: DONE (2026-02-13) | **Effort**: 4h | **Blocked**: No
+**What**: Upgraded QuickAnalyze from 3 sparse cards to full PeptideDetail-parity visualization.
+**Files**: `ui/src/pages/QuickAnalyze.tsx`
+**Details**: Deleted legacy `PredictResponse` type, now uses `Peptide` type directly via `mapApiRowToPeptide()`. Added: SequenceTrack (S4PRED colored residues), Helical Wheel, S4PRED probability chart, TANGO aggregation heatmap, AlphaFold viewer, 5 KPI tiles (Charge, H, muH, FF-Helix, S4PRED Helix), Copy/FASTA buttons, UniProt cross-links, FF-Helix vs S4PRED interpretation note.
 
 ### B6. DuckDB Result Cache
 **Status**: NOT STARTED | **Effort**: 12h | **Blocked**: No
@@ -201,4 +209,7 @@ services/uniprot_pipeline.py — UniProt query execution
 
 ---
 
-*Phase A complete (A4/A5 need live URL). Phase B: 4/8 done, B1/B6 blocked on deployment. Continue with B3 or B5 next.*
+- [x] B5 PARTIAL: Backend dead code cleanup (process_row, duplicate diagnose_tango, unused imports, provider_status_builder)
+- [x] B9: QuickAnalyze upgraded to full PeptideDetail-parity (Peptide type, SequenceTrack, HelicalWheel, S4PRED chart, TANGO heatmap, AlphaFold, KPI tiles)
+
+*Phase A complete (A4/A5 need live URL). Phase B: 6/8 done, B1/B6 blocked on deployment. B5 full extract deferred (814-line uniprot monolith needs dedicated plan).*

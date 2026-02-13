@@ -12,7 +12,7 @@ from calculations.biochem import calculate_biochemical_features as calc_biochem
 from services.normalize import normalize_cols, normalize_rows_for_ui
 from services.dataframe_utils import (
     has_all, has_any, ensure_cols, ff_flags,
-    BIOCHEM_COLS, JPRED_COLS, TANGO_COLS
+    BIOCHEM_COLS, TANGO_COLS
 )
 from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
 
@@ -49,7 +49,6 @@ def load_example_data(recalc: int = 0) -> dict:
 
     # Decide what to compute based on what's already present
     already_has_biochem = has_all(df, BIOCHEM_COLS)
-    already_has_jpred  = has_any(df, JPRED_COLS)
     already_has_tango  = has_any(df, TANGO_COLS)
 
     # Recompute only if asked (recalc=1) or missing
@@ -61,10 +60,6 @@ def load_example_data(recalc: int = 0) -> dict:
         for c in BIOCHEM_COLS:
             if c in df.columns:
                 df[c] = pd.to_numeric(df[c], errors="coerce")
-
-    # JPred disabled - kept for reference only
-    # Secondary structure predictions will be handled by a flexible interface in the future
-    already_has_jpred = False
 
     if recalc or (settings.USE_TANGO and not already_has_tango):
         try:
