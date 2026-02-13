@@ -15,6 +15,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 
+from auxiliary import get_corrected_sequence
 from config import settings
 
 logger = logging.getLogger(__name__)
@@ -476,8 +477,16 @@ def run_s4pred_sequences(
 
     for entry_id, sequence in sequences:
         try:
+            # Sanitize non-standard AAs before S4PRED (X→A, O→K, J→L, etc.)
+            clean_seq = get_corrected_sequence(sequence)
+            if not clean_seq:
+                logger.warning(f"[{trace_id}] S4PRED skipping {entry_id}: empty after sanitization")
+                stats['parsed_bad'] += 1
+                results.append({'entry_id': entry_id})
+                continue
+
             # Run prediction
-            prediction = predictor.predict_from_sequence(entry_id, sequence)
+            prediction = predictor.predict_from_sequence(entry_id, clean_seq)
 
             # Analyse results
             analysis = analyse_s4pred_result(prediction)
@@ -632,8 +641,13 @@ def filter_by_s4pred_diff(
         ):
             valid_diffs.append(ssw_diff)
 
-    # Compute threshold: mean of valid diffs, or 0.0 if no valid diffs
-    avg_diff = sum(valid_diffs) / len(valid_diffs) if valid_diffs else 0.0
+    # Compute threshold: mean of valid diffs, or 0.0 if no valid diffs.
+    # Single peptide: mean([x]) = x, so x < x is always False → SSW always -1.
+    # Use fallback 0.0 for single-row to match batch behavior.
+    if len(valid_diffs) <= 1:
+        avg_diff = 0.0
+    else:
+        avg_diff = sum(valid_diffs) / len(valid_diffs)
 
     # Step 2: Classify each sequence
     predictions: List[Optional[int]] = []

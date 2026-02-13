@@ -58,6 +58,10 @@ class PeptideRow(BaseModel):
     tangoBetaMax: Optional[float] = Field(None, description="Max value of Tango Beta curve")
     tangoHelixMax: Optional[float] = Field(None, description="Max value of Tango Helix curve")
     tangoHasData: Optional[bool] = Field(None, description="True if any Tango curves are available (non-empty)")
+    # TANGO per-residue curves (for aggregation heatmap visualization)
+    tangoAggCurve: Optional[List[float]] = Field(None, description="TANGO per-residue aggregation prediction curve")
+    tangoBetaCurve: Optional[List[float]] = Field(None, description="TANGO per-residue beta prediction curve")
+    tangoHelixCurve: Optional[List[float]] = Field(None, description="TANGO per-residue helix prediction curve")
     
     # FF-Helix (local propensity)
     # Produced by: backend/auxiliary.py:ff_helix_percent() and ff_helix_cores()
@@ -129,6 +133,7 @@ class PeptideRow(BaseModel):
             'hydrophobicity', 'charge', 'muH',
             'sswPrediction', 'sswScore', 'sswDiff', 'sswHelixPercentage', 'sswBetaPercentage',
             'tangoAggMax', 'tangoBetaMax', 'tangoHelixMax', 'tangoHasData',
+            'tangoAggCurve', 'tangoBetaCurve', 'tangoHelixCurve',
             'ffHelixPercent', 'ffHelixFragments',
             'ffHelixFlag', 'ffHelixScore', 'ffSswFlag', 'ffSswScore',
             # S4PRED fields

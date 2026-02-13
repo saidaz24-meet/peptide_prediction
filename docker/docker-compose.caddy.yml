@@ -25,7 +25,7 @@ services:
     volumes:
       - pvl-runs:/data/runs
       - pvl-uploads:/data/uploads
-      - ${TOOLS_HOST_PATH:-./tools}:/opt/tools:ro
+      - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
       - pvl-cache:/app/.run_cache
     environment:
       - ENVIRONMENT=production
@@ -103,6 +103,9 @@ services:
     build:
       context: ..
       dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_URL: /api
+        VITE_SENTRY_DSN: ${SENTRY_DSN:-}
     container_name: pvl-frontend-builder
     # Copy built assets to shared volume, then exit
     entrypoint: ["/bin/sh", "-c", "cp -r /usr/share/nginx/html/* /output/ && echo 'Frontend assets copied to /output'"]

@@ -206,7 +206,8 @@ def process_single_sequence(
 
     # Compute provider status
     tango_ran = settings.USE_TANGO and "SSW prediction" in df.columns
-    ssw_hits = 1 if tango_ran and df.iloc[0].get("SSW prediction", -1) != -1 else 0
+    ssw_val = df.iloc[0].get("SSW prediction") if tango_ran else None
+    ssw_hits = 1 if tango_ran and ssw_val is not None and not (isinstance(ssw_val, float) and pd.isna(ssw_val)) else 0
     s4pred_ran = settings.USE_S4PRED and "Helix prediction (S4PRED)" in df.columns
 
     provider_status_meta = _build_provider_status_meta(ssw_hits, tango_ran, s4pred_ran)

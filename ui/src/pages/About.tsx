@@ -141,12 +141,14 @@ export default function About() {
                 <li>Hydrophobicity, Charge, μH; SSW & FF-Helix</li>
                 <li>Cohort visualizations + correlation matrix</li>
                 <li>Sliding-window profiles with helix overlays</li>
+                <li>Helical wheel projection (HeliQuest colors)</li>
               </ul>
               <ul className="list-disc pl-5 space-y-1">
                 <li>Smart ranking & Top-N shortlist</li>
-                <li>CSV & PDF report export</li>
+                <li>CSV, PDF, and FASTA export (single + bulk)</li>
                 <li>UniProt & AlphaFold quick links</li>
-                <li>Per-residue probability curves (S4PRED)</li>
+                <li>Per-residue S4PRED coloring & probability curves</li>
+                <li>Citable via CITATION.cff (CFF 1.2.0)</li>
               </ul>
             </CardContent>
           </Card>
@@ -199,17 +201,12 @@ export default function About() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={async () => {
-                      try {
-                        const response = await fetch("/api/test-sentry-simple");
-                        const data = await response.json();
-                        alert(`Backend test: ${JSON.stringify(data, null, 2)}`);
-                      } catch (error) {
-                        alert(`Backend test failed: ${error}`);
-                      }
+                    onClick={() => {
+                      Sentry.captureMessage("Test breadcrumb from About page", "warning");
+                      alert("Warning-level message sent! Check Sentry dashboard.");
                     }}
                   >
-                    Test Backend Sentry
+                    Send Test Warning
                   </Button>
                   <Button
                     variant="destructive"

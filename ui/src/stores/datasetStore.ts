@@ -111,42 +111,11 @@ export const useDatasetStore = create<DatasetState>()(
       },
 
       ingestBackendRows: (rows: BackendRow[], meta?: DatasetMetadata) => {
-        // Debug entry (can be set via localStorage or URL param)
-        const debugEntry = (typeof window !== 'undefined' && window.localStorage?.getItem('DEBUG_ENTRY')) || 
-                          new URLSearchParams(window.location.search).get('debug_entry') || '';
-        
-        if (debugEntry) {
-          console.log(`[DEBUG_TRACE][FRONTEND_RECEIVE] Looking for entry: ${debugEntry}`);
-          const debugRow = rows.find(r => String(r.id || r.entry || '').trim() === debugEntry.trim());
-          if (debugRow) {
-            console.log(`[DEBUG_TRACE][FRONTEND_RECEIVE] Found entry ${debugEntry}:`, debugRow);
-            console.log(`  Raw backend row keys (SSW-related):`,
-              Object.keys(debugRow).filter(k => k.toLowerCase().includes('ssw') ||
-                k.toLowerCase().includes('helix') || k.toLowerCase().includes('beta')));
-            for (const key of ['id', 'sswPrediction', 'sswHelixPercentage', 
-                             'sswBetaPercentage', 'ffHelixPercent']) {
-              if (key in debugRow) {
-                console.log(`  ${key}: ${debugRow[key]} (type: ${typeof debugRow[key]})`);
-              }
-            }
-          } else {
-            console.log(`[DEBUG_TRACE][FRONTEND_RECEIVE] Entry ${debugEntry} not found in rows`);
-          }
-        }
-
         const mapped: Peptide[] = rows
           .map((r: BackendRow, idx: number) => {
             try {
-              // Source is always from backend API (upload-csv, uniprot, or example)
               const source = '/api/ingestBackendRows';
               const mapped_pep = mapApiRowToPeptide(r, `${source}[${idx}]`);
-              // Debug: Log mapping for traced entry
-              if (debugEntry && String(mapped_pep.id).trim() === debugEntry.trim()) {
-                console.log(`[DEBUG_TRACE][FRONTEND_MAP] Entry ${debugEntry} after mapping:`, mapped_pep);
-                console.log(`  sswPrediction: ${mapped_pep.sswPrediction} (type: ${typeof mapped_pep.sswPrediction})`);
-                console.log(`  sswHelixPercentage: ${mapped_pep.sswHelixPct} (type: ${typeof mapped_pep.sswHelixPct})`);
-                console.log(`  sswBetaPercentage: ${mapped_pep.sswBetaPct} (type: ${typeof mapped_pep.sswBetaPct})`);
-              }
               return mapped_pep;
             } catch (error) {
               console.warn(`[datasetStore] Failed to map row ${idx}:`, r, 'Error:', error);
@@ -209,23 +178,6 @@ export const useDatasetStore = create<DatasetState>()(
           ? (sswPositive / sswValidPeptides.length) * 100 
           : null;
         
-        // Debug: Log stats computation for traced entry
-        const debugEntry = (typeof window !== 'undefined' && window.localStorage?.getItem('DEBUG_ENTRY')) || 
-                          new URLSearchParams(window.location.search).get('debug_entry') || '';
-        if (debugEntry) {
-          const debugPep = peptides.find(p => String(p.id).trim() === debugEntry.trim());
-          if (debugPep) {
-            console.log(`[DEBUG_TRACE][FRONTEND_STATS] Entry ${debugEntry} in stats calculation:`);
-          const sswPred = debugPep.sswPrediction;
-          console.log(`  sswPrediction: ${sswPred} (type: ${typeof sswPred})`);
-          console.log(`  Is counted as positive: ${sswPred === 1}`);
-          }
-          console.log(`[DEBUG_TRACE][FRONTEND_STATS] Final computed stats:`);
-          console.log(`  sswPositive: ${sswPositive}`);
-          console.log(`  sswPositivePercent: ${sswPositivePercent !== null ? `${sswPositivePercent}%` : 'N/A'}`);
-          console.log(`  Total peptides: ${totalPeptides}`);
-        }
-
         // Helper for means (returns null if no valid values)
         const mean = (arr: number[]): number | null => {
           if (arr.length === 0) return null;
@@ -243,6 +195,12 @@ export const useDatasetStore = create<DatasetState>()(
           peptides.map((p) => p.length).filter((v): v is number => typeof v === 'number' && !Number.isNaN(v))
         ) ?? 0;
 
+        // μH stats
+        const muHVals = peptides
+          .map((p) => p.muH)
+          .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+        const meanMuH = muHVals.length > 0 ? (mean(muHVals) ?? null) : null;
+
         // FF-Helix stats (only count peptides where we have data)
         // FF-Helix is always computed (no provider dependency), but may be null/undefined
         const helixVals = peptides
@@ -250,27 +208,17 @@ export const useDatasetStore = create<DatasetState>()(
           .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
         const meanFFHelixPercent = helixVals.length > 0 ? mean(helixVals) : null;
         
-        // CSV path guard: one-time console warning if all FF-Helix values are 0/null on CSV path but non-zero on UniProt
-        // This helps diagnose mapping issues between CSV normalization and UI
-        if (meanFFHelixPercent === null || meanFFHelixPercent === 0) {
-          const sampleVals = peptides.slice(0, 3).map(p => ({
-            id: p.id,
-            ffHelixPercent: p.ffHelixPercent,
-            type: typeof p.ffHelixPercent,
-          }));
-          console.warn(
-            '[CSV_FF_HELIX_GUARD] FF-Helix mean is null or 0. Sample values:',
-            sampleVals,
-            'Total peptides:', peptides.length,
-            'Valid FF-Helix count:', helixVals.length
-          );
-        }
+        // S4PRED Helix % stats
+        const s4predHelixVals = peptides
+          .map((p) => p.s4predHelixPercent)
+          .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+        const meanS4predHelixPercent = s4predHelixVals.length > 0 ? mean(s4predHelixVals) : null;
 
         // Count availability of different prediction types
-        const s4predAvailable = peptides.filter(p =>
-          p.providerStatus?.s4pred?.status === "available" &&
-          p.s4pred?.helixSegments && p.s4pred.helixSegments.length > 0
-        ).length;
+        const s4predAvailable = peptides.filter(p => {
+          const st = p.providerStatus?.s4pred?.status?.toUpperCase();
+          return st === "AVAILABLE" || st === "PARTIAL";
+        }).length;
         const ffHelixAvailable = peptides.filter(p => 
           typeof p.ffHelixPercent === 'number' && !Number.isNaN(p.ffHelixPercent)
         ).length;
@@ -293,7 +241,9 @@ export const useDatasetStore = create<DatasetState>()(
           sswPositivePercent,
           meanHydrophobicity,
           meanCharge,
+          meanMuH,
           meanFFHelixPercent,
+          meanS4predHelixPercent,
           meanLength,
           // Add these for better UI display
           s4predAvailable,
@@ -325,14 +275,16 @@ export const useDatasetStore = create<DatasetState>()(
           // In production, you might want to throw or report to monitoring
         }
 
-        console.log('[DEBUG] Calculated stats:', stats); // Debug log
-
         set({ stats });
       },
 
       setLoading: (isLoading) => set({ isLoading }),
       setError: (error) => set({ error }),
-      resetData: () => set({ ...initialState }),
+      resetData: () => {
+        set({ ...initialState });
+        // Also clear persisted data from localStorage to prevent resurrection
+        try { localStorage.removeItem('peptide-dataset-storage'); } catch {}
+      },
       getPeptideById: (id) => get().peptides.find((p) => p.id === id),
       
       // Reproduce run state management
@@ -355,13 +307,61 @@ export const useDatasetStore = create<DatasetState>()(
     }),
     {
       name: 'peptide-dataset-storage',
+      version: 2,  // Bump when persisted schema changes
+      migrate: (persisted: any, version: number) => {
+        // v0/v1 → v2: added peptides, stats, meta to persist
+        if (version < 2) {
+          return {
+            ...initialState,
+            columnMapping: persisted?.columnMapping ?? {},
+            lastRunType: persisted?.lastRunType ?? null,
+            lastRunInput: persisted?.lastRunInput ?? null,
+            lastRunConfig: persisted?.lastRunConfig ?? null,
+          };
+        }
+        return persisted;
+      },
       partialize: (state) => ({
+        // Persist prediction results so they survive page refresh
+        peptides: state.peptides,
+        stats: state.stats,
+        meta: state.meta,
         columnMapping: state.columnMapping,
         // Only persist config and predict input (not File objects)
         lastRunType: state.lastRunType,
         lastRunInput: state.lastRunType === 'predict' ? state.lastRunInput : null,  // Don't persist File
         lastRunConfig: state.lastRunConfig,
       }),
+      storage: {
+        getItem: (name) => {
+          try { return localStorage.getItem(name); } catch { return null; }
+        },
+        setItem: (name, value) => {
+          try {
+            localStorage.setItem(name, value);
+          } catch (e: any) {
+            if (e?.name === 'QuotaExceededError') {
+              // Drop per-residue curves to fit within 5MB localStorage limit
+              try {
+                const parsed = JSON.parse(value);
+                if (parsed?.state?.peptides) {
+                  parsed.state.peptides = parsed.state.peptides.map((p: any) => {
+                    const { tango, s4predCurve, ...rest } = p;
+                    return rest;
+                  });
+                  localStorage.setItem(name, JSON.stringify(parsed));
+                }
+              } catch {
+                // Last resort: clear persisted data rather than silently losing updates
+                localStorage.removeItem(name);
+              }
+            }
+          }
+        },
+        removeItem: (name) => {
+          try { localStorage.removeItem(name); } catch {}
+        },
+      },
     }
   )
 );

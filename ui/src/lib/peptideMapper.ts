@@ -206,20 +206,23 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
       : undefined;
 
   // Optional per-residue curves (Tango)
-  // Look in multiple locations: top-level, legacy keys, and extra
+  // Check canonical API fields first (tangoAggCurve), then legacy keys
   const extra = row.extras || row.extra || {};
   const tango: TangoCurves | undefined = (() => {
     const agg = (
+      row.tangoAggCurve ||
       row.tangoAgg ||
       row["Tango Aggregation curve"] ||
       extra["Tango Aggregation curve"]
     ) as number[] | undefined;
     const beta = (
+      row.tangoBetaCurve ||
       row.tangoBeta ||
       row["Tango Beta curve"] ||
       extra["Tango Beta curve"]
     ) as number[] | undefined;
     const helix = (
+      row.tangoHelixCurve ||
       row.tangoHelix ||
       row["Tango Helix curve"] ||
       extra["Tango Helix curve"]

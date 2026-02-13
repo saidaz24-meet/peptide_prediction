@@ -2,6 +2,7 @@
 import os
 import re
 import json
+import platform
 import subprocess
 import shutil
 import math
@@ -59,7 +60,7 @@ def _ensure_dirs() -> None:
 def _start_new_run_dir() -> str:
     """Create a new timestamped run dir and cache it. Also sweeps stray *.txt in Tango/."""
     _ensure_dirs()
-    stamp = datetime.now().strftime("run_%Y%m%d_%H%M%S")
+    stamp = datetime.now().strftime("run_%Y%m%d_%H%M%S_%f")
     run_dir = os.path.join(OUT_DIR, stamp)
     os.makedirs(run_dir, exist_ok=True)
 
@@ -192,8 +193,9 @@ def _write_simple_bat(records: List[Tuple[str, str]], script_path: str) -> List[
     lines.append("set -euo pipefail\n")
     # Use absolute path to binary (computed at script generation time)
     lines.append(f'BIN="{abs_bin}"\n')
-    # Ensure binary is executable and not quarantined (macOS safety)
-    lines.append('xattr -d com.apple.quarantine "$BIN" >/dev/null 2>&1 || true\n')
+    # Ensure binary is executable and not quarantined (macOS safety — no-op on Linux)
+    if platform.system() == "Darwin":
+        lines.append('xattr -d com.apple.quarantine "$BIN" >/dev/null 2>&1 || true\n')
     lines.append('chmod +x "$BIN" || true\n')
     lines.append('if [ ! -x "$BIN" ]; then echo "[TANGO] tango binary missing at $BIN"; exit 1; fi\n')
 
@@ -213,7 +215,7 @@ def _write_simple_bat(records: List[Tuple[str, str]], script_path: str) -> List[
         lines.append(
             f'"$BIN" {safe} nt="N" ct="N" ph="7" te="298" io="0.1" tf="0" seq="{seq}" > "{expected_output}"\n'
         )
-    with open(script_path, "w") as fh:
+    with open(script_path, "w", encoding="utf-8") as fh:
         fh.writelines(lines)
     os.chmod(script_path, 0o755)
     return entry_mapping
@@ -280,7 +282,7 @@ def _write_run_meta(
 
     meta_path = os.path.join(run_dir, "run_meta.json")
     try:
-        with open(meta_path, "w") as f:
+        with open(meta_path, "w", encoding="utf-8") as f:
             json.dump(run_meta, f, indent=2)
     except Exception as e:
         log_warning("tango_meta_write_failed", f"Failed to write run_meta.json: {e}", **{"error": str(e)})
@@ -356,11 +358,12 @@ def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> str:
                   **{"traceId": trace_id, "reason": "EACCES", "exit": None, "path": bin_path_abs})
         return run_dir
 
-    # Make sure macOS Gatekeeper doesn't block
+    # Make sure binary is executable (and remove macOS quarantine if on Darwin)
     try:
         os.chmod(bin_path, 0o755)
-        subprocess.run(["xattr", "-d", "com.apple.quarantine", bin_path],
-                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        if platform.system() == "Darwin":
+            subprocess.run(["xattr", "-d", "com.apple.quarantine", bin_path],
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
 
@@ -368,7 +371,7 @@ def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> str:
     trace_id = get_trace_id()
 
     try:
-        proc = subprocess.run(cmd, cwd=run_dir, capture_output=True, text=True, timeout=3600)
+        proc = subprocess.run(cmd, cwd=run_dir, capture_output=True, text=True, timeout=300)
         stderr_tail = proc.stderr[-2048:] if proc.stderr and len(proc.stderr) > 2048 else (proc.stderr or "")
         stdout_preview = proc.stdout[:500] if proc.stdout else ""
         output_files = [f for f in os.listdir(run_dir) if f.lower().endswith(".txt") and f != "Tango_run.sh"]
@@ -389,7 +392,7 @@ def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> str:
 
     except subprocess.TimeoutExpired:
         _write_run_meta(run_dir, trace_id, "Timeout", bin_exists=True,
-                        stderr_tail="Execution timed out after 3600 seconds",
+                        stderr_tail="Execution timed out after 300 seconds",
                         exception_type="TimeoutExpired", **meta_common)
         log_error("tango_simple_failed", "Simple runner timed out",
                   **{"traceId": trace_id, "reason": "Timeout", "exit": None, "path": bin_path_abs})
@@ -435,7 +438,7 @@ def __get_peptide_tango_result(filepath: str) -> Optional[dict]:
 
     name = os.path.splitext(os.path.basename(filepath))[0]
     try:
-        with open(filepath, "r") as fh:
+        with open(filepath, "r", encoding="utf-8") as fh:
             lines = [ln.strip() for ln in fh if ln.strip()]
     except Exception:
         return None
@@ -606,7 +609,7 @@ def _read_entry_mapping(run_dir: str) -> Optional[List[Dict[str, str]]]:
     if not os.path.exists(meta_path):
         return None
     try:
-        with open(meta_path, "r") as f:
+        with open(meta_path, "r", encoding="utf-8") as f:
             meta = json.load(f)
             return meta.get("entry_mapping")
     except Exception:
@@ -884,7 +887,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
     if os.path.exists(batch_path):
         try:
             from io import StringIO
-            with open(batch_path, "r") as fh:
+            with open(batch_path, "r", encoding="utf-8") as fh:
                 tab_lines = [ln for ln in fh if "\t" in ln]
             if tab_lines:
                 df_out = pd.read_csv(StringIO("".join(tab_lines)), sep="\t")
@@ -1041,7 +1044,7 @@ def _read_run_meta_reason(run_dir: Optional[str]) -> Optional[str]:
         return None
     
     try:
-        with open(meta_path, "r") as f:
+        with open(meta_path, "r", encoding="utf-8") as f:
             meta = json.load(f)
             return meta.get("reason")
     except Exception:
@@ -1118,7 +1121,7 @@ def smoke_test_tango(n_inputs: int = 1) -> Dict[str, Any]:
             result["duration_ms"] = int((time.time() - start) * 1000)
             return result
 
-        with open(meta_path, "r") as f:
+        with open(meta_path, "r", encoding="utf-8") as f:
             run_meta = json.load(f)
 
         entry_mapping = run_meta.get("entry_mapping")
@@ -1231,6 +1234,10 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
     if len(valid_diffs) == 0:
         avg_diff = fallback_threshold
         log_warning("ssw_diff_no_valid", f"No valid SSW diff values; using fallback threshold {fallback_threshold}", **{"strategy": strategy, "fallback": fallback_threshold})
+    elif len(valid_diffs) == 1:
+        # Single peptide: mean([x]) = x, so x < x is always False → SSW always -1.
+        # Use fallback threshold for consistent single-sequence vs batch behavior.
+        avg_diff = fallback_threshold
     else:
         if strategy == "mean":
             avg_diff = valid_diffs.mean()

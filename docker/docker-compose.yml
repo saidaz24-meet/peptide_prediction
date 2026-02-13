@@ -26,8 +26,8 @@ services:
       # Persistent data volumes
       - pvl-runs:/data/runs
       - pvl-uploads:/data/uploads
-      # Tool assets (volume-mounted per Strategy A)
-      - pvl-tools:/opt/tools
+      # Tool assets (bind-mount from project root tools/ directory)
+      - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
       # Runtime cache
       - pvl-cache:/app/.run_cache
     environment:
@@ -65,6 +65,7 @@ services:
       dockerfile: docker/Dockerfile.frontend
       args:
         VITE_API_URL: /api
+        VITE_SENTRY_DSN: ${SENTRY_DSN:-}
     container_name: pvl-frontend-dev
     ports:
       - "3000:80"
@@ -81,9 +82,6 @@ volumes:
   pvl-runs:
     driver: local
   pvl-uploads:
-    driver: local
-  # Tool assets (populate with models/binaries)
-  pvl-tools:
     driver: local
   # Runtime cache
   pvl-cache:

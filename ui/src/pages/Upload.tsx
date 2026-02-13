@@ -70,8 +70,7 @@ export default function Upload() {
 
   // ---- CSV/TSV preview (XLSX skips preview) ----
   const handleLocalPreview = (file: File) => {
-    console.log('[Upload] handleLocalPreview called with file:', file.name);
-    setLocalFile(file); // <— KEY: remember the file so Analyze can enable
+    setLocalFile(file);
     setQc(null);
 
     const name = file.name.toLowerCase();
@@ -79,39 +78,28 @@ export default function Upload() {
     const isXLSX = name.endsWith(".xlsx") || name.endsWith(".xls");
 
     if (isXLSX) {
-      // Skip client preview; backend will read Excel directly.
-      console.log('[Upload] Excel file detected, skipping preview');
       setRawPreview({ fileName: file.name, headers: [], rows: [], rowCount: 0 } as any);
       setCurrentStep(1);
       return;
     }
 
-    console.log('[Upload] Parsing CSV/TSV file...');
     Papa.parse(file, {
       header: true,
       skipEmptyLines: "greedy",
       delimiter: isTSV ? "\t" : undefined,
       complete: (res) => {
-        console.log('[Upload] Papa.parse complete, rows:', res.data?.length);
         const rowsObj = (res.data as any[]).filter(Boolean);
         const headers =
           res.meta.fields?.length ? res.meta.fields : rowsObj.length ? Object.keys(rowsObj[0]) : [];
 
-        console.log('[Upload] Headers:', headers);
-
-        // For preview, we don't need strict validation - just show all rows
-        // Validation will happen on the backend during analysis
         const previewData = {
           fileName: file.name,
           headers,
-          rows: rowsObj.slice(0, 200), // Show first 200 rows for preview
+          rows: rowsObj.slice(0, 200),
           rowCount: rowsObj.length,
         };
-        
-        console.log('[Upload] Setting raw preview data:', previewData);
         setRawPreview(previewData as any);
 
-        // Optional: still do validation to show warnings, but don't filter
         const pickSeq = (r: any) =>
           r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
         const rejected: any[] = [];
@@ -122,8 +110,6 @@ export default function Upload() {
           }
         }
 
-        console.log('[Upload] Rejected (invalid sequences):', rejected.length);
-
         if (rejected.length > 0) {
           setQc({
             rejectedCount: rejected.length,
@@ -131,12 +117,9 @@ export default function Upload() {
           });
         } else setQc(null);
 
-        console.log('[Upload] Advancing to step 1');
         setCurrentStep(1);
-        console.log('[Upload] Step should now be 1, rawData:', previewData);
       },
       error: (err) => {
-        console.error('[Upload] Papa.parse error:', err);
         toast.error(`Failed to read file: ${err.message}`);
       },
     });
@@ -230,6 +213,40 @@ export default function Upload() {
                       Query UniProt
                     </Button>
                   </div>
+
+                  {/* Try Example Data */}
+                  {uploadMode === 'file' && (
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-2">Or try an example dataset:</p>
+                      <div className="flex gap-2 justify-center flex-wrap">
+                        {[
+                          { label: 'Antimicrobial Peptides (12)', file: '/example/antimicrobial_peptides.csv' },
+                          { label: 'Amyloid Peptides (9)', file: '/example/amyloid_peptides.csv' },
+                          { label: 'Venom Peptides (16)', file: '/example/peptide_data.csv' },
+                        ].map((ex) => (
+                          <Button
+                            key={ex.file}
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-7"
+                            onClick={async () => {
+                              try {
+                                const resp = await fetch(ex.file);
+                                const text = await resp.text();
+                                const blob = new Blob([text], { type: 'text/csv' });
+                                const file = new File([blob], ex.file.split('/').pop() || 'example.csv', { type: 'text/csv' });
+                                handleLocalPreview(file);
+                              } catch {
+                                toast.error('Failed to load example dataset');
+                              }
+                            }}
+                          >
+                            {ex.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* File Upload */}
                   {uploadMode === 'file' && (

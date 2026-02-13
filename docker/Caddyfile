@@ -12,11 +12,11 @@
     # API proxy - forward to backend service
     handle /api/* {
         reverse_proxy backend:8000 {
-            # Timeout settings for long-running predictions
+            # Timeout settings for long-running predictions (TANGO can take minutes)
             transport http {
                 dial_timeout 60s
-                read_timeout 120s
-                write_timeout 120s
+                read_timeout 600s
+                write_timeout 600s
             }
         }
     }

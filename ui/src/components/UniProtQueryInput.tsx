@@ -151,8 +151,6 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
           sortValue = mappedSort; // null for "best", or mapped value like "length asc"
         }
         
-        // Debug logging
-        console.log(`[UNIPROT][UI] Sort mapping: ${controls.sort} → ${sortValue === null ? '(omitted)' : sortValue}`);
       }
       // If retryWithoutSort is true, sortValue stays null (omit sort on retry)
 
@@ -193,30 +191,13 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
         requestBody.sort = sortValue;
       }
       // Explicitly do NOT set requestBody.sort if sortValue is null, "score", or undefined
-      
-      // Debug logging before sending (remove sort from log if sensitive)
-      const logBody = { ...requestBody };
-      console.log('[UNIPROT][UI] Request body:', JSON.stringify(logBody, null, 2));
 
       try {
         const result = await executeUniProtQuery(requestBody, abortController.signal);
         clearTimeout(timeoutId);
-        
-        // Log final API query for transparency
+
         const apiQuery = result.meta?.api_query_string || parsedQuery?.api_query_string || query;
         setFinalApiQuery(apiQuery);
-        console.log('[UNIPROT][UI] Final API query executed:', apiQuery);
-        console.log('[UNIPROT][UI] Query URL:', result.meta?.url);
-        console.log('[UNIPROT][UI] Results:', result.meta?.row_count, 'rows');
-        
-        // Log provider status if available
-        if (result.meta?.provider_status) {
-          const ps = result.meta.provider_status;
-          console.log('[UNIPROT][UI] Provider status:', {
-            tango: ps.tango?.skipped_reason || (ps.tango?.ran ? 'completed' : 'not run'),
-            s4pred: ps.s4pred?.skipped_reason || (ps.s4pred?.ran ? 'completed' : 'not run'),
-          });
-        }
 
         onQueryExecuted(result.rows, result.meta);
         
@@ -246,7 +227,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                                  (requestBody.length_min !== undefined || requestBody.length_max !== undefined));
           
           if (hasInvalidSort || hasLengthIssue) {
-            console.log('[UNIPROT][UI] Auto-retrying without sort/length due to 400 error');
+            // Auto-retry without sort/length due to 400 error
             setIsExecuting(false);
             onLoadingChange?.(false);
             toast('Adjusted query (removed unsupported sort/length). Retrying...');

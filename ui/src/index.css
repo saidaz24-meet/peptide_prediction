@@ -47,7 +47,10 @@
     --chameleon-negative: 220 8.9% 46.1%;
     --helix: 211 96% 68%;
     --helix-foreground: 0 0% 100%;
-    
+    --beta: 25 95% 53%;
+    --beta-foreground: 0 0% 100%;
+    --coil: 220 8.9% 66%;
+
     /* Borders and inputs */
     --border: 220 13% 91%;
     --input: 220 13% 91%;
@@ -116,7 +119,10 @@
     --chameleon-negative: 220 8.9% 46.1%;
     --helix: 211 96% 68%;
     --helix-foreground: 0 0% 100%;
-    
+    --beta: 25 95% 53%;
+    --beta-foreground: 0 0% 100%;
+    --coil: 220 8.9% 66%;
+
     --border: 220 27% 16%;
     --input: 220 27% 16%;
     --ring: 258 90% 66%;

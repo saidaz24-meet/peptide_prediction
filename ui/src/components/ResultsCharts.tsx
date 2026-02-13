@@ -73,15 +73,24 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
     };
   }).sort((a, b) => a.binStart - b.binStart); // Ensure left→right ordering
 
-  // SSW distribution
+  // SSW distribution (null rows excluded — they have no prediction)
   const pos = peptides.filter(p => p.sswPrediction === 1).length;
   const neg = peptides.filter(p => p.sswPrediction === -1).length;
   const unc = peptides.filter(p => p.sswPrediction === 0).length;
   const sswDistribution = [
     { name: 'SSW Positive', value: pos, color: COLORS.chameleonPositive },
     { name: 'SSW Negative', value: neg, color: COLORS.chameleonNegative },
-    { name: 'Not available', value: unc, color: COLORS.muted },
+    { name: 'Uncertain', value: unc, color: COLORS.muted },
   ].filter(d => d.value > 0);
+
+  // SSW predictor agreement stats (TANGO vs S4PRED)
+  const bothSSW = peptides.filter(p =>
+    p.sswPrediction != null && p.sswPrediction !== 0 &&
+    p.s4predSswPrediction != null && p.s4predSswPrediction !== 0
+  );
+  const sswAgree = bothSSW.filter(p => p.sswPrediction === p.s4predSswPrediction).length;
+  const sswDisagree = bothSSW.length - sswAgree;
+  const sswAgreePct = bothSSW.length > 0 ? ((sswAgree / bothSSW.length) * 100).toFixed(0) : null;
 
   // Radar comparison (if both groups empty, render empty)
   const positiveGroup = peptides.filter(p => p.sswPrediction === 1);
@@ -94,11 +103,11 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
             positive: mean(positiveGroup.map(p => p.hydrophobicity)),
             negative: mean(negativeGroup.map(p => p.hydrophobicity)) },
           { metric: 'Charge (abs)',
-            positive: mean(positiveGroup.map(p => Math.abs(p.charge))),
-            negative: mean(negativeGroup.map(p => Math.abs(p.charge))) },
+            positive: mean(positiveGroup.map(p => Math.abs(p.charge ?? 0)).filter(Number.isFinite)),
+            negative: mean(negativeGroup.map(p => Math.abs(p.charge ?? 0)).filter(Number.isFinite)) },
           { metric: 'Length (norm)',
-            positive: mean(positiveGroup.map(p => p.length)) / 50,
-            negative: mean(negativeGroup.map(p => p.length)) / 50 },
+            positive: mean(positiveGroup.map(p => p.length).filter((v): v is number => typeof v === 'number' && Number.isFinite(v))) / 50,
+            negative: mean(negativeGroup.map(p => p.length).filter((v): v is number => typeof v === 'number' && Number.isFinite(v))) / 50 },
           { metric: 'μH',
             positive: mean(positiveGroup.map(p => (typeof p.muH === 'number' ? p.muH : 0))),
             negative: mean(negativeGroup.map(p => (typeof p.muH === 'number' ? p.muH : 0))) },
@@ -200,16 +209,14 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
                     />
                     <ChartTooltip
                       content={({ payload }) => {
-                        if (payload && payload.length > 0) {
-                          const { hydrophobicity, muH } = payload[0].payload;
-                          return (
-                            <div className="bg-background border border-border rounded p-2 text-xs">
-                              <p>H: {parseFloat(hydrophobicity).toFixed(2)}</p>
-                              <p>μH: {parseFloat(muH).toFixed(2)}</p>
-                            </div>
-                          );
-                        }
-                        return null;
+                        const item = payload?.[0]?.payload;
+                        if (!item) return null;
+                        return (
+                          <div className="bg-background border border-border rounded p-2 text-xs">
+                            <p>H: {parseFloat(item.hydrophobicity).toFixed(2)}</p>
+                            <p>μH: {parseFloat(item.muH).toFixed(2)}</p>
+                          </div>
+                        );
                       }}
                     />
                     <Scatter data={scatterData.filter(d => d.ssw === 1)} fill={COLORS.chameleonPositive} name="SSW +" />
@@ -287,8 +294,8 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }}>
         <Card className="shadow-medium">
           <CardHeader>
-            <CardTitle>SSW Prediction Distribution</CardTitle>
-            <CardDescription>Proportion of structural switch predictions</CardDescription>
+            <CardTitle>TANGO SSW Distribution</CardTitle>
+            <CardDescription>Structural switch predictions from TANGO aggregation analysis</CardDescription>
           </CardHeader>
           <CardContent>
             {sswDistribution.length === 0 ? (
@@ -305,6 +312,22 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
                 </ResponsiveContainer>
               </ChartContainer>
             )}
+            {/* Predictor agreement note */}
+            {bothSSW.length > 0 && (
+              <div className="mt-3 p-3 rounded-md bg-muted/30 text-xs text-muted-foreground space-y-1">
+                <div className="flex items-center gap-1.5">
+                  <Info className="h-3.5 w-3.5 shrink-0" />
+                  <span className="font-medium">TANGO vs S4PRED agreement: {sswAgreePct}% ({sswAgree}/{bothSSW.length} peptides)</span>
+                </div>
+                {sswDisagree > 0 && (
+                  <p className="ml-5">
+                    {sswDisagree} peptide{sswDisagree > 1 ? 's' : ''} show different SSW calls.
+                    TANGO SSW reflects aggregation-correlated switching (primary for fibril research);
+                    S4PRED SSW reflects pure secondary structure switching.
+                  </p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>
@@ -314,7 +337,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
         <Card className="shadow-medium">
           <CardHeader>
             <CardTitle>Cohort Comparison</CardTitle>
-            <CardDescription>Mean profiles: SSW positive vs negative</CardDescription>
+            <CardDescription>Mean profiles: TANGO SSW+ vs SSW- groups</CardDescription>
           </CardHeader>
         <CardContent>
           {radarData.length === 0 ? (
@@ -343,8 +366,8 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle>FF-Helix % vs SSW Prediction</CardTitle>
-                <CardDescription>Relationship between fibril-forming helix content and structural switching</CardDescription>
+                <CardTitle>FF-Helix % vs TANGO SSW</CardTitle>
+                <CardDescription>Fibril-forming helix content vs TANGO structural switch prediction</CardDescription>
               </div>
               <TooltipProvider>
                 <UITooltip>

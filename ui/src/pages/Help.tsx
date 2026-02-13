@@ -38,15 +38,15 @@ const metrics = [
   {
     icon: Layers,
     name: 'FF-Helix Percentage',
-    description: 'Predicted percentage of helical secondary structure (S4PRED/TANGO)',
-    interpretation: 'Higher percentages indicate more structured peptides. Range: 0-100%',
+    description: 'Fibril-forming helix propensity computed via a Chou-Fasman sliding-window algorithm (window=6, threshold=1.0). This is a sequence-based prediction, NOT an experimental measurement from circular dichroism (CD).',
+    interpretation: 'Higher values indicate greater sequence propensity for alpha-helical structure. A 100% score means every 6-residue window in the sequence exceeds the Chou-Fasman helix propensity threshold. Do not compare directly with experimental CD helicity values, which measure actual folded structure in solution.',
     color: 'text-helix',
   },
   {
     icon: BarChart3,
     name: 'SSW Prediction',
-    description: 'Binary prediction for membrane-active potential',
-    interpretation: 'Positive = likely membrane-active, Negative = likely not membrane-active',
+    description: 'Secondary Structure Switch prediction from TANGO aggregation analysis and/or S4PRED neural network. Indicates whether the peptide may undergo a conformational switch between helix and beta-sheet.',
+    interpretation: 'Positive = predicted to undergo structural switch (potential amyloid/fibril former). Negative = predicted stable (no switch). N/A = provider not available or sequence too short.',
     color: 'text-chameleon-positive',
   },
 ];
@@ -220,6 +220,60 @@ export default function Help() {
                 <h4 className="font-medium">Export Options</h4>
                 <p className="text-sm text-muted-foreground">
                   Export filtered results to CSV or individual peptide data to JSON for further analysis.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Scientific Notes */}
+          <Card className="shadow-medium">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <BookOpen className="w-5 h-5 mr-2 text-primary" />
+                Scientific Notes
+              </CardTitle>
+              <CardDescription>
+                Important methodological details for interpreting results
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="space-y-2">
+                <h4 className="font-medium">FF-Helix % vs Experimental Helicity</h4>
+                <p className="text-sm text-muted-foreground">
+                  The FF-Helix percentage reported by PVL is a <strong className="text-foreground">Chou-Fasman propensity score</strong>, not
+                  an experimental circular dichroism (CD) measurement. It uses a sliding-window approach
+                  (window size = 6 residues) with the Chou-Fasman helix propensity scale. A residue is
+                  classified as "helix-forming" if the average propensity of its surrounding window exceeds
+                  a threshold of 1.0. The percentage reflects how many positions in the sequence are predicted
+                  helix-forming by this criterion.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Experimental CD helicity values measure actual folded structure in solution and depend on
+                  buffer conditions, temperature, and peptide concentration. These are typically lower than
+                  sequence-based predictions for most peptides.
+                </p>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <h4 className="font-medium">S4PRED Neural Network</h4>
+                <p className="text-sm text-muted-foreground">
+                  S4PRED (Single Sequence Secondary Structure PREDiction) is an ensemble of 5 neural networks
+                  that predicts per-residue secondary structure from amino acid sequence alone (no multiple
+                  sequence alignment required). It outputs probabilities for three classes: Helix (H),
+                  Beta-strand (E), and Coil (C). The per-residue prediction shown in the Sequence Track
+                  uses the highest-probability class at each position.
+                </p>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <h4 className="font-medium">SSW (Secondary Structure Switch)</h4>
+                <p className="text-sm text-muted-foreground">
+                  SSW prediction identifies peptides that may switch between alpha-helix and beta-sheet
+                  conformations. This is relevant for amyloid formation and fibril-forming behavior.
+                  The prediction uses either TANGO (aggregation thermodynamics) or S4PRED (neural network
+                  helix/beta balance), comparing helix and beta propensities against dataset-level averages.
+                  A "Positive" prediction suggests the peptide has significant propensity for both helix
+                  and beta structures, indicating potential for structural switching.
                 </p>
               </div>
             </CardContent>

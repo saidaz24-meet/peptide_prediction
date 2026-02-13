@@ -94,15 +94,11 @@ export default function MetricDetail() {
           // SSW semantics: 1=positive, -1=negative, 0=uncertain, null=missing
           const pos = peptidesTyped.filter(p => p.sswPrediction === 1).length;
           const neg = peptidesTyped.filter(p => p.sswPrediction === -1).length;
-          const missing = peptidesTyped.filter(p =>
-            p.sswPrediction === null || p.sswPrediction === undefined
-          ).length;
-          // Uncertain (0) is rare - group with negative for display simplicity
           const uncertain = peptidesTyped.filter(p => p.sswPrediction === 0).length;
           return [
-            { name: 'SSW Positive', value: pos, color: COLORS.positive },
-            { name: 'SSW Negative', value: neg + uncertain, color: COLORS.negative },
-            { name: 'Not available', value: missing, color: COLORS.muted },
+            { name: 'TANGO SSW+', value: pos, color: COLORS.positive },
+            { name: 'TANGO SSW-', value: neg, color: COLORS.negative },
+            ...(uncertain > 0 ? [{ name: 'Uncertain', value: uncertain, color: COLORS.muted }] : []),
           ].filter(d => d.value > 0);
         } else if (metricId === 'ff-secondary-switch') {
           // This would require FF-Secondary structure switch data - simplified for now

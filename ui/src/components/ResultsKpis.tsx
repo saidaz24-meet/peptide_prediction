@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { TrendingUp, Users, Zap, BarChart3 } from 'lucide-react';
+import { TrendingUp, Users, Zap, BarChart3, Dna } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { DatasetStats, DatasetMetadata } from '@/types/peptide';
 import { useNavigate } from 'react-router-dom';
@@ -36,7 +36,10 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
   // Note: We don't check 'ran' field - 'status' is authoritative
   const tangoStatus = meta?.provider_status?.tango?.status;
   const tangoAvailable = tangoStatus === 'AVAILABLE' || tangoStatus === 'PARTIAL';
-  
+
+  const s4predStatus = meta?.provider_status?.s4pred?.status;
+  const s4predAvailable = s4predStatus === 'AVAILABLE' || s4predStatus === 'PARTIAL';
+
   const ffAvailable = (stats.ffHelixAvailable ?? 0) > 0;
   const sswAvailable = (stats.sswAvailable ?? 0) > 0;
 
@@ -59,7 +62,7 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
       onClick: () => {}, // Total peptides doesn't have a detail page
     },
     {
-      title: 'SSW Positive',
+      title: 'TANGO SSW+',
       // NO LYING UI: If TANGO didn't run, show N/A (not 0%)
       value: tangoAvailable
         ? formatPercent(stats.sswPositivePercent)
@@ -94,11 +97,27 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
       bgColor: 'bg-helix/10',
       metricId: 'ff-helix' as MetricId,
       onClick: () => navigate('/metrics/ff-helix'),
+      subtitle: 'intrinsic propensity',
+    },
+    {
+      title: 'Avg S4PRED Helix',
+      value: s4predAvailable && stats.meanS4predHelixPercent !== null
+        ? `${stats.meanS4predHelixPercent.toFixed(1)}%`
+        : 'N/A',
+      icon: Dna,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-600/10',
+      metricId: null as MetricId | null,
+      onClick: () => {},
+      subtitle: 'context-dependent',
+      tooltip: !s4predAvailable
+        ? 'S4PRED did not run or is unavailable'
+        : undefined,
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
       {kpis.map((kpi, index) => {
         const Icon = kpi.icon;
         return (
@@ -108,7 +127,7 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
-            <Card 
+            <Card
               className={`shadow-soft transition-shadow ${kpi.metricId ? 'cursor-pointer hover:shadow-medium active:scale-[0.98]' : ''}`}
               onClick={kpi.metricId ? kpi.onClick : undefined}
             >
@@ -126,6 +145,9 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
                     >
                       {kpi.value}
                     </motion.p>
+                    {'subtitle' in kpi && kpi.subtitle && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{kpi.subtitle}</p>
+                    )}
                   </div>
                   <div className={`w-12 h-12 rounded-lg ${kpi.bgColor} flex items-center justify-center`}>
                     <Icon className={`w-6 h-6 ${kpi.color}`} />

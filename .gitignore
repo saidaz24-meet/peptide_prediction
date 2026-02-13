@@ -36,6 +36,12 @@ backend/Psipred/work/
 #  ------------------------------
 
 
+# 🧠 MODEL WEIGHTS & TOOL BINARIES (volume-mounted, not committed)
+tools/
+*.pt
+*.pth
+*.onnx
+
 # 📦 NODE (Frontend)
 ui/.next/
 ui/node_modules/

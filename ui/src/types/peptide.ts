@@ -180,8 +180,11 @@ export type DatasetStats = {
   sswPositivePercent: number | null; // null when TANGO unavailable
   meanHydrophobicity: number;
   meanCharge: number;
+  meanMuH: number | null; // null when no μH data available
   meanFFHelixPercent: number | null; // null when no FF-Helix data available
   meanLength: number;
+
+  meanS4predHelixPercent: number | null; // null when no S4PRED data available
 
   // availability counts for better UI display
   s4predAvailable?: number;

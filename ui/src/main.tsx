@@ -28,11 +28,12 @@ if (SENTRY_DSN) {
       // Setting this option to true will send default PII data to Sentry
       // For example, automatic IP address collection on events
       sendDefaultPii: true,
-      // Set traces_sample_rate to 1.0 to capture 100% of transactions for performance monitoring
-      // Adjust this value in production
-      tracesSampleRate: 0.1,
-      // Set profiles_sample_rate to profile 10% of sampled transactions
-      profilesSampleRate: 0.1,
+      // Free tier: 100% sampling OK for low-traffic research tool
+      tracesSampleRate: 1.0,
+      profilesSampleRate: 1.0,
+      // Session Replay: capture 100% of sessions, always capture on error
+      replaysSessionSampleRate: 1.0,
+      replaysOnErrorSampleRate: 1.0,
       environment: import.meta.env.MODE || "development",
       // Enable debug mode to see Sentry activity in console (disable in production)
       debug: import.meta.env.VITE_SENTRY_DEBUG === "true",
@@ -49,9 +50,6 @@ if (SENTRY_DSN) {
     
     SENTRY_INITIALIZED = true;
     console.log("[SENTRY] Initialized successfully");
-    
-    // Send a test message to verify connection
-    Sentry.captureMessage("Sentry frontend initialized", "info");
   } catch (error) {
     console.error("[SENTRY] Failed to initialize:", error);
     SENTRY_INITIALIZED = false;

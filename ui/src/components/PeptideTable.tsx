@@ -9,17 +9,48 @@ import {
   getPaginationRowModel,
   createColumnHelper,
   flexRender,
+  type VisibilityState,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ChevronLeft, ChevronRight, Download, Eye, Filter, X } from 'lucide-react';
+import { ArrowUpDown, ChevronLeft, ChevronRight, Columns3, Download, Eye, Filter, Info, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Peptide } from '@/types/peptide';
 import { toast } from 'react-hot-toast';
 import { TangoBadge } from '@/components/TangoBadge';
 import { S4PredBadge } from '@/components/S4PredBadge';
+
+/** Compact info-icon tooltip for column headers */
+function HeaderTip({ tip }: { tip: string }) {
+  return (
+    <TooltipProvider delayDuration={200}>
+      <UITooltip>
+        <TooltipTrigger asChild>
+          <Info className="ml-1 inline h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent side="bottom" className="max-w-[260px] text-xs leading-relaxed">
+          {tip}
+        </TooltipContent>
+      </UITooltip>
+    </TooltipProvider>
+  );
+}
 
 // --- Column filter types ---
 type CategoricalFilterValue = 'all' | '1' | '-1' | '0' | 'null';
@@ -93,6 +124,10 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
   const [globalFilter, setGlobalFilter] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>(EMPTY_FILTERS);
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+    species: false,            // Secondary info — available via detail view
+    s4predSswPrediction: false, // S4PRED SSW is secondary to TANGO SSW
+  });
   const navigate = useNavigate();
 
   const activeFilterCount = useMemo(() => countActiveFilters(columnFilters), [columnFilters]);
@@ -129,32 +164,40 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         ),
         cell: (info) => {
           const id = String(info.getValue());
+          // UniProt accession pattern: [OPQ][0-9][A-Z0-9]{3}[0-9] or [A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}
+          const isUniprot = /^[A-Z][0-9][A-Z0-9]{3}[0-9](-\d+)?$/i.test(id);
           const uni = `https://www.uniprot.org/uniprotkb/${id}/entry`;
           const af = `https://alphafold.ebi.ac.uk/entry/${id}`;
           return (
             <div className="flex items-center gap-2">
-              <a
-                href={uni}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono text-sm text-blue-600 hover:underline"
-                onClick={(e) => e.stopPropagation()}
-                title="Open UniProt entry"
-              >
-                {id}
-              </a>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-6 px-2"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  window.open(af, '_blank', 'noopener,noreferrer');
-                }}
-                title="Open AlphaFold entry"
-              >
-                AlphaFold
-              </Button>
+              {isUniprot ? (
+                <a
+                  href={uni}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono text-sm text-blue-600 hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                  title="Open UniProt entry"
+                >
+                  {id}
+                </a>
+              ) : (
+                <span className="font-mono text-sm">{id}</span>
+              )}
+              {isUniprot && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-6 px-2"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    window.open(af, '_blank', 'noopener,noreferrer');
+                  }}
+                  title="Open AlphaFold entry"
+                >
+                  AlphaFold
+                </Button>
+              )}
             </div>
           );
         },
@@ -186,6 +229,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             Hydrophobicity
+            <HeaderTip tip="Kyte-Doolittle scale. Higher values = greater preference for non-polar environments, often correlating with membrane affinity." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -199,7 +243,12 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         },
       }),
       columnHelper.accessor('muH', {
-        header: 'μH',
+        header: () => (
+          <span className="flex items-center">
+            μH
+            <HeaderTip tip="Hydrophobic moment — measures amphipathic character. Values >0.5 suggest strong hydrophobic/hydrophilic face separation, relevant for membrane-active peptides." />
+          </span>
+        ),
         cell: (info) => (
           <span className="font-mono">
             {info.getValue()?.toFixed(2) || '-'}
@@ -214,6 +263,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             Charge
+            <HeaderTip tip="Net charge at pH 7.0. Positive charge can enhance electrostatic interaction with negatively charged membranes." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -228,7 +278,12 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         },
       }),
       columnHelper.accessor('sswPrediction', {
-        header: 'TANGO SSW',
+        header: () => (
+          <span className="flex items-center">
+            TANGO SSW
+            <HeaderTip tip="Secondary Structure Switch from TANGO aggregation analysis. 'Positive' = overlapping helix/beta regions detected, suggesting conformational switching potential." />
+          </span>
+        ),
         cell: (info) => {
           const peptide = info.row.original;
           const prediction = info.getValue();
@@ -252,7 +307,12 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         },
       }),
       columnHelper.accessor('s4predSswPrediction', {
-        header: 'S4PRED SSW',
+        header: () => (
+          <span className="flex items-center">
+            S4PRED SSW
+            <HeaderTip tip="Secondary Structure Switch from S4PRED neural network. Compares helix/beta probabilities to detect structure-switching regions." />
+          </span>
+        ),
         cell: (info) => {
           const peptide = info.row.original;
           const prediction = info.getValue();
@@ -279,6 +339,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             S4PRED Helix %
+            <HeaderTip tip="Neural network helix prediction (context-dependent). Requires ≥5 consecutive residues with P(Helix)≥0.5. Short peptides often show 0% even with high FF-Helix." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -292,7 +353,12 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         },
       }),
       columnHelper.accessor('ffHelixPercent', {
-        header: 'FF-Helix %',
+        header: () => (
+          <span className="flex items-center">
+            FF-Helix %
+            <HeaderTip tip="Force-field helix propensity — intrinsic amino acid tendency to form helices (context-free). Does NOT consider sequence neighbors. Can be high while S4PRED is low for short peptides." />
+          </span>
+        ),
         cell: (info) => {
           const value = info.getValue();
           return (
@@ -339,8 +405,10 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
     getPaginationRowModel: getPaginationRowModel(),
     state: {
       globalFilter,
+      columnVisibility,
     },
     onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: setColumnVisibility,
     globalFilterFn: 'includesString',
     initialState: {
       pagination: {
@@ -364,7 +432,14 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
       'S4PRED_SSW_Prediction',
       'S4PRED_Helix_Percent',
       'FF_Helix_Percent',
+      'FF_Helix_Flag',
+      'FF_SSW_Flag',
     ];
+
+    const escapeCSV = (val: unknown): string => {
+      const s = String(val ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
 
     const csvContent = [
       headers.join(','),
@@ -374,13 +449,15 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         peptide.sequence,
         peptide.length,
         peptide.hydrophobicity,
-        peptide.muH || '',
+        peptide.muH ?? '',
         peptide.charge,
         peptide.sswPrediction ?? '',
         peptide.s4predSswPrediction ?? '',
         peptide.s4predHelixPercent ?? '',
         peptide.ffHelixPercent ?? '',
-      ].join(','))
+        peptide.ffHelixFlag ?? '',
+        peptide.ffSswFlag ?? '',
+      ].map(escapeCSV).join(','))
     ].join('\n');
     
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -442,6 +519,44 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
               </Badge>
             )}
           </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Columns3 className="w-4 h-4 mr-2" />
+                Columns
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              {table.getAllLeafColumns()
+                .filter(col => col.getCanHide())
+                .map(col => {
+                  const labels: Record<string, string> = {
+                    id: 'ID',
+                    species: 'Species',
+                    length: 'Length',
+                    hydrophobicity: 'Hydrophobicity',
+                    muH: 'μH',
+                    charge: 'Charge',
+                    sswPrediction: 'TANGO SSW',
+                    s4predSswPrediction: 'S4PRED SSW',
+                    s4predHelixPercent: 'S4PRED Helix %',
+                    ffHelixPercent: 'FF-Helix %',
+                    actions: 'Actions',
+                  };
+                  return (
+                    <DropdownMenuCheckboxItem
+                      key={col.id}
+                      checked={col.getIsVisible()}
+                      onCheckedChange={(v) => col.toggleVisibility(!!v)}
+                    >
+                      {labels[col.id] ?? col.id}
+                    </DropdownMenuCheckboxItem>
+                  );
+                })}
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button onClick={exportToCSV} size="sm">
             <Download className="w-4 h-4 mr-2" />
             Export CSV
@@ -687,7 +802,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
       </AnimatePresence>
 
       {/* Table */}
-      <div className="rounded-md border">
+      <div className="rounded-md border overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (

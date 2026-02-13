@@ -45,31 +45,38 @@ export function PeptideRadarChart({ peptide, cohortStats }: PeptideRadarChartPro
     return Math.max(0, Math.min(1, value));
   };
 
-  const data = [
-    {
+  const data: { metric: string; peptide: number; cohort: number; fullMark: number }[] = [];
+
+  if (peptide.hydrophobicity !== null) {
+    data.push({
       metric: 'Hydrophobicity',
       peptide: normalizeHydrophobicity(peptide.hydrophobicity),
       cohort: normalizeHydrophobicity(cohortStats.meanHydrophobicity),
       fullMark: 1,
-    },
-    {
+    });
+  }
+
+  if (peptide.charge !== null) {
+    data.push({
       metric: 'Charge (abs)',
       peptide: normalizeCharge(peptide.charge),
       cohort: normalizeCharge(cohortStats.meanCharge),
       fullMark: 1,
-    },
-    {
+    });
+  }
+
+  if (peptide.length !== null) {
+    data.push({
       metric: 'Length',
       peptide: normalizeLength(peptide.length),
       cohort: normalizeLength(cohortStats.meanLength),
       fullMark: 1,
-    },
-  ];
+    });
+  }
 
   // Add μH if available
   if (peptide.muH !== undefined) {
-    // Calculate cohort mean μH
-    const cohortMeanMuH = 0.3; // Default fallback, should be calculated from actual cohort
+    const cohortMeanMuH = cohortStats.meanMuH ?? 0.3;
     data.push({
       metric: 'μH',
       peptide: normalizeMuH(peptide.muH),
@@ -89,6 +96,22 @@ export function PeptideRadarChart({ peptide, cohortStats }: PeptideRadarChartPro
       metric: 'FF-Helix %',
       peptide: peptide.ffHelixPercent / 100, // Normalize to 0-1
       cohort: cohortStats.meanFFHelixPercent / 100,
+      fullMark: 1,
+    });
+  }
+
+  // Add S4PRED Helix if available
+  if (peptide.s4predHelixPercent !== undefined &&
+      peptide.s4predHelixPercent !== null &&
+      peptide.s4predHelixPercent >= 0 &&
+      peptide.s4predHelixPercent <= 100 &&
+      cohortStats.meanS4predHelixPercent !== null &&
+      cohortStats.meanS4predHelixPercent !== undefined &&
+      cohortStats.meanS4predHelixPercent >= 0) {
+    data.push({
+      metric: 'S4PRED Helix %',
+      peptide: peptide.s4predHelixPercent / 100,
+      cohort: cohortStats.meanS4predHelixPercent / 100,
       fullMark: 1,
     });
   }
@@ -135,10 +158,10 @@ export function PeptideRadarChart({ peptide, cohortStats }: PeptideRadarChartPro
             strokeWidth={1}
             strokeDasharray="3 3"
           />
-          <ChartTooltip 
+          <ChartTooltip
             content={<ChartTooltipContent />}
             formatter={(value: number, name: string) => [
-              `${(value * 100).toFixed(1)}%`,
+              `${(value * 100).toFixed(1)}% `,
               name
             ]}
           />

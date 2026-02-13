@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Peptide Visual Lab (PVL)"
+type: software
+version: "1.0.0"
+date-released: "2026-02-12"
+abstract: >-
+  A web-based tool for comprehensive peptide analysis combining
+  aggregation propensity (TANGO), secondary structure prediction (S4PRED),
+  fibril-forming helix detection (FF-Helix), and secondary structure switch
+  (SSW) prediction with interactive visualizations.
+authors:
+  - family-names: "Azaizah"
+    given-names: "Said"
+    affiliation: "DESY (Deutsches Elektronen-Synchrotron)"
+repository-code: "https://github.com/peptide-visual-lab/pvl"
+license: MIT
+keywords:
+  - peptide
+  - bioinformatics
+  - secondary structure
+  - aggregation
+  - amyloid
+  - fibril
+  - S4PRED
+  - TANGO
+  - visualization
+  - web tool

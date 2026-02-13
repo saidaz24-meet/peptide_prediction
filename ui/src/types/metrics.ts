@@ -25,9 +25,9 @@ export interface MetricDefinition {
 export const METRIC_DEFINITIONS: Record<MetricId, MetricDefinition> = {
   'ssw-positive': {
     id: 'ssw-positive',
-    title: 'SSW Positive',
-    description: 'Percentage of peptides with Secondary Structure Switch (SSW) prediction = positive',
-    definition: 'SSW (Secondary Structure Switch) prediction indicates membrane-active peptides that can switch between different secondary structures. A positive prediction (1) suggests the peptide has the potential for membrane interaction and structural switching behavior.',
+    title: 'TANGO SSW+',
+    description: 'Percentage of peptides with TANGO SSW (Secondary Structure Switch) prediction = positive',
+    definition: 'TANGO SSW (Secondary Structure Switch) prediction uses aggregation propensity analysis to identify membrane-active peptides that can switch between different secondary structures. A positive prediction (1) suggests the peptide has the potential for membrane interaction and structural switching behavior. Note: S4PRED also provides an independent SSW prediction using neural network secondary structure analysis.',
     chartType: 'pie',
     tableColumns: ['id', 'name', 'sswPrediction', 'sswScore', 'sswDiff', 'sswHelixPct', 'sswBetaPct', 'hydrophobicity', 'charge'],
     statKey: 'sswPositivePercent',

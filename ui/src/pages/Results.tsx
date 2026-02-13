@@ -19,12 +19,12 @@ import { Legend } from '@/components/Legend';
 
 import { useDatasetStore } from '@/stores/datasetStore';
 import { useThresholds, scorePeptide } from '@/stores/datasetStore'; // smart ranking
-import { exportResultsAsPDF } from '@/lib/report';
-import { applyThresholds, DEFAULT_THRESHOLDS, meetsFFHelixThreshold, type ResolvedThresholds } from '@/lib/thresholds';
+import { exportShortlistPDF } from '@/lib/report';
+import { applyThresholds, DEFAULT_THRESHOLDS, type ResolvedThresholds } from '@/lib/thresholds';
 import { uploadCSV, predictOne } from '@/lib/api';
 import { RotateCcw } from 'lucide-react';
 
-import type { Peptide, SSWPrediction } from '@/types/peptide';
+import type { Peptide } from '@/types/peptide';
 // mapApiRowsToPeptides removed - peptides from store are already mapped
 
 import { CorrelationCard } from '@/components/CorrelationCard';
@@ -87,19 +87,27 @@ function ReproduceButton({
     }
   };
   
-  const { type } = getLastRun();
+  const { type, input } = getLastRun();
   const canReproduce = type !== null;
-  
+  // Check if file-based run lost its File object (non-serializable, lost after refresh)
+  const fileLost = type === 'upload' && !(input instanceof File);
+
+  const tooltip = !canReproduce
+    ? 'No previous run available'
+    : fileLost
+    ? 'Re-upload your CSV to re-run (file data is lost after refresh)'
+    : 'Re-run the same analysis with identical parameters';
+
   return (
-    <Button 
-      variant="outline" 
-      size="sm" 
+    <Button
+      variant="outline"
+      size="sm"
       onClick={handleReproduce}
-      disabled={!canReproduce}
-      title={canReproduce ? 'Reproduce last run with same input and config' : 'No previous run to reproduce'}
+      disabled={!canReproduce || fileLost}
+      title={tooltip}
     >
       <RotateCcw className="w-4 h-4 mr-2" />
-      Reproduce
+      Re-run
     </Button>
   );
 }
@@ -142,6 +150,23 @@ export default function Results() {
       .map((x) => x.p);
   }, [peptidesTyped, wH, wCharge, wMuH, wHelix, topN, resolvedThresholds.ffHelixPercentThreshold]);
 
+  function exportAllFASTA() {
+    if (!peptidesTyped.length) return;
+    const lines = peptidesTyped.map((p) => {
+      const header = `>${p.id}${p.species ? `|${p.species}` : ''}${p.name ? ` ${p.name}` : ''}`;
+      const wrapped = p.sequence.match(/.{1,80}/g)?.join('\n') ?? p.sequence;
+      return `${header}\n${wrapped}`;
+    });
+    const fasta = lines.join('\n') + '\n';
+    const blob = new Blob([fasta], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'peptides.fasta';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   function exportShortlistCSV() {
     if (!shortlist.length) return;
     const cols = [
@@ -154,18 +179,28 @@ export default function Results() {
       'charge',
       'muH',
       'ffHelixPercent',
+      's4predHelixPercent',
       'sswPrediction',
+      's4predSswPrediction',
+      'ffHelixFlag',
+      'ffSswFlag',
     ];
+    const sswCols = new Set(['sswPrediction', 's4predSswPrediction']);
+    const flagCols = new Set(['ffHelixFlag', 'ffSswFlag']);
     const rows = shortlist.map((p) =>
       cols.map((c) => {
         const val = (p as any)[c];
         if (val === undefined || val === null) return '';
-        if (c === 'sswPrediction') {
-          // SSW semantics: 1 = switch predicted, -1 = no switch, 0 = uncertain, null = not computed
+        if (sswCols.has(c)) {
           if (val === 1) return 'Positive';
           if (val === -1) return 'Negative';
           if (val === 0) return 'Uncertain';
-          return 'N/A';  // null or undefined
+          return '';
+        }
+        if (flagCols.has(c)) {
+          if (val === 1) return 'Candidate';
+          if (val === -1) return 'Not candidate';
+          return '';
         }
         return val;
       })
@@ -248,9 +283,16 @@ export default function Results() {
 
               <Legend />
               <ReproduceButton getLastRun={getLastRun} ingestBackendRows={ingestBackendRows} setLoading={setLoading} setError={setError} />
-              <Button variant="outline" size="sm" onClick={() => exportResultsAsPDF()}>
+              <Button variant="outline" size="sm" onClick={exportAllFASTA}>
                 <Download className="w-4 h-4 mr-2" />
-                Export Report
+                FASTA
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => exportShortlistPDF(
+                peptidesTyped, stats!, meta, { wH, wCharge, wMuH, wHelix }, topN,
+                resolvedThresholds.ffHelixPercentThreshold,
+              )}>
+                <Download className="w-4 h-4 mr-2" />
+                PDF Report
               </Button>
             </div>
           </div>
@@ -258,161 +300,15 @@ export default function Results() {
           {/* KPIs */}
           <ResultsKpis stats={stats} meta={meta} />
 
-          {/* Smart Candidate Ranking */}
-          <Card className="shadow-medium">
-            <CardHeader>
-              <CardTitle>Smart Candidate Ranking</CardTitle>
-              <CardDescription>Tune weights to shortlist top candidates instantly for synthesis.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Hydrophobicity weight</span>
-                    <span className="text-muted-foreground">{wH.toFixed(2)}</span>
-                  </div>
-                  <Slider min={0} max={3} step={0.1} value={[wH]} onValueChange={([v]) => setWeights({ wH: v })} />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>|Charge| weight</span>
-                    <span className="text-muted-foreground">{wCharge.toFixed(2)}</span>
-                  </div>
-                  <Slider min={0} max={3} step={0.1} value={[wCharge]} onValueChange={([v]) => setWeights({ wCharge: v })} />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>μH (moment) weight</span>
-                    <span className="text-muted-foreground">{wMuH.toFixed(2)}</span>
-                  </div>
-                  <Slider min={0} max={3} step={0.1} value={[wMuH]} onValueChange={([v]) => setWeights({ wMuH: v })} />
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Helix flag weight</span>
-                    <span className="text-muted-foreground">{wHelix.toFixed(2)}</span>
-                  </div>
-                  <Slider min={0} max={3} step={0.1} value={[wHelix]} onValueChange={([v]) => setWeights({ wHelix: v })} />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Top N</span>
-                  <Input
-                    type="number"
-                    className="w-20"
-                    value={topN}
-                    min={1}
-                    onChange={(e) => setWeights({ topN: Math.max(1, Number(e.target.value) || 10) })}
-                  />
-                </div>
-                <Button variant="outline" size="sm" onClick={exportShortlistCSV}>
-                  <Download className="w-4 h-4 mr-2" />
-                  Export shortlist.csv
-                </Button>
-              </div>
-
-              {/* Reuse your existing table look by passing just the top-N */}
-              <div className="mt-4">
-                <CardTitle className="text-base mb-2">Top {topN} candidates</CardTitle>
-                <PeptideTable peptides={shortlist} />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Flag Threshold Tuner (view-only, uses meta.thresholds) */}
-          <Card className="shadow-medium">
-            <CardHeader>
-              <CardTitle>Flag Threshold Tuner</CardTitle>
-              <CardDescription>
-                Current thresholds from backend (mode: {thresholdMode}). Pass/fail labels use these values.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>μH cutoff</span>
-                  <span className="text-muted-foreground">{resolvedThresholds.muHCutoff.toFixed(2)}</span>
-                </div>
-                <Slider
-                  min={-5}
-                  max={5}
-                  step={0.1}
-                  value={[resolvedThresholds.muHCutoff]}
-                  disabled
-                  className="opacity-60"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {resolvedThresholds.muHCutoff === 0
-                    ? 'No μH cutoff applied (default mode)'
-                    : 'Computed from dataset averages'}
-                </p>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>Hydrophobicity cutoff</span>
-                  <span className="text-muted-foreground">{resolvedThresholds.hydroCutoff.toFixed(2)}</span>
-                </div>
-                <Slider
-                  min={-5}
-                  max={5}
-                  step={0.1}
-                  value={[resolvedThresholds.hydroCutoff]}
-                  disabled
-                  className="opacity-60"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {resolvedThresholds.hydroCutoff === 0
-                    ? 'No hydrophobicity cutoff applied (default mode)'
-                    : 'Computed from dataset averages'}
-                </p>
-              </div>
-
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span>FF-Helix % threshold (for scoring)</span>
-                  <span className="text-muted-foreground">{resolvedThresholds.ffHelixPercentThreshold.toFixed(1)}%</span>
-                </div>
-                <Slider
-                  min={0}
-                  max={100}
-                  step={0.1}
-                  value={[resolvedThresholds.ffHelixPercentThreshold]}
-                  disabled
-                  className="opacity-60"
-                />
-              </div>
-
-              {/* Quick live counts */}
-              <div className="grid grid-cols-2 gap-3 pt-2">
-                <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">FF-Helix Candidates</div>
-                  <div className="text-lg font-semibold">{ffHelixOnCount}</div>
-                </div>
-                <div className="rounded-md border p-3">
-                  <div className="text-xs text-muted-foreground">SSW Candidates</div>
-                  <div className="text-lg font-semibold">{chamOnCount}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Main Content Tabs */}
-          <Tabs defaultValue="overview" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="overview">Overview & Charts</TabsTrigger>
+          {/* Main Content Tabs — Data Table first (researcher workflow) */}
+          <Tabs defaultValue="data" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="data">Data Table</TabsTrigger>
+              <TabsTrigger value="ranking">Candidate Ranking</TabsTrigger>
+              <TabsTrigger value="charts">Charts & Analysis</TabsTrigger>
             </TabsList>
 
-            <TabsContent value="overview" className="space-y-6">
-              {/* Charts use the full dataset */}
-              <ResultsCharts peptides={peptidesTyped} providerStatus={meta?.provider_status} />
-              {/* cohort correlation heatmap */}
-              <CorrelationCard peptides={peptidesTyped} />
-            </TabsContent>
-
+            {/* Data Table — default view */}
             <TabsContent value="data" className="space-y-6">
               <Card className="shadow-medium">
                 <CardHeader>
@@ -423,6 +319,123 @@ export default function Results() {
                   <PeptideTable peptides={peptidesTyped} />
                 </CardContent>
               </Card>
+            </TabsContent>
+
+            {/* Candidate Ranking */}
+            <TabsContent value="ranking" className="space-y-6">
+              <Card className="shadow-medium">
+                <CardHeader>
+                  <CardTitle>Smart Candidate Ranking</CardTitle>
+                  <CardDescription>Tune weights to shortlist top candidates instantly for synthesis.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>Hydrophobicity weight</span>
+                        <span className="text-muted-foreground">{wH.toFixed(2)}</span>
+                      </div>
+                      <Slider min={0} max={3} step={0.1} value={[wH]} onValueChange={([v]) => setWeights({ wH: v })} />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>|Charge| weight</span>
+                        <span className="text-muted-foreground">{wCharge.toFixed(2)}</span>
+                      </div>
+                      <Slider min={0} max={3} step={0.1} value={[wCharge]} onValueChange={([v]) => setWeights({ wCharge: v })} />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>μH (moment) weight</span>
+                        <span className="text-muted-foreground">{wMuH.toFixed(2)}</span>
+                      </div>
+                      <Slider min={0} max={3} step={0.1} value={[wMuH]} onValueChange={([v]) => setWeights({ wMuH: v })} />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span>Helix flag weight</span>
+                        <span className="text-muted-foreground">{wHelix.toFixed(2)}</span>
+                      </div>
+                      <Slider min={0} max={3} step={0.1} value={[wHelix]} onValueChange={([v]) => setWeights({ wHelix: v })} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">Top N</span>
+                      <Input
+                        type="number"
+                        className="w-20"
+                        value={topN}
+                        min={1}
+                        onChange={(e) => setWeights({ topN: Math.max(1, Number(e.target.value) || 10) })}
+                      />
+                    </div>
+                    <Button variant="outline" size="sm" onClick={exportShortlistCSV}>
+                      <Download className="w-4 h-4 mr-2" />
+                      Export shortlist.csv
+                    </Button>
+                  </div>
+
+                  <div className="mt-4">
+                    <CardTitle className="text-base mb-2">Top {topN} candidates</CardTitle>
+                    <PeptideTable peptides={shortlist} />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Classification Summary */}
+              <Card className="shadow-medium">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">Classification Summary</CardTitle>
+                  <CardDescription>
+                    Thresholds applied during analysis ({thresholdMode} mode)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                    <div className="rounded-md border p-3">
+                      <div className="text-xs text-muted-foreground">FF-Helix Candidates</div>
+                      <div className="text-xl font-semibold">{ffHelixOnCount}</div>
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        of {peptidesTyped.length} ({peptidesTyped.length > 0 ? ((ffHelixOnCount / peptidesTyped.length) * 100).toFixed(0) : 0}%)
+                      </div>
+                    </div>
+                    <div className="rounded-md border p-3">
+                      <div className="text-xs text-muted-foreground">SSW Candidates</div>
+                      <div className="text-xl font-semibold">{chamOnCount}</div>
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        of {peptidesTyped.length} ({peptidesTyped.length > 0 ? ((chamOnCount / peptidesTyped.length) * 100).toFixed(0) : 0}%)
+                      </div>
+                    </div>
+                    <div className="rounded-md border p-3">
+                      <div className="text-xs text-muted-foreground">μH cutoff</div>
+                      <div className="text-lg font-semibold tabular-nums">{resolvedThresholds.muHCutoff.toFixed(2)}</div>
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        {resolvedThresholds.muHCutoff === 0 ? 'Not applied' : 'Dataset avg'}
+                      </div>
+                    </div>
+                    <div className="rounded-md border p-3">
+                      <div className="text-xs text-muted-foreground">Hydrophobicity cutoff</div>
+                      <div className="text-lg font-semibold tabular-nums">{resolvedThresholds.hydroCutoff.toFixed(2)}</div>
+                      <div className="text-[10px] text-muted-foreground mt-1">
+                        {resolvedThresholds.hydroCutoff === 0 ? 'Not applied' : 'Dataset avg'}
+                      </div>
+                    </div>
+                    <div className="rounded-md border p-3">
+                      <div className="text-xs text-muted-foreground">FF-Helix % threshold</div>
+                      <div className="text-lg font-semibold tabular-nums">{resolvedThresholds.ffHelixPercentThreshold.toFixed(0)}%</div>
+                      <div className="text-[10px] text-muted-foreground mt-1">For scoring</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Charts & Analysis */}
+            <TabsContent value="charts" className="space-y-6">
+              <ResultsCharts peptides={peptidesTyped} providerStatus={meta?.provider_status} />
+              <CorrelationCard peptides={peptidesTyped} />
             </TabsContent>
           </Tabs>
 

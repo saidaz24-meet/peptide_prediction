@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   Copy,
   Download,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Card,
@@ -22,6 +23,11 @@ import { PeptideRadarChart } from '@/components/PeptideRadarChart';
 import { PositionBars } from '@/components/PositionBars';
 import { ProviderBadge } from '@/components/ProviderBadge';
 import { TangoBadge } from '@/components/TangoBadge';
+import { SequenceTrack } from '@/components/SequenceTrack';
+import { HelicalWheel } from '@/components/HelicalWheel';
+import { AggregationHeatmap } from '@/components/AggregationHeatmap';
+import { ChartExportButtons } from '@/components/ChartExportButtons';
+import { AlphaFoldViewer } from '@/components/AlphaFoldViewer';
 
 // NEW: small additions for sliding-window profiles
 import { useMemo, useState } from 'react';
@@ -83,6 +89,21 @@ export default function PeptideDetail() {
     toast.success('Peptide data downloaded');
   };
 
+  const handleDownloadFASTA = () => {
+    const header = `>${peptide.id}${peptide.species ? `|${peptide.species}` : ''}${peptide.name ? ` ${peptide.name}` : ''}`;
+    // Wrap sequence at 80 characters per FASTA convention
+    const wrapped = peptide.sequence.match(/.{1,80}/g)?.join('\n') ?? peptide.sequence;
+    const fasta = `${header}\n${wrapped}\n`;
+    const blob = new Blob([fasta], { type: 'text/plain;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${peptide.id}.fasta`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toast.success('FASTA downloaded');
+  };
+
   // Use centralized TangoBadge for consistent display semantics
   const getSSWBadge = () => {
     // Use canonical tangoHasData field from backend (preferred)
@@ -135,8 +156,22 @@ export default function PeptideDetail() {
               </Button>
 
               <div>
-                <h1 className="text-3xl font-bold text-foreground">
-                  Peptide {peptide.id}
+                <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
+                  Peptide{' '}
+                  {/^[A-Z][0-9][A-Z0-9]{3}[0-9](-\d+)?$/i.test(peptide.id) ? (
+                    <a
+                      href={`https://www.uniprot.org/uniprotkb/${peptide.id}/entry`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                      title="Open UniProt entry"
+                    >
+                      {peptide.id}
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                  ) : (
+                    <span>{peptide.id}</span>
+                  )}
                 </h1>
                 {peptide.species && (
                   <p className="text-muted-foreground">Species: {peptide.species}</p>
@@ -164,9 +199,13 @@ export default function PeptideDetail() {
                   <Copy className="w-4 h-4 mr-2" />
                   Copy Sequence
                 </Button>
+                <Button variant="outline" size="sm" onClick={handleDownloadFASTA}>
+                  <Download className="w-4 h-4 mr-2" />
+                  FASTA
+                </Button>
                 <Button variant="outline" size="sm" onClick={handleDownloadJSON}>
                   <Download className="w-4 h-4 mr-2" />
-                  Download JSON
+                  JSON
                 </Button>
               </div>
             </div>
@@ -179,7 +218,7 @@ export default function PeptideDetail() {
                 <div>
                   <CardTitle>Peptide Information</CardTitle>
                   <CardDescription>
-                    Length: {peptide.length} amino acids
+                    Length: {peptide.length ?? '?'} amino acids
                   </CardDescription>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -193,26 +232,16 @@ export default function PeptideDetail() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Sequence */}
-              <div>
-                <h3 className="font-semibold mb-2">Sequence</h3>
-                <div className="bg-muted/50 rounded-lg p-4 font-mono text-sm break-all">
-                  {peptide.sequence}
-                </div>
-              </div>
+              {/* Sequence with S4PRED coloring */}
+              <SequenceTrack peptide={peptide} />
 
-              {/* Secondary structure track (S4PRED) */}
-              <div>
-                <h3 className="font-semibold mb-2">Secondary Structure Segments</h3>
-                {peptide.s4pred?.helixSegments?.length ? (
-                  <SegmentTrack
-                    sequence={peptide.sequence}
-                    helixFragments={peptide.s4pred.helixSegments}
-                  />
-                ) : (
-                  <div className="text-sm text-muted-foreground">S4PRED helix segments not available</div>
-                )}
-              </div>
+              {/* Segment track (visual bar) */}
+              {peptide.s4pred?.helixSegments?.length ? (
+                <SegmentTrack
+                  sequence={peptide.sequence}
+                  helixFragments={peptide.s4pred.helixSegments}
+                />
+              ) : null}
             </CardContent>
           </Card>
 
@@ -241,6 +270,21 @@ export default function PeptideDetail() {
             </Card>
           </div>
 
+          {/* Helical Wheel Projection — only for short helical peptides */}
+          {peptide.length <= 40 && (
+            <Card className="shadow-medium">
+              <CardHeader>
+                <CardTitle>Helical Wheel Projection</CardTitle>
+                <CardDescription>
+                  Schiffer-Edmundson axial view of the alpha-helix. The red arrow shows the hydrophobic moment direction (amphipathic face).
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="flex justify-center">
+                <HelicalWheel sequence={peptide.sequence} />
+              </CardContent>
+            </Card>
+          )}
+
           {/* NEW: Sliding-Window Profiles (frontend-only, non-destructive) */}
           {/* Gate: Hide per-residue charts for sequences > 200 residues (unreadable and slow) */}
           {peptide.length <= 200 ? (
@@ -264,7 +308,7 @@ export default function PeptideDetail() {
                 </div>
 
                 {/* Hydrophobicity (KD) */}
-                <div className="space-y-2">
+                <div className="space-y-2" data-chart-export>
                   <h3 className="text-sm font-semibold">Hydrophobicity (Kyte–Doolittle)</h3>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -272,7 +316,7 @@ export default function PeptideDetail() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="x" tickCount={10} />
                         <YAxis />
-                        <Tooltip />
+                        <Tooltip formatter={(v: number) => v.toFixed(3)} />
                         <Legend />
                         {helixBands.map((r, i) => (
                           <ReferenceArea key={i} x1={r.x1} x2={r.x2} opacity={0.15} />
@@ -281,10 +325,11 @@ export default function PeptideDetail() {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+                  <ChartExportButtons filename={`${peptide.id}-hydrophobicity-w${win}`} />
                 </div>
 
                 {/* Hydrophobic moment (μH) */}
-                <div className="space-y-2">
+                <div className="space-y-2" data-chart-export>
                   <h3 className="text-sm font-semibold">Hydrophobic Moment (μH)</h3>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -292,7 +337,7 @@ export default function PeptideDetail() {
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis dataKey="x" tickCount={10} />
                         <YAxis />
-                        <Tooltip />
+                        <Tooltip formatter={(v: number) => v.toFixed(3)} />
                         <Legend />
                         {helixBands.map((r, i) => (
                           <ReferenceArea key={i} x1={r.x1} x2={r.x2} opacity={0.15} />
@@ -301,6 +346,7 @@ export default function PeptideDetail() {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+                  <ChartExportButtons filename={`${peptide.id}-muH-w${win}`} />
                 </div>
 
                 <div className="text-xs text-muted-foreground">
@@ -337,10 +383,37 @@ export default function PeptideDetail() {
                 <CardDescription>
                   Per-residue helix (H), beta (E), and coil (C) probabilities from S4PRED neural network prediction.
                 </CardDescription>
+                {/* Dominant structure summary from mean per-residue probabilities */}
+                {(() => {
+                  const pH = peptide.s4pred?.pH || [];
+                  const pE = peptide.s4pred?.pE || [];
+                  const pC = peptide.s4pred?.pC || [];
+                  const n = Math.max(pH.length, pE.length, pC.length);
+                  if (n === 0) return null;
+                  const meanH = pH.reduce((a, b) => a + b, 0) / n;
+                  const meanE = pE.reduce((a, b) => a + b, 0) / n;
+                  const meanC = pC.reduce((a, b) => a + b, 0) / n;
+                  const parts: { label: string; pct: number; cls: string }[] = [
+                    { label: 'Coil', pct: meanC * 100, cls: 'text-muted-foreground' },
+                    { label: 'Beta', pct: meanE * 100, cls: 'text-beta' },
+                    { label: 'Helix', pct: meanH * 100, cls: 'text-helix' },
+                  ].sort((a, b) => b.pct - a.pct);
+                  return (
+                    <div className="flex items-center gap-2 mt-2 text-sm">
+                      <span className="text-muted-foreground">Avg composition:</span>
+                      {parts.map((p, i) => (
+                        <span key={p.label}>
+                          <span className={`font-medium ${p.cls}`}>{p.label} {p.pct.toFixed(0)}%</span>
+                          {i < parts.length - 1 && <span className="text-muted-foreground/40 mx-1">/</span>}
+                        </span>
+                      ))}
+                    </div>
+                  );
+                })()}
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Combined probability plot */}
-                <div className="space-y-2">
+                <div className="space-y-2" data-chart-export>
                   <h3 className="text-sm font-semibold">Secondary Structure Probabilities</h3>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
@@ -383,6 +456,7 @@ export default function PeptideDetail() {
                       </LineChart>
                     </ResponsiveContainer>
                   </div>
+                  <ChartExportButtons filename={`${peptide.id}-s4pred-probabilities`} />
                 </div>
 
                 {/* S4PRED summary stats */}
@@ -407,6 +481,17 @@ export default function PeptideDetail() {
                   </div>
                 </div>
 
+                {/* Context note when S4PRED finds no helix but FF-Helix is high */}
+                {typeof peptide.s4predHelixPercent === 'number' &&
+                 peptide.s4predHelixPercent < 5 &&
+                 typeof peptide.ffHelixPercent === 'number' &&
+                 peptide.ffHelixPercent > 20 && (
+                  <p className="text-xs text-muted-foreground mt-2 px-1 leading-relaxed">
+                    S4PRED finds no stable helix segments (requires ≥5 residues with P(Helix)≥0.5).
+                    FF-Helix ({peptide.ffHelixPercent.toFixed(0)}%) reflects intrinsic amino acid propensity, not predicted structure.
+                  </p>
+                )}
+
                 <div className="text-xs text-muted-foreground">
                   S4PRED: Single Sequence Secondary Structure PREDiction (neural network ensemble).
                 </div>
@@ -414,12 +499,36 @@ export default function PeptideDetail() {
             </Card>
           )}
 
+          {/* TANGO Aggregation Heatmap */}
+          {peptide.tango?.agg && peptide.tango.agg.length > 0 && (
+            <Card className="shadow-medium">
+              <CardHeader>
+                <CardTitle>TANGO Aggregation Profile</CardTitle>
+                <CardDescription>
+                  Per-residue aggregation propensity from TANGO. High scores indicate amyloid-forming regions.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <AggregationHeatmap
+                  sequence={peptide.sequence}
+                  aggCurve={peptide.tango.agg}
+                  betaCurve={peptide.tango.beta}
+                  helixCurve={peptide.tango.helix}
+                  peptideId={peptide.id}
+                />
+              </CardContent>
+            </Card>
+          )}
+
+          {/* AlphaFold Structure Viewer */}
+          <AlphaFoldViewer peptideId={peptide.id} />
+
           {/* Feature tiles */}
           <div className="grid md:grid-cols-4 gap-4">
             <Card className="shadow-soft">
               <CardContent className="p-4">
                 <div className="text-2xl font-bold text-primary">
-                  {peptide.hydrophobicity.toFixed(2)}
+                  {peptide.hydrophobicity !== null ? peptide.hydrophobicity.toFixed(2) : 'N/A'}
                 </div>
                 <div className="text-sm text-muted-foreground">Hydrophobicity</div>
                 {stats && (
@@ -436,17 +545,20 @@ export default function PeptideDetail() {
                   {peptide.muH?.toFixed(2) ?? 'N/A'}
                 </div>
                 <div className="text-sm text-muted-foreground">μH</div>
-                <div className="text-xs text-muted-foreground mt-1">
-                  Hydrophobic moment
-                </div>
+                {stats && stats.meanMuH !== null && stats.meanMuH !== undefined && (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Cohort: {stats.meanMuH.toFixed(2)}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
             <Card className="shadow-soft">
               <CardContent className="p-4">
                 <div className="text-2xl font-bold text-primary">
-                  {peptide.charge > 0 ? '+' : ''}
-                  {peptide.charge.toFixed(1)}
+                  {peptide.charge !== null
+                    ? `${peptide.charge > 0 ? '+' : ''}${peptide.charge.toFixed(1)}`
+                    : 'N/A'}
                 </div>
                 <div className="text-sm text-muted-foreground">Charge</div>
                 {stats && (
@@ -466,6 +578,7 @@ export default function PeptideDetail() {
                     : 'Not available'}
                 </div>
                 <div className="text-sm text-muted-foreground">FF-Helix</div>
+                <div className="text-[10px] text-muted-foreground/60">intrinsic propensity</div>
                 {stats && stats.meanFFHelixPercent !== null && stats.meanFFHelixPercent !== undefined && (
                   <div className="text-xs text-muted-foreground mt-1">
                     Cohort: {stats.meanFFHelixPercent.toFixed(0)}%

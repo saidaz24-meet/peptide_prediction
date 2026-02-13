@@ -1,3 +1,4 @@
+import math
 import os
 from statistics import mean
 from statistics import median
@@ -146,13 +147,13 @@ def __check_subsegment(prediction: list, start: int, end: int) -> tuple:
     max_end = -1
     max_score = -1
     for cur_length in all_possible_length:
-        for i in range(start, end - cur_length + 1):
+        for i in range(start, end - cur_length + 2):  # +2: inclusive end
             cur_mean = mean(prediction[i:(i + cur_length)])
             cur_median = median(prediction[i:(i + cur_length)])
             if cur_mean > max_score or cur_median > max_score:
                 max_score = max(cur_median, cur_mean)
                 max_start = i
-                max_end = i + cur_length
+                max_end = i + cur_length - 1  # inclusive end to match segment convention
 
     return max_start, max_end, max_score
 
@@ -185,8 +186,8 @@ def get_secondary_structure_segments(prediction: list, prediction_method: str) -
 
             end = i - 1 - gap
             segment_length = end - start + 1
-            good_segment = segment_length >= MIN_LENGTH and (mean(prediction[start:end]) >= min_score or
-                                                             median(prediction[start:end]) >= min_score)
+            good_segment = segment_length >= MIN_LENGTH and (mean(prediction[start:end + 1]) >= min_score or
+                                                             median(prediction[start:end + 1]) >= min_score)
             if good_segment:
                 segments.append(tuple((start, end)))
             elif segment_length >= MIN_LENGTH:
@@ -335,22 +336,26 @@ def check_secondary_structure_prediction_content(secondary_structure_prediction_
     :param secondary_structure_prediction_conf: list of floats with confidence value of secondary structure prediction.
     :return: percentage of secondary structure prediction
     """
-    residues_with_secondary_structure_prediction = 0
-    for residue_conf_value in secondary_structure_prediction_conf:
-        if residue_conf_value > 0:
-            residues_with_secondary_structure_prediction += 1
+    # Filter out NaN/None values — they shouldn't inflate the denominator
+    valid_values = [v for v in secondary_structure_prediction_conf
+                    if v is not None and not (isinstance(v, float) and math.isnan(v))]
+    if not valid_values:
+        return 0
+    residues_with_secondary_structure_prediction = sum(1 for v in valid_values if v > 0)
     if residues_with_secondary_structure_prediction == 0:
         return 0
-    return (residues_with_secondary_structure_prediction / len(secondary_structure_prediction_conf)) * 100
+    return (residues_with_secondary_structure_prediction / len(valid_values)) * 100
 
 
 def get_corrected_sequence(sequence) -> str:
     """
     Substitute letters for general amino acid to be compatible with prediction tools:
-    "X" -> "A"
-    "Z" -> "E"
-    "B" -> D
-    "U" -> C
+    "X" -> "A"  (unknown → alanine)
+    "Z" -> "E"  (Glu/Gln ambiguity → glutamate)
+    "B" -> "D"  (Asp/Asn ambiguity → aspartate)
+    "U" -> "C"  (selenocysteine → cysteine)
+    "O" -> "K"  (pyrrolysine → lysine)
+    "J" -> "L"  (Leu/Ile ambiguity → leucine)
 
     :param sequence: The sequence to modify (handles NaN/None gracefully)
     :return: sequence with the substituted amino acids, or empty string if invalid
@@ -365,6 +370,8 @@ def get_corrected_sequence(sequence) -> str:
     s2 = s1.replace('Z', 'E')
     s3 = s2.replace('U', 'C')
     s4 = s3.replace('B', 'D')
+    s4 = s4.replace('O', 'K')
+    s4 = s4.replace('J', 'L')
     if '-' in s4:
         return s4.split('-')[0].upper()
     return s4.upper()

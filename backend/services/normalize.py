@@ -255,8 +255,9 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
     """
     result = row_dict.copy()
     
-    # TANGO fields: if TANGO is not available/failed/not_configured, nullify ALL TANGO fields
-    if provider_status.tango.status != "AVAILABLE":
+    # TANGO fields: if TANGO is OFF or UNAVAILABLE, nullify ALL TANGO fields
+    # PARTIAL means some peptides have data — preserve it, let per-row nulls handle the rest
+    if provider_status.tango.status in ("OFF", "UNAVAILABLE"):
         # All TANGO/SSW fields must be null when provider not available
         tango_fields = [
             "sswPrediction", "sswScore", "sswDiff",
@@ -265,6 +266,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
             # Nested tango object fields
             "tangoAgg", "tangoBeta", "tangoHelix", "tangoTurn",
             "tangoAggregationCurve", "tangoBetaCurve", "tangoHelixCurve", "tangoTurnCurve",
+            "tangoAggCurve",  # camelCase versions (post-normalization)
             "sswFragments", "tangoFragments",
         ]
         for field in tango_fields:

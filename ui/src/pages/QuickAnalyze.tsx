@@ -295,8 +295,8 @@ export default function QuickAnalyze() {
                       helical segments and membrane activity.
                     </p>
                     <p className="text-muted-foreground">
-                      TANGO/S4PRED columns will read "not available" if those providers aren't wired for single-sequence
-                      runs on your machine.
+                      TANGO and S4PRED predictions will show "N/A" if those tools are not installed on the server.
+                      Biochemical properties (charge, hydrophobicity, FF-Helix) are always computed.
                     </p>
                   </CardContent>
                 </Card>

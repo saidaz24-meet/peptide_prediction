@@ -77,6 +77,10 @@ class PeptideSchema(BaseModel):
     tango_beta_max: Optional[float] = Field(None, alias="Tango Beta max")
     tango_helix_max: Optional[float] = Field(None, alias="Tango Helix max")
     tango_has_data: Optional[bool] = Field(None, alias="Tango has data")
+    # TANGO per-residue curves (for aggregation heatmap in PeptideDetail)
+    tango_agg_curve: Optional[List[float]] = Field(None, alias="Tango Aggregation curve")
+    tango_beta_curve: Optional[List[float]] = Field(None, alias="Tango Beta curve")
+    tango_helix_curve: Optional[List[float]] = Field(None, alias="Tango Helix curve")
 
     @field_validator('ssw_score', 'ssw_diff', 'ssw_helix_percentage', 'ssw_beta_percentage', 'ff_helix_percent', 'ff_helix_score', 'ff_ssw_score', 'hydrophobicity', 'charge', 'mu_h', 'tango_agg_max', 'tango_beta_max', 'tango_helix_max', 's4pred_helix_score', 's4pred_helix_percent', 's4pred_ssw_score', 's4pred_ssw_diff', 's4pred_ssw_helix_percent', 's4pred_ssw_beta_percent', 's4pred_ssw_percent', mode='before')
     @classmethod

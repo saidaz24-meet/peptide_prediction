@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
+import logging
 
 from config import settings
 from services.logger import get_logger, set_trace_id, log_info, log_error
@@ -26,10 +28,15 @@ if settings.SENTRY_DSN:
             dsn=settings.SENTRY_DSN,
             integrations=[
                 FastApiIntegration(),
+                LoggingIntegration(
+                    level=logging.WARNING,
+                    event_level=logging.ERROR,
+                ),
             ],
             send_default_pii=True,
-            traces_sample_rate=0.1,
-            profiles_sample_rate=0.1,
+            # Free tier: 100% sampling OK for low-traffic research tool
+            traces_sample_rate=1.0,
+            profiles_sample_rate=1.0,
             environment=settings.ENVIRONMENT,
             release=release,
             debug=settings.SENTRY_DEBUG,
@@ -112,8 +119,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Trace-Id"],
 )
 
 # Add TraceIdMiddleware last (so it executes first/outermost and captures all requests)
