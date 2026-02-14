@@ -186,10 +186,11 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
   );
 
   // FF-Helix
-  const rawFFValue = row.ffHelixPercent || row["FF-Helix %"] || row["FF Helix %"] || row["FF Helix"] || row["FF-Helix"];
+  // IMPORTANT: Use ?? not || — ffHelixPercent of 0 is a valid value (no helix-forming windows)
+  const rawFFValue = row.ffHelixPercent ?? row["FF-Helix %"] ?? row["FF Helix %"] ?? row["FF Helix"] ?? row["FF-Helix"];
   const ffHelixPercent = num(rawFFValue, true);
   const ffHelixFragments = toSegments(
-    row.ffHelixFragments || row["FF Helix fragments"] || row["FF-Helix fragments"] || []
+    row.ffHelixFragments ?? row["FF Helix fragments"] ?? row["FF-Helix fragments"] ?? []
   );
 
   // JPred — optional
@@ -197,7 +198,7 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
     row.jpredHelixFragments || row["Helix fragments (Jpred)"] || row["JPred Helix fragments"] || []
   );
   const jpredScore = num(
-    row.jpredHelixScore || row["Helix score (Jpred)"] || row["JPred Helix score"],
+    row.jpredHelixScore ?? row["Helix score (Jpred)"] ?? row["JPred Helix score"],
     true
   );
   const jpred: JPredInfo | undefined =

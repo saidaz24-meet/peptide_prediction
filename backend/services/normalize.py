@@ -376,11 +376,9 @@ def _sanitize_for_json(obj, field_name: str = None):
     # primitives
     if isinstance(obj, float):
         if math.isfinite(obj):
-            # Convert -1.0 to None (fake default for missing numeric data)
-            # EXCEPT: never convert legitimate floats that happen to be -1.0
-            # In practice, -1.0 should not be a valid float value in this domain
-            if obj == -1.0:
-                return None
+            # NOTE: Do NOT convert -1.0 to None here.
+            # Legitimate floats can be -1.0 (e.g., charge, hydrophobicity).
+            # Field-specific fake-default handling is done by _convert_fake_defaults_to_null.
             return obj
         return None  # NaN/inf -> None
     if isinstance(obj, int):

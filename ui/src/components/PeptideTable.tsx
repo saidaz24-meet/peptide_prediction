@@ -167,7 +167,6 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           // UniProt accession pattern: [OPQ][0-9][A-Z0-9]{3}[0-9] or [A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}
           const isUniprot = /^[A-Z][0-9][A-Z0-9]{3}[0-9](-\d+)?$/i.test(id);
           const uni = `https://www.uniprot.org/uniprotkb/${id}/entry`;
-          const af = `https://alphafold.ebi.ac.uk/entry/${id}`;
           return (
             <div className="flex items-center gap-2">
               {isUniprot ? (
@@ -183,20 +182,6 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
                 </a>
               ) : (
                 <span className="font-mono text-sm">{id}</span>
-              )}
-              {isUniprot && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-6 px-2"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    window.open(af, '_blank', 'noopener,noreferrer');
-                  }}
-                  title="Open AlphaFold entry"
-                >
-                  AlphaFold
-                </Button>
               )}
             </div>
           );
