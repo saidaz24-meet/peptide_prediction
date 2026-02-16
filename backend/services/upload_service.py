@@ -77,44 +77,6 @@ class UploadProcessingError(Exception):
         self.status_code = status_code
 
 
-def _run_s4pred_provider(df: pd.DataFrame, trace_entry: Optional[str], sentry_initialized: bool) -> None:
-    """Run S4PRED secondary structure prediction."""
-    s4pred_start_time = time.time()
-    try:
-        # Extract sequences for S4PRED
-        sequences = []
-        for _, row in df.iterrows():
-            entry_id = str(row.get('Entry', ''))
-            sequence = str(row.get('Sequence', ''))
-            if entry_id and sequence:
-                sequences.append((entry_id, sequence))
-
-        if not sequences:
-            log_warning("s4pred_no_sequences", "No valid sequences for S4PRED")
-            return
-
-        # Run S4PRED
-        success, stats = s4pred.run_s4pred_database(df, "upload", trace_id=get_trace_id())
-        s4pred_elapsed = (time.time() - s4pred_start_time) * 1000
-        log_info("s4pred_complete", f"S4PRED processing complete: {stats.get('parsed_ok', 0)}/{stats.get('requested', 0)}",
-                **{"s4pred_time_ms": round(s4pred_elapsed, 2), **stats})
-    except Exception as e:
-        trace_id = get_trace_id()
-        log_error("s4pred_error", f"S4PRED provider error: {e}",
-                stage="s4pred", **{"error": str(e), "entry": trace_entry})
-
-        if sentry_initialized:
-            with sentry_sdk.push_scope() as scope:
-                scope.set_tag("provider", "s4pred")
-                scope.set_tag("stage", "execution")
-                scope.set_tag("endpoint", "upload-csv")
-                scope.set_context("s4pred_error", {
-                    "trace_id": trace_id,
-                    "entry": trace_entry,
-                })
-                sentry_sdk.capture_exception(e, level="error")
-
-
 def _set_ssw_fields_to_none(df: pd.DataFrame) -> None:
     """Set all SSW fields to None for all rows."""
     n = len(df)
@@ -126,13 +88,20 @@ def _set_ssw_fields_to_none(df: pd.DataFrame) -> None:
     df["SSW prediction"] = pd.Series([None] * n, index=df.index, dtype=object)
 
 
-def _run_tango_processing(
+def run_tango_processing(
     df: pd.DataFrame,
     trace_entry: Optional[str],
-    sentry_initialized: bool
+    sentry_initialized: bool,
+    tango_requested: bool = True,
 ) -> Tuple[Dict[str, Any], str, Optional[str], bool, Optional[str]]:
     """
     Run TANGO processing pipeline.
+
+    Args:
+        df: DataFrame with Entry and Sequence columns
+        trace_entry: Optional entry ID for tracing
+        sentry_initialized: Whether Sentry is available
+        tango_requested: Whether TANGO was requested (False = skip even if USE_TANGO=1)
 
     Returns:
         Tuple of (tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir)
@@ -141,9 +110,15 @@ def _run_tango_processing(
     tango_provider_status = "OFF"
     tango_provider_reason = None
     tango_enabled_flag = settings.USE_TANGO
-    tango_requested_flag = True  # Upload CSV always requests Tango if enabled
+    tango_requested_flag = tango_requested
     tango_ran = False
     run_dir = None
+
+    # Early exit if caller opted out of TANGO
+    if not tango_requested_flag:
+        tango_provider_status = "OFF"
+        tango_provider_reason = "Not requested (run_tango=false)"
+        return tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir
 
     try:
         if tango_enabled_flag:
@@ -415,7 +390,7 @@ def _run_tango_processing(
     return tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir
 
 
-def _run_s4pred_processing(
+def run_s4pred_processing(
     df: pd.DataFrame,
     trace_entry: Optional[str],
     sentry_initialized: bool
@@ -531,7 +506,7 @@ def _run_s4pred_processing(
     return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
 
 
-def _compute_ssw_stats(rows_out: List[Dict[str, Any]], trace_entry: Optional[str]) -> Tuple[int, int, float]:
+def compute_ssw_stats(rows_out: List[Dict[str, Any]], trace_entry: Optional[str]) -> Tuple[int, int, float]:
     """
     Compute SSW positive statistics from final normalized rows.
 
@@ -568,7 +543,7 @@ def _compute_ssw_stats(rows_out: List[Dict[str, Any]], trace_entry: Optional[str
     return ssw_positives, ssw_valid_count, ssw_percent
 
 
-def _compute_reproducibility_primitives(
+def compute_reproducibility_primitives(
     df: pd.DataFrame,
     threshold_config_requested: Optional[Dict[str, Any]],
     tango_stats: Dict[str, Any],
@@ -671,18 +646,15 @@ def process_upload_dataframe(
     log_info("ff_helix_complete", f"Computed FF-Helix for {len(df)} peptides",
             **{"ff_helix_time_ms": round(ff_helix_elapsed, 2)})
 
-    # Secondary structure prediction via provider interface
-    _run_s4pred_provider(df, trace_entry, sentry_initialized)
-
     # --- TANGO processing ---
-    tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = _run_tango_processing(
+    tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = run_tango_processing(
         df, trace_entry, sentry_initialized
     )
     tango_enabled_flag = settings.USE_TANGO
     tango_requested_flag = True
 
     # --- S4PRED processing ---
-    s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = _run_s4pred_processing(
+    s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = run_s4pred_processing(
         df, trace_entry, sentry_initialized
     )
     s4pred_enabled_flag = settings.USE_S4PRED
@@ -777,7 +749,7 @@ def process_upload_dataframe(
             log_warning("trace_entry_not_found", f"Entry {trace_entry} not found in normalized rows", entry=trace_entry)
 
     # Compute SSW positive stats
-    ssw_positives, ssw_valid_count, ssw_percent = _compute_ssw_stats(rows_out, trace_entry)
+    ssw_positives, ssw_valid_count, ssw_percent = compute_ssw_stats(rows_out, trace_entry)
 
     ff_avail = int((pd.to_numeric(df.get("FF-Helix %", pd.Series([-1]*len(df))), errors="coerce") != -1).sum())
 
@@ -813,7 +785,7 @@ def process_upload_dataframe(
     _last_run_dir = tango._latest_run_dir()
 
     # Compute reproducibility primitives
-    repro_run_id, trace_id, inputs_hash, config_hash, provider_status_summary, resolved_thresholds = _compute_reproducibility_primitives(
+    repro_run_id, trace_id, inputs_hash, config_hash, provider_status_summary, resolved_thresholds = compute_reproducibility_primitives(
         df, threshold_config_requested, tango_stats, tango_enabled_flag, tango_provider_status,
         s4pred_stats=s4pred_stats, s4pred_enabled_flag=s4pred_enabled_flag, s4pred_provider_status=s4pred_provider_status
     )
