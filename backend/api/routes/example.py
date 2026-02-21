@@ -11,8 +11,8 @@ router = APIRouter()
 @router.get("/api/example", response_model=RowsResponse)
 def load_example(recalc: int = 0):
     """
-    Serve the presentation dataset with JPred/Tango already computed.
-    By default (recalc=0) we DO NOT recompute biochem/JPred/Tango.
+    Serve the presentation dataset with pre-computed predictions.
+    By default (recalc=0) we DO NOT recompute biochem/TANGO.
     Set recalc=1 if you explicitly want to recompute locally.
     """
     return load_example_data(recalc=recalc)

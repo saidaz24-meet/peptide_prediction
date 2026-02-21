@@ -43,7 +43,7 @@ repos:
     hooks:
       - id: test-unit
         name: Run fast unit tests
-        entry: bash -c 'cd backend && USE_TANGO=0 USE_PSIPRED=0 python -m pytest tests/test_api_contracts.py tests/test_uniprot_query_parsing.py tests/test_uniprot_sort.py tests/test_trace_id.py -v --tb=short'
+        entry: bash -c 'cd backend && USE_TANGO=0 USE_S4PRED=0 python -m pytest tests/test_api_contracts.py tests/test_uniprot_query_parsing.py tests/test_uniprot_sort.py tests/test_trace_id.py -v --tb=short'
         language: system
         files: ^backend/.*\.py$
         pass_filenames: false

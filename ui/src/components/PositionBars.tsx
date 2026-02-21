@@ -72,42 +72,22 @@ export function PositionBars({ peptide, allPeptides }: PositionBarsProps) {
     }
   }
 
-  // Add FF-Helix if available (only show in detailed view, not main dashboard)
-  // Filter out invalid values (negative or >100)
-  if (peptide.ffHelixPercent !== undefined && 
-      peptide.ffHelixPercent >= 0 && 
-      peptide.ffHelixPercent <= 100) {
-    const peptidesWithHelix = allPeptides.filter(
-      p => p.ffHelixPercent !== undefined && 
-           p.ffHelixPercent >= 0 && 
-           p.ffHelixPercent <= 100
-    );
-    if (peptidesWithHelix.length > 1) {
-      metrics.push({
-        label: 'FF-Helix %',
-        value: peptide.ffHelixPercent,
-        allValues: peptidesWithHelix.map(p => p.ffHelixPercent!),
-        formatter: (v: number) => `${v.toFixed(1)}%`,
-      });
-    }
-  }
-
-  // Add S4PRED Helix % if available
+  // S4PRED Helix % (primary helix metric)
   if (peptide.s4predHelixPercent !== undefined &&
       peptide.s4predHelixPercent !== null &&
       peptide.s4predHelixPercent >= 0 &&
       peptide.s4predHelixPercent <= 100) {
-    const peptidesWithS4pred = allPeptides.filter(
+    const peptidesWithHelix = allPeptides.filter(
       p => p.s4predHelixPercent !== undefined &&
            p.s4predHelixPercent !== null &&
            p.s4predHelixPercent >= 0 &&
            p.s4predHelixPercent <= 100
     );
-    if (peptidesWithS4pred.length > 1) {
+    if (peptidesWithHelix.length > 1) {
       metrics.push({
         label: 'S4PRED Helix %',
         value: peptide.s4predHelixPercent,
-        allValues: peptidesWithS4pred.map(p => p.s4predHelixPercent!),
+        allValues: peptidesWithHelix.map(p => p.s4predHelixPercent!),
         formatter: (v: number) => `${v.toFixed(1)}%`,
       });
     }

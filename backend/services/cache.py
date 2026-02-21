@@ -31,7 +31,7 @@ def cache_key(sequence: str, provider: Optional[str] = None) -> str:
     
     Args:
         sequence: Amino acid sequence
-        provider: Optional provider name (e.g., "tango", "psipred") for provider-specific caching
+        provider: Optional provider name (e.g., "tango", "s4pred") for provider-specific caching
     
     Returns:
         Cache key string (filename-safe)

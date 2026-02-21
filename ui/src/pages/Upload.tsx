@@ -375,7 +375,7 @@ export default function Upload() {
                                 />
                               </div>
                               <div>
-                                <Label htmlFor="ffHelix-threshold">FF-Helix % Threshold</Label>
+                                <Label htmlFor="ffHelix-threshold">CF Propensity % Threshold</Label>
                                 <input
                                   id="ffHelix-threshold"
                                   type="number"

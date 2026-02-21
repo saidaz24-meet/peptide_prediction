@@ -25,10 +25,12 @@ const LABELS: Record<string, string> = {
   muH: 'μH',
   length: 'Length',
   chargeAbs: '|Charge|',
+  ffHelixPercent: 'FF-Helix %',
+  tangoAggMax: 'Agg Max',
 };
 
-type ColKey = 'hydrophobicity' | 'muH' | 'length' | 'chargeAbs';
-const COLS: ColKey[] = ['hydrophobicity', 'muH', 'length', 'chargeAbs'];
+type ColKey = 'hydrophobicity' | 'muH' | 'length' | 'chargeAbs' | 'ffHelixPercent' | 'tangoAggMax';
+const COLS: ColKey[] = ['hydrophobicity', 'muH', 'length', 'chargeAbs', 'ffHelixPercent', 'tangoAggMax'];
 
 // red-white-blue color scale for r in [-1,1]
 function corrColor(r: number): string {
@@ -54,26 +56,34 @@ function corrColor(r: number): string {
 
 export function CorrelationCard({ peptides }: { peptides: Peptide[] }) {
   const { matrix, rows } = useMemo(() => {
-    // filter rows with numeric hydro & muH at minimum (others can be derived)
+    // Relaxed filter: only require core fields; optional fields handled per-pair
     const valid = peptides.filter(
       (p) =>
         Number.isFinite(p.hydrophobicity) &&
-        Number.isFinite(p.muH) &&
         Number.isFinite(p.length) &&
         Number.isFinite(p.charge)
     );
+
+    // Extract a numeric value for a given column from a peptide
+    function getVal(p: Peptide, col: ColKey): number {
+      switch (col) {
+        case 'chargeAbs': return Math.abs(p.charge ?? 0);
+        case 'muH': return typeof p.muH === 'number' ? p.muH : NaN;
+        case 'ffHelixPercent': return typeof p.ffHelixPercent === 'number' ? p.ffHelixPercent : NaN;
+        case 'tangoAggMax': return typeof p.tangoAggMax === 'number' ? p.tangoAggMax : NaN;
+        default: return (p as any)[col] ?? NaN;
+      }
+    }
 
     const m: number[][] = [];
     for (let i = 0; i < COLS.length; i++) {
       m[i] = [];
       for (let j = 0; j < COLS.length; j++) {
-        const xi = valid.map((p) =>
-          COLS[i] === 'chargeAbs' ? Math.abs(p.charge) : (p as any)[COLS[i]]
-        );
-        const yj = valid.map((p) =>
-          COLS[j] === 'chargeAbs' ? Math.abs(p.charge) : (p as any)[COLS[j]]
-        );
-        m[i][j] = pearson(xi as number[], yj as number[]);
+        // For each pair, only include peptides where both values are finite
+        const pairs = valid
+          .map(p => [getVal(p, COLS[i]), getVal(p, COLS[j])] as [number, number])
+          .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b));
+        m[i][j] = pearson(pairs.map(([a]) => a), pairs.map(([, b]) => b));
       }
     }
     return { matrix: m, rows: valid.length };
@@ -93,7 +103,7 @@ export function CorrelationCard({ peptides }: { peptides: Peptide[] }) {
           <div
             className="inline-grid"
             style={{
-              gridTemplateColumns: `repeat(${COLS.length + 1}, minmax(80px, 1fr))`,
+              gridTemplateColumns: `auto repeat(${COLS.length}, minmax(60px, 1fr))`,
               gap: '2px',
             }}
           >

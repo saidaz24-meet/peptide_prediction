@@ -138,7 +138,7 @@ export default function About() {
             <CardContent className="grid md:grid-cols-2 gap-3 text-sm">
               <ul className="list-disc pl-5 space-y-1">
                 <li>Flexible upload with QC (+ rejected rows export)</li>
-                <li>Hydrophobicity, Charge, μH; SSW & FF-Helix</li>
+                <li>Hydrophobicity, Charge, μH; SSW & Helix prediction</li>
                 <li>Cohort visualizations + correlation matrix</li>
                 <li>Sliding-window profiles with helix overlays</li>
                 <li>Helical wheel projection (HeliQuest colors)</li>
@@ -153,7 +153,7 @@ export default function About() {
             </CardContent>
           </Card>
 
-          {/* JPred / Tango note */}
+          {/* TANGO / S4PRED Providers */}
           <Card className="shadow-medium">
             <CardHeader><CardTitle>TANGO / S4PRED Providers</CardTitle></CardHeader>
             <CardContent className="text-sm text-muted-foreground">

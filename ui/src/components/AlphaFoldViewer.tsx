@@ -125,11 +125,20 @@ export function AlphaFoldViewer({ peptideId }: AlphaFoldViewerProps) {
           </div>
         </div>
 
+        {/* Short peptide caveat */}
+        {entry.sequenceLength < 30 && (
+          <div className="p-2 rounded bg-amber-50 dark:bg-amber-950/30 text-xs text-amber-700 dark:text-amber-400">
+            <strong>Caution:</strong> AlphaFold predictions for peptides shorter than 30 residues
+            should be interpreted with care. The model requires sufficient sequence context for
+            reliable structure prediction.
+          </div>
+        )}
+
         {/* Embedded 3D viewer (lazy-loaded on click) */}
         {showViewer ? (
           <div className="rounded-lg overflow-hidden border" style={{ height: 400 }}>
             <iframe
-              src={getMolstarViewerUrl(entry.uniprotAccession)}
+              src={getMolstarViewerUrl(entry.uniprotAccession, entry.cifUrl)}
               width="100%"
               height="100%"
               frameBorder="0"

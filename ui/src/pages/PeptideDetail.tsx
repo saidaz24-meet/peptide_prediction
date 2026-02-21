@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { useDatasetStore } from '@/stores/datasetStore';
 import { SegmentTrack } from '@/components/SegmentTrack';
 import { EvidencePanel } from '@/components/EvidencePanel';
@@ -28,6 +28,7 @@ import { HelicalWheel } from '@/components/HelicalWheel';
 import { AggregationHeatmap } from '@/components/AggregationHeatmap';
 import { ChartExportButtons } from '@/components/ChartExportButtons';
 import { AlphaFoldViewer } from '@/components/AlphaFoldViewer';
+import { S4PredChart } from '@/components/S4PredChart';
 
 // NEW: small additions for sliding-window profiles
 import { useMemo, useState } from 'react';
@@ -223,11 +224,11 @@ export default function PeptideDetail() {
                 </div>
                 <div className="flex items-center space-x-2">
                   {getSSWBadge()}
-                  <Badge variant="outline" className="text-helix border-helix">
-                    {typeof peptide.ffHelixPercent === 'number'
-                      ? `FF-Helix: ${peptide.ffHelixPercent.toFixed(1)}%`
-                      : 'FF-Helix: N/A'}
-                  </Badge>
+                  {typeof peptide.s4predHelixPercent === 'number' && (
+                    <Badge variant="outline" className="text-helix border-helix">
+                      S4PRED Helix: {peptide.s4predHelixPercent.toFixed(1)}%
+                    </Badge>
+                  )}
                 </div>
               </div>
             </CardHeader>
@@ -270,8 +271,11 @@ export default function PeptideDetail() {
             </Card>
           </div>
 
-          {/* Helical Wheel Projection — only for short helical peptides */}
+          {/* Helical Wheel Projection — only for short peptides WITH some helix prediction */}
           {peptide.length <= 40 && (
+            (typeof peptide.ffHelixPercent === 'number' && peptide.ffHelixPercent > 0) ||
+            (typeof peptide.s4predHelixPercent === 'number' && peptide.s4predHelixPercent > 0)
+          ) ? (
             <Card className="shadow-medium">
               <CardHeader>
                 <CardTitle>Helical Wheel Projection</CardTitle>
@@ -279,11 +283,26 @@ export default function PeptideDetail() {
                   Schiffer-Edmundson axial view of the alpha-helix. The red arrow shows the hydrophobic moment direction (amphipathic face).
                 </CardDescription>
               </CardHeader>
-              <CardContent className="flex justify-center">
-                <HelicalWheel sequence={peptide.sequence} />
+              <CardContent>
+                <div className="flex justify-center">
+                  <HelicalWheel sequence={peptide.sequence} />
+                </div>
+                {typeof peptide.s4predHelixPercent === 'number' && peptide.s4predHelixPercent === 0 && typeof peptide.ffHelixPercent === 'number' && peptide.ffHelixPercent > 0 && (
+                  <div className="mt-3 p-2 rounded bg-muted/50 text-xs text-muted-foreground">
+                    <strong>Note:</strong> S4PRED predicts no helical segments for this sequence. The wheel shows the hypothetical helix projection based on Chou-Fasman propensity ({peptide.ffHelixPercent.toFixed(0)}%).
+                  </div>
+                )}
               </CardContent>
             </Card>
-          )}
+          ) : peptide.length <= 40 ? (
+            <Card className="shadow-medium">
+              <CardContent className="py-6">
+                <p className="text-sm text-muted-foreground text-center">
+                  Helical wheel not shown — neither Chou-Fasman nor S4PRED predict helical structure for this sequence.
+                </p>
+              </CardContent>
+            </Card>
+          ) : null}
 
           {/* NEW: Sliding-Window Profiles (frontend-only, non-destructive) */}
           {/* Gate: Hide per-residue charts for sequences > 200 residues (unreadable and slow) */}
@@ -376,128 +395,32 @@ export default function PeptideDetail() {
           )}
 
           {/* S4PRED Secondary Structure Predictions */}
-          {peptide.s4pred && (peptide.s4pred.pH?.length || peptide.s4pred.pE?.length) && peptide.length && peptide.length <= 200 && (
-            <Card className="shadow-medium">
-              <CardHeader>
-                <CardTitle>S4PRED Secondary Structure Probabilities</CardTitle>
-                <CardDescription>
-                  Per-residue helix (H), beta (E), and coil (C) probabilities from S4PRED neural network prediction.
-                </CardDescription>
-                {/* Dominant structure summary from mean per-residue probabilities */}
-                {(() => {
-                  const pH = peptide.s4pred?.pH || [];
-                  const pE = peptide.s4pred?.pE || [];
-                  const pC = peptide.s4pred?.pC || [];
-                  const n = Math.max(pH.length, pE.length, pC.length);
-                  if (n === 0) return null;
-                  const meanH = pH.reduce((a, b) => a + b, 0) / n;
-                  const meanE = pE.reduce((a, b) => a + b, 0) / n;
-                  const meanC = pC.reduce((a, b) => a + b, 0) / n;
-                  const parts: { label: string; pct: number; cls: string }[] = [
-                    { label: 'Coil', pct: meanC * 100, cls: 'text-muted-foreground' },
-                    { label: 'Beta', pct: meanE * 100, cls: 'text-beta' },
-                    { label: 'Helix', pct: meanH * 100, cls: 'text-helix' },
-                  ].sort((a, b) => b.pct - a.pct);
-                  return (
-                    <div className="flex items-center gap-2 mt-2 text-sm">
-                      <span className="text-muted-foreground">Avg composition:</span>
-                      {parts.map((p, i) => (
-                        <span key={p.label}>
-                          <span className={`font-medium ${p.cls}`}>{p.label} {p.pct.toFixed(0)}%</span>
-                          {i < parts.length - 1 && <span className="text-muted-foreground/40 mx-1">/</span>}
-                        </span>
-                      ))}
-                    </div>
-                  );
-                })()}
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {/* Combined probability plot */}
-                <div className="space-y-2" data-chart-export>
-                  <h3 className="text-sm font-semibold">Secondary Structure Probabilities</h3>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={(() => {
-                          const pH = peptide.s4pred?.pH || [];
-                          const pE = peptide.s4pred?.pE || [];
-                          const pC = peptide.s4pred?.pC || [];
-                          const maxLen = Math.max(pH.length, pE.length, pC.length);
-                          return Array.from({ length: maxLen }, (_, i) => ({
-                            x: i + 1,
-                            'P(Helix)': pH[i] ?? null,
-                            'P(Beta)': pE[i] ?? null,
-                            'P(Coil)': pC[i] ?? null,
-                          }));
-                        })()}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="x" tickCount={10} />
-                        <YAxis domain={[0, 1]} label={{ value: 'Probability', angle: -90, position: 'insideLeft' }} />
-                        <Tooltip
-                          content={({ payload, label }) => {
-                            if (!payload?.length) return null;
-                            return (
-                              <div className="bg-background border border-border rounded p-2 text-xs space-y-1">
-                                <p className="font-medium">Residue {label}</p>
-                                {payload.map((entry: any) => (
-                                  <p key={entry.dataKey} style={{ color: entry.color }}>
-                                    {entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(3) : entry.value}
-                                  </p>
-                                ))}
-                              </div>
-                            );
-                          }}
-                        />
-                        <Legend wrapperStyle={{ paddingTop: '4px' }} />
-                        <Line type="monotone" dataKey="P(Helix)" stroke="hsl(var(--helix))" dot={false} strokeWidth={2} />
-                        <Line type="monotone" dataKey="P(Beta)" stroke="hsl(var(--beta))" dot={false} strokeWidth={2} />
-                        <Line type="monotone" dataKey="P(Coil)" stroke="hsl(var(--muted-foreground))" dot={false} strokeWidth={1} strokeDasharray="3 3" />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                  <ChartExportButtons filename={`${peptide.id}-s4pred-probabilities`} />
+          <S4PredChart peptide={peptide} className="shadow-medium">
+            {/* S4PRED summary stats */}
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="text-center p-2 rounded bg-muted/50">
+                <div className="font-semibold text-helix">
+                  {typeof peptide.s4predHelixPercent === 'number' ? `${peptide.s4predHelixPercent.toFixed(1)}%` : 'N/A'}
                 </div>
-
-                {/* S4PRED summary stats */}
-                <div className="grid grid-cols-3 gap-4 text-sm">
-                  <div className="text-center p-2 rounded bg-muted/50">
-                    <div className="font-semibold text-helix">
-                      {typeof peptide.s4predHelixPercent === 'number' ? `${peptide.s4predHelixPercent.toFixed(1)}%` : 'N/A'}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Helix %</div>
-                  </div>
-                  <div className="text-center p-2 rounded bg-muted/50">
-                    <div className="font-semibold">
-                      {peptide.s4predSswPrediction === 1 ? '✓ Yes' : peptide.s4predSswPrediction === -1 ? '✗ No' : 'N/A'}
-                    </div>
-                    <div className="text-xs text-muted-foreground">SSW Predicted</div>
-                  </div>
-                  <div className="text-center p-2 rounded bg-muted/50">
-                    <div className="font-semibold">
-                      {peptide.s4pred?.helixSegments?.length ?? 0}
-                    </div>
-                    <div className="text-xs text-muted-foreground">Helix Segments</div>
-                  </div>
+                <div className="text-xs text-muted-foreground">Helix %</div>
+              </div>
+              <div className="text-center p-2 rounded bg-muted/50">
+                <div className="font-semibold">
+                  {peptide.s4predSswPrediction === 1 ? '✓ Yes' : peptide.s4predSswPrediction === -1 ? '✗ No' : 'N/A'}
                 </div>
-
-                {/* Context note when S4PRED finds no helix but FF-Helix is high */}
-                {typeof peptide.s4predHelixPercent === 'number' &&
-                 peptide.s4predHelixPercent < 5 &&
-                 typeof peptide.ffHelixPercent === 'number' &&
-                 peptide.ffHelixPercent > 20 && (
-                  <p className="text-xs text-muted-foreground mt-2 px-1 leading-relaxed">
-                    S4PRED finds no stable helix segments (requires ≥5 residues with P(Helix)≥0.5).
-                    FF-Helix ({peptide.ffHelixPercent.toFixed(0)}%) reflects intrinsic amino acid propensity, not predicted structure.
-                  </p>
-                )}
-
-                <div className="text-xs text-muted-foreground">
-                  S4PRED: Single Sequence Secondary Structure PREDiction (neural network ensemble).
+                <div className="text-xs text-muted-foreground">SSW Predicted</div>
+              </div>
+              <div className="text-center p-2 rounded bg-muted/50">
+                <div className="font-semibold">
+                  {peptide.s4pred?.helixSegments?.length ?? 0}
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                <div className="text-xs text-muted-foreground">Helix Segments</div>
+              </div>
+            </div>
+            <div className="text-xs text-muted-foreground">
+              S4PRED: Single Sequence Secondary Structure PREDiction (neural network ensemble).
+            </div>
+          </S4PredChart>
 
           {/* TANGO Aggregation Heatmap */}
           {peptide.tango?.agg && peptide.tango.agg.length > 0 && (
@@ -514,6 +437,7 @@ export default function PeptideDetail() {
                   aggCurve={peptide.tango.agg}
                   betaCurve={peptide.tango.beta}
                   helixCurve={peptide.tango.helix}
+                  s4predBetaCurve={peptide.s4pred?.pE}
                   peptideId={peptide.id}
                 />
               </CardContent>
@@ -573,15 +497,15 @@ export default function PeptideDetail() {
             <Card className="shadow-soft">
               <CardContent className="p-4">
                 <div className="text-2xl font-bold text-helix">
-                  {typeof peptide.ffHelixPercent === 'number'
-                    ? `${peptide.ffHelixPercent.toFixed(0)}%`
-                    : 'Not available'}
+                  {typeof peptide.s4predHelixPercent === 'number'
+                    ? `${peptide.s4predHelixPercent.toFixed(0)}%`
+                    : 'N/A'}
                 </div>
-                <div className="text-sm text-muted-foreground">FF-Helix</div>
-                <div className="text-[10px] text-muted-foreground/60">intrinsic propensity</div>
-                {stats && stats.meanFFHelixPercent !== null && stats.meanFFHelixPercent !== undefined && (
+                <div className="text-sm text-muted-foreground">S4PRED Helix</div>
+                <div className="text-[10px] text-muted-foreground/60">neural network prediction</div>
+                {stats && stats.meanS4predHelixPercent !== null && stats.meanS4predHelixPercent !== undefined && (
                   <div className="text-xs text-muted-foreground mt-1">
-                    Cohort: {stats.meanFFHelixPercent.toFixed(0)}%
+                    Cohort: {stats.meanS4predHelixPercent.toFixed(0)}%
                   </div>
                 )}
               </CardContent>

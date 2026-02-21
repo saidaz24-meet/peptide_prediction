@@ -1,7 +1,7 @@
 # Peptide Visual Lab (PVL) - Developer Reference
 
 **Audience**: Developers working on or integrating with PVL
-**Last Updated**: 2026-02-07
+**Last Updated**: 2026-02-16
 **Prerequisites**: Python familiarity, basic understanding of REST APIs
 
 ---
@@ -28,9 +28,9 @@
 ```
 browser POST /api/upload-csv
   │
-  ├─► server.py:upload_csv()                    # Entry point, orchestrator
+  ├─► api/routes/upload.py                      # Thin route handler
   │     │
-  │     ├─► services/upload_service.py           # File parsing + validation
+  │     ├─► services/upload_service.py           # File parsing + validation + orchestration
   │     │     ├─► services/dataframe_utils.py    # read_any_table(), ensure_ff_cols()
   │     │     │     ├─► auxiliary.py              # ff_helix_percent(), ff_helix_cores()
   │     │     │     └─► biochem_calculation.py    # hydrophobic_moment() [for beta uH]
@@ -221,7 +221,7 @@ def _resolve_header_synonyms(df: pd.DataFrame) -> pd.DataFrame:
 Each prediction provider (TANGO, S4PRED) is **completely isolated** — one provider's failure never affects another or crashes the pipeline.
 
 ```python
-# server.py:upload_csv() — simplified
+# services/upload_service.py — simplified
 try:
     if use_tango:
         tango_result = run_tango_simple(records)
@@ -511,7 +511,7 @@ Both flags use **database-average thresholds** — the average is computed from 
 ### Running Tests Locally
 
 ```bash
-# All tests (214 passing, no external tools needed)
+# All tests (235 passing, no external tools needed)
 cd backend && USE_TANGO=0 USE_S4PRED=0 .venv/bin/python -m pytest tests/ -v --tb=short
 
 # Specific test file
@@ -676,6 +676,6 @@ Results.tsx
 
 ---
 
-*For high-level architecture decisions, see `docs/SYSTEM_OVERVIEW.md`.
-For non-technical explanation, see `docs/TEAM_GUIDE.md`.
-For the science and demo walkthrough, see `docs/MEETING_WALKTHROUGH.md`.*
+*For high-level architecture decisions, see `docs/active/MASTER_DEV_DOC.md`.
+For non-technical explanation, see `README_EXPLAINER.md`.
+For API contracts, see `docs/active/CONTRACTS.md`.*

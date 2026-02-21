@@ -252,7 +252,7 @@ docker stats pvl-backend pvl-caddy
 
 | SPOF | Impact | Mitigation |
 |------|--------|-----------|
-| Single VM | Total outage | Acceptable for research tool. Future: K8s replicas. |
+| Single VM | Total outage | Acceptable for Phase 1. DESY K8s (confirmed long-term) provides multi-replica HA. |
 | Single uvicorn worker | Request queuing | Increase to 2-4 workers (costs ~800MB RAM each) |
 | TANGO binary crash | Degraded (no aggregation) | Graceful fallback: biochem + S4PRED still work |
 | S4PRED model load failure | Degraded (no SS prediction) | Graceful fallback: biochem still works |
@@ -431,8 +431,9 @@ GET /api/precomputed/{uniprot_id}
   → Returns precomputed results or 404
 ```
 
-## Phase 3: Full Proteome (Future Vision)
+## Phase 3: Full Proteome (Future Vision — DESY K8s)
 
+DESY K8s cluster access confirmed as long-term target (2026-02-22). Details pending.
 This phase requires DESY K8s cluster resources:
 
 | Resource | Requirement |

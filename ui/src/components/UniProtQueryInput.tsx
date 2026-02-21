@@ -12,7 +12,7 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Search, Loader2, AlertCircle, Info } from 'lucide-react';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { API_BASE, executeUniProtQuery } from '@/lib/api';
 
 type QueryMode = 'auto' | 'accession' | 'keyword' | 'organism' | 'keyword_organism';

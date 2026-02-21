@@ -32,10 +32,10 @@ services:
       - LOG_LEVEL=INFO
       - HOST=0.0.0.0
       - PORT=8000
-      - USE_TANGO=${USE_TANGO:-0}
+      - USE_TANGO=${USE_TANGO:-1}
       - USE_S4PRED=${USE_S4PRED:-1}
       - CORS_ORIGINS=https://${DOMAIN:-localhost},http://${DOMAIN:-localhost}
-      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango
+      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
       - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
       - SENTRY_DSN=${SENTRY_DSN:-}
     healthcheck:

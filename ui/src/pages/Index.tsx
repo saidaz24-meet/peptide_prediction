@@ -1,6 +1,6 @@
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { Upload, BarChart3, Beaker, ArrowRight } from 'lucide-react';
+import { Upload, BarChart3, Beaker, ArrowRight, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -28,13 +28,21 @@ const Index = () => {
               Upload CSV files and instantly generate publication-ready analysis.
             </p>
             
-            <Link to="/upload">
-              <Button size="lg" className="text-lg px-8 py-6">
-                <Upload className="w-5 h-5 mr-2" />
-                Upload Dataset
-                <ArrowRight className="w-5 h-5 ml-2" />
-              </Button>
-            </Link>
+            <div className="flex items-center justify-center gap-4">
+              <Link to="/upload">
+                <Button size="lg" className="text-lg px-8 py-6">
+                  <Upload className="w-5 h-5 mr-2" />
+                  Upload Dataset
+                  <ArrowRight className="w-5 h-5 ml-2" />
+                </Button>
+              </Link>
+              <Link to="/quick">
+                <Button variant="outline" size="lg" className="text-lg px-6 py-6">
+                  <FlaskConical className="w-5 h-5 mr-2" />
+                  Try Quick Analyze
+                </Button>
+              </Link>
+            </div>
           </div>
 
           {/* Features */}

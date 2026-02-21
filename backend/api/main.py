@@ -20,8 +20,11 @@ from services.trace_helpers import get_trace_id_for_response
 from api.routes import health, example, upload, predict, providers, uniprot, feedback
 
 # Initialize Sentry before FastAPI app creation
+# Skip Sentry during test runs — test-triggered errors (invalid sort, missing columns,
+# TANGO binding) are expected and should not pollute the Sentry dashboard.
 SENTRY_INITIALIZED = False
-if settings.SENTRY_DSN:
+_running_under_pytest = "pytest" in os.environ.get("_", "") or "pytest" in " ".join(os.sys.argv)
+if settings.SENTRY_DSN and not _running_under_pytest:
     try:
         release = settings.SENTRY_RELEASE
         sentry_sdk.init(

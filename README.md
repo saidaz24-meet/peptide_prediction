@@ -1,100 +1,108 @@
-# 🧬 Peptide Visual Lab (DESY — Landau Group) 🔬
+# Peptide Visual Lab (PVL)
 
-Interactive web app for exploring peptide properties and fibril-forming predictions.
-Designed for **internal use** at DESY (Professor Meytal Landau's group).
-Developed with guidance from **Dr. Aleksandr Golubev**.
+**Comprehensive peptide analysis combining aggregation propensity, secondary structure prediction, and fibril-forming helix detection — with interactive visualizations.**
 
----
-> 🏗️ Built at **DESY / CSSB (Landau Lab)**. Runs fully offline on a single lab machine, but can be published for worldwide access (see **Deployment**). 🌍
+Built at [DESY](https://www.desy.de/) / [CSSB](https://www.cssb-hamburg.de/) (Landau Lab).
 
----
-
-## 🎯 Purpose
-
-- 📤 Upload peptide datasets from UniProt (TSV/CSV/XLSX)
-- 🧪 Compute biophysical features (Hydrophobicity, Charge, Hydrophobic Moment μH)
-- 🔗 Integrate **Tango (SSW)** and **JPred** results (when local outputs are provided)
-- 📊 Visualize cohorts, rank candidates, and export reports/shortlists
+[![CI](https://github.com/saidaz24-meet/peptide_prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/saidaz24-meet/peptide_prediction/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
+[![Tests: 235 passing](https://img.shields.io/badge/tests-235%20passing-brightgreen)](#running-tests)
 
 ---
 
-## ✨ Key Features
+## What It Does
 
-- **🔄 Flexible upload**: TSV/CSV/XLSX; optional column mapping
-- **✅ Upload QC**: invalid sequences reported, download *rejected_rows.csv*
-- **🏷️ Provenance pill**: JPred/Tango **ON/OFF** + hit counts
-- **📏 Six core metrics**:
-  1. 🦎 Chameleon prediction (SSW)
-  2. 🌀 Helix segments (JPred)
-  3. ⚡ Charge
-  4. 💧 Hydrophobicity
-  5. 🌊 Hydrophobic moment (μH)
-  6. 🧬 FF-Helix (derived flag)
-- **📈 Visualizations**
-  - 📉 Hydrophobicity distribution
-  - 🎯 Hydrophobicity vs μH scatter
-  - 🦎 Chameleon distribution & cohort radar
-  - 📊 **Sliding-window profiles** (H & μH) with helix overlays
-- **🎛️ Smart ranking**: sliders for metric weights + **Top-N shortlist** (CSV)
-- **🔍 Per-peptide deep dive**: segment track, metrics, interpretations
-- **📋 Exports**: CSV export; **PDF Report** (one-click)
-- **☁️ Cloud (optional)**: Save/Load datasets via **Firebase Auth + Firestore**
+PVL is a web-based research tool for studying peptide aggregation, structural switching, and fibril formation. Upload a dataset of peptide sequences and get:
+
+- **Aggregation propensity** via [TANGO](https://tango.switchlab.org/) — per-residue aggregation, beta-aggregation, and helix curves
+- **Secondary structure prediction** via [S4PRED](https://github.com/psipred/s4pred) — helix/beta/coil probabilities for each residue
+- **Fibril-forming helix detection** (FF-Helix) — intrinsic helical propensity scoring (always available, no external tools)
+- **Secondary Structure Switch (SSW)** prediction — identifies chameleon sequences from both TANGO and S4PRED
+- **Biochemical properties** — charge, hydrophobicity, hydrophobic moment (muH)
+- **Smart candidate ranking** — adjustable metric weights with top-N shortlist export
+
+> **Deployed at DESY.** PVL runs on a DESY VM with Docker Compose + Caddy auto-HTTPS. Kubernetes deployment planned as long-term scaling target. You can also run it locally with Docker.
 
 ---
 
-## ⚙️ How It Works
+## Quick Start
 
-### 1. **Backend** (`backend/` — FastAPI) 🐍
-- ✅ Accepts UniProt exports (TSV/CSV/XLSX)
-- 🔧 Normalizes headers; derives `Length` if missing
-- 🧮 Computes **Charge**, **Hydrophobicity**, **μH** (sequence-based)
-- 🔮 If local results present and enabled:
-  - **JPred** → `Helix fragments (Jpred)`, `Helix score (Jpred)`
-  - **Tango** → `SSW prediction`, `SSW score`
-- 🏁 Computes **FF flags** from cohort thresholds
+PVL runs as two Docker containers (backend + frontend). This is the supported deployment method.
 
-### 2. **Frontend** (`ui/` — React + Vite + shadcn/ui + Recharts) ⚛️
-- 📤 Upload → 👀 Preview → **🔬 Analyze** (calls backend)
-- 🗺️ Optional **column mapping**
-- 📊 Renders dashboards, detail pages, and exports
+### Prerequisites
 
-## 💜 Said Azaizah's contributions
+- [Docker](https://docs.docker.com/get-docker/) and [Docker Compose](https://docs.docker.com/compose/install/)
+- (Optional) TANGO binary — placed in `tools/tango/bin/tango`
+- (Optional) S4PRED model weights — placed in `tools/s4pred/models/` (5 files, ~86 MB each)
 
-- **🍎 End-to-end Tango integration on macOS M-series**, with a **simple runner** that:
-  - ✍️ writes canonical input formats,
-  - ▶️ executes per-peptide predictions,
-  - 📖 parses heterogeneous Tango outputs (table, mixed text),
-  - 🔄 merges results back into the DataFrame,
-  - 📊 computes SSW (chameleon) and cohort statistics robustly.
-- **🚩 Feature-flagged PSIPRED path**: safe-to-enable Docker runner that prepares FASTAs, invokes HHblits+PSIPRED if present, else **logs and continues**.
-- **🧬 FF-Helix% & core fragments** always computed (no Tango/PSIPRED dependency).
-- **🔧 Frontend mapping & stats fixes** so "Chameleon Positive" and "Avg FF-Helix%" cards reflect backend data correctly.
-- **🚀 Deployment playbooks** for: single lab server, tunnelled public access, or split front-/back-end hosting.
-
----
-
-## 🚀 Quick Start
-
-### Option 1: Docker (Recommended) 🐳
-
-The fastest way to get started:
+### Run
 
 ```bash
-# Clone the repository
-git clone https://github.com/your-org/peptide-prediction.git
-cd peptide-prediction
+git clone https://github.com/saidaz24-meet/peptide_prediction.git
+cd peptide_prediction
 
-# Start with Docker Compose
-docker compose -f docker/docker-compose.yml up --build
+# Copy and edit environment config
+cp backend/.env.example backend/.env
 
-# Access the app
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:8000/api/health
+# Start services
+make docker-build
+make docker-up
 ```
 
-### Option 2: Local Development
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-#### 1️⃣ Backend
+**Try Quick Analyze** — paste a single peptide sequence on the home page to see results instantly, no file upload needed.
+
+### Prediction Tools
+
+PVL uses external prediction tools that are **volume-mounted** (not baked into the Docker image):
+
+| Tool | Purpose | Required? | Path |
+|------|---------|-----------|------|
+| **S4PRED** | Secondary structure (helix/beta/coil) | Optional | `tools/s4pred/models/` |
+| **TANGO** | Aggregation propensity | Optional | `tools/tango/bin/tango` |
+| **FF-Helix** | Fibril-forming helix detection | Always available | Built-in (pure Python) |
+
+Without S4PRED or TANGO, PVL still computes FF-Helix%, charge, hydrophobicity, muH, and all biochemical properties.
+
+---
+
+## Features
+
+### Analysis
+
+- Upload peptide datasets (CSV/TSV/XLSX) or paste a single sequence (Quick Analyze)
+- UniProt search integration — query by protein name, organism, or accession
+- Per-residue sliding-window profiles (hydrophobicity, muH) with helix overlays
+- S4PRED per-residue probability curves with colored sequence track
+- TANGO per-residue aggregation heatmap with beta and helix overlays
+- Helical wheel projection (HeliQuest color scheme, Eisenberg muH arrow)
+- AlphaFold DB integration with pLDDT metrics and Mol* 3D viewer
+- Cohort comparison dashboard (overlay two datasets side-by-side)
+
+### Visualization & Export
+
+- Interactive charts (distribution, scatter, radar, bar)
+- Publication-ready SVG and PNG export for all charts
+- CSV export with full computed properties
+- FASTA export (single or bulk)
+- PDF report with ranked shortlist and methodology summary
+
+### Data Management
+
+- Smart candidate ranking with adjustable metric weights
+- Column visibility toggle and data table filters
+- Progressive disclosure (Data Table | Ranking | Charts tabs)
+- Result persistence across page refreshes
+- Example datasets (antimicrobial peptides, amyloid peptides) for quick exploration
+
+---
+
+## For Developers
+
+### Local Development Setup
+
+#### Backend
 
 ```bash
 cd backend
@@ -102,193 +110,148 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# Feature flags (safe defaults)
-export USE_TANGO=0          # Set to 1 if you have the Tango binary
-export USE_S4PRED=1         # S4Pred secondary structure prediction
-export USE_JPRED=0          # Deprecated, always off
+# Copy environment config
+cp .env.example .env
 
+# Start the server
 uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-#### 2️⃣ Frontend
+#### Frontend
 
 ```bash
 cd ui
 npm install
 echo "VITE_API_BASE_URL=http://127.0.0.1:8000" > .env.local
-npm run dev   # open http://127.0.0.1:5173
+npm run dev
 ```
 
-📤 Upload a UniProt table (CSV/TSV/XLSX) with Entry and Sequence (others optional).
-📊 You'll see cohort cards + ranking and a full table. Use Export CSV or Export shortlist.csv.
-
-## 🧪 How to Run Tests
-
-```bash
-make test       # Run all tests (fast, deterministic, no network)
-make test-unit  # Run fastest unit tests only
-make lint       # Run linters (Python + TypeScript)
-make typecheck  # Run type checkers (Python + TypeScript)
-make fmt        # Format code (Python + TypeScript)
-make ci         # Run lint + typecheck + test (CI pipeline)
-```
-
-## 🔒 Pre-commit Hooks
-
-Pre-commit hooks automatically run formatting, linting, and fast unit tests before each commit to prevent broken code.
-
-**Install:**
-```bash
-pip install pre-commit
-pre-commit install
-```
-
-**What runs on commit:**
-- Python formatting (ruff format)
-- Python linting (ruff check)
-- TypeScript formatting (prettier)
-- TypeScript linting (eslint)
-- Fast unit tests (test-unit subset)
-
-**Run manually:**
-```bash
-pre-commit run --all-files  # Run on all files
-pre-commit run              # Run on staged files only
-```
-
-**Skip hooks (not recommended):**
-```bash
-git commit --no-verify  # Skip pre-commit hooks
-```
-
-## 🐳 Docker Deployment
-
-### Development Mode
-
-```bash
-# Build and start services with hot reload
-docker compose -f docker/docker-compose.yml up --build
-
-# Services:
-# - Backend:  http://localhost:8000 (with source mounted for hot reload)
-# - Frontend: http://localhost:3000 (Nginx serving built assets)
-```
-
-### Production Mode
-
-```bash
-# Build and start optimized containers
-docker compose -f docker/docker-compose.prod.yml up -d
-
-# Access at http://localhost (port 80)
-```
+Open [http://localhost:5173](http://localhost:5173).
 
 ### Environment Variables
 
-Copy `.env.example` to `.env` and configure:
+Key backend settings (see `backend/.env.example` for the full list):
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `USE_TANGO` | `0` | Enable TANGO aggregation prediction |
+| `USE_S4PRED` | `1` | Enable S4PRED secondary structure prediction |
+| `TANGO_BINARY_PATH` | — | Path to TANGO binary |
+| `S4PRED_MODEL_PATH` | — | Path to S4PRED model weights directory |
+| `CORS_ORIGINS` | `localhost:3000,5173` | Allowed CORS origins |
+| `SENTRY_DSN` | — | Sentry error tracking (optional) |
+
+### Running Tests
 
 ```bash
-USE_TANGO=0              # Enable TANGO aggregation prediction
-USE_S4PRED=1             # Enable S4PRED secondary structure
-SENTRY_DSN=              # Optional: Sentry error tracking
-CORS_ORIGINS=http://localhost:3000
+make test          # All tests (fast, deterministic, no network)
+make test-unit     # Fast unit tests only
+make lint          # Linters (Python + TypeScript)
+make typecheck     # Type checkers (Python + TypeScript)
+make fmt           # Format code
+make ci            # Full pipeline (lint + typecheck + test)
 ```
+
+### Project Structure
+
+```
+backend/
+  api/routes/        # FastAPI endpoint definitions
+  services/          # Business logic (normalize, predict, etc.)
+  schemas/           # API models (single source of truth)
+  server.py          # Compatibility shim (15 LOC, deprecated)
+  tango.py           # TANGO runner and parser
+  s4pred.py          # S4PRED runner and analyzer
+  auxiliary.py       # FF-Helix and SSW helpers
+  biochem_calculation.py  # Charge, hydrophobicity, muH
+  config.py          # Settings (loaded from env vars)
+  tests/             # pytest test suite
+
+ui/
+  src/pages/         # React pages (Results, PeptideDetail, Upload, etc.)
+  src/components/    # Reusable components (HelicalWheel, SequenceTrack, etc.)
+  src/stores/        # Zustand state management
+  src/types/         # TypeScript type definitions
+  src/lib/           # Utilities (export, AlphaFold client, etc.)
+
+docker/
+  Dockerfile.backend    # Backend image (CPU-only PyTorch)
+  Dockerfile.frontend   # Frontend image (nginx)
+  docker-compose.yml    # Development
+  docker-compose.prod.yml   # Production (nginx)
+  docker-compose.caddy.yml  # Production (Caddy auto-HTTPS)
+
+tools/               # External tools (gitignored, volume-mounted into Docker)
+  tango/bin/tango     # TANGO binary
+  s4pred/models/      # S4PRED model weights
+```
+
+### Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Python 3.11, FastAPI, pandas, PyTorch (CPU) |
+| Frontend | React 18, TypeScript, Vite, Tailwind CSS, shadcn/ui, Recharts |
+| State | Zustand (with persistence) |
+| Testing | pytest, Vitest |
+| CI/CD | GitHub Actions |
+| Deployment | Docker Compose + Caddy (VM), DESY K8s (long-term) |
 
 ---
 
-## 🔧 Prediction Tools
+## Documentation
 
-### 🥭 TANGO (Aggregation Prediction)
+| Document | Audience | What It Covers |
+|----------|----------|----------------|
+| [README_EXPLAINER.md](README_EXPLAINER.md) | Biologists, collaborators | Non-technical A-to-Z guide: every chart explained, full user flow, glossary |
+| [docs/active/ACTIVE_CONTEXT.md](docs/active/ACTIVE_CONTEXT.md) | Developers | Architecture overview, entry points, data flow, key modules |
+| [docs/active/CONTRACTS.md](docs/active/CONTRACTS.md) | Developers | API endpoints, request/response shapes, SSW semantics |
+| [docs/active/TESTING_GUIDE.md](docs/active/TESTING_GUIDE.md) | Developers | Test commands, golden tests, debugging strategies |
+| [docs/active/DEPLOYMENT_GUIDE.md](docs/active/DEPLOYMENT_GUIDE.md) | DevOps | Step-by-step VM deployment with Docker + Caddy |
+| [docs/active/MASTER_DEV_DOC.md](docs/active/MASTER_DEV_DOC.md) | Tech leads | Strategic decisions, roadmap priorities, infrastructure checklist |
 
-1. Put your mac binary at `backend/Tango/bin/tango`
+---
 
-```bash
-chmod +x backend/Tango/bin/tango
+## Contributing
+
+Contributions are welcome. Please:
+
+1. Fork the repository
+2. Create a feature branch from `main`
+3. Run `make ci` before submitting a pull request
+4. Keep changes focused — one feature or fix per PR
+
+For bug reports and feature requests, open an issue on GitHub.
+
+---
+
+## Citation
+
+If you use PVL in your research, please cite:
+
+```bibtex
+@software{pvl2026,
+  author    = {Azaizah, Said},
+  title     = {Peptide Visual Lab (PVL)},
+  version   = {1.0.0},
+  year      = {2026},
+  url       = {https://github.com/saidaz24-meet/peptide_prediction},
+  license   = {MIT}
+}
 ```
 
-2. (Apple Silicon only, x86_64 binary) Install Rosetta:
+See [CITATION.cff](CITATION.cff) for machine-readable citation metadata.
 
-```bash
-softwareupdate --install-rosetta --agree-to-license
-```
+---
 
-### 🧬 S4PRED (Secondary Structure)
+## Acknowledgements
 
-S4PRED is included and runs automatically when `USE_S4PRED=1`. It provides:
-- Helix/Beta/Coil probability predictions
-- Secondary Structure Switch (SSW) detection
-- Per-residue confidence scores
+- **[TANGO](https://tango.switchlab.org/)** — Fernandez-Escamilla et al., *Nat Biotechnol* 22, 1302-1306 (2004)
+- **[S4PRED](https://github.com/psipred/s4pred)** — Moffat et al., *Bioinformatics* 38, 4647-4653 (2022)
+- **DESY / CSSB (Landau Lab)** — Prof. Meytal Landau, Dr. Aleksandr Golubev
 
-## 🌍 Deployment (make it globally accessible)
+---
 
-The backend can keep running locally in your lab and still be reachable worldwide over HTTPS. Choose one:
+## License
 
-### 🅰️ **Option A — Lab server + Cloudflare Tunnel (recommended)**
-
-- 🏠 Keep backend and Tango/PSIPRED on the lab laptop.
-- 🎯 Serve the frontend either:
-  - directly from the lab laptop (Nginx), or
-  - host the static UI on Firebase Hosting/Vercel and proxy `/api` to the tunnel URL.
-- 🌩️ Use Cloudflare Tunnel to expose `http://127.0.0.1:8000` to the internet safely (no open inbound port).
-
-**Steps (summary):**
-
-1. 🏗️ Build the UI: `cd ui && npm run build`
-2. 🌐 Install Nginx (or any static server) and serve `ui/dist` at `/`.
-3. 🚇 Install Cloudflare Tunnel (`cloudflared`), authenticate, and create a tunnel that forwards:
-   - `/api/*` → `http://localhost:8000`
-   - `/` → local static files (or skip if using Firebase Hosting/Vercel)
-4. 🎯 Point your domain DNS (Cloudflare) to the tunnel. You get free HTTPS.
-
-This keeps sensitive tools and data inside your lab while offering a stable public URL.
-
-### 🅱️ **Option B — Cloud VM (Hetzner/AWS) with Docker**
-
-- 🖥️ Provision a small VM, install Docker.
-- 🐳 Run backend in a container with Tango/PSIPRED binaries mounted (or baked into the image).
-- 🌐 Serve UI via Nginx.
-- 🔒 Add a domain + Let's Encrypt (or Caddy for auto-TLS).
-
-### ©️ **Option C — Split hosting (very simple)**
-
-- ☁️ Frontend on Firebase Hosting (push `ui/dist/`).
-- 🏠 Backend stays on lab laptop. Expose `/api` via Cloudflare Tunnel and set
-  `VITE_API_BASE_URL="https://your-tunnel-domain.example/api"` in the hosted UI.
-
-📖 All options are fully described in `DEPLOYMENT.md` with exact commands and example configs.
-
-## 📚 Technical Documentation
-
-**📖 [docs/KNOWLEDGE_INDEX.md](docs/KNOWLEDGE_INDEX.md)** — **Start here!** Single entry point to all documentation.
-
-**Quick links to core docs:**
-
-- **[WORKFLOWS.md](docs/WORKFLOWS.md)** — Operator cookbook (setup, running, troubleshooting)
-- **[SYSTEM_MAP.md](docs/SYSTEM_MAP.md)** — Architecture overview
-- **[EXECUTION_PATHS.md](docs/EXECUTION_PATHS.md)** — End-to-end execution flows
-- **[FAILURE_MODES.md](docs/FAILURE_MODES.md)** — Silent failure modes (MUST READ)
-- **[CONFIG_MATRIX.md](docs/CONFIG_MATRIX.md)** — All configuration options
-- **[ARCHITECTURE.md](docs/ARCHITECTURE.md)** — Detailed frontend architecture
-- **[FILE_REFERENCE.md](docs/FILE_REFERENCE.md)** — File-by-file commentary
-
-**See [docs/KNOWLEDGE_INDEX.md](docs/KNOWLEDGE_INDEX.md) for complete documentation index.**
-
-## 🗺️ Roadmap (what's next)
-
-- **🎨 Single-sequence drawer**: PSIPRED curves (P(H)/P(E)/P(C)), Tango β-aggregation track, segment ribbons.
-- **🔐 Auth + Firestore**: sign-in, "previous datasets", cloud export of Tango/PSIPRED outputs (schema and rules outlined in `DEV_GUIDE.md`).
-- **🔍 UniProt fetcher**: type a protein or organism → fetch, window peptides to CSV, analyze.
-
-## 📜 License
-
-This repository is intended for research use.
-If you need a permissive OSI license, choose Apache-2.0 (recommended) or BSD-3-Clause.
-
-For now, we include a DESY Research License template (`LICENSE-DESY-RESEARCH.md`).
-If you plan a public SaaS, consider switching to Apache-2.0.
-
-## 🙏 Acknowledgements
-
-- **🥭 Tango**: Fernandez-Escamilla et al., *Nat Biotechnol* 22, 1302–1306 (2004).
-- **🧠 PSIPRED**: Jones, *J Mol Biol* 292, 195–202 (1999).
-- **💜 Thanks to DESY / CSSB (Landau Lab)**: Said Azaizah & Dr. Aleksandr Golubev for guidance on SSW/FF calculations.
+[MIT](https://opensource.org/licenses/MIT)

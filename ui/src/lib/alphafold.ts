@@ -66,6 +66,7 @@ export function isValidUniProtAccession(id: string): boolean {
 }
 
 /** Get the embedded Mol* viewer URL for an AlphaFold structure */
-export function getMolstarViewerUrl(uniprotId: string): string {
-  return `https://www.ebi.ac.uk/pdbe/molstar/alphafold/${uniprotId}`;
+export function getMolstarViewerUrl(uniprotId: string, cifUrl?: string): string {
+  const structureUrl = cifUrl || `https://alphafold.ebi.ac.uk/files/AF-${uniprotId}-F1-model_v4.cif`;
+  return `https://molstar.org/viewer/?structure-url=${encodeURIComponent(structureUrl)}&structure-url-format=mmcif`;
 }

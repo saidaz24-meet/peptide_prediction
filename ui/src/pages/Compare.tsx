@@ -174,7 +174,7 @@ export default function Compare() {
     { label: 'Mean H', a: fmt(statsA.meanHydrophobicity), b: fmt(statsB?.meanHydrophobicity), delta: deltaStr(statsA.meanHydrophobicity, statsB?.meanHydrophobicity), deltaCls: deltaColor(statsA.meanHydrophobicity, statsB?.meanHydrophobicity) },
     { label: 'Mean |Charge|', a: fmt(statsA.meanCharge), b: fmt(statsB?.meanCharge), delta: deltaStr(statsA.meanCharge, statsB?.meanCharge), deltaCls: deltaColor(statsA.meanCharge, statsB?.meanCharge) },
     { label: 'Mean μH', a: fmt(statsA.meanMuH), b: fmt(statsB?.meanMuH), delta: deltaStr(statsA.meanMuH, statsB?.meanMuH), deltaCls: deltaColor(statsA.meanMuH, statsB?.meanMuH) },
-    { label: 'Mean FF-Helix %', a: fmt(statsA.meanFFHelixPercent, 1), b: fmt(statsB?.meanFFHelixPercent, 1), delta: deltaStr(statsA.meanFFHelixPercent, statsB?.meanFFHelixPercent), deltaCls: deltaColor(statsA.meanFFHelixPercent, statsB?.meanFFHelixPercent) },
+    { label: 'Mean S4PRED Helix %', a: fmt(statsA.meanS4predHelixPercent, 1), b: fmt(statsB?.meanS4predHelixPercent, 1), delta: deltaStr(statsA.meanS4predHelixPercent, statsB?.meanS4predHelixPercent), deltaCls: deltaColor(statsA.meanS4predHelixPercent, statsB?.meanS4predHelixPercent) },
     { label: 'Mean Length', a: fmt(statsA.meanLength, 1), b: fmt(statsB?.meanLength, 1), delta: deltaStr(statsA.meanLength, statsB?.meanLength), deltaCls: deltaColor(statsA.meanLength, statsB?.meanLength) },
   ];
 

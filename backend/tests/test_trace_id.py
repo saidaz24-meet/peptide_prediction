@@ -16,7 +16,7 @@ from api.main import app
 # Disable providers for fast tests
 import os
 os.environ.setdefault("USE_TANGO", "0")
-os.environ.setdefault("USE_PSIPRED", "0")
+os.environ.setdefault("USE_S4PRED", "0")
 
 client = TestClient(app)
 

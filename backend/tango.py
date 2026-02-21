@@ -19,7 +19,59 @@ logger = get_logger()
 # Paths / constants (repo-relative, robust to cwd)
 # ---------------------------------------------------------------------
 PROJECT_PATH = os.path.dirname(os.path.abspath(__file__))
-TANGO_DIR    = os.path.abspath(os.path.join(PROJECT_PATH, "Tango"))
+TANGO_DIR    = os.path.abspath(os.path.join(PROJECT_PATH, "Tango"))  # legacy fallback
+
+# Multi-platform binary directory: tools/tango/bin/ at repo root
+_REPO_ROOT = os.path.abspath(os.path.join(PROJECT_PATH, ".."))
+_TOOLS_BIN_DIR = os.path.join(_REPO_ROOT, "tools", "tango", "bin")
+
+# Platform → binary name mapping
+_PLATFORM_BINARIES = {
+    ("Darwin",  "x86_64"):  "tango_darwin_x86_64",
+    ("Darwin",  "arm64"):   "tango_darwin_x86_64",   # Rosetta on Apple Silicon
+    ("Linux",   "x86_64"):  "tango_linux_x86_64",
+    ("Linux",   "i386"):    "tango_linux_i386",
+    ("Linux",   "i686"):    "tango_linux_i386",
+    ("Windows", "AMD64"):   "tango_win32.exe",
+    ("Windows", "x86"):     "tango_win32.exe",
+}
+
+
+def _resolve_tango_bin() -> Optional[str]:
+    """
+    Resolve the TANGO binary path with this priority:
+      1. TANGO_BINARY_PATH env var (Docker / explicit override)
+      2. Platform-specific binary in tools/tango/bin/
+      3. Legacy backend/Tango/bin/tango fallback
+      4. System PATH lookup via shutil.which("tango")
+
+    Returns absolute path to the binary, or None if not found.
+    """
+    # 1. Explicit env var (Docker sets this)
+    env_path = os.environ.get("TANGO_BINARY_PATH")
+    if env_path and os.path.isfile(env_path):
+        return os.path.abspath(env_path)
+
+    # 2. Platform-specific binary in tools/tango/bin/
+    sys_name = platform.system()
+    machine = platform.machine()
+    bin_name = _PLATFORM_BINARIES.get((sys_name, machine))
+    if bin_name:
+        candidate = os.path.join(_TOOLS_BIN_DIR, bin_name)
+        if os.path.isfile(candidate):
+            return os.path.abspath(candidate)
+
+    # 3. Legacy path: backend/Tango/bin/tango
+    legacy = os.path.join(TANGO_DIR, "bin", "tango")
+    if os.path.isfile(legacy):
+        return os.path.abspath(legacy)
+
+    # 4. System PATH
+    which = shutil.which("tango")
+    if which:
+        return os.path.abspath(which)
+
+    return None
 
 # Runtime output directories: Use temp location to avoid triggering uvicorn --reload
 # Load from config (with fallback for backward compatibility)
@@ -186,8 +238,10 @@ def _write_simple_bat(records: List[Tuple[str, str]], script_path: str) -> List[
         This mapping is the SINGLE SOURCE OF TRUTH for output file names.
     """
     os.makedirs(os.path.dirname(script_path), exist_ok=True)
-    # Compute absolute path to TANGO binary at script generation time
-    abs_bin = os.path.abspath(os.path.join(TANGO_DIR, "bin", "tango"))
+    # Resolve TANGO binary via platform-aware resolver
+    abs_bin = _resolve_tango_bin()
+    if not abs_bin:
+        abs_bin = os.path.abspath(os.path.join(TANGO_DIR, "bin", "tango"))  # will fail later with clear error
     lines = []
     lines.append("#!/bin/bash\n")
     lines.append("set -euo pipefail\n")
@@ -314,7 +368,9 @@ def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> str:
     entry_mapping = _write_simple_bat(records, script_path)
 
     # Capture paths and environment for diagnostics
-    bin_path = os.path.join(TANGO_DIR, "bin", "tango")
+    bin_path = _resolve_tango_bin()
+    if not bin_path:
+        bin_path = os.path.join(TANGO_DIR, "bin", "tango")  # will fail at exists check below
     bin_path_abs = os.path.abspath(bin_path)
     run_dir_abs = os.path.abspath(run_dir)
     cmd = ["bash", "Tango_run.sh"]

@@ -85,22 +85,7 @@ export function PeptideRadarChart({ peptide, cohortStats }: PeptideRadarChartPro
     });
   }
 
-  // Add FF-Helix if available (filter invalid values)
-  if (peptide.ffHelixPercent !== undefined && 
-      peptide.ffHelixPercent >= 0 && 
-      peptide.ffHelixPercent <= 100 &&
-      cohortStats.meanFFHelixPercent !== null &&
-      cohortStats.meanFFHelixPercent !== undefined &&
-      cohortStats.meanFFHelixPercent >= 0) {
-    data.push({
-      metric: 'FF-Helix %',
-      peptide: peptide.ffHelixPercent / 100, // Normalize to 0-1
-      cohort: cohortStats.meanFFHelixPercent / 100,
-      fullMark: 1,
-    });
-  }
-
-  // Add S4PRED Helix if available
+  // S4PRED Helix % on radar (primary helix metric)
   if (peptide.s4predHelixPercent !== undefined &&
       peptide.s4predHelixPercent !== null &&
       peptide.s4predHelixPercent >= 0 &&

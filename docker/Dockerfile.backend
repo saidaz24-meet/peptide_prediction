@@ -90,10 +90,10 @@ ENV PYTHONUNBUFFERED=1 \
     DATA_UPLOADS_PATH=/data/uploads \
     TOOLS_PATH=/opt/tools \
     # Tool paths (mounted at runtime)
-    TANGO_BINARY_PATH=/opt/tools/tango/bin/tango \
+    TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64 \
     S4PRED_MODEL_PATH=/opt/tools/s4pred/models \
-    # Provider flags (safe defaults)
-    USE_TANGO=0 \
+    # Provider flags (safe defaults — both enabled for production)
+    USE_TANGO=1 \
     USE_S4PRED=1
 
 # Switch to non-root user

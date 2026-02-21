@@ -58,18 +58,18 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
     const HelixIcon = helixIsHigher ? TrendingUp : TrendingDown;
 
     evidenceItems.push({
-      property: 'FF-Helix Content',
+      property: 'Chou-Fasman Propensity',
       value: `${peptide.ffHelixPercent.toFixed(1)}%`,
-      comparison: `${helixIsHigher ? 'More' : 'Less'} structured than cohort mean (${cohortStats.meanFFHelixPercent.toFixed(1)}%)`,
+      comparison: `${helixIsHigher ? 'Higher' : 'Lower'} propensity than cohort mean (${cohortStats.meanFFHelixPercent.toFixed(1)}%)`,
       difference: `${helixIsHigher ? '+' : ''}${helixDiff.toFixed(1)}%`,
       icon: HelixIcon,
       color: helixIsHigher ? 'text-green-600' : 'text-blue-600',
     });
   } else if (peptide.ffHelixPercent === undefined || peptide.ffHelixPercent === null) {
     evidenceItems.push({
-      property: 'FF-Helix Content',
+      property: 'Chou-Fasman Propensity',
       value: 'Not available',
-      comparison: 'No helix structure data available',
+      comparison: 'No propensity data available',
       difference: '',
       icon: Minus,
       color: 'text-muted-foreground',
@@ -94,6 +94,26 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
       difference: `${s4IsHigher ? '+' : ''}${s4Diff.toFixed(1)}%`,
       icon: S4Icon,
       color: s4IsHigher ? 'text-green-600' : 'text-blue-600',
+    });
+  }
+
+  // Aggregation propensity evidence (TANGO)
+  if (typeof peptide.tangoAggMax === 'number' && peptide.tangoAggMax > 0) {
+    const aggLevel = peptide.tangoAggMax > 20 ? 'HIGH' : peptide.tangoAggMax > 5 ? 'MODERATE' : 'LOW';
+    const aggIcon = peptide.tangoAggMax > 5 ? TrendingUp : Minus;
+    const aggColor = peptide.tangoAggMax > 20 ? 'text-red-600' : peptide.tangoAggMax > 5 ? 'text-amber-600' : 'text-green-600';
+
+    evidenceItems.push({
+      property: 'Aggregation Propensity',
+      value: `Peak: ${peptide.tangoAggMax.toFixed(1)}%`,
+      comparison: aggLevel === 'HIGH'
+        ? 'Strong aggregation-prone region detected'
+        : aggLevel === 'MODERATE'
+          ? 'Aggregation hotspot present'
+          : 'No significant aggregation hotspots',
+      difference: aggLevel,
+      icon: aggIcon,
+      color: aggColor,
     });
   }
 
@@ -206,21 +226,16 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
           })}
         </div>
 
-        {/* FF-Helix vs S4PRED Discrepancy Alert */}
+        {/* Note when Chou-Fasman propensity differs significantly from S4PRED */}
         {peptide.ffHelixPercent != null &&
          peptide.s4predHelixPercent != null &&
          peptide.ffHelixPercent > 20 &&
          peptide.s4predHelixPercent < 5 && (
-          <div className="mt-4 p-4 rounded-lg border border-amber-200 bg-amber-50/50 dark:bg-amber-950/20 dark:border-amber-800">
-            <h4 className="font-medium text-sm text-amber-800 dark:text-amber-200 mb-1">
-              Why FF-Helix ({peptide.ffHelixPercent.toFixed(0)}%) differs from S4PRED Helix ({peptide.s4predHelixPercent.toFixed(0)}%)
-            </h4>
-            <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
-              <strong>FF-Helix</strong> measures intrinsic amino acid propensity to form helices (context-free, per-residue).
-              <strong> S4PRED</strong> uses a neural network that considers sequence context and requires ≥5 consecutive helix-prone residues.
-              Short peptides often have high FF-Helix but low S4PRED — the amino acids favor helix individually,
-              but the full sequence context does not support a stable helix segment.
-            </p>
+          <div className="mt-4 p-3 rounded-lg border border-muted text-xs text-muted-foreground leading-relaxed">
+            <strong>Note:</strong> Chou-Fasman propensity ({peptide.ffHelixPercent.toFixed(0)}%) measures
+            context-free amino acid helix tendency (1978 method). S4PRED ({peptide.s4predHelixPercent.toFixed(0)}%)
+            uses a modern neural network. For short peptides, the residues may favor helix individually but
+            not form a stable segment in context. <strong>S4PRED is the authoritative prediction.</strong>
           </div>
         )}
 

@@ -272,7 +272,7 @@ def _compute_helix_uh(df: pd.DataFrame, fragments_col: str, uh_col: str) -> None
 
 def fill_percent_from_tango_if_missing(df: pd.DataFrame) -> None:
     """
-    If PSIPRED is off, ensure percent content fields exist using Tango merges.
+    If S4PRED is off, ensure percent content fields exist using Tango merges.
     (Your tango.process_tango_output already sets these for each row.)
     We just guarantee presence + numeric dtype so the UI cards can compute means.
     """

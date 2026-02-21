@@ -55,7 +55,7 @@ export function Legend() {
             <div className="space-y-2 text-xs text-muted-foreground">
               <div>Hydrophobicity: -2.0 to +2.0</div>
               <div>Hydrophobic Moment: 0.0 to 1.0</div>
-              <div>FF-Helix: 0% to 100%</div>
+              <div>S4PRED Helix: 0% to 100%</div>
               <div>Charge: Positive/Negative values</div>
             </div>
           </div>

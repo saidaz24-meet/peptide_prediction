@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { Download } from 'lucide-react';
 import { useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,8 @@ import { useThresholds, scorePeptide } from '@/stores/datasetStore'; // smart ra
 import { exportShortlistPDF } from '@/lib/report';
 import { applyThresholds, DEFAULT_THRESHOLDS, type ResolvedThresholds } from '@/lib/thresholds';
 import { uploadCSV, predictOne } from '@/lib/api';
-import { RotateCcw } from 'lucide-react';
+import { RotateCcw, FlaskConical, Info } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 import type { Peptide } from '@/types/peptide';
 // mapApiRowsToPeptides removed - peptides from store are already mapped
@@ -282,6 +283,12 @@ export default function Results() {
               )}
 
               <Legend />
+              <Link to="/quick">
+                <Button variant="outline" size="sm">
+                  <FlaskConical className="w-4 h-4 mr-2" />
+                  Single Sequence
+                </Button>
+              </Link>
               <ReproduceButton getLastRun={getLastRun} ingestBackendRows={ingestBackendRows} setLoading={setLoading} setError={setError} />
               <Button variant="outline" size="sm" onClick={exportAllFASTA}>
                 <Download className="w-4 h-4 mr-2" />
@@ -395,7 +402,7 @@ export default function Results() {
                 <CardContent>
                   <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                     <div className="rounded-md border p-3">
-                      <div className="text-xs text-muted-foreground">FF-Helix Candidates</div>
+                      <div className="text-xs text-muted-foreground">Helix Candidates (μH)</div>
                       <div className="text-xl font-semibold">{ffHelixOnCount}</div>
                       <div className="text-[10px] text-muted-foreground mt-1">
                         of {peptidesTyped.length} ({peptidesTyped.length > 0 ? ((ffHelixOnCount / peptidesTyped.length) * 100).toFixed(0) : 0}%)
@@ -425,11 +432,22 @@ export default function Results() {
                     <div className="rounded-md border p-3">
                       <div className="text-xs text-muted-foreground">FF-Helix % threshold</div>
                       <div className="text-lg font-semibold tabular-nums">{resolvedThresholds.ffHelixPercentThreshold.toFixed(0)}%</div>
-                      <div className="text-[10px] text-muted-foreground mt-1">For scoring</div>
+                      <div className="text-[10px] text-muted-foreground mt-1">Propensity cutoff</div>
                     </div>
                   </div>
                 </CardContent>
               </Card>
+
+              {/* FF-Helix explanation */}
+              <Alert variant="default" className="border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20">
+                <Info className="h-4 w-4 text-purple-600" />
+                <AlertDescription className="text-sm text-muted-foreground">
+                  <strong className="text-foreground">FF-Helix %</strong> measures intrinsic amino acid helix propensity
+                  using a sliding window (Fauchere-Pliska scale). It is <strong className="text-foreground">not</strong> a
+                  prediction of actual helical content. Values of 0% or 100% are expected for many peptides. Do not compare
+                  to CD spectroscopy measurements. See the <Link to="/help" className="underline text-purple-600 hover:text-purple-800">Help page</Link> for details.
+                </AlertDescription>
+              </Alert>
             </TabsContent>
 
             {/* Charts & Analysis */}

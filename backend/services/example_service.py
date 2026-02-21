@@ -27,8 +27,8 @@ EXAMPLE_PATH = BASE_DIR / "ui" / "public" / "Final_Staphylococcus_2023_new.xlsx"
 
 def load_example_data(recalc: int = 0) -> dict:
     """
-    Serve the presentation dataset with JPred/Tango already computed.
-    By default (recalc=0) we DO NOT recompute biochem/JPred/Tango.
+    Serve the presentation dataset with pre-computed predictions.
+    By default (recalc=0) we DO NOT recompute biochem/TANGO.
     Set recalc=1 if you explicitly want to recompute locally.
     """
     if not os.path.exists(EXAMPLE_PATH):

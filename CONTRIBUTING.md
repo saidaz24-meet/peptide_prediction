@@ -9,6 +9,8 @@ Thank you for your interest in contributing! This document provides guidelines a
 - Python 3.11+
 - Node.js 20+
 - Docker (optional, for containerized development)
+- (Optional) TANGO binary in `tools/tango/bin/`
+- (Optional) S4PRED weights in `tools/s4pred/models/`
 
 ### Development Setup
 
@@ -37,10 +39,12 @@ Thank you for your interest in contributing! This document provides guidelines a
    ```bash
    # Terminal 1 - Backend
    cd backend && source .venv/bin/activate
-   uvicorn api.main:app --reload
+   uvicorn api.main:app --host 0.0.0.0 --port 8000 --reload
 
    # Terminal 2 - Frontend
-   cd ui && npm run dev
+   cd ui
+   echo "VITE_API_BASE_URL=http://127.0.0.1:8000" > .env.local
+   npm run dev
    ```
 
 ## Development Workflow
@@ -105,11 +109,14 @@ npm run format      # Format (if configured)
 Run tests before submitting:
 
 ```bash
-# All tests
+# All tests (235 passing, deterministic, no network)
 make test
 
-# Backend only
-cd backend && pytest tests/ -v
+# Backend only (must disable external tools)
+cd backend && USE_TANGO=0 USE_S4PRED=0 .venv/bin/python -m pytest tests/ -v --tb=short
+
+# Full CI pipeline (lint + typecheck + test)
+make ci
 
 # Frontend build check
 cd ui && npm run build

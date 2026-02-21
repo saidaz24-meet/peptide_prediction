@@ -52,7 +52,7 @@ const KD: Record<string, number> = {
     return pts;
   }
   
-  /** Convert JPred helix fragments [[start,end],...] into ReferenceArea ranges (1-indexed) */
+  /** Convert helix fragments [[start,end],...] into ReferenceArea ranges (1-indexed) */
   export function helixRanges(frags?: [number, number][], k = 11): Array<{ x1: number; x2: number }> {
     if (!frags || !frags.length) return [];
     // profile’s x runs over window starts; shade where window fully inside helix segment

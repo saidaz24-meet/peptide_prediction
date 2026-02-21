@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { motion, cubicBezier } from "framer-motion";
-import { FlaskConical, ChevronRight, Copy, Download } from "lucide-react";
+import { FlaskConical, ChevronRight, Copy, Download, ArrowLeft } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { useNavigate } from "react-router-dom";
-import { toast } from "react-hot-toast";
+import { Link, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import { predictOne as apiPredictOne } from "@/lib/api";
 import { mapApiRowToPeptide } from "@/lib/peptideMapper";
 import { Peptide } from "@/types/peptide";
@@ -15,18 +15,9 @@ import { TangoBadge } from "@/components/TangoBadge";
 import { SequenceTrack } from "@/components/SequenceTrack";
 import { HelicalWheel } from "@/components/HelicalWheel";
 import { AggregationHeatmap } from "@/components/AggregationHeatmap";
-import { ChartExportButtons } from "@/components/ChartExportButtons";
 import { AlphaFoldViewer } from "@/components/AlphaFoldViewer";
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-} from "recharts";
+import { S4PredChart } from "@/components/S4PredChart";
+import { useDatasetStore } from "@/stores/datasetStore";
 
 async function predictSequence(sequence: string, entry?: string): Promise<Peptide> {
   const response = await apiPredictOne(sequence, entry);
@@ -150,6 +141,16 @@ export default function QuickAnalyze() {
         transition={{ duration: 0.35, ease: cubicBezier(0.22, 1, 0.36, 1) }}
         className="max-w-5xl mx-auto p-6 space-y-8"
       >
+        {useDatasetStore.getState().peptides.length > 0 && (
+          <Link
+            to="/results"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="h-4 w-4 mr-1" />
+            Back to Batch Results
+          </Link>
+        )}
+
         <div className="flex items-center gap-3">
           <FlaskConical className="h-6 w-6 text-primary" />
           <h1 className="text-2xl font-semibold">Quick Analyze (single peptide)</h1>
@@ -234,14 +235,9 @@ export default function QuickAnalyze() {
                       hasTangoData={p.tangoHasData ?? false}
                       showIcon
                     />
-                    <Badge variant="outline" className="text-helix border-helix">
-                      {typeof p.ffHelixPercent === "number"
-                        ? `FF-Helix: ${p.ffHelixPercent.toFixed(1)}%`
-                        : "FF-Helix: N/A"}
-                    </Badge>
                     {typeof p.s4predHelixPercent === "number" && (
                       <Badge variant="outline" className="text-helix border-helix">
-                        S4PRED: {p.s4predHelixPercent.toFixed(1)}%
+                        S4PRED Helix: {p.s4predHelixPercent.toFixed(1)}%
                       </Badge>
                     )}
                     <Button variant="outline" size="sm" onClick={handleCopySequence}>
@@ -261,7 +257,7 @@ export default function QuickAnalyze() {
             </Card>
 
             {/* ── KPI tiles ── */}
-            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <Card>
                 <CardContent className="p-4">
                   <div className="text-2xl font-bold text-primary">
@@ -289,19 +285,10 @@ export default function QuickAnalyze() {
               <Card>
                 <CardContent className="p-4">
                   <div className="text-2xl font-bold text-helix">
-                    {typeof p.ffHelixPercent === "number" ? `${p.ffHelixPercent.toFixed(0)}%` : "N/A"}
-                  </div>
-                  <div className="text-sm text-muted-foreground">FF-Helix</div>
-                  <div className="text-[10px] text-muted-foreground/60">intrinsic propensity</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-2xl font-bold text-helix">
                     {typeof p.s4predHelixPercent === "number" ? `${p.s4predHelixPercent.toFixed(0)}%` : "N/A"}
                   </div>
                   <div className="text-sm text-muted-foreground">S4PRED Helix</div>
-                  <div className="text-[10px] text-muted-foreground/60">context-dependent</div>
+                  <div className="text-[10px] text-muted-foreground/60">neural network prediction</div>
                 </CardContent>
               </Card>
             </div>
@@ -322,100 +309,7 @@ export default function QuickAnalyze() {
             )}
 
             {/* ── S4PRED Per-Residue Probabilities ── */}
-            {p.s4pred && (p.s4pred.pH?.length || p.s4pred.pE?.length) && p.length != null && p.length <= 200 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>S4PRED Secondary Structure Probabilities</CardTitle>
-                  <CardDescription>
-                    Per-residue helix (H), beta (E), and coil (C) probabilities.
-                  </CardDescription>
-                  {/* Dominant structure summary */}
-                  {(() => {
-                    const pH = p.s4pred?.pH || [];
-                    const pE = p.s4pred?.pE || [];
-                    const pC = p.s4pred?.pC || [];
-                    const n = Math.max(pH.length, pE.length, pC.length);
-                    if (n === 0) return null;
-                    const meanH = pH.reduce((a, b) => a + b, 0) / n;
-                    const meanE = pE.reduce((a, b) => a + b, 0) / n;
-                    const meanC = pC.reduce((a, b) => a + b, 0) / n;
-                    const parts = [
-                      { label: "Coil", pct: meanC * 100, cls: "text-muted-foreground" },
-                      { label: "Beta", pct: meanE * 100, cls: "text-beta" },
-                      { label: "Helix", pct: meanH * 100, cls: "text-helix" },
-                    ].sort((a, b) => b.pct - a.pct);
-                    return (
-                      <div className="flex items-center gap-2 mt-2 text-sm">
-                        <span className="text-muted-foreground">Avg composition:</span>
-                        {parts.map((pt, i) => (
-                          <span key={pt.label}>
-                            <span className={`font-medium ${pt.cls}`}>{pt.label} {pt.pct.toFixed(0)}%</span>
-                            {i < parts.length - 1 && <span className="text-muted-foreground/40 mx-1">/</span>}
-                          </span>
-                        ))}
-                      </div>
-                    );
-                  })()}
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2" data-chart-export>
-                    <div className="h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <LineChart
-                          data={(() => {
-                            const pH = p.s4pred?.pH || [];
-                            const pE = p.s4pred?.pE || [];
-                            const pC = p.s4pred?.pC || [];
-                            const maxLen = Math.max(pH.length, pE.length, pC.length);
-                            return Array.from({ length: maxLen }, (_, i) => ({
-                              x: i + 1,
-                              "P(Helix)": pH[i] ?? null,
-                              "P(Beta)": pE[i] ?? null,
-                              "P(Coil)": pC[i] ?? null,
-                            }));
-                          })()}
-                        >
-                          <CartesianGrid strokeDasharray="3 3" />
-                          <XAxis dataKey="x" tickCount={10} />
-                          <YAxis domain={[0, 1]} label={{ value: "Probability", angle: -90, position: "insideLeft" }} />
-                          <Tooltip
-                            content={({ payload, label }) => {
-                              if (!payload?.length) return null;
-                              return (
-                                <div className="bg-background border border-border rounded p-2 text-xs space-y-1">
-                                  <p className="font-medium">Residue {label}</p>
-                                  {payload.map((e: any) => (
-                                    <p key={e.dataKey} style={{ color: e.color }}>
-                                      {e.name}: {typeof e.value === "number" ? e.value.toFixed(3) : e.value}
-                                    </p>
-                                  ))}
-                                </div>
-                              );
-                            }}
-                          />
-                          <Legend wrapperStyle={{ paddingTop: "4px" }} />
-                          <Line type="monotone" dataKey="P(Helix)" stroke="hsl(var(--helix))" dot={false} strokeWidth={2} />
-                          <Line type="monotone" dataKey="P(Beta)" stroke="hsl(var(--beta))" dot={false} strokeWidth={2} />
-                          <Line type="monotone" dataKey="P(Coil)" stroke="hsl(var(--muted-foreground))" dot={false} strokeWidth={1} strokeDasharray="3 3" />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <ChartExportButtons filename={`${p.id}-s4pred-probabilities`} />
-                  </div>
-
-                  {/* FF-Helix vs S4PRED context note */}
-                  {typeof p.s4predHelixPercent === "number" &&
-                   p.s4predHelixPercent < 5 &&
-                   typeof p.ffHelixPercent === "number" &&
-                   p.ffHelixPercent > 20 && (
-                    <p className="text-xs text-muted-foreground px-1 leading-relaxed">
-                      S4PRED finds no stable helix segments (requires 5+ residues with P(Helix) &ge; 0.5).
-                      FF-Helix ({p.ffHelixPercent.toFixed(0)}%) reflects intrinsic amino acid propensity, not predicted structure.
-                    </p>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+            <S4PredChart peptide={p} />
 
             {/* ── TANGO Aggregation Heatmap ── */}
             {p.tango?.agg && p.tango.agg.length > 0 && (
@@ -458,7 +352,7 @@ export default function QuickAnalyze() {
                 </p>
                 <p>
                   TANGO and S4PRED predictions show "N/A" if those tools are not installed on the server.
-                  Biochemical properties (charge, hydrophobicity, FF-Helix) are always computed.
+                  Biochemical properties (charge, hydrophobicity, hydrophobic moment) are always computed.
                 </p>
               </CardContent>
             </Card>

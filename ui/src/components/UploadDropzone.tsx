@@ -9,7 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useDatasetStore } from '@/stores/datasetStore';
 import { ParsedCSVData } from '@/types/peptide';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import * as XLSX from "xlsx";
 
 /** so we now should try to do the one sequence immideate results rq. */

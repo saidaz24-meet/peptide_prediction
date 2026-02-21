@@ -106,7 +106,7 @@ make test
 ### Backend Core
 | File | Purpose |
 |------|---------|
-| `backend/server.py` | Main orchestrator (~1500 LOC) |
+| `backend/server.py` | Compatibility shim (~15 LOC, deprecated) |
 | `backend/tango.py` | TANGO runner/parser (~1300 LOC) |
 | `backend/s4pred.py` | S4PRED runner/analyzer (~670 LOC) |
 | `backend/auxiliary.py` | FF-Helix + SSW helpers (~370 LOC) |

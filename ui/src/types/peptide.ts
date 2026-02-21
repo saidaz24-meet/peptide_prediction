@@ -190,6 +190,7 @@ export type DatasetStats = {
   s4predAvailable?: number;
   ffHelixAvailable?: number;
   sswAvailable?: number;
+  aggHotspotPercent?: number | null;
 };
 
 // ----- Raw CSV load shape -----

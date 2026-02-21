@@ -107,15 +107,32 @@ services/uniprot_pipeline.py — UniProt query execution
 
 ---
 
-## Phase C: Platform Scale (1–2 years)
+## Phase C: Platform Scale — DESY Kubernetes (confirmed long-term)
+
+DESY will provide managed K8s cluster access (confirmed 2026-02-22). Details pending:
+- Namespace allocation, resource quotas
+- Ingress Controller type (likely nginx-ingress — DESY will confirm)
+- Container registry access (GHCR pull OK, or DESY-internal registry)
+- Persistent volume provisioner (for DuckDB/PostgreSQL data)
+
+**Key insight**: In K8s, PVL's Caddy and nginx configs are NOT used. The cluster's Ingress Controller
+handles TLS termination and routing. PVL just needs Deployment, Service, and Ingress manifests.
+Docker images are already K8s-ready (OCI-compliant, healthchecks, resource limits, env-var config).
 
 ### C1. Proteome Precomputation
-**Effort**: 40h | **Blocked**: Needs K8s
+**Effort**: 40h | **Blocked**: Needs K8s namespace
 **What**: Precompute predictions for top 10 organisms (~10% of UniProt) via K8s CronJobs → Parquet → DuckDB. Enables millisecond queries for common proteins.
 
-### C2. Kubernetes Deployment
-**Effort**: 24h | **Blocked**: Needs DESY K8s access
-**What**: Helm chart with backend, Celery workers, Redis, Caddy ingress. Horizontal scaling.
+### C2. Kubernetes Deployment (Helm Chart)
+**Effort**: 24h | **Blocked**: Needs DESY K8s cluster details (namespace, Ingress Controller, quotas)
+**What**: Helm chart with:
+- **Deployment**: backend (N replicas), frontend (static assets via nginx sidecar or init container)
+- **Service**: ClusterIP for backend + frontend
+- **Ingress**: Routes `pvl.desy.de/api/*` → backend, `pvl.desy.de/*` → frontend. TLS via cert-manager (cluster-level).
+- **ConfigMap/Secret**: env vars (same as current `.env`)
+- **PersistentVolumeClaim**: for S4PRED weights + TANGO binary (ReadOnlyMany)
+- Optional: Celery workers + Redis for async batch processing
+**Note**: No Caddy in K8s. Ingress Controller replaces it entirely.
 
 ### C3. ESMFold/AlphaFold On-Demand Prediction
 **Effort**: 24h | **Blocked**: Needs GPU access
@@ -135,12 +152,14 @@ services/uniprot_pipeline.py — UniProt query execution
 
 | Item | Waiting For | Contact | Notes |
 |------|-------------|---------|-------|
-| TANGO Linux binary | Peleg | License + binary | macOS binary works locally, need Linux for VM |
 | Domain name | DESY IT | DNS assignment | Caddy config ready, just needs `DOMAIN=x.desy.de` |
 | VM SSH access | DESY IT | Access approval | DEPLOYMENT_SPEC.md ready (4-core/8GB Phase 1) |
+| K8s cluster details | DESY IT | Namespace, Ingress Controller, quotas, registry | Confirmed as long-term target (2026-02-22) |
 | GitLab migration | DESY IT | Repo creation | Mirror strategy documented |
-| K8s namespace | DESY IT | Cluster access | Phase C only, not urgent |
-| Peleg's FF-Helix changes | Peleg | Threshold values | May change FF-Helix scoring parameters |
+
+**Resolved**:
+- Peleg's thresholds/weights — verified 2026-02-18 via MD5 checksums and line-by-line code comparison that all S4PRED weights, model architecture, thresholds, Fauchere-Pliska scale, and biochemical constants exactly match Peleg's reference repo (`260120_Alpha_and_SSW_FF_Predictor`). No further input needed for scoring parameters.
+- TANGO Linux binary — received 2026-02-18. All 4 platform binaries installed in `tools/tango/bin/` with platform-aware auto-detection. Docker config updated to use `tango_linux_x86_64`.
 
 ---
 

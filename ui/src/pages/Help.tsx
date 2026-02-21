@@ -37,10 +37,10 @@ const metrics = [
   },
   {
     icon: Layers,
-    name: 'FF-Helix Percentage',
-    description: 'Fibril-forming helix propensity computed via a Chou-Fasman sliding-window algorithm (window=6, threshold=1.0). This is a sequence-based prediction, NOT an experimental measurement from circular dichroism (CD).',
-    interpretation: 'Higher values indicate greater sequence propensity for alpha-helical structure. A 100% score means every 6-residue window in the sequence exceeds the Chou-Fasman helix propensity threshold. Do not compare directly with experimental CD helicity values, which measure actual folded structure in solution.',
-    color: 'text-helix',
+    name: 'FF-Helix % (Fibril-Forming Helix Propensity)',
+    description: 'Percentage of residues in sliding windows (6 residues) with mean Fauchere-Pliska helix propensity above threshold (1.0). This is a sequence-based propensity score, NOT a prediction of actual helical content.',
+    interpretation: '0% = no 6-residue window exceeds the propensity threshold. 100% = all residues participate in qualifying windows. Do NOT compare to CD spectroscopy values (which measure environment-dependent helicity of 15-50% in membranes). FF-Helix measures intrinsic amino acid tendency only.',
+    color: 'text-purple-600',
   },
   {
     icon: BarChart3,
@@ -238,19 +238,24 @@ export default function Help() {
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="space-y-2">
-                <h4 className="font-medium">FF-Helix % vs Experimental Helicity</h4>
+                <h4 className="font-medium">FF-Helix % vs S4PRED Helix %</h4>
                 <p className="text-sm text-muted-foreground">
-                  The FF-Helix percentage reported by PVL is a <strong className="text-foreground">Chou-Fasman propensity score</strong>, not
-                  an experimental circular dichroism (CD) measurement. It uses a sliding-window approach
-                  (window size = 6 residues) with the Chou-Fasman helix propensity scale. A residue is
-                  classified as "helix-forming" if the average propensity of its surrounding window exceeds
-                  a threshold of 1.0. The percentage reflects how many positions in the sequence are predicted
-                  helix-forming by this criterion.
+                  PVL reports two helix-related metrics that measure different things:
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Experimental CD helicity values measure actual folded structure in solution and depend on
-                  buffer conditions, temperature, and peptide concentration. These are typically lower than
-                  sequence-based predictions for most peptides.
+                  <strong className="text-foreground">S4PRED Helix %</strong> is the primary helix prediction.
+                  A modern neural network (5-model ensemble) predicts per-residue helix, beta-sheet,
+                  and coil probabilities considering the full sequence context. Helix segments require &ge;5 consecutive
+                  residues with P(Helix) &ge; 0.5.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong className="text-foreground">FF-Helix %</strong> (Fibril-Forming Helix Propensity) is a
+                  context-free scoring method using the Fauchere-Pliska helix propensity scale with a 6-residue
+                  sliding window. It measures the intrinsic amino acid tendency to form helices, ignoring sequence
+                  context and environment. A value of 0% means no window exceeds the threshold; 100% means all
+                  residues participate in qualifying windows. These values should <strong className="text-foreground">not</strong> be
+                  compared to experimental CD spectroscopy measurements (which report environment-dependent helicity,
+                  typically 15-50% in membrane environments).
                 </p>
               </div>
               <Separator />

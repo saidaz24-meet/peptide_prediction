@@ -1,6 +1,6 @@
 # Known Issues — Prioritized Backlog
 
-**Last Updated**: 2026-02-07
+**Last Updated**: 2026-02-16
 
 ## Priority Definitions
 
@@ -27,6 +27,12 @@
 | ISSUE-009 | **P1** | Simplify tango.py (1527 → 1306 lines) | `backend/tango.py` | MEDIUM | — | ✅ DONE |
 | ISSUE-010 | **P1** | Simplify auxiliary.py (540 → 377 lines) | `backend/auxiliary.py` | LOW | — | ✅ DONE |
 | ISSUE-011 | **P2** | Optimize Docker image (3GB → <1GB) | `docker/Dockerfile.*` | LOW | — | ✅ DONE (CPU-only torch + split deps) |
+| ISSUE-012 | **P2** | Data table filter button is decorative | `ui/src/components/PeptideTable.tsx` | LOW | — | ✅ FIXED |
+| ISSUE-013 | **P1** | normalize.py blanket -1.0 conversion | `backend/services/normalize.py` | MEDIUM | — | ✅ FIXED |
+| ISSUE-014 | **P1** | JS \|\| vs ?? for numeric 0 | `ui/src/lib/peptideMapper.ts` | MEDIUM | — | ✅ FIXED |
+| ISSUE-015 | **P1** | SSW self-referential threshold | `backend/tango.py`, `backend/s4pred.py` | MEDIUM | — | ✅ FIXED |
+| ISSUE-016 | **P1** | S4PRED availability check case sensitivity | `backend/server.py` | HIGH | — | ✅ FIXED |
+| ISSUE-017 | **P1** | Non-standard amino acid crashes | `backend/biochem_calculation.py` | MEDIUM | `test_nonstandard_aa.py` | ✅ FIXED |
 
 ---
 
@@ -142,6 +148,87 @@ cd ui && npm run build  # Should succeed
 # P1 — Incorrect Results
 
 _No open P1 issues._
+
+---
+
+## ISSUE-013: normalize.py blanket -1.0 conversion broke charge = -1.0
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P1 |
+| **Status** | **FIXED** (2026-02-13) |
+| **Blast Radius** | MEDIUM |
+| **Root Module** | `backend/services/normalize.py` |
+
+### Fix Applied
+- `_sanitize_for_json()` was converting ALL float `-1.0` to `None` — broke legitimate `charge = -1.0`
+- Removed blanket conversion. Field-specific `-1 → null` already handled by `_convert_fake_defaults_to_null()`
+- **Rule**: Never use blanket sentinel conversion. Always use field-specific logic.
+
+---
+
+## ISSUE-014: JS `||` vs `??` for numeric 0 in peptideMapper.ts
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P1 |
+| **Status** | **FIXED** (2026-02-13) |
+| **Blast Radius** | MEDIUM |
+| **Root Module** | `ui/src/lib/peptideMapper.ts` |
+
+### Fix Applied
+- Used `||` for `ffHelixPercent` fallback — JS treats `0` as falsy, so `ffHelixPercent: 0` was lost (showed "–")
+- Changed to `??` (nullish coalescing) — only treats null/undefined as missing
+- **Rule**: ALWAYS use `??` for numeric fallback chains in TypeScript.
+
+---
+
+## ISSUE-015: SSW self-referential threshold for single peptide
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P1 |
+| **Status** | **FIXED** (2026-02-13) |
+| **Blast Radius** | MEDIUM |
+| **Root Module** | `backend/tango.py`, `backend/s4pred.py` |
+
+### Fix Applied
+- Single peptide: SSW threshold = mean([x]) = x, so x < x always False → always returned -1
+- Both `tango.py:filter_by_avg_diff()` and `s4pred.py:filter_by_s4pred_diff()` now use fallback_threshold (0.0) when len(valid_diffs) <= 1
+- Also fixed: `predict_service.py` SSW hit detection used `!= -1` (wrong for None), now uses `notna()` check
+- Also fixed: `health.py` missing `import time`
+
+---
+
+## ISSUE-016: S4PRED availability check case sensitivity
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P1 |
+| **Status** | **FIXED** (2026-02-13) |
+| **Blast Radius** | HIGH |
+| **Root Module** | `backend/server.py` |
+
+### Fix Applied
+- S4PRED availability check compared uppercase vs lowercase status strings, always returned 0
+- Fixed string comparison to be case-consistent
+
+---
+
+## ISSUE-017: Non-standard amino acid crashes (X, O, J)
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P1 |
+| **Status** | **FIXED** (2026-02-13) |
+| **Blast Radius** | MEDIUM |
+| **Root Module** | `backend/biochem_calculation.py`, `backend/auxiliary.py` |
+
+### Fix Applied
+- Hydrophobicity raised `KeyError` on non-standard amino acids (X, O, J)
+- Hydrophobic moment raised `TypeError` (None * float) on unknown residues
+- Added O→K (pyrrolysine) and J→L (Leu/Ile) to `get_corrected_sequence()`
+- 21 new tests added for non-standard amino acid handling
 
 ---
 

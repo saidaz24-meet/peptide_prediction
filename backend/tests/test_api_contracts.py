@@ -8,7 +8,7 @@ Run from backend/ directory:
     python -m pytest tests/test_api_contracts.py -v
 
 Or with environment variables to disable providers:
-    USE_TANGO=0 USE_PSIPRED=0 python -m pytest tests/test_api_contracts.py -v
+    USE_TANGO=0 USE_S4PRED=0 python -m pytest tests/test_api_contracts.py -v
 """
 import os
 import pytest
@@ -16,9 +16,9 @@ from fastapi.testclient import TestClient
 from api.main import app
 
 # Disable providers for fast tests (set env vars before importing server)
-# This prevents tests from trying to run TANGO/PSIPRED which may not be available
+# This prevents tests from trying to run TANGO/S4PRED which may not be available
 os.environ.setdefault("USE_TANGO", "0")
-os.environ.setdefault("USE_PSIPRED", "0")
+os.environ.setdefault("USE_S4PRED", "0")
 
 client = TestClient(app)
 

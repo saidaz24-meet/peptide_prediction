@@ -236,6 +236,14 @@ export const useDatasetStore = create<DatasetState>()(
           return true;
         }).length;
 
+        // Aggregation hotspot count (tangoAggMax > 5%)
+        const aggHotspots = !tangoUnavailable
+          ? peptides.filter(p => typeof p.tangoAggMax === 'number' && p.tangoAggMax > 5).length
+          : 0;
+        const aggHotspotPercent = !tangoUnavailable && peptides.length > 0
+          ? (aggHotspots / peptides.length) * 100
+          : null;
+
         const stats: DatasetStats = {
           totalPeptides,
           sswPositivePercent,
@@ -249,6 +257,7 @@ export const useDatasetStore = create<DatasetState>()(
           s4predAvailable,
           ffHelixAvailable,
           sswAvailable,
+          aggHotspotPercent,
         };
 
         // Regression check: verify table positives match stats positives

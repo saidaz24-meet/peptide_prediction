@@ -12,11 +12,14 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   Legend,
+  ReferenceLine,
 } from 'recharts';
 import { ChartExportButtons } from '@/components/ChartExportButtons';
 
@@ -25,6 +28,7 @@ interface AggregationHeatmapProps {
   aggCurve: number[];
   betaCurve?: number[];
   helixCurve?: number[];
+  s4predBetaCurve?: number[];
   peptideId: string;
 }
 
@@ -33,9 +37,11 @@ export function AggregationHeatmap({
   aggCurve,
   betaCurve,
   helixCurve,
+  s4predBetaCurve,
   peptideId,
 }: AggregationHeatmapProps) {
   const [showAll, setShowAll] = useState(false);
+  const [showOverlay, setShowOverlay] = useState(false);
 
   const data = useMemo(() => {
     return aggCurve.map((agg, i) => ({
@@ -149,14 +155,82 @@ export function AggregationHeatmap({
         </div>
       ) : null}
 
-      {(betaCurve?.length || helixCurve?.length) ? (
-        <button
-          onClick={() => setShowAll(!showAll)}
-          className="text-xs text-muted-foreground hover:text-foreground underline"
-        >
-          {showAll ? 'Hide Beta & Helix curves' : 'Show Beta & Helix curves'}
-        </button>
-      ) : null}
+      {/* Toggle links */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {(betaCurve?.length || helixCurve?.length) ? (
+          <button
+            onClick={() => setShowAll(!showAll)}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            {showAll ? 'Hide Beta & Helix curves' : 'Show Beta & Helix curves'}
+          </button>
+        ) : null}
+        {(betaCurve?.length || s4predBetaCurve?.length) ? (
+          <button
+            onClick={() => setShowOverlay(!showOverlay)}
+            className="text-xs text-muted-foreground hover:text-foreground underline"
+          >
+            {showOverlay ? 'Hide Aggregation–Structure Overlay' : 'Show Aggregation–Structure Overlay'}
+          </button>
+        ) : null}
+      </div>
+
+      {/* Aggregation–Structure Overlay (rendered outside toggle row) */}
+      {showOverlay && (betaCurve?.length || s4predBetaCurve?.length) && (
+        <div className="space-y-2" data-chart-export>
+          <h3 className="text-sm font-semibold">Aggregation–Structure Overlay</h3>
+          <p className="text-xs text-muted-foreground">
+            Regions where aggregation (red) and beta propensity (blue/cyan) overlap suggest amyloid-forming stretches.
+          </p>
+          <div className="h-52">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart
+                data={aggCurve.map((agg, i) => ({
+                  pos: i + 1,
+                  aa: sequence[i] || '?',
+                  Aggregation: agg,
+                  'TANGO Beta': betaCurve?.[i] ?? null,
+                  'S4PRED P(β)': s4predBetaCurve?.[i] != null ? (s4predBetaCurve[i] * 100) : null,
+                }))}
+                margin={{ top: 10, right: 20, bottom: 20, left: 20 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis
+                  dataKey="pos"
+                  tickCount={Math.min(aggCurve.length, 20)}
+                  tick={{ fontSize: 10 }}
+                  label={{ value: 'Residue position', position: 'insideBottom', offset: -2, fontSize: 11 }}
+                />
+                <YAxis tick={{ fontSize: 10 }} label={{ value: 'Score (%)', angle: -90, position: 'insideLeft', fontSize: 11 }} />
+                <ReferenceLine y={5} stroke="#eab308" strokeDasharray="6 3" label={{ value: '5%', position: 'right', fontSize: 9, fill: '#eab308' }} />
+                <Tooltip
+                  content={({ payload, label }) => {
+                    if (!payload?.length) return null;
+                    const d = payload[0]?.payload;
+                    return (
+                      <div className="bg-background border border-border rounded p-2 text-xs space-y-1">
+                        <p className="font-medium">Residue {label}: {d?.aa}</p>
+                        {payload.map((entry: any) => (
+                          entry.value != null && (
+                            <p key={entry.dataKey} style={{ color: entry.color }}>
+                              {entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(1) : entry.value}%
+                            </p>
+                          )
+                        ))}
+                      </div>
+                    );
+                  }}
+                />
+                <Legend />
+                <Line type="monotone" dataKey="Aggregation" stroke="#ef4444" strokeWidth={2} dot={false} />
+                {betaCurve?.length && <Line type="monotone" dataKey="TANGO Beta" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />}
+                {s4predBetaCurve?.length && <Line type="monotone" dataKey="S4PRED P(β)" stroke="#06b6d4" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />}
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <ChartExportButtons filename={`${peptideId}-agg-structure-overlay`} />
+        </div>
+      )}
 
       <div className="text-xs text-muted-foreground">
         TANGO predicts aggregation propensity per residue. Scores &gt;5% indicate aggregation-prone regions. High peaks suggest amyloid-forming stretches.

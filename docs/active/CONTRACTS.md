@@ -1,6 +1,6 @@
 # API Contracts
 
-**Last Updated**: 2026-02-05
+**Last Updated**: 2026-02-16
 **Purpose**: Exact request/response shapes for all API endpoints.
 
 ---
@@ -317,12 +317,14 @@ The `sswPrediction` field indicates structural switch propensity:
       "parsed_bad": 0
     }
   },
-  "psipred": {
-    "status": "unavailable",
-    "reason": "Docker not configured"
-  },
-  "jpred": {
-    "status": "not_configured"
+  "s4pred": {
+    "status": "available",
+    "reason": null,
+    "stats": {
+      "requested": 150,
+      "parsed_ok": 150,
+      "parsed_bad": 0
+    }
   },
   "run_dirs": {
     "tango": "/path/to/latest/run"

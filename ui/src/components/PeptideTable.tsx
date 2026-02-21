@@ -32,9 +32,23 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { Peptide } from '@/types/peptide';
-import { toast } from 'react-hot-toast';
+import { toast } from 'sonner';
 import { TangoBadge } from '@/components/TangoBadge';
 import { S4PredBadge } from '@/components/S4PredBadge';
+
+/** Compute S4PRED composition summary for hover preview. Returns null if no data. */
+function getS4PredComposition(p: Peptide): string | null {
+  const pH = p.s4pred?.pH;
+  const pE = p.s4pred?.pE;
+  const pC = p.s4pred?.pC;
+  if (!pH?.length && !pE?.length) return null;
+  const n = Math.max(pH?.length ?? 0, pE?.length ?? 0, pC?.length ?? 0);
+  if (n === 0) return null;
+  const meanH = ((pH?.reduce((a, b) => a + b, 0) ?? 0) / n) * 100;
+  const meanE = ((pE?.reduce((a, b) => a + b, 0) ?? 0) / n) * 100;
+  const meanC = ((pC?.reduce((a, b) => a + b, 0) ?? 0) / n) * 100;
+  return `${meanH.toFixed(0)}% Helix · ${meanE.toFixed(0)}% Beta · ${meanC.toFixed(0)}% Coil`;
+}
 
 /** Compact info-icon tooltip for column headers */
 function HeaderTip({ tip }: { tip: string }) {
@@ -127,6 +141,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     species: false,            // Secondary info — available via detail view
     s4predSswPrediction: false, // S4PRED SSW is secondary to TANGO SSW
+    ffHelixPercent: false,     // Chou-Fasman propensity — demoted to advanced (S4PRED Helix is primary)
   });
   const navigate = useNavigate();
 
@@ -324,7 +339,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             S4PRED Helix %
-            <HeaderTip tip="Neural network helix prediction (context-dependent). Requires ≥5 consecutive residues with P(Helix)≥0.5. Short peptides often show 0% even with high FF-Helix." />
+            <HeaderTip tip="Neural network helix prediction (context-dependent). Requires ≥5 consecutive residues with P(Helix)≥0.5." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -340,8 +355,8 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
       columnHelper.accessor('ffHelixPercent', {
         header: () => (
           <span className="flex items-center">
-            FF-Helix %
-            <HeaderTip tip="Force-field helix propensity — intrinsic amino acid tendency to form helices (context-free). Does NOT consider sequence neighbors. Can be high while S4PRED is low for short peptides." />
+            CF Propensity %
+            <HeaderTip tip="Chou-Fasman (1978) helix propensity — context-free amino acid tendency to form helices. Not comparable to S4PRED or experimental CD measurements." />
           </span>
         ),
         cell: (info) => {
@@ -527,7 +542,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
                     sswPrediction: 'TANGO SSW',
                     s4predSswPrediction: 'S4PRED SSW',
                     s4predHelixPercent: 'S4PRED Helix %',
-                    ffHelixPercent: 'FF-Helix %',
+                    ffHelixPercent: 'CF Propensity %',
                     actions: 'Actions',
                   };
                   return (
@@ -598,7 +613,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
 
                 {/* FF-Helix Flag */}
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">FF-Helix Flag</label>
+                  <label className="text-xs text-muted-foreground">FF-Helix Flag (S4PRED-based)</label>
                   <Select
                     value={columnFilters.ffHelixFlag}
                     onValueChange={(v) => setColumnFilters(f => ({ ...f, ffHelixFlag: v as CategoricalFilterValue }))}
@@ -726,7 +741,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
 
                 {/* FF-Helix % */}
                 <div className="space-y-1">
-                  <label className="text-xs text-muted-foreground">FF-Helix %</label>
+                  <label className="text-xs text-muted-foreground">CF Propensity %</label>
                   <div className="flex gap-1">
                     <Input
                       type="number"
@@ -806,41 +821,56 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             ))}
           </TableHeader>
           <TableBody>
-            {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => {
-                const peptideId = row.original.id;
-                const isValid = peptideId && String(peptideId).trim().length > 0;
-                return (
-                  <TableRow
-                    key={row.id}
-                    className={isValid ? "cursor-pointer hover:bg-muted/50" : "opacity-50 cursor-not-allowed"}
-                    onClick={() => {
-                      if (isValid) {
-                        navigate(`/peptides/${peptideId}`);
-                      }
-                    }}
+            <TooltipProvider delayDuration={400}>
+              {table.getRowModel().rows?.length ? (
+                table.getRowModel().rows.map((row) => {
+                  const p = row.original;
+                  const isValid = p.id && String(p.id).trim().length > 0;
+                  const composition = getS4PredComposition(p);
+
+                  return (
+                    <UITooltip key={row.id}>
+                      <TooltipTrigger asChild>
+                        <TableRow
+                          className={isValid ? "cursor-pointer hover:bg-muted/50" : "opacity-50 cursor-not-allowed"}
+                          onClick={() => {
+                            if (isValid) {
+                              navigate(`/peptides/${p.id}`);
+                            }
+                          }}
+                        >
+                          {row.getVisibleCells().map((cell) => (
+                            <TableCell key={cell.id}>
+                              {flexRender(
+                                cell.column.columnDef.cell,
+                                cell.getContext()
+                              )}
+                            </TableCell>
+                          ))}
+                        </TableRow>
+                      </TooltipTrigger>
+                      {composition && (
+                        <TooltipContent side="top" align="start" className="max-w-xs">
+                          <div className="space-y-0.5 text-xs">
+                            <p className="font-medium">{p.id} ({p.length ?? '?'} aa)</p>
+                            <p>S4PRED: {composition}</p>
+                          </div>
+                        </TooltipContent>
+                      )}
+                    </UITooltip>
+                  );
+                })
+              ) : (
+                <TableRow>
+                  <TableCell
+                    colSpan={columns.length}
+                    className="h-24 text-center"
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <TableCell key={cell.id}>
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext()
-                        )}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                );
-              })
-            ) : (
-              <TableRow>
-                <TableCell
-                  colSpan={columns.length}
-                  className="h-24 text-center"
-                >
-                  No results.
-                </TableCell>
-              </TableRow>
-            )}
+                    No results.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TooltipProvider>
           </TableBody>
         </Table>
       </div>

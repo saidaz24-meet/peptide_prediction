@@ -2,7 +2,6 @@
 Health check and dependency status endpoints.
 """
 import os
-import shutil
 import time
 from typing import Any, Dict
 from fastapi import APIRouter, HTTPException
@@ -27,25 +26,14 @@ def _check_tango_availability() -> Dict[str, Any]:
     # Import here to avoid circular imports
     import tango as tango_module
 
-    # Check binary path
-    bin_path = os.path.join(tango_module.TANGO_DIR, "bin", "tango")
-    tango_bin_env = os.getenv("TANGO_BIN")
+    # Use centralized platform-aware resolver
+    bin_path = tango_module._resolve_tango_bin()
 
-    if tango_bin_env and os.path.exists(tango_bin_env):
-        bin_path = tango_bin_env
-    elif not os.path.exists(bin_path):
-        which_path = shutil.which("tango")
-        if which_path:
-            bin_path = which_path
-        else:
-            result["reason"] = f"TANGO binary not found (checked {bin_path} and PATH)"
-            return result
+    if not bin_path:
+        result["reason"] = "TANGO binary not found (checked TANGO_BINARY_PATH, tools/tango/bin/, backend/Tango/bin/, and PATH)"
+        return result
 
     result["path"] = os.path.abspath(bin_path)
-
-    if not os.path.exists(bin_path):
-        result["reason"] = f"TANGO binary not found at {bin_path}"
-        return result
 
     if not os.access(bin_path, os.X_OK):
         result["reason"] = f"TANGO binary not executable at {bin_path}"
@@ -206,7 +194,7 @@ async def health_dependencies(check_uniprot: bool = False):
     if not tango_status["available"] and settings.USE_TANGO:
         issues.append({
             "provider": "tango",
-            "fix": "Place TANGO binary at backend/Tango/bin/tango or set TANGO_BIN env var"
+            "fix": "Place platform binary in tools/tango/bin/ or set TANGO_BINARY_PATH env var"
         })
     if not s4pred_status["available"] and settings.USE_S4PRED:
         issues.append({

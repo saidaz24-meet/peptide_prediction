@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { TrendingUp, Users, Zap, BarChart3, Dna } from 'lucide-react';
+import { TrendingUp, Users, Zap, BarChart3 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { DatasetStats, DatasetMetadata } from '@/types/peptide';
 import { useNavigate } from 'react-router-dom';
@@ -88,36 +88,24 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
       onClick: () => navigate('/metrics/hydrophobicity'),
     },
     {
-      title: 'Avg FF-Helix',
-      value: ffAvailable && stats.meanFFHelixPercent !== null
-        ? `${stats.meanFFHelixPercent.toFixed(1)}%`
+      title: 'Agg Hotspots',
+      value: tangoAvailable && stats.aggHotspotPercent != null
+        ? `${stats.aggHotspotPercent.toFixed(0)}%`
         : 'N/A',
       icon: BarChart3,
-      color: 'text-helix',
-      bgColor: 'bg-helix/10',
-      metricId: 'ff-helix' as MetricId,
-      onClick: () => navigate('/metrics/ff-helix'),
-      subtitle: 'intrinsic propensity',
-    },
-    {
-      title: 'Avg S4PRED Helix',
-      value: s4predAvailable && stats.meanS4predHelixPercent !== null
-        ? `${stats.meanS4predHelixPercent.toFixed(1)}%`
-        : 'N/A',
-      icon: Dna,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-600/10',
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-600/10',
       metricId: null as MetricId | null,
       onClick: () => {},
-      subtitle: 'context-dependent',
-      tooltip: !s4predAvailable
-        ? 'S4PRED did not run or is unavailable'
-        : undefined,
+      subtitle: 'TANGO Agg Max > 5%',
+      tooltip: !tangoAvailable
+        ? 'TANGO did not run or is unavailable'
+        : 'Percentage of peptides with peak TANGO aggregation score above 5%',
     },
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {kpis.map((kpi, index) => {
         const Icon = kpi.icon;
         return (

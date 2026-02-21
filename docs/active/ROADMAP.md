@@ -1,6 +1,6 @@
 # Peptide Visual Lab (PVL) - Development Roadmap
 
-**Last Updated**: 2026-02-13
+**Last Updated**: 2026-02-22
 **Status**: Active Development (pre-paper, deployment-ready)
 **Branch**: `ref-impl-replacement`
 
@@ -11,7 +11,7 @@
 PVL occupies a unique niche: the **only web tool** combining aggregation propensity (TANGO), secondary structure prediction (S4PRED), fibril-forming helix detection (FF-Helix), and SSW prediction with interactive visualizations. Nearest competitors (PASTA 2.0, Waltz, AGGRESCAN) are single-algorithm, non-visual, or offline-only.
 
 **Open source path**: MIT license → CITATION.cff (done) → Zenodo DOI → bio.tools → JOSS paper
-**Deployment path**: VM (current target) → VM + Queue → K8s (long-term)
+**Deployment path**: DESY VM + Docker Compose (now) → DESY Kubernetes (confirmed long-term, awaiting cluster details)
 
 ---
 
@@ -41,16 +41,19 @@ PVL occupies a unique niche: the **only web tool** combining aggregation propens
 - Tightened CORS (explicit methods + headers)
 - DEPLOYMENT_SPEC.md (Phase 1: 4-core/8GB, Phase 2: 8-core/16GB)
 - PSIPRED/JPred fully removed from active codebase
-- 214 passing tests (all deterministic, no network)
+- 235 passing tests (all deterministic, no network)
 
 ### Waiting for DESY Team
 | Item | Contact | Notes |
 |------|---------|-------|
-| TANGO Linux binary | Peleg | License + binary (macOS works locally) |
 | Domain name | DESY IT | Caddy config ready, just needs `DOMAIN=x.desy.de` |
 | VM SSH access | DESY IT | DEPLOYMENT_SPEC.md ready |
+| K8s cluster details | DESY IT | Namespace, Ingress Controller type, registry, resource quotas |
 | GitLab migration | DESY IT | Mirror strategy documented |
-| Peleg's FF-Helix changes | Peleg | May change scoring parameters |
+
+**Resolved**:
+- Peleg's thresholds/weights — verified 2026-02-18 via MD5 checksums and line-by-line code comparison that all S4PRED weights, model architecture, thresholds, Fauchere-Pliska scale, and biochemical constants exactly match Peleg's reference repo (`260120_Alpha_and_SSW_FF_Predictor`). No further input needed for scoring parameters.
+- TANGO Linux binary — received 2026-02-18. All 4 platform binaries (macOS x86_64, Linux x86_64, Linux i386, Windows x86) installed in `tools/tango/bin/` with platform-aware auto-detection via `_resolve_tango_bin()`. Docker config updated to use `tango_linux_x86_64`.
 
 ---
 
@@ -76,19 +79,23 @@ Items that can be done independently, no DESY input needed.
 | B2 | Cohort comparison dashboard | 16h | DONE (overlay charts + delta table) |
 | B3 | Plotly.js scientific charts | 12h | Heatmaps, 3D scatter (alongside Recharts) |
 | B4 | AlphaFold DB integration + Mol* viewer | 16h | DONE (iframe viewer, pLDDT metrics) |
-| B5 | server.py refactor (~1500 → ~500 lines) | 16h | High risk, needs test coverage first |
+| B5 | server.py refactor (~1293 → 15 lines) | 16h | DONE (extracted to services/, broke circular import, fixed dup S4PRED bug) |
 | B6 | DuckDB result cache | 12h | Persist results across restarts |
 | B7 | Progressive disclosure (Simple/Advanced) | 8h | DONE (3-tab layout) |
 | B8 | Ranked shortlist PDF report | 8h | DONE (data-driven PDF) |
 
 ---
 
-## Phase C: Platform Scale (1-2 years)
+## Phase C: Platform Scale — DESY Kubernetes (confirmed long-term)
+
+DESY will provide K8s cluster access. Details (namespace, Ingress Controller, quotas) pending.
+Docker images are already K8s-ready (OCI-compliant, healthchecks, resource limits, env-var config).
+In K8s, PVL's Caddy/nginx configs are replaced by the cluster's Ingress Controller + cert-manager.
 
 | ID | Task | Effort | Blocked By |
 |----|------|--------|------------|
 | C1 | Proteome precomputation (top 10 organisms) | 40h | K8s access |
-| C2 | Kubernetes deployment (Helm chart) | 24h | K8s namespace |
+| C2 | Kubernetes deployment (Helm chart + manifests) | 24h | K8s namespace + Ingress Controller details from DESY |
 | C3 | ESMFold/AlphaFold on-demand prediction | 24h | GPU access |
 | C4 | Plugin architecture (provider interface) | 16h | — |
 | C5 | Mol* 3D full integration (MolViewSpec) | 20h | — |
@@ -195,13 +202,24 @@ Items that can be done independently, no DESY input needed.
 - [x] Add Zustand persist version migration (v1→v2)
 - [x] Add localStorage QuotaExceededError handling (graceful curve-stripping fallback)
 
+### Sprint 1: Documentation & Cleanup (Feb 16)
+- [x] README overhaul (removed JPred/PSIPRED/Firebase/Cloudflare references, accurate feature list, Docker-only quick start)
+- [x] Stale docs cleanup: deleted DOCKER_RUNBOOK.md (superseded by DEPLOYMENT_GUIDE), updated 9 docs (ACTIVE_CONTEXT, TESTING_GUIDE, CONTRACTS, KNOWN_ISSUES, MASTER_GUIDE, MEETING_WALKTHROUGH, DEVELOPER_REFERENCE, SYSTEM_OVERVIEW, ROADMAP)
+- [x] Toast consolidation: kept Sonner, removed react-hot-toast + shadcn/radix toast (7 files edited, 4 dead files deleted, 2 packages removed)
+- [x] QuickAnalyze ↔ Batch navigation: back-to-results link, landing page CTA, Results→Quick link
+- [x] FF-Helix demotion: removed from KPI cards/badges, S4PRED promoted to primary helix metric, Chou-Fasman renamed and hidden by default (17 files, scatter chart now uses S4PRED)
+- [x] S4PredChart extraction: deduplicated ~90-line S4PRED probability chart into reusable component (QuickAnalyze 466→364, PeptideDetail 598→504)
+- [x] Table hover preview: S4PRED composition tooltip on PeptideTable row hover ("X% Helix · Y% Beta · Z% Coil")
+- [x] Dead code fixes: removed duplicate S4PRED blocks in PeptideRadarChart (was rendering 2 Helix axes) and PositionBars (was showing 2 Helix bars)
+
 ---
 
 ## Architecture Constraints (Do Not Violate)
 
 | Constraint | Rule |
 |------------|------|
-| Cost | Free only. DESY K8s = yes. Supabase = no. |
+| Cost | Free only. DESY VM + K8s = yes. Supabase = no. |
+| Deployment | VM + Docker Compose (now). DESY K8s (long-term, confirmed). |
 | Database | DuckDB (near-term cache). Postgres (future, K8s). |
 | Predictors | S4PRED = primary. TANGO = secondary. PSIPRED = removed. |
 | Auth | Not needed (open source, public tool). |
@@ -215,7 +233,7 @@ Items that can be done independently, no DESY input needed.
 | ID | Issue | Priority | When to Fix |
 |----|-------|----------|-------------|
 | TD-01 | JPred column names in dataframe_utils.py, biochem.py | LOW | B5 refactor |
-| TD-02 | server.py ~1500 lines | MEDIUM | B5 (dedicated) |
+| TD-02 | ~~server.py ~1500 lines~~ | ~~MEDIUM~~ | DONE (1293→15 LOC, 2026-02-16) |
 | TD-03 | normalize.py duplicate fallback logic ~700 lines | MEDIUM | B5 (dedicated) |
 | TD-04 | canonical.py orphaned (462 LOC, unused) | LOW | Confirm + delete |
 | TD-05 | Global mutable state (provider_tracking) not thread-safe | MEDIUM | B1 (Celery) |
@@ -227,7 +245,10 @@ Items that can be done independently, no DESY input needed.
 ### Backend Core
 | File | Purpose | Lines |
 |------|---------|-------|
-| `backend/server.py` | Main orchestrator | ~1500 |
+| `backend/server.py` | Compatibility shim (deprecated) | ~15 |
+| `backend/services/uniprot_execute_service.py` | UniProt query execution | ~635 |
+| `backend/services/feedback_service.py` | Feedback + rate limiting | ~207 |
+| `backend/services/upload_service.py` | Upload processing pipeline | ~831 |
 | `backend/tango.py` | TANGO runner/parser | ~1300 |
 | `backend/s4pred.py` | S4PRED runner/analyzer | ~670 |
 | `backend/auxiliary.py` | FF-Helix + SSW helpers | ~370 |
@@ -271,12 +292,37 @@ Items that can be done independently, no DESY input needed.
 | 2026-02-01 | Null semantics: JSON null only | No sentinel values |
 | 2026-02-07 | CPU-only PyTorch in Docker | Saves ~1.8GB, no GPU needed |
 | 2026-02-07 | Caddy ready, nginx default | Switch when domain assigned |
-| 2026-02-11 | Reverse proxy: Caddy (auto-TLS) | No DESY preference stated |
+| 2026-02-11 | Reverse proxy: Caddy (auto-TLS) for VM | No DESY preference stated |
+| 2026-02-22 | K8s confirmed as long-term deployment | DESY will provide managed K8s cluster |
+| 2026-02-22 | K8s ingress: cluster-provided (not our nginx/Caddy) | PVL creates Ingress manifests, cluster handles TLS |
 | 2026-02-11 | No auth needed | Open source, public tool |
 | 2026-02-11 | GHCR for images (no Harbor) | DMZ VM can pull from GitHub |
 | 2026-02-12 | Helical wheel: pure React SVG | No npm libs exist; zero deps |
 | 2026-02-12 | HeliQuest color scheme | Publication standard for AMP |
 
 ---
+
+---
+
+## Documentation Structure
+
+All authoritative documentation is in `docs/active/`. Stale docs were deleted (2026-02-22).
+
+| File | Purpose |
+|------|---------|
+| `README.md` | Project overview, quick start, tech stack |
+| `README_EXPLAINER.md` | Non-technical A-Z team guide (the ONE guide for teaching the team) |
+| `CONTRIBUTING.md` | Contribution guidelines |
+| `CLAUDE.md` | AI agent instructions |
+| `docs/active/ACTIVE_CONTEXT.md` | Architecture overview, entry points, data flow |
+| `docs/active/CONTRACTS.md` | API endpoints, request/response shapes |
+| `docs/active/TESTING_GUIDE.md` | Test commands, test file inventory |
+| `docs/active/KNOWN_ISSUES.md` | Issue backlog (all 17 resolved) |
+| `docs/active/DEVELOPER_REFERENCE.md` | Deep technical reference (data pipeline, null semantics, debugging) |
+| `docs/active/MASTER_DEV_DOC.md` | Strategic decisions, security, cost, risk register |
+| `docs/active/ROADMAP.md` | This file — development roadmap |
+| `docs/active/DEPLOYMENT_GUIDE.md` | Step-by-step VM deployment + K8s plan |
+| `docs/active/DEPLOYMENT_SPEC.md` | VM sizing and resource analysis |
+| `docs/active/FUTURE_IMPLEMENTATIONS.md` | Detailed future features with effort estimates |
 
 *For detailed implementation notes on each future item, see `docs/active/FUTURE_IMPLEMENTATIONS.md`.*
