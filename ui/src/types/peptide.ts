@@ -82,7 +82,7 @@ export type Peptide = {
   ffHelixFragments?: Array<SegmentTuple> | Segment[];        // "FF Helix fragments"
 
   // FF flags (database-level binary classification from reference implementation)
-  // TODO: FF-Helix threshold parameters pending verification with Peleg before paper submission.
+  // Thresholds verified against Peleg's reference dataset (2026-02-26). Fallback: H=0.417, uH=0.388.
   ffHelixFlag?: number | null;    // 1 (candidate), -1 (not candidate), null (no data). S4PRED-based.
   ffHelixScore?: number | null;   // helix_uH + helix_score
   ffSswFlag?: number | null;      // 1 (candidate), -1 (not candidate), null (no data)
@@ -186,6 +186,10 @@ export type DatasetStats = {
 
   meanS4predHelixPercent: number | null; // null when no S4PRED data available
 
+  // FF candidate percentages
+  ffHelixCandidatePercent?: number | null; // % of peptides with ffHelixFlag === 1
+  ffSswCandidatePercent?: number | null;   // % of peptides with ffSswFlag === 1 (gated on TANGO)
+
   // availability counts for better UI display
   s4predAvailable?: number;
   ffHelixAvailable?: number;
@@ -255,7 +259,6 @@ export type DatasetMetadata = {
   thresholds?: {
     muHCutoff: number;
     hydroCutoff: number;
-    ffHelixPercentThreshold: number;
   };
   thresholdConfigRequested?: ThresholdConfig | null;
   thresholdConfigResolved?: ThresholdConfig | null;

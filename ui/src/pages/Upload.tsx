@@ -11,14 +11,16 @@ import { useDatasetStore } from "@/stores/datasetStore";
 import { uploadCSV } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import AppFooter from "@/components/AppFooter";
 import { UploadDropzone } from "@/components/UploadDropzone";
 import { UniProtQueryInput } from "@/components/UniProtQueryInput";
+import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 import { Search } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { ThresholdConfigPanel } from "@/components/ThresholdConfigPanel";
 import type { ThresholdConfig } from "@/types/peptide";
 
 const steps = [
@@ -57,14 +59,14 @@ export default function Upload() {
   const [customThresholds, setCustomThresholds] = useState({
     muHCutoff: 0.0,
     hydroCutoff: 0.0,
-    ffHelixPercentThreshold: 50.0,
+    aggThreshold: 5.0,
   });
 
   // preview QC banner
   const [qc, setQc] = useState<null | { rejectedCount: number; download: () => void }>(null);
 
   // store
-  const { rawData, isLoading, setRawPreview, ingestBackendRows, setLoading, setLastRun } = useDatasetStore();
+  const { rawData, isLoading, setRawPreview, ingestBackendRows, setLoading, setLastRun, setSourceFile } = useDatasetStore();
   const navigate = useNavigate();
   const progressPercent = ((currentStep + 1) / steps.length) * 100;
 
@@ -78,8 +80,57 @@ export default function Upload() {
     const isXLSX = name.endsWith(".xlsx") || name.endsWith(".xls");
 
     if (isXLSX) {
-      setRawPreview({ fileName: file.name, headers: [], rows: [], rowCount: 0 } as any);
-      setCurrentStep(1);
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const ws = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+          if (jsonData.length < 2) {
+            toast.error("Excel file has no data rows");
+            return;
+          }
+
+          const xlHeaders = (jsonData[0] as string[]).map(h => String(h ?? ""));
+          const xlRows = jsonData.slice(1, 201).map(row => {
+            const obj: Record<string, any> = {};
+            xlHeaders.forEach((h, i) => { obj[h] = row[i] ?? ""; });
+            return obj;
+          });
+
+          setRawPreview({
+            fileName: file.name,
+            headers: xlHeaders,
+            rows: xlRows,
+            rowCount: jsonData.length - 1,
+          } as any);
+
+          // QC check for invalid sequences
+          const pickSeq = (r: any) =>
+            r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
+          const allRows = jsonData.slice(1).map(row => {
+            const obj: Record<string, any> = {};
+            xlHeaders.forEach((h, i) => { obj[h] = row[i] ?? ""; });
+            return obj;
+          });
+          const rejected = allRows.filter(r => {
+            const seq = String(pickSeq(r));
+            return seq && !isValidSeq(seq);
+          });
+          if (rejected.length > 0) {
+            setQc({ rejectedCount: rejected.length, download: () => exportCsv("rejected_rows.csv", rejected) });
+          } else {
+            setQc(null);
+          }
+
+          setCurrentStep(1);
+        } catch (err: any) {
+          toast.error(`Failed to read Excel file: ${err?.message || err}`);
+        }
+      };
+      reader.readAsArrayBuffer(file);
       return;
     }
 
@@ -137,9 +188,10 @@ export default function Upload() {
         ...(thresholdMode === 'custom' && { custom: customThresholds }),
       };
       
-      // Store run input/config for reproduce
+      // Store run input/config for reproduce and recalculate
       setLastRun('upload', localFile, thresholdConfig);
-      
+      setSourceFile(localFile);
+
       const { rows, meta } = (await uploadCSV(localFile, thresholdConfig)) as any; // POST /api/upload-csv
       ingestBackendRows(rows, meta);
       navigate("/results");
@@ -310,6 +362,31 @@ export default function Upload() {
 
                       <DataPreview data={rawData} />
 
+                      {/* Sequence length summary */}
+                      {rawData.rows && rawData.rows.length > 0 && (() => {
+                        const pickSeq = (r: any) =>
+                          r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
+                        const lengths = rawData.rows.map(r => String(pickSeq(r)).length).filter(l => l > 0);
+                        const short = lengths.filter(l => l < 15).length;
+                        const optimal = lengths.filter(l => l >= 15 && l <= 100).length;
+                        const long = lengths.filter(l => l > 100).length;
+                        const hasWarnings = short > 0 || long > 0;
+                        if (!hasWarnings) return null;
+                        return (
+                          <Alert>
+                            <AlertTriangle className="h-4 w-4" />
+                            <AlertDescription>
+                              <div className="text-sm space-y-1">
+                                <p className="font-medium">Sequence length summary:</p>
+                                {short > 0 && <p>&lt;15 aa: {short} sequences (S4PRED may be unreliable)</p>}
+                                <p>15–100 aa: {optimal} sequences (optimal range)</p>
+                                {long > 0 && <p>&gt;100 aa: {long} sequences (TANGO accuracy may decrease)</p>}
+                              </div>
+                            </AlertDescription>
+                          </Alert>
+                        );
+                      })()}
+
                       {/* Auto-detected columns info */}
                       {rawData.headers && rawData.headers.length > 0 && (
                         <div className="bg-muted/50 rounded-lg p-4">
@@ -326,75 +403,17 @@ export default function Upload() {
                       )}
 
                       {/* Threshold Configuration (collapsed by default) */}
-                      <details className="border rounded-lg">
-                        <summary className="px-4 py-3 cursor-pointer text-sm font-medium hover:bg-muted/50">
-                          Advanced: Threshold Configuration
-                        </summary>
-                        <div className="px-4 pb-4 space-y-4">
-                          <div>
-                            <Label htmlFor="threshold-mode">Threshold Mode</Label>
-                            <Select value={thresholdMode} onValueChange={(v: 'default' | 'recommended' | 'custom') => setThresholdMode(v)}>
-                              <SelectTrigger id="threshold-mode" className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="default">Default</SelectItem>
-                                <SelectItem value="recommended">Recommended (computed from data)</SelectItem>
-                                <SelectItem value="custom">Custom</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {thresholdMode === 'default' && 'Use default threshold values'}
-                              {thresholdMode === 'recommended' && 'Compute thresholds from data using median'}
-                              {thresholdMode === 'custom' && 'Set custom threshold values'}
-                            </p>
-                          </div>
-
-                          {thresholdMode === 'custom' && (
-                            <div className="grid grid-cols-3 gap-4">
-                              <div>
-                                <Label htmlFor="muH-cutoff">μH Cutoff</Label>
-                                <input
-                                  id="muH-cutoff"
-                                  type="number"
-                                  step="0.1"
-                                  className="w-full mt-1 px-3 py-2 border rounded-md"
-                                  value={customThresholds.muHCutoff}
-                                  onChange={(e) => setCustomThresholds({ ...customThresholds, muHCutoff: parseFloat(e.target.value) || 0 })}
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor="hydro-cutoff">Hydrophobicity Cutoff</Label>
-                                <input
-                                  id="hydro-cutoff"
-                                  type="number"
-                                  step="0.1"
-                                  className="w-full mt-1 px-3 py-2 border rounded-md"
-                                  value={customThresholds.hydroCutoff}
-                                  onChange={(e) => setCustomThresholds({ ...customThresholds, hydroCutoff: parseFloat(e.target.value) || 0 })}
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor="ffHelix-threshold">CF Propensity % Threshold</Label>
-                                <input
-                                  id="ffHelix-threshold"
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  max="100"
-                                  className="w-full mt-1 px-3 py-2 border rounded-md"
-                                  value={customThresholds.ffHelixPercentThreshold}
-                                  onChange={(e) => setCustomThresholds({ ...customThresholds, ffHelixPercentThreshold: parseFloat(e.target.value) || 50 })}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </details>
+                      <ThresholdConfigPanel
+                        thresholdMode={thresholdMode}
+                        onModeChange={setThresholdMode}
+                        customThresholds={customThresholds}
+                        onCustomChange={setCustomThresholds}
+                        variant="details"
+                      />
                     </>
                   )}
 
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <Button variant="outline" onClick={() => setCurrentStep(0)}>
                       Back
                     </Button>
@@ -402,6 +421,10 @@ export default function Upload() {
                       {isAnalyzing ? "Analyzing…" : "Analyze Dataset"}
                     </Button>
                   </div>
+                  <AnalysisProgress
+                    isActive={isAnalyzing}
+                    peptideCount={rawData?.rowCount ?? rawData?.rows?.length ?? 0}
+                  />
                 </motion.div>
               )}
             </CardContent>

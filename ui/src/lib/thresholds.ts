@@ -5,11 +5,16 @@
  * filtering and ranking across Results and QuickAnalyze.
  */
 import type { Peptide } from '@/types/peptide';
+import { computeAggFlag, type AggFlagConfig, DEFAULT_AGG_CONFIG } from '@/lib/aggregationFlags';
 
 export type ResolvedThresholds = {
   muHCutoff: number;
   hydroCutoff: number;
-  ffHelixPercentThreshold: number;
+  aggThreshold: number;
+  // Smart aggregation flagging config
+  dangerousThreshold: number;
+  percentOfLengthCutoff: number;
+  minSswResidues: number;
 };
 
 /**
@@ -18,8 +23,21 @@ export type ResolvedThresholds = {
 export const DEFAULT_THRESHOLDS: ResolvedThresholds = {
   muHCutoff: 0.0,
   hydroCutoff: 0.0,
-  ffHelixPercentThreshold: 50.0,
+  aggThreshold: 5.0,
+  dangerousThreshold: 25.0,
+  percentOfLengthCutoff: 20.0,
+  minSswResidues: 3,
 };
+
+/** Extract AggFlagConfig from ResolvedThresholds */
+export function toAggConfig(t: ResolvedThresholds): AggFlagConfig {
+  return {
+    aggThreshold: t.aggThreshold,
+    dangerousThreshold: t.dangerousThreshold,
+    percentOfLengthCutoff: t.percentOfLengthCutoff,
+    minSswResidues: t.minSswResidues,
+  };
+}
 
 /**
  * Apply thresholds to a peptide and return view flags
@@ -46,20 +64,37 @@ export function applyThresholds(
 }
 
 /**
- * Check if FF-Helix percent meets threshold (for scoring)
- * 
- * @param peptide - Peptide to evaluate
- * @param thresholds - Resolved thresholds from meta.thresholds
- * @returns true if ffHelixPercent >= ffHelixPercentThreshold
+ * Compute classification summary counts for a set of peptides given thresholds.
+ *
+ * Used by ThresholdTuner to show impact counts when thresholds change.
  */
-export function meetsFFHelixThreshold(
-  peptide: Peptide,
+export function classificationSummary(
+  peptides: Peptide[],
   thresholds: ResolvedThresholds
-): boolean {
-  const ffHelixPercent = peptide.ffHelixPercent;
-  if (typeof ffHelixPercent !== 'number' || isNaN(ffHelixPercent)) {
-    return false;
+): {
+  ffHelixCandidates: number;
+  sswCandidates: number;
+  aggFlagged: number;
+  total: number;
+} {
+  let ffHelixCandidates = 0;
+  let sswCandidates = 0;
+  let aggFlagged = 0;
+
+  const aggConfig = toAggConfig(thresholds);
+
+  for (const p of peptides) {
+    const { ffHelixView, sswView } = applyThresholds(p, thresholds);
+    if (ffHelixView === 1) ffHelixCandidates++;
+    if (sswView === 1) sswCandidates++;
+    if (computeAggFlag(p, aggConfig).flagged) aggFlagged++;
   }
-  return ffHelixPercent >= thresholds.ffHelixPercentThreshold;
+
+  return {
+    ffHelixCandidates,
+    sswCandidates,
+    aggFlagged,
+    total: peptides.length,
+  };
 }
 

@@ -8,19 +8,23 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 import { predictOne as apiPredictOne } from "@/lib/api";
 import { mapApiRowToPeptide } from "@/lib/peptideMapper";
-import { Peptide } from "@/types/peptide";
+import { Peptide, ThresholdConfig } from "@/types/peptide";
+import { ThresholdConfigPanel } from "@/components/ThresholdConfigPanel";
 import { TangoBadge } from "@/components/TangoBadge";
 import { SequenceTrack } from "@/components/SequenceTrack";
 import { HelicalWheel } from "@/components/HelicalWheel";
 import { AggregationHeatmap } from "@/components/AggregationHeatmap";
 import { AlphaFoldViewer } from "@/components/AlphaFoldViewer";
 import { S4PredChart } from "@/components/S4PredChart";
+import { ConsensusCard } from "@/components/ConsensusCard";
 import { useDatasetStore } from "@/stores/datasetStore";
 
-async function predictSequence(sequence: string, entry?: string): Promise<Peptide> {
-  const response = await apiPredictOne(sequence, entry);
+async function predictSequence(sequence: string, entry?: string, thresholdConfig?: ThresholdConfig): Promise<Peptide> {
+  const response = await apiPredictOne(sequence, entry, thresholdConfig);
   return mapApiRowToPeptide(response.row, "/api/predict");
 }
 
@@ -78,6 +82,14 @@ export default function QuickAnalyze() {
   const [peptide, setPeptide] = useState<Peptide | null>(null);
   const navigate = useNavigate();
 
+  // Threshold configuration
+  const [thresholdMode, setThresholdMode] = useState<'default' | 'recommended' | 'custom'>('default');
+  const [customThresholds, setCustomThresholds] = useState({
+    muHCutoff: 0.0,
+    hydroCutoff: 0.0,
+    aggThreshold: 5.0,
+  });
+
   const [phase, setPhase] = useState<Phase>("idle");
   const [clickPos, setClickPos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
@@ -90,8 +102,15 @@ export default function QuickAnalyze() {
     setLoading(true);
     setPeptide(null);
     try {
-      const res = await predictSequence(sequence, entry);
+      const thresholdConfig: ThresholdConfig = {
+        mode: thresholdMode,
+        version: "1.0.0",
+        ...(thresholdMode === 'custom' && { custom: customThresholds }),
+      };
+      const res = await predictSequence(sequence, entry, thresholdConfig);
       setPeptide(res);
+      // Store source for recalculate
+      useDatasetStore.getState().setLastRun('predict', { sequence, entry }, thresholdConfig);
       toast.success("Prediction ready");
     } catch (err: any) {
       toast.error(err?.message || "Prediction failed");
@@ -183,6 +202,40 @@ export default function QuickAnalyze() {
                 </div>
               </div>
 
+              <ThresholdConfigPanel
+                thresholdMode={thresholdMode}
+                onModeChange={setThresholdMode}
+                customThresholds={customThresholds}
+                onCustomChange={setCustomThresholds}
+                variant="details"
+              />
+
+              {/* Sequence length warnings */}
+              {sequence.trim().length > 0 && sequence.trim().length < 5 && (
+                <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Sequences shorter than 5 aa cannot be analyzed by TANGO.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {sequence.trim().length >= 5 && sequence.trim().length < 15 && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Short sequences (&lt;15 aa) produce unreliable secondary structure predictions. Biochemical properties remain valid.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {sequence.trim().length > 100 && (
+                <Alert>
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    Long sequences (&gt;100 aa) may decrease TANGO prediction accuracy. S4PRED remains reliable.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="flex gap-3">
                 <Button type="submit" disabled={loading}>
                   {loading ? "Analyzing..." : "Analyze"}
@@ -234,6 +287,7 @@ export default function QuickAnalyze() {
                       sswPrediction={p.sswPrediction}
                       hasTangoData={p.tangoHasData ?? false}
                       showIcon
+                      sswContext={{ sswHelixPercentage: p.sswHelixPct, sswDiff: p.sswDiff }}
                     />
                     {typeof p.s4predHelixPercent === "number" && (
                       <Badge variant="outline" className="text-helix border-helix">
@@ -292,6 +346,9 @@ export default function QuickAnalyze() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* ── Consensus Analysis ── */}
+            <ConsensusCard peptide={p} />
 
             {/* ── Helical Wheel + Biochem side by side ── */}
             {p.length != null && p.length <= 40 && (

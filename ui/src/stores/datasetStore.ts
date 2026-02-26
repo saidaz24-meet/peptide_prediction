@@ -8,28 +8,56 @@ import type {
 } from '../types/peptide';
 
 import { mapApiRowToPeptide } from "@/lib/peptideMapper";
+import { uploadCSV, predictOne as apiPredictOne } from "@/lib/api";
 import type { Peptide, ThresholdConfig } from "@/types/peptide";
+import type { ResolvedThresholds } from "@/lib/thresholds";
 
 // --- SMART RANKING (weights + scorer) ---
 export const useThresholds = create<{
-  wH: number; wCharge: number; wMuH: number; wHelix: number;
+  wH: number; wCharge: number; wMuH: number; wFfHelix: number; wFfSsw: number;
   topN: number;
-  setWeights: (partial: Partial<{wH:number;wCharge:number;wMuH:number;wHelix:number;topN:number}>) => void;
+  setWeights: (partial: Partial<{wH:number;wCharge:number;wMuH:number;wFfHelix:number;wFfSsw:number;topN:number}>) => void;
 }>(set => ({
-  wH: 1, wCharge: 1, wMuH: 1, wHelix: 1, topN: 10,
+  wH: 1, wCharge: 1, wMuH: 1, wFfHelix: 1, wFfSsw: 1, topN: 10,
   setWeights: (partial) => set(partial),
 }));
 
+export type ZStats = {
+  hMean: number; hStd: number;
+  cMean: number; cStd: number;
+  mMean: number; mStd: number;
+};
+
+export function computeZStats(peptides: Peptide[]): ZStats {
+  const hVals = peptides.map(p => Number(p.hydrophobicity ?? 0));
+  const cVals = peptides.map(p => Math.abs(Number(p.charge ?? 0)));
+  const mVals = peptides.map(p => Number(p.muH ?? 0));
+  const mean = (a: number[]) => a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0;
+  const std = (a: number[], m: number) => {
+    if (a.length < 2) return 1; // avoid div-by-zero
+    return Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / a.length) || 1;
+  };
+  const hM = mean(hVals), cM = mean(cVals), mM = mean(mVals);
+  return { hMean: hM, hStd: std(hVals, hM), cMean: cM, cStd: std(cVals, cM), mMean: mM, mStd: std(mVals, mM) };
+}
+
 export function scorePeptide(
   p: Peptide,
-  w: { wH:number; wCharge:number; wMuH:number; wHelix:number },
-  ffHelixThreshold: number = 50.0  // Default threshold, can be overridden from meta.thresholds
+  w: { wH:number; wCharge:number; wMuH:number; wFfHelix:number; wFfSsw:number },
+  zStats?: ZStats,
 ){
   const h = Number(p.hydrophobicity ?? 0);
   const c = Math.abs(Number(p.charge ?? 0));
   const m = Number(p.muH ?? 0);
-  const helix = p.ffHelixPercent && p.ffHelixPercent >= ffHelixThreshold ? 1 : 0;
-  return w.wH*h + w.wCharge*c + w.wMuH*m + w.wHelix*helix;
+  const ffHelix = p.ffHelixFlag === 1 ? 1 : 0;
+  const ffSsw = p.ffSswFlag === 1 ? 1 : 0;
+  if (zStats) {
+    const hz = (h - zStats.hMean) / zStats.hStd;
+    const cz = (c - zStats.cMean) / zStats.cStd;
+    const mz = (m - zStats.mMean) / zStats.mStd;
+    return w.wH*hz + w.wCharge*cz + w.wMuH*mz + w.wFfHelix*ffHelix + w.wFfSsw*ffSsw;
+  }
+  return w.wH*h + w.wCharge*c + w.wMuH*m + w.wFfHelix*ffHelix + w.wFfSsw*ffSsw;
 }
 
 type BackendRow = Record<string, any>;
@@ -54,6 +82,9 @@ interface DatasetState {
   lastRunInput: RunInput | null;  // File or { sequence, entry }
   lastRunConfig: ThresholdConfig | null;
 
+  // Volatile source references (not persisted — for recalculate)
+  sourceFile: File | null;
+
   setRawData: (data: ParsedCSVData) => void;
   setRawPreview: (data: ParsedCSVData) => void;
   setPeptides: (peptides: Peptide[]) => void;
@@ -67,6 +98,8 @@ interface DatasetState {
   getPeptideById: (id: string) => Peptide | undefined;
   setLastRun: (type: 'upload' | 'predict', input: RunInput, config: ThresholdConfig | null) => void;
   getLastRun: () => { type: 'upload' | 'predict' | null; input: RunInput | null; config: ThresholdConfig | null };
+  setSourceFile: (file: File | null) => void;
+  recalculate: (thresholds: ResolvedThresholds) => Promise<'server' | 'client' | 'none'>;
 }
 
 const initialState: Omit<
@@ -84,6 +117,8 @@ const initialState: Omit<
   | 'getPeptideById'
   | 'setLastRun'
   | 'getLastRun'
+  | 'setSourceFile'
+  | 'recalculate'
 > = {
   rawData: null,
   peptides: [],
@@ -95,6 +130,7 @@ const initialState: Omit<
   lastRunType: null,
   lastRunInput: null,
   lastRunConfig: null,
+  sourceFile: null,
 };
 
 export const useDatasetStore = create<DatasetState>()(
@@ -236,13 +272,25 @@ export const useDatasetStore = create<DatasetState>()(
           return true;
         }).length;
 
-        // Aggregation hotspot count (tangoAggMax > 5%)
-        const aggHotspots = !tangoUnavailable
-          ? peptides.filter(p => typeof p.tangoAggMax === 'number' && p.tangoAggMax > 5).length
-          : 0;
-        const aggHotspotPercent = !tangoUnavailable && peptides.length > 0
-          ? (aggHotspots / peptides.length) * 100
+        // Aggregation hotspot count (tangoAggMax > aggThreshold)
+        // Denominator: peptides WITH TANGO data (not all peptides)
+        const aggThreshold = (meta?.thresholds as any)?.aggThreshold ?? 5.0;
+        const tangoDataPeptides = !tangoUnavailable
+          ? peptides.filter(p => typeof p.tangoAggMax === 'number')
+          : [];
+        const aggHotspots = tangoDataPeptides.filter(p => (p.tangoAggMax as number) > aggThreshold).length;
+        const aggHotspotPercent = tangoDataPeptides.length > 0
+          ? (aggHotspots / tangoDataPeptides.length) * 100
           : null;
+
+        // FF-Helix candidate count: ffHelixFlag === 1
+        const ffHelixCandidates = peptides.filter(p => p.ffHelixFlag === 1).length;
+        const ffHelixCandidatePercent = totalPeptides > 0 ? (ffHelixCandidates / totalPeptides) * 100 : null;
+
+        // FF-SSW candidate count: ffSswFlag === 1 (gated on TANGO availability)
+        const ffSswCandidates = peptides.filter(p => p.ffSswFlag === 1).length;
+        const ffSswCandidatePercent = (!tangoUnavailable && totalPeptides > 0)
+          ? (ffSswCandidates / totalPeptides) * 100 : null;
 
         const stats: DatasetStats = {
           totalPeptides,
@@ -253,6 +301,8 @@ export const useDatasetStore = create<DatasetState>()(
           meanFFHelixPercent,
           meanS4predHelixPercent,
           meanLength,
+          ffHelixCandidatePercent,
+          ffSswCandidatePercent,
           // Add these for better UI display
           s4predAvailable,
           ffHelixAvailable,
@@ -312,6 +362,55 @@ export const useDatasetStore = create<DatasetState>()(
           input: state.lastRunInput,
           config: state.lastRunConfig,
         };
+      },
+
+      setSourceFile: (file) => set({ sourceFile: file }),
+
+      recalculate: async (thresholds) => {
+        const state = get();
+        const thresholdConfig: ThresholdConfig = {
+          mode: 'custom',
+          version: '1.0.0',
+          custom: thresholds,
+        };
+
+        // Case 1: Upload source file available → re-POST
+        if (state.sourceFile) {
+          set({ isLoading: true });
+          try {
+            const { rows, meta } = (await uploadCSV(state.sourceFile, thresholdConfig)) as any;
+            const mapped: Peptide[] = rows
+              .map((r: BackendRow, idx: number) => {
+                try {
+                  return mapApiRowToPeptide(r, `/api/recalculate[${idx}]`);
+                } catch { return null; }
+              })
+              .filter((p: Peptide | null): p is Peptide => p !== null);
+            set({ peptides: mapped, meta: meta || null, lastRunConfig: thresholdConfig });
+            get().calculateStats();
+            return 'server';
+          } finally {
+            set({ isLoading: false });
+          }
+        }
+
+        // Case 2: Predict source (single sequence) → re-POST
+        if (state.lastRunType === 'predict' && state.lastRunInput && typeof state.lastRunInput === 'object' && 'sequence' in state.lastRunInput) {
+          const input = state.lastRunInput as { sequence: string; entry?: string };
+          set({ isLoading: true });
+          try {
+            const response = await apiPredictOne(input.sequence, input.entry, thresholdConfig);
+            const peptide = mapApiRowToPeptide(response.row, '/api/recalculate');
+            set({ peptides: [peptide], lastRunConfig: thresholdConfig });
+            get().calculateStats();
+            return 'server';
+          } finally {
+            set({ isLoading: false });
+          }
+        }
+
+        // Case 3: No source available → client-side only (aggFlags already applied via thresholdStore)
+        return 'none';
       },
     }),
     {
@@ -375,15 +474,3 @@ export const useDatasetStore = create<DatasetState>()(
   )
 );
 
-// --- Flag threshold store (unchanged) ---
-type FlagsState = {
-  muHCutoff: number;
-  hydroCutoff: number;
-  setFlags: (p: Partial<Pick<FlagsState, 'muHCutoff' | 'hydroCutoff'>>) => void;
-};
-
-export const useFlags = create<FlagsState>((set) => ({
-  muHCutoff: 0,
-  hydroCutoff: 0,
-  setFlags: (p) => set(p),
-}));

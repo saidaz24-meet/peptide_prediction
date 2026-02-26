@@ -1,5 +1,7 @@
 import jsPDF from "jspdf";
 import type { Peptide, DatasetStats, DatasetMetadata } from "@/types/peptide";
+import type { ResolvedThresholds } from "@/lib/thresholds";
+import { DEFAULT_THRESHOLDS } from "@/lib/thresholds";
 import { scorePeptide } from "@/stores/datasetStore";
 
 // ---- PDF report constants ----
@@ -10,7 +12,7 @@ const BODY_FONT = 9;
 const TABLE_FONT = 8;
 const COL_GAP = 6;
 
-type Weights = { wH: number; wCharge: number; wMuH: number; wHelix: number };
+type Weights = { wH: number; wCharge: number; wMuH: number; wFfHelix: number; wFfSsw: number };
 
 function fmt(v: number | null | undefined, decimals = 2): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return "N/A";
@@ -51,8 +53,13 @@ export function exportShortlistPDF(
   meta: DatasetMetadata | null,
   weights: Weights,
   topN: number = 10,
-  ffHelixThreshold: number = 50.0,
+  thresholds: ResolvedThresholds | number = 50.0,
 ) {
+  // Backward compat: accept number (old ffHelixThreshold) or full ResolvedThresholds
+  const resolvedThresholds: ResolvedThresholds =
+    typeof thresholds === 'number'
+      ? { ...DEFAULT_THRESHOLDS }
+      : thresholds;
   const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
@@ -129,11 +136,47 @@ export function exportShortlistPDF(
   y += 16;
 
   // ================================================================
+  // 2b. THRESHOLDS APPLIED
+  // ================================================================
+  checkPage(80);
+  pdf.setFontSize(HEADER_FONT);
+  pdf.setFont("helvetica", "bold");
+  pdf.text("Thresholds Applied", MARGIN, y);
+  y += LINE_H + 2;
+
+  pdf.setFontSize(BODY_FONT);
+  pdf.setFont("helvetica", "normal");
+
+  // Detect if custom or server thresholds
+  const isServerDefault =
+    resolvedThresholds.muHCutoff === 0.0 &&
+    resolvedThresholds.hydroCutoff === 0.0;
+  const thresholdSource = isServerDefault ? "Original (server)" : "Custom (client-adjusted)";
+
+  const thresholdRows = [
+    ["μH Cutoff", fmt(resolvedThresholds.muHCutoff)],
+    ["Hydrophobicity Cutoff", fmt(resolvedThresholds.hydroCutoff)],
+    ["Agg Threshold", fmtPct(resolvedThresholds.aggThreshold, 1)],
+    ["Source", thresholdSource],
+  ];
+
+  for (const [label, value] of thresholdRows) {
+    pdf.setFont("helvetica", "bold");
+    pdf.text(label + ":", MARGIN + 10, y);
+    pdf.setFont("helvetica", "normal");
+    pdf.text(value, MARGIN + 160, y);
+    y += LINE_H;
+  }
+  y += 4;
+  hline(pdf, y, pageW);
+  y += 16;
+
+  // ================================================================
   // 3. TOP-N RANKED PEPTIDES
   // ================================================================
   // Score and rank
   const ranked = peptides
-    .map((p) => ({ p, score: scorePeptide(p, weights, ffHelixThreshold) }))
+    .map((p) => ({ p, score: scorePeptide(p, weights) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, Math.max(1, topN));
 
@@ -146,24 +189,25 @@ export function exportShortlistPDF(
   pdf.setFont("helvetica", "normal");
   pdf.setTextColor(100);
   pdf.text(
-    `Weights — H: ${weights.wH}  Charge: ${weights.wCharge}  μH: ${weights.wMuH}  Helix: ${weights.wHelix}  |  CF propensity threshold: ${ffHelixThreshold}%`,
+    `Weights — H: ${weights.wH}  Charge: ${weights.wCharge}  μH: ${weights.wMuH}  FF Helix: ${weights.wFfHelix}  FF SSW: ${weights.wFfSsw}`,
     MARGIN, y + LINE_H,
   );
   pdf.setTextColor(0);
   y += LINE_H + 10;
 
-  // Table columns: Rank, ID, Seq (truncated), Length, H, Charge, μH, FF-Helix%, SSW, Score
+  // Table columns: Rank, ID, Seq (truncated), Length, H, Charge, μH, FF Helix, FF SSW, SSW, Score
   const cols = [
-    { header: "#",         width: 24 },
-    { header: "ID",        width: 90 },
-    { header: "Sequence",  width: 180 },
-    { header: "Len",       width: 32 },
-    { header: "H",         width: 50 },
-    { header: "|Charge|",  width: 50 },
-    { header: "μH",        width: 50 },
-    { header: "CF Prop%", width: 55 },
-    { header: "SSW",       width: 55 },
-    { header: "Score",     width: 50 },
+    { header: "#",         width: 22 },
+    { header: "ID",        width: 85 },
+    { header: "Sequence",  width: 160 },
+    { header: "Len",       width: 28 },
+    { header: "H",         width: 42 },
+    { header: "|Q|",       width: 42 },
+    { header: "μH",        width: 42 },
+    { header: "FF Hlx",    width: 42 },
+    { header: "FF SSW",    width: 42 },
+    { header: "SSW",       width: 48 },
+    { header: "Score",     width: 45 },
   ];
 
   // Table header
@@ -195,6 +239,9 @@ export function exportShortlistPDF(
       ? p.sequence.slice(0, 27) + "..."
       : p.sequence;
 
+    const ffHelixLabel = p.ffHelixFlag === 1 ? "Yes" : p.ffHelixFlag === -1 ? "No" : "-";
+    const ffSswLabel = p.ffSswFlag === 1 ? "Yes" : p.ffSswFlag === -1 ? "No" : "-";
+
     const row = [
       String(i + 1),
       p.id.length > 15 ? p.id.slice(0, 13) + ".." : p.id,
@@ -203,7 +250,8 @@ export function exportShortlistPDF(
       fmt(p.hydrophobicity),
       fmt(p.charge !== null ? Math.abs(p.charge) : null),
       fmt(p.muH),
-      fmtPct(p.ffHelixPercent),
+      ffHelixLabel,
+      ffSswLabel,
       sswLabel(p.sswPrediction),
       score.toFixed(2),
     ];
@@ -238,7 +286,7 @@ export function exportShortlistPDF(
     "CF Propensity %: Chou-Fasman (1978) context-free helix propensity (legacy metric).",
     "S4PRED Helix %: Neural network secondary structure prediction (primary helix metric).",
     "TANGO SSW: Structural Switch prediction from TANGO aggregation analysis.",
-    "Ranking Score = wH×H + wCharge×|Charge| + wμH×μH + wHelix×(CF Propensity≥threshold ? 1 : 0).",
+    "Ranking Score = wH×H + wCharge×|Charge| + wμH×μH + wFfHelix×(ffHelixFlag=1 ? 1 : 0) + wFfSsw×(ffSswFlag=1 ? 1 : 0).",
     "",
     "Generated by Peptide Visual Lab (PVL) — https://github.com/your-org/peptide-visual-lab",
   ];
