@@ -28,14 +28,15 @@
 - **TESTING_GUIDE.md** — Test commands, local setup, known failures
 - **CONTRACTS.md** — API endpoints, request/response shapes, UI requirements
 - **KNOWN_ISSUES.md** — Known bugs, limitations, workarounds
-- **FILES_TO_TOUCH.md** — Hot files most likely to be edited
+- **PELEG_REVIEW_TASKS.md** — Holistic review task chunks (current priority)
+- **MASTER_DEV_DOC.md** — Consolidated architecture + decisions reference
+- **DEPLOYMENT.md** — VM specs, step-by-step deployment, K8s plan
+- **ROADMAP.md** — Strategic position, Phase A/B/C tasks, completed history
+- **DEVELOPER_REFERENCE.md** — Pipeline internals, null semantics, debugging
+- **SPECIALS.md** — Special handling rules
 
-**DO NOT READ**:
-- `docs/_archive/**` — Historical/archived docs (ignored)
-- `docs/legacy/**` — Legacy docs (ignored)
-- `docs/reference/**` — Reference docs (use active context instead)
-- `docs/user/**` — User-specific docs (ignored)
-- Any markdown files outside `docs/active/` (unless explicitly requested)
+**DO NOT READ** unless explicitly requested:
+- Any markdown files outside `docs/active/`
 
 **Before opening new files outside docs/active/**:
 1. Propose top 3 files you want to read
@@ -107,30 +108,39 @@ make test
 | File | Purpose |
 |------|---------|
 | `backend/server.py` | Compatibility shim (~15 LOC, deprecated) |
-| `backend/tango.py` | TANGO runner/parser (~1300 LOC) |
+| `backend/tango.py` | TANGO runner/parser (~1400 LOC) |
 | `backend/s4pred.py` | S4PRED runner/analyzer (~670 LOC) |
 | `backend/auxiliary.py` | FF-Helix + SSW helpers (~370 LOC) |
-| `backend/biochem_calculation.py` | Charge, hydrophobicity, μH (~200 LOC) |
-| `backend/config.py` | Centralized settings (~210 LOC) |
+| `backend/biochem_calculation.py` | Charge, hydrophobicity, μH (~85 LOC) |
+| `backend/config.py` | Centralized settings (~245 LOC) |
 | `backend/services/normalize.py` | Response normalization (~740 LOC) |
 | `backend/schemas/api_models.py` | **CANONICAL** API contract (protected) |
+| `backend/consensus.py` | Consensus pipeline logic |
+| `backend/services/provider_state.py` | Provider state tracking |
+| `backend/services/uniprot_execute_service.py` | UniProt query execution (~635 LOC) |
 
 ### Frontend Core
 | File | Purpose |
 |------|---------|
 | `ui/src/pages/Results.tsx` | Main dashboard |
 | `ui/src/pages/PeptideDetail.tsx` | Peptide deep-dive |
-| `ui/src/stores/datasetStore.ts` | Zustand state management |
+| `ui/src/stores/datasetStore.ts` | Zustand: peptide data + stats |
+| `ui/src/stores/thresholdStore.ts` | Zustand: threshold presets + re-classification |
+| `ui/src/stores/chartSelectionStore.ts` | Zustand: chart filter state |
+| `ui/src/lib/peptideMapper.ts` | API → frontend type mapping |
+| `ui/src/types/peptide.ts` | Canonical frontend type definitions |
 
 ## Quick Reference
 ```bash
 # Development
-make test       # All tests (deterministic, no network)
-make test-unit  # Fast unit tests
-make lint       # Code quality
-make typecheck  # Type checking
-make fmt        # Format code
-make ci         # Full pipeline
+make test           # All tests (deterministic, no network)
+make test-unit      # Fast unit tests
+make lint           # Code quality
+make typecheck      # Type checking
+make fmt            # Format code
+make ci             # Full pipeline
+make smoke-tango    # Verify TANGO binary works
+make contract-check # Verify backend↔UI contract sync
 
 # Predictor flags
 USE_TANGO=1     # Enable TANGO

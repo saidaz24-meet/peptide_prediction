@@ -4,7 +4,7 @@
 > **Last updated**: 2026-02-22
 > **Scope**: Decisions, priorities, and new insights NOT covered by other active docs.
 > **Other active docs**: ACTIVE_CONTEXT.md (architecture), CONTRACTS.md (API), TESTING_GUIDE.md (tests),
-> KNOWN_ISSUES.md (bugs), DEPLOYMENT_GUIDE.md (deploy), FUTURE_IMPLEMENTATIONS.md (features), ROADMAP.md (strategy)
+> KNOWN_ISSUES.md (bugs), DEPLOYMENT.md (deploy), ROADMAP.md (strategy + features)
 
 ---
 
@@ -298,7 +298,7 @@ Status: Not started. Effort: 4h.
 
 | Blocker | Action When Resolved |
 |---------|---------------------|
-| DESY VM access | Follow DEPLOYMENT_GUIDE.md step by step |
+| DESY VM access | Follow DEPLOYMENT.md step by step |
 | Domain (pvl.desy.de) | Set `DOMAIN=pvl.desy.de` in docker/.env |
 | bio.tools registration | 1h task after live URL exists |
 | Zenodo DOI | 1h task after first GitHub release (v1.0.0) |

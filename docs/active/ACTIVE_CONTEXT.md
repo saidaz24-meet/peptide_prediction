@@ -1,7 +1,8 @@
 # Active Context: Architecture Overview
 
-**Last Updated**: 2026-02-16
+**Last Updated**: 2026-03-01
 **Purpose**: Single entry point for developers and AI agents working on this codebase.
+**Deep dive**: See [DEVELOPER_REFERENCE.md](DEVELOPER_REFERENCE.md) for pipeline internals, null semantics, and debugging workflows.
 
 ---
 
@@ -236,9 +237,7 @@ cd ui && npm install && npm run dev
 | `docs/active/TESTING_GUIDE.md` | Test commands and setup |
 | `docs/active/KNOWN_ISSUES.md` | Issue backlog (all 17 issues resolved) |
 | `docs/active/DEVELOPER_REFERENCE.md` | Deep technical reference (data pipeline, null semantics, debugging) |
-| `docs/active/DEPLOYMENT_GUIDE.md` | Step-by-step VM + K8s deployment |
-| `docs/active/DEPLOYMENT_SPEC.md` | VM sizing and resource analysis |
-| `docs/active/FUTURE_IMPLEMENTATIONS.md` | Detailed future roadmap |
+| `docs/active/DEPLOYMENT.md` | VM specs, step-by-step deployment, K8s plan |
 | `docs/active/MASTER_DEV_DOC.md` | Strategic decisions, security, risk register |
 | `docs/active/ROADMAP.md` | Development roadmap and completed work |
 | `README_EXPLAINER.md` | Non-technical A-Z team guide |

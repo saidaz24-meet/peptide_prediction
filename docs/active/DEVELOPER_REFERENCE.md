@@ -1,8 +1,9 @@
 # Peptide Visual Lab (PVL) - Developer Reference
 
 **Audience**: Developers working on or integrating with PVL
-**Last Updated**: 2026-02-16
+**Last Updated**: 2026-03-01
 **Prerequisites**: Python familiarity, basic understanding of REST APIs
+**Quick overview**: See [ACTIVE_CONTEXT.md](ACTIVE_CONTEXT.md) for architecture summary and entry points.
 
 ---
 
