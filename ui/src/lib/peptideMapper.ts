@@ -296,8 +296,17 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
   // S4PRED summary fields
   const s4predHelixPrediction = num(row.s4predHelixPrediction ?? row["Helix prediction (S4PRED)"], true);
   const s4predHelixPercent = num(row.s4predHelixPercent ?? row["Helix percentage (S4PRED)"], true);
+  const s4predHelixScore = num(row.s4predHelixScore ?? row["Helix score (S4PRED)"], true);
+  const s4predHelixFragmentsTop = toSegments(row.s4predHelixFragments ?? row["Helix fragments (S4PRED)"] ?? []);
   const s4predSswPrediction = num(row.s4predSswPrediction ?? row["SSW prediction (S4PRED)"], true);
+  const s4predSswDiff = num(row.s4predSswDiff ?? row["SSW diff (S4PRED)"], true);
   const s4predHasData = row.s4predHasData ?? (s4pred !== undefined);
+
+  // FF flags (from backend — computed by apply_ff_flags)
+  const ffHelixFlag = num(row.ffHelixFlag ?? row["FF-Helix (Jpred)"] ?? row["FF-Helix"], true);
+  const ffHelixScore = num(row.ffHelixScore ?? row["FF-helix score"] ?? row["FF-Helix score"], true);
+  const ffSswFlag = num(row.ffSswFlag ?? row["FF-Secondary structure switch"], true);
+  const ffSswScore = num(row.ffSswScore ?? row["FF-Secondary structure switch score"] ?? row["FF-SSW score"], true);
 
   // Provider status: pass through from backend row
   // Do not fabricate provider status; only pass through what backend provides
@@ -319,6 +328,12 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
     // FF-Helix (always computed locally, shouldn't be null unless error)
     ffHelixPercent,
     ffHelixFragments,
+
+    // FF flags (from backend)
+    ffHelixFlag,
+    ffHelixScore,
+    ffSswFlag,
+    ffSswScore,
 
     // SSW (Secondary Structure Switch)
     // sswPrediction: null = no prediction, -1/0/1 = valid predictions
@@ -343,7 +358,10 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
     // S4PRED summary fields
     s4predHelixPrediction,
     s4predHelixPercent,
+    s4predHelixScore,
+    s4predHelixFragments: s4predHelixFragmentsTop?.length ? s4predHelixFragmentsTop : undefined,
     s4predSswPrediction,
+    s4predSswDiff,
     s4predHasData,
 
     // Provider status (Principle B: mandatory provider status)

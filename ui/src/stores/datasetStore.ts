@@ -12,7 +12,49 @@ import { uploadCSV, predictOne as apiPredictOne } from "@/lib/api";
 import type { Peptide, ThresholdConfig } from "@/types/peptide";
 import type { ResolvedThresholds } from "@/lib/thresholds";
 
-// --- SMART RANKING (weights + scorer) ---
+// --- RANKING STORE (percentile-based, replaces z-score approach) ---
+import {
+  rankPeptides,
+  DEFAULT_WEIGHTS,
+  PRESETS,
+  type RankingWeights,
+  type RankingMetric,
+  type RankingPreset,
+} from '@/lib/ranking';
+
+export const useRankingStore = create<{
+  weights: RankingWeights;
+  topN: number;
+  preset: RankingPreset | 'custom';
+  setWeight: (metric: RankingMetric, value: number) => void;
+  setTopN: (n: number) => void;
+  applyPreset: (preset: RankingPreset) => void;
+  resetWeights: () => void;
+}>(set => ({
+  weights: { ...DEFAULT_WEIGHTS },
+  topN: 10,
+  preset: 'equal',
+  setWeight: (metric, value) => set(state => ({
+    weights: { ...state.weights, [metric]: value },
+    preset: 'custom',
+  })),
+  setTopN: (n) => set({ topN: Math.max(1, n) }),
+  applyPreset: (preset) => set({
+    weights: { ...PRESETS[preset] },
+    preset,
+  }),
+  resetWeights: () => set({
+    weights: { ...DEFAULT_WEIGHTS },
+    preset: 'equal',
+  }),
+}));
+
+// Re-export ranking types and functions for convenience
+export { rankPeptides, DEFAULT_WEIGHTS, PRESETS };
+export type { RankingWeights, RankingMetric, RankingPreset };
+
+// --- DEPRECATED: Legacy z-score exports (used by report.ts until migration) ---
+/** @deprecated Use useRankingStore instead */
 export const useThresholds = create<{
   wH: number; wCharge: number; wMuH: number; wFfHelix: number; wFfSsw: number;
   topN: number;
@@ -22,41 +64,16 @@ export const useThresholds = create<{
   setWeights: (partial) => set(partial),
 }));
 
-export type ZStats = {
-  hMean: number; hStd: number;
-  cMean: number; cStd: number;
-  mMean: number; mStd: number;
-};
-
-export function computeZStats(peptides: Peptide[]): ZStats {
-  const hVals = peptides.map(p => Number(p.hydrophobicity ?? 0));
-  const cVals = peptides.map(p => Math.abs(Number(p.charge ?? 0)));
-  const mVals = peptides.map(p => Number(p.muH ?? 0));
-  const mean = (a: number[]) => a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0;
-  const std = (a: number[], m: number) => {
-    if (a.length < 2) return 1; // avoid div-by-zero
-    return Math.sqrt(a.reduce((s, v) => s + (v - m) ** 2, 0) / a.length) || 1;
-  };
-  const hM = mean(hVals), cM = mean(cVals), mM = mean(mVals);
-  return { hMean: hM, hStd: std(hVals, hM), cMean: cM, cStd: std(cVals, cM), mMean: mM, mStd: std(mVals, mM) };
-}
-
+/** @deprecated Use rankPeptides() from ranking.ts instead */
 export function scorePeptide(
   p: Peptide,
   w: { wH:number; wCharge:number; wMuH:number; wFfHelix:number; wFfSsw:number },
-  zStats?: ZStats,
 ){
   const h = Number(p.hydrophobicity ?? 0);
   const c = Math.abs(Number(p.charge ?? 0));
   const m = Number(p.muH ?? 0);
   const ffHelix = p.ffHelixFlag === 1 ? 1 : 0;
   const ffSsw = p.ffSswFlag === 1 ? 1 : 0;
-  if (zStats) {
-    const hz = (h - zStats.hMean) / zStats.hStd;
-    const cz = (c - zStats.cMean) / zStats.cStd;
-    const mz = (m - zStats.mMean) / zStats.mStd;
-    return w.wH*hz + w.wCharge*cz + w.wMuH*mz + w.wFfHelix*ffHelix + w.wFfSsw*ffSsw;
-  }
   return w.wH*h + w.wCharge*c + w.wMuH*m + w.wFfHelix*ffHelix + w.wFfSsw*ffSsw;
 }
 

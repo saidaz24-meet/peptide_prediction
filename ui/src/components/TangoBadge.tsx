@@ -12,6 +12,7 @@ import {
   getTangoDisplayState,
   getTangoDisplayProps,
   type ProviderStatusInfo,
+  type SswContext,
 } from '@/lib/tangoDisplaySemantics';
 
 interface TangoBadgeProps {
@@ -20,6 +21,8 @@ interface TangoBadgeProps {
   /** Whether Tango data (curves) exist, even if sswPrediction is null */
   hasTangoData?: boolean;
   showIcon?: boolean;
+  /** Optional SSW context for richer negative-prediction tooltips */
+  sswContext?: SswContext;
 }
 
 /**
@@ -33,8 +36,8 @@ interface TangoBadgeProps {
  * - AVAILABLE + -1 → "Negative" (secondary)
  * - AVAILABLE + 0 or (null with data) → "Uncertain" (outline)
  */
-export function TangoBadge({ providerStatus, sswPrediction, hasTangoData = false, showIcon = true }: TangoBadgeProps) {
-  const state = getTangoDisplayState(providerStatus, sswPrediction, hasTangoData);
+export function TangoBadge({ providerStatus, sswPrediction, hasTangoData = false, showIcon = true, sswContext }: TangoBadgeProps) {
+  const state = getTangoDisplayState(providerStatus, sswPrediction, hasTangoData, sswContext);
   const props = getTangoDisplayProps(state);
 
   const Icon = showIcon

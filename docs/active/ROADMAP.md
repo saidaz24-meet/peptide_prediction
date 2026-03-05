@@ -1,8 +1,8 @@
 # Peptide Visual Lab (PVL) — Development Roadmap
 
-**Last Updated**: 2026-03-01
+**Last Updated**: 2026-03-05
 **Status**: Active Development (pre-paper, deployment-ready)
-**Branch**: `ref-impl-replacement`
+**Branch**: `main` (merged from `ref-impl-replacement`)
 
 ---
 
@@ -27,7 +27,8 @@ PVL occupies a unique niche: the **only web tool** combining aggregation propens
 - Smart ranking, per-residue profiles, CSV/PDF/FASTA export
 - Helical wheel projection, collapsible sidebar, progressive disclosure (3-tab)
 - Sentry error tracking, CITATION.cff, pinned dependencies
-- 270+ passing tests (all deterministic, no network)
+- 323 backend tests + 77 frontend tests = 400 total (all deterministic, no network)
+- Peleg holistic review: Chunks 1-7 DONE, Chunk 8 PARKED, Chunk 9 ONGOING
 
 ### Waiting for DESY
 | Item | Contact | Notes |
@@ -97,6 +98,37 @@ Full PeptideDetail-parity: SequenceTrack, HelicalWheel, S4PRED chart, TANGO heat
 
 ---
 
+## Peleg Holistic Review
+
+| Chunk | Scope | Status |
+|-------|-------|--------|
+| 1 | FF data layer (flags, scores, thresholds) | DONE |
+| 2 | FF frontend (badges, KPIs, charts) | DONE |
+| 3 | Terminology & UX patterns | DONE |
+| 4 | Chart architecture stabilization | DONE |
+| 5 | Ranking system | DONE |
+| 6 | Ranking redesign (multi-metric) | DONE |
+| 7 | Polish & edge cases | DONE |
+| 8 | UI/UX Redesign | PARKED (→ Phase D) |
+| 9 | Documentation & cleanup | ONGOING |
+
+---
+
+## Phase D: UI/UX Redesign (Next)
+
+**Prerequisites**: Chunks 1-7 complete, 400 tests safety net, clean main branch.
+
+| ID | Task | Effort | Status | Details |
+|----|------|--------|--------|---------|
+| D1 | Extract PeptideViewer component | 4h | TODO | ~200 LOC duplicated between QuickAnalyze and PeptideDetail |
+| D2 | Card-based progressive disclosure | 16h | TODO | Summary cards on dashboard, click-to-expand |
+| D3 | Per-residue profile viewer | 12h | TODO | Unified multi-track viewer (P_H, P_E, TANGO curves) |
+| D4 | Code-splitting / lazy routes | 4h | TODO | Main bundle is 2.4MB (warning threshold 500KB) |
+| D5 | Sidebar polish (icons-only, hover labels) | 4h | TODO | Already exists, needs refinement |
+| D6 | Theme finalization | 4h | TODO | Lock dark/light theme with consistent shadcn/ui tokens |
+
+---
+
 ## Phase C: Platform Scale — DESY Kubernetes
 
 DESY K8s confirmed long-term (2026-02-22). Docker images already K8s-ready. Details pending.
@@ -120,6 +152,10 @@ Standardized provider interface for external prediction tools.
 ### C5. Mol* 3D Full Integration
 **Effort**: 20h
 MolViewSpec annotations, custom coloring by PVL predictions.
+
+### C6. Guided Onboarding Tour
+**Status**: NOT STARTED | **Effort**: 8h
+Step-by-step walkthrough for first-time users (react-joyride or similar). Highlights KPI cards, chart tabs, ranking system, threshold controls. Pairs with existing Legend overlay (first-visit dialog).
 
 ---
 
@@ -188,6 +224,31 @@ MolViewSpec annotations, custom coloring by PVL predictions.
 - Deleted 7 stale/redundant docs
 - Merged security/risk/cost into MASTER_DEV_DOC.md
 - Updated all cross-references
+
+</details>
+
+<details>
+<summary>Feb 22 – Mar 5: Peleg Holistic Review (Chunks 1-7)</summary>
+
+- FF data layer: flags, scores, Peleg thresholds verified against reference
+- FF frontend: badges, KPIs, charts for FF-Helix and FF-SSW
+- Terminology: SSW labeling (TANGO/S4PRED), consistent naming
+- Chart architecture: ChartFrame, ExpandableChart, ZoomableChart
+- Ranking: multi-metric scoring, weight sliders, consensus pipeline
+- Polish: edge cases, threshold tuner, aggregation flagging
+- Tests: 235 → 323 backend, 0 → 77 frontend (vitest)
+
+</details>
+
+<details>
+<summary>Mar 5: Pre-Redesign Cleanup</summary>
+
+- Deleted backend/_archive/ (4 dead files), stale Excel files, unused components
+- Removed JPRED_COLS constant, favicon duplicates, docs/CLAUDE.md
+- Fixed tsconfig.json (baseUrl, removed ignoreDeprecations)
+- Fixed README broken link (DEPLOYMENT_GUIDE.md → DEPLOYMENT.md)
+- Updated all docs to reflect 400 tests, Peleg review status
+- Squash-merged ref-impl-replacement into main
 
 </details>
 

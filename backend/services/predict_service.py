@@ -187,12 +187,14 @@ def process_single_sequence(
 
     # Compute biochemical features
     calc_biochem(df)
-    apply_ff_flags(df)
+
+    # Resolve thresholds BEFORE apply_ff_flags so user thresholds are wired in
+    resolved_thresholds = resolve_thresholds(threshold_config_requested, df)
+    threshold_mode = (threshold_config_requested or {}).get("mode", "default")
+    ff_thresholds_used = apply_ff_flags(df, resolved_thresholds=resolved_thresholds, threshold_mode=threshold_mode)
+
     _finalize_ui_aliases(df)
     finalize_ff_fields(df)
-
-    # Resolve thresholds
-    resolved_thresholds = resolve_thresholds(threshold_config_requested, df)
 
     # Normalize single row for UI
     row_data = normalize_rows_for_ui(
@@ -229,7 +231,7 @@ def process_single_sequence(
         "providerStatusSummary": provider_status_summary,
         "thresholdConfigRequested": threshold_config_requested,
         "thresholdConfigResolved": threshold_config_resolved,
-        "thresholds": resolved_thresholds,
+        "thresholds": {**resolved_thresholds, **ff_thresholds_used},
     })
 
     # ISSUE-018: Validate response through Pydantic model

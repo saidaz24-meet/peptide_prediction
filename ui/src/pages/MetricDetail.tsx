@@ -1,26 +1,35 @@
-import { useParams, useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { PeptideTable } from '@/components/PeptideTable';
-import { METRIC_DEFINITIONS, MetricId } from '@/types/metrics';
-import { useDatasetStore } from '@/stores/datasetStore';
-import { Peptide, DatasetStats } from '@/types/peptide';
+import { useParams, useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import { ArrowLeft } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { PeptideTable } from "@/components/PeptideTable";
+import { METRIC_DEFINITIONS, MetricId } from "@/types/metrics";
+import { useDatasetStore } from "@/stores/datasetStore";
+import { Peptide, DatasetStats } from "@/types/peptide";
 // mapApiRowsToPeptides removed - peptides from store are already mapped
-import { useMemo } from 'react';
+import { useMemo } from "react";
 import {
-  BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
-  ResponsiveContainer, Tooltip, Legend,
-} from 'recharts';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  Legend,
+} from "recharts";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 
 const COLORS = {
   // Use existing CSS variables that are actually defined
-  positive: 'hsl(var(--success))',           // Green for SSW positive (fibril-forming)
-  negative: 'hsl(var(--chameleon-negative))', // Gray for SSW negative
-  primary: 'hsl(var(--primary))',
-  muted: 'hsl(var(--muted-foreground))',
+  positive: "hsl(var(--success))", // Green for SSW (fibril-forming)
+  negative: "hsl(var(--chameleon-negative))", // Gray for No SSW
+  primary: "hsl(var(--primary))",
+  muted: "hsl(var(--muted-foreground))",
 };
 
 export default function MetricDetail() {
@@ -36,7 +45,7 @@ export default function MetricDetail() {
         <Card>
           <CardContent className="p-6">
             <p className="text-muted-foreground">Metric not found</p>
-            <Button onClick={() => navigate('/results')} className="mt-4">
+            <Button onClick={() => navigate("/results")} className="mt-4">
               Back to Results
             </Button>
           </CardContent>
@@ -54,18 +63,18 @@ export default function MetricDetail() {
     if (!peptidesTyped.length) return null;
 
     switch (metric.chartType) {
-      case 'distribution': {
+      case "distribution": {
         // Histogram data
         const values: number[] = [];
-        
-        if (metricId === 'ff-helix') {
-          peptidesTyped.forEach(p => {
-            if (typeof p.ffHelixPercent === 'number') values.push(p.ffHelixPercent);
+
+        if (metricId === "ff-helix") {
+          peptidesTyped.forEach((p) => {
+            if (typeof p.ffHelixPercent === "number") values.push(p.ffHelixPercent);
           });
-        } else if (metricId === 'hydrophobicity') {
-          peptidesTyped.forEach(p => values.push(p.hydrophobicity));
-        } else if (metricId === 'charge') {
-          peptidesTyped.forEach(p => values.push(Math.abs(p.charge)));
+        } else if (metricId === "hydrophobicity") {
+          peptidesTyped.forEach((p) => values.push(p.hydrophobicity));
+        } else if (metricId === "charge") {
+          peptidesTyped.forEach((p) => values.push(Math.abs(p.charge)));
         }
 
         if (values.length === 0) return null;
@@ -78,7 +87,7 @@ export default function MetricDetail() {
         return Array.from({ length: 10 }, (_, i) => {
           const binStart = min + i * binSize;
           const binEnd = binStart + binSize;
-          const count = values.filter(v => {
+          const count = values.filter((v) => {
             return i < 9 ? v >= binStart && v < binEnd : v >= binStart && v <= binEnd;
           }).length;
           return {
@@ -89,33 +98,35 @@ export default function MetricDetail() {
         }).sort((a, b) => a.binStart - b.binStart);
       }
 
-      case 'pie': {
-        if (metricId === 'ssw-positive') {
+      case "pie": {
+        if (metricId === "ssw-positive") {
           // SSW semantics: 1=positive, -1=negative, 0=uncertain, null=missing
-          const pos = peptidesTyped.filter(p => p.sswPrediction === 1).length;
-          const neg = peptidesTyped.filter(p => p.sswPrediction === -1).length;
-          const uncertain = peptidesTyped.filter(p => p.sswPrediction === 0).length;
+          const pos = peptidesTyped.filter((p) => p.sswPrediction === 1).length;
+          const neg = peptidesTyped.filter((p) => p.sswPrediction === -1).length;
+          const uncertain = peptidesTyped.filter((p) => p.sswPrediction === 0).length;
           return [
-            { name: 'TANGO SSW+', value: pos, color: COLORS.positive },
-            { name: 'TANGO SSW-', value: neg, color: COLORS.negative },
-            ...(uncertain > 0 ? [{ name: 'Uncertain', value: uncertain, color: COLORS.muted }] : []),
-          ].filter(d => d.value > 0);
-        } else if (metricId === 'ff-secondary-switch') {
+            { name: "TANGO SSW", value: pos, color: COLORS.positive },
+            { name: "TANGO No SSW", value: neg, color: COLORS.negative },
+            ...(uncertain > 0
+              ? [{ name: "Uncertain", value: uncertain, color: COLORS.muted }]
+              : []),
+          ].filter((d) => d.value > 0);
+        } else if (metricId === "ff-secondary-switch") {
           // This would require FF-Secondary structure switch data - simplified for now
-          const pos = peptidesTyped.filter(p => p.sswPrediction === 1).length; // Placeholder
+          const pos = peptidesTyped.filter((p) => p.sswPrediction === 1).length; // Placeholder
           const neg = peptidesTyped.length - pos;
           return [
-            { name: 'Fibril-forming (SSW)', value: pos, color: COLORS.positive },
-            { name: 'Not fibril-forming', value: neg, color: COLORS.negative },
-          ].filter(d => d.value > 0);
-        } else if (metricId === 'ff-helix-flag') {
+            { name: "Fibril-forming (SSW)", value: pos, color: COLORS.positive },
+            { name: "Not fibril-forming", value: neg, color: COLORS.negative },
+          ].filter((d) => d.value > 0);
+        } else if (metricId === "ff-helix-flag") {
           // This would require FF-Helix flag data - simplified for now
-          const pos = peptidesTyped.filter(p => (p.ffHelixPercent ?? 0) > 0).length; // Placeholder
+          const pos = peptidesTyped.filter((p) => (p.ffHelixPercent ?? 0) > 0).length; // Placeholder
           const neg = peptidesTyped.length - pos;
           return [
-            { name: 'Fibril-forming (Helix)', value: pos, color: COLORS.positive },
-            { name: 'Not fibril-forming', value: neg, color: COLORS.negative },
-          ].filter(d => d.value > 0);
+            { name: "Fibril-forming (Helix)", value: pos, color: COLORS.positive },
+            { name: "Not fibril-forming", value: neg, color: COLORS.negative },
+          ].filter((d) => d.value > 0);
         }
         return null;
       }
@@ -141,7 +152,7 @@ export default function MetricDetail() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/results')}
+              onClick={() => navigate("/results")}
               className="gap-2"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -174,10 +185,13 @@ export default function MetricDetail() {
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                   No data available
                 </div>
-              ) : metric.chartType === 'distribution' ? (
+              ) : metric.chartType === "distribution" ? (
                 <ChartContainer config={{}} className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 20, right: 20, bottom: 20, left: 20 }}>
+                    <BarChart
+                      data={chartData}
+                      margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
+                    >
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis
                         dataKey="range"
@@ -192,7 +206,7 @@ export default function MetricDetail() {
                     </BarChart>
                   </ResponsiveContainer>
                 </ChartContainer>
-              ) : metric.chartType === 'pie' ? (
+              ) : metric.chartType === "pie" ? (
                 <ChartContainer config={{}} className="h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -202,7 +216,9 @@ export default function MetricDetail() {
                         cy="50%"
                         outerRadius={100}
                         dataKey="value"
-                        label={({ name, percent }: any) => `${name}: ${(percent * 100).toFixed(1)}%`}
+                        label={({ name, percent }: any) =>
+                          `${name}: ${(percent * 100).toFixed(1)}%`
+                        }
                       >
                         {(chartData as any[]).map((entry, index) => (
                           <Cell key={`cell-${index}`} fill={entry.color} />
@@ -221,7 +237,9 @@ export default function MetricDetail() {
           <Card>
             <CardHeader>
               <CardTitle>Peptide Data</CardTitle>
-              <CardDescription>Filtered view showing relevant columns for {metric.title}</CardDescription>
+              <CardDescription>
+                Filtered view showing relevant columns for {metric.title}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <PeptideTable peptides={filteredPeptides} />
@@ -232,4 +250,3 @@ export default function MetricDetail() {
     </div>
   );
 }
-

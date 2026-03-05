@@ -345,17 +345,17 @@ These items appeared in the corpus but are explicitly deferred:
 
 ---
 
-## 9. Codebase Vital Signs (2026-02-22 Snapshot)
+## 9. Codebase Vital Signs (2026-03-05 Snapshot)
 
 | Metric | Value |
 |--------|-------|
 | Backend LOC | ~9,000 (18 services, 8 routes, 5 schemas) |
-| Frontend LOC | ~15,000 (10 pages, 27 custom components, 74 UI kit) |
-| Tests | 235 passing (deterministic, no network) |
+| Frontend LOC | ~17,000 (9 pages, 40+ custom components, 74 UI kit) |
+| Tests | 323 backend + 77 frontend = 400 total (deterministic, no network) |
 | Docker image | ~800MB backend, ~150MB frontend |
 | Config env vars | 28 (all in config.py) |
 | Predictors | S4PRED (primary), TANGO (secondary) |
-| State management | Zustand (1 store, 389 LOC) |
+| State management | Zustand (3 stores: dataset, threshold, chartSelection) |
 | Charts | Recharts (primary), custom SVG |
 | CI/CD | GitHub Actions (lint + typecheck + test + Docker build + GHCR publish) |
 

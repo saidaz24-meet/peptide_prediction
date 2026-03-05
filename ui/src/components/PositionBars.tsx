@@ -50,15 +50,6 @@ export function PositionBars({ peptide, allPeptides }: PositionBarsProps) {
     });
   }
 
-  if (peptide.length !== null) {
-    metrics.push({
-      label: 'Length',
-      value: peptide.length,
-      allValues: allPeptides.map(p => p.length).filter((v): v is number => v !== null),
-      formatter: (v: number) => v.toString(),
-    });
-  }
-
   // Add μH if available
   if (peptide.muH !== undefined) {
     const peptidesWithMuH = allPeptides.filter(p => p.muH !== undefined);
@@ -68,27 +59,6 @@ export function PositionBars({ peptide, allPeptides }: PositionBarsProps) {
         value: peptide.muH,
         allValues: peptidesWithMuH.map(p => p.muH!),
         formatter: (v: number) => v.toFixed(2),
-      });
-    }
-  }
-
-  // S4PRED Helix % (primary helix metric)
-  if (peptide.s4predHelixPercent !== undefined &&
-      peptide.s4predHelixPercent !== null &&
-      peptide.s4predHelixPercent >= 0 &&
-      peptide.s4predHelixPercent <= 100) {
-    const peptidesWithHelix = allPeptides.filter(
-      p => p.s4predHelixPercent !== undefined &&
-           p.s4predHelixPercent !== null &&
-           p.s4predHelixPercent >= 0 &&
-           p.s4predHelixPercent <= 100
-    );
-    if (peptidesWithHelix.length > 1) {
-      metrics.push({
-        label: 'S4PRED Helix %',
-        value: peptide.s4predHelixPercent,
-        allValues: peptidesWithHelix.map(p => p.s4predHelixPercent!),
-        formatter: (v: number) => `${v.toFixed(1)}%`,
       });
     }
   }

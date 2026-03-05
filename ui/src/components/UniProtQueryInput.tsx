@@ -1,22 +1,32 @@
-import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Search, Loader2, AlertCircle, Info } from 'lucide-react';
-import { toast } from 'sonner';
-import { API_BASE, executeUniProtQuery } from '@/lib/api';
+} from "@/components/ui/select";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Search, Loader2, AlertCircle, Info } from "lucide-react";
+import { toast } from "sonner";
+import { API_BASE, executeUniProtQuery } from "@/lib/api";
+import { AnalysisProgress } from "@/components/AnalysisProgress";
 
-type QueryMode = 'auto' | 'accession' | 'keyword' | 'organism' | 'keyword_organism';
-type SortOrder = 'best' | 'length-asc' | 'length-desc' | 'protein-asc' | 'protein-desc' | 'organism-asc' | 'organism-desc' | 'reviewed-asc' | 'reviewed-desc';
+type QueryMode = "auto" | "accession" | "keyword" | "organism" | "keyword_organism";
+type SortOrder =
+  | "best"
+  | "length-asc"
+  | "length-desc"
+  | "protein-asc"
+  | "protein-desc"
+  | "organism-asc"
+  | "organism-desc"
+  | "reviewed-asc"
+  | "reviewed-desc";
 
 interface ParsedQuery {
   mode: QueryMode;
@@ -45,19 +55,19 @@ interface QueryControls {
 }
 
 export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQueryInputProps) {
-  const [query, setQuery] = useState('');
-  const [selectedMode, setSelectedMode] = useState<QueryMode>('auto');
+  const [query, setQuery] = useState("");
+  const [selectedMode, setSelectedMode] = useState<QueryMode>("auto");
   const [parsedQuery, setParsedQuery] = useState<ParsedQuery | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isExecuting, setIsExecuting] = useState(false);
   const [finalApiQuery, setFinalApiQuery] = useState<string | null>(null);
-  
+
   // Query controls state
   const [controls, setControls] = useState<QueryControls>({
     reviewed: true, // Default: reviewed (Swiss-Prot) first
     lengthMin: null, // No default - user must explicitly set if they want length filter
     lengthMax: null, // No default - user must explicitly set if they want length filter
-    sort: 'best', // Best Match → omit sort parameter
+    sort: "best", // Best Match → omit sort parameter
     includeIsoforms: false,
     size: 500,
     runTango: false, // Default: OFF for fast response
@@ -65,6 +75,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
   });
 
   // Auto-parse query when it changes (debounced)
+  // This is a non-blocking preview — parse failures are silent.
   useEffect(() => {
     if (!query.trim()) {
       setParsedQuery(null);
@@ -72,54 +83,51 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
       return;
     }
 
+    let cancelled = false;
     const timeoutId = setTimeout(async () => {
       setIsParsing(true);
       try {
         const response = await fetch(`${API_BASE}/api/uniprot/parse`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query }),
         });
 
-        if (!response.ok) {
-          throw new Error('Failed to parse query');
-        }
+        if (cancelled) return;
+        if (!response.ok) throw new Error("parse failed");
 
         const parsed: ParsedQuery = await response.json();
-        setParsedQuery(parsed);
-        
-        // Auto-select detected mode if auto is selected
-        if (selectedMode === 'auto' && (parsed.mode as string) !== 'unknown') {
-          // Mode is already 'auto', just use parsed.api_query_string
-        }
-      } catch (error) {
-        console.error('Query parse error:', error);
-        toast.error('Failed to parse query');
+        if (!cancelled) setParsedQuery(parsed);
+      } catch {
+        // Parse is a preview feature — don't show errors or block the user
       } finally {
-        setIsParsing(false);
+        if (!cancelled) setIsParsing(false);
       }
-    }, 500); // 500ms debounce
+    }, 500);
 
-    return () => clearTimeout(timeoutId);
+    return () => {
+      cancelled = true;
+      clearTimeout(timeoutId);
+    };
   }, [query, selectedMode]);
 
   // Single source of truth: Map UI sort labels to UniProt API format
   // Best Match → omit `sort` parameter (UniProt defaults to best match)
   const UNIPROT_SORT_MAP: Record<string, string | null> = {
-    'best': null,                       // Best Match → omit `sort`
-    'length-asc': 'length asc',
-    'length-desc': 'length desc',
-    'protein-asc': 'protein_name asc',
-    'protein-desc': 'protein_name desc',
-    'organism-asc': 'organism_name asc',
-    'organism-desc': 'organism_name desc',
-    'reviewed-asc': 'reviewed asc',
-    'reviewed-desc': 'reviewed desc',
+    best: null, // Best Match → omit `sort`
+    "length-asc": "length asc",
+    "length-desc": "length desc",
+    "protein-asc": "protein_name asc",
+    "protein-desc": "protein_name desc",
+    "organism-asc": "organism_name asc",
+    "organism-desc": "organism_name desc",
+    "reviewed-asc": "reviewed asc",
+    "reviewed-desc": "reviewed desc",
   };
 
   const handleExecute = async (retryWithoutSort = false, retryWithoutLength = false) => {
     if (!query.trim()) {
-      toast.error('Please enter a query');
+      toast.error("Please enter a query");
       return;
     }
 
@@ -131,7 +139,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
     const abortController = new AbortController();
     const timeoutId = setTimeout(() => {
       abortController.abort();
-    }, 30000); // 30 second timeout
+    }, 120000); // 2 minute timeout
 
     try {
       // Map sort to UniProt format using single source of truth
@@ -139,18 +147,19 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
       let sortValue: string | null = null;
       if (!retryWithoutSort) {
         // Defensive check: if sort is "score" (legacy), treat as "best"
-        const sortKey = (controls.sort as string) === 'score' ? 'best' : controls.sort;
-        
+        const sortKey = (controls.sort as string) === "score" ? "best" : controls.sort;
+
         const mappedSort = UNIPROT_SORT_MAP[sortKey];
         if (mappedSort === undefined) {
           // Unknown sort key - warn and omit (should not happen with type safety, but guard anyway)
-          console.warn(`[UNIPROT][UI] Unknown sort key: ${controls.sort} (normalized: ${sortKey}), omitting sort`);
+          console.warn(
+            `[UNIPROT][UI] Unknown sort key: ${controls.sort} (normalized: ${sortKey}), omitting sort`
+          );
           toast(`Unknown sort option, using default (best match)`);
           sortValue = null; // Omit sort for unknown keys
         } else {
           sortValue = mappedSort; // null for "best", or mapped value like "length asc"
         }
-        
       }
       // If retryWithoutSort is true, sortValue stays null (omit sort on retry)
 
@@ -160,16 +169,16 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
         mode: selectedMode,
         include_isoforms: controls.includeIsoforms,
         size: controls.size,
-        run_tango: controls.runTango,  // Use UI toggle state
-        run_s4pred: controls.runS4pred,  // Use UI toggle state
-        max_provider_sequences: 50,  // Limit if providers are enabled
+        run_tango: controls.runTango, // Use UI toggle state
+        run_s4pred: controls.runS4pred, // Use UI toggle state
+        max_provider_sequences: 50, // Limit if providers are enabled
       };
-      
+
       // Reviewed: pass true|false|null (null = omit from query)
       if (controls.reviewed !== null) {
         requestBody.reviewed = controls.reviewed;
       }
-      
+
       // Length bounds: only include if at least one is explicitly set (and not retrying without length)
       if (!retryWithoutLength) {
         // If only min set → send length_min (backend will format [min TO *])
@@ -183,11 +192,11 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
         // If both set → send both (backend will format [min TO max])
         // If both null/undefined → omit length entirely (no length_min or length_max in request)
       }
-      
+
       // Sort: only include if mapped value is not null (i.e., not "best" and valid)
       // "best" maps to null → omit sort parameter (UniProt defaults to best match)
       // Defensive: NEVER send "score" - it's invalid
-      if (sortValue !== null && sortValue !== 'score' && sortValue !== undefined) {
+      if (sortValue !== null && sortValue !== "score" && sortValue !== undefined) {
         requestBody.sort = sortValue;
       }
       // Explicitly do NOT set requestBody.sort if sortValue is null, "score", or undefined
@@ -200,7 +209,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
         setFinalApiQuery(apiQuery);
 
         onQueryExecuted(result.rows, result.meta);
-        
+
         // Show provider status in toast if providers were skipped
         const ps = result.meta?.provider_status;
         if (ps?.tango?.skipped_reason || ps?.s4pred?.skipped_reason) {
@@ -208,38 +217,46 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
           if (ps.tango?.skipped_reason) reasons.push(`TANGO: ${ps.tango.skipped_reason}`);
           if (ps.s4pred?.skipped_reason) reasons.push(`S4PRED: ${ps.s4pred.skipped_reason}`);
           if (reasons.length > 0) {
-            toast(`Providers not computed: ${reasons.join(', ')}`);
+            toast(`Providers not computed: ${reasons.join(", ")}`);
           }
         }
-        
-        toast.success(`Retrieved ${result.meta?.row_count || result.rows.length} entries from UniProt`);
+
+        toast.success(
+          `Retrieved ${result.meta?.row_count || result.rows.length} entries from UniProt`
+        );
       } catch (error: any) {
         clearTimeout(timeoutId);
-        console.error('UniProt query error:', error);
-        
+        console.error("UniProt query error:", error);
+
         // Auto-retry logic for 400 errors
-        const is400Error = (error as any).status === 400 || error.message?.toLowerCase().includes('400');
+        const is400Error =
+          (error as any).status === 400 || error.message?.toLowerCase().includes("400");
         if (is400Error && !retryWithoutSort && !retryWithoutLength) {
           const lowerMessage = error.message.toLowerCase();
-          const hasInvalidSort = lowerMessage.includes('sort') || lowerMessage.includes('invalid sort');
-          const hasLengthIssue = lowerMessage.includes('length') || 
-                                (controls.lengthMin === null && controls.lengthMax === null && 
-                                 (requestBody.length_min !== undefined || requestBody.length_max !== undefined));
-          
+          const hasInvalidSort =
+            lowerMessage.includes("sort") || lowerMessage.includes("invalid sort");
+          const hasLengthIssue =
+            lowerMessage.includes("length") ||
+            (controls.lengthMin === null &&
+              controls.lengthMax === null &&
+              (requestBody.length_min !== undefined || requestBody.length_max !== undefined));
+
           if (hasInvalidSort || hasLengthIssue) {
             // Auto-retry without sort/length due to 400 error
             setIsExecuting(false);
             onLoadingChange?.(false);
-            toast('Adjusted query (removed unsupported sort/length). Retrying...');
+            toast("Adjusted query (removed unsupported sort/length). Retrying...");
             // Retry without sort and without length
             return handleExecute(true, true);
           }
         }
-        
-        if (error.name === 'AbortError') {
-          toast.error('Query timed out after 30 seconds. Please try a smaller query or check your connection.');
+
+        if (error.name === "AbortError") {
+          toast.error(
+            "Query timed out after 2 minutes. Please try a smaller query or check your connection."
+          );
         } else {
-          toast.error(error.message || 'Failed to execute UniProt query');
+          toast.error(error.message || "Failed to execute UniProt query");
         }
       }
     } finally {
@@ -249,15 +266,16 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
     }
   };
 
-  const displayMode = selectedMode === 'auto' ? (parsedQuery?.mode || 'auto') : selectedMode;
-  const displayApiQuery = finalApiQuery || parsedQuery?.api_query_string || '';
+  const displayMode = selectedMode === "auto" ? parsedQuery?.mode || "auto" : selectedMode;
+  const displayApiQuery = finalApiQuery || parsedQuery?.api_query_string || "";
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>Query UniProt Database</CardTitle>
         <CardDescription>
-          Search by accession, keyword, organism, or combinations. Examples: P12345, "amyloid", "9606", "amyloid organism_id:9606"
+          Search by accession, keyword, organism, or combinations. Examples: P12345, "amyloid",
+          "9606", "amyloid organism_id:9606"
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -271,16 +289,13 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !isExecuting) {
+                if (e.key === "Enter" && !isExecuting) {
                   handleExecute();
                 }
               }}
               disabled={isExecuting}
             />
-            <Button
-              onClick={() => handleExecute()}
-              disabled={isExecuting || !query.trim() || isParsing}
-            >
+            <Button onClick={() => handleExecute()} disabled={isExecuting || !query.trim()}>
               {isExecuting ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -319,7 +334,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
 
         {/* Parsed Query Info */}
         {parsedQuery && (
-          <Alert className={parsedQuery.error ? 'border-destructive' : ''}>
+          <Alert className={parsedQuery.error ? "border-destructive" : ""}>
             {parsedQuery.error ? (
               <>
                 <AlertCircle className="h-4 w-4" />
@@ -332,11 +347,25 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                   <div className="space-y-1">
                     <div>
                       <strong>Detected mode:</strong> {displayMode}
-                      {selectedMode === 'auto' && (parsedQuery.mode as string) !== 'unknown' && ' (auto-detected)'}
+                      {selectedMode === "auto" &&
+                        (parsedQuery.mode as string) !== "unknown" &&
+                        " (auto-detected)"}
                     </div>
-                    {parsedQuery.accession && <div><strong>Accession:</strong> {parsedQuery.accession}</div>}
-                    {parsedQuery.keyword && <div><strong>Keyword:</strong> {parsedQuery.keyword}</div>}
-                    {parsedQuery.organism_id && <div><strong>Organism ID:</strong> {parsedQuery.organism_id}</div>}
+                    {parsedQuery.accession && (
+                      <div>
+                        <strong>Accession:</strong> {parsedQuery.accession}
+                      </div>
+                    )}
+                    {parsedQuery.keyword && (
+                      <div>
+                        <strong>Keyword:</strong> {parsedQuery.keyword}
+                      </div>
+                    )}
+                    {parsedQuery.organism_id && (
+                      <div>
+                        <strong>Organism ID:</strong> {parsedQuery.organism_id}
+                      </div>
+                    )}
                   </div>
                 </AlertDescription>
               </>
@@ -353,11 +382,17 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               <div className="space-y-2">
                 <Label htmlFor="reviewed-filter">Protein Status</Label>
                 <Select
-                  value={controls.reviewed === true ? 'reviewed' : controls.reviewed === false ? 'unreviewed' : 'all'}
+                  value={
+                    controls.reviewed === true
+                      ? "reviewed"
+                      : controls.reviewed === false
+                        ? "unreviewed"
+                        : "all"
+                  }
                   onValueChange={(value) => {
-                    setControls(prev => ({
+                    setControls((prev) => ({
                       ...prev,
-                      reviewed: value === 'reviewed' ? true : value === 'unreviewed' ? false : null,
+                      reviewed: value === "reviewed" ? true : value === "unreviewed" ? false : null,
                     }));
                   }}
                   disabled={isExecuting}
@@ -378,7 +413,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                 <Label htmlFor="sort-order">Sort Order</Label>
                 <Select
                   value={controls.sort}
-                  onValueChange={(value) => setControls(prev => ({ ...prev, sort: value as SortOrder }))}
+                  onValueChange={(value) =>
+                    setControls((prev) => ({ ...prev, sort: value as SortOrder }))
+                  }
                   disabled={isExecuting}
                 >
                   <SelectTrigger id="sort-order">
@@ -406,10 +443,10 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                   type="number"
                   min="1"
                   placeholder="e.g., 10"
-                  value={controls.lengthMin ?? ''}
+                  value={controls.lengthMin ?? ""}
                   onChange={(e) => {
                     const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                    setControls(prev => ({ ...prev, lengthMin: val && val > 0 ? val : null }));
+                    setControls((prev) => ({ ...prev, lengthMin: val && val > 0 ? val : null }));
                   }}
                   disabled={isExecuting}
                 />
@@ -423,14 +460,23 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                   type="number"
                   min="1"
                   placeholder="e.g., 100"
-                  value={controls.lengthMax ?? ''}
+                  value={controls.lengthMax ?? ""}
                   onChange={(e) => {
                     const val = e.target.value ? parseInt(e.target.value, 10) : null;
-                    setControls(prev => ({ ...prev, lengthMax: val && val > 0 ? val : null }));
+                    setControls((prev) => ({ ...prev, lengthMax: val && val > 0 ? val : null }));
                   }}
                   disabled={isExecuting}
                 />
               </div>
+
+              {/* Length filter hint */}
+              {controls.lengthMin === null && controls.lengthMax === null && (
+                <div className="md:col-span-2 text-xs text-muted-foreground flex items-center gap-1">
+                  <Info className="h-3 w-3 shrink-0" />
+                  Tip: 5–40 aa recommended for peptide research. &gt;40 aa: reduced TANGO accuracy.
+                  &lt;5 aa: too short for predictions.
+                </div>
+              )}
 
               {/* Include Isoforms */}
               <div className="space-y-2">
@@ -440,7 +486,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                     type="checkbox"
                     id="include-isoforms"
                     checked={controls.includeIsoforms}
-                    onChange={(e) => setControls(prev => ({ ...prev, includeIsoforms: e.target.checked }))}
+                    onChange={(e) =>
+                      setControls((prev) => ({ ...prev, includeIsoforms: e.target.checked }))
+                    }
                     disabled={isExecuting}
                     className="h-4 w-4 rounded border-gray-300 cursor-pointer disabled:cursor-not-allowed"
                   />
@@ -462,7 +510,10 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                   value={controls.size}
                   onChange={(e) => {
                     const val = parseInt(e.target.value, 10);
-                    setControls(prev => ({ ...prev, size: val && val > 0 ? Math.min(val, 10000) : 500 }));
+                    setControls((prev) => ({
+                      ...prev,
+                      size: val && val > 0 ? Math.min(val, 10000) : 500,
+                    }));
                   }}
                   disabled={isExecuting}
                 />
@@ -486,7 +537,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                     type="checkbox"
                     id="run-tango"
                     checked={controls.runTango}
-                    onChange={(e) => setControls(prev => ({ ...prev, runTango: e.target.checked }))}
+                    onChange={(e) =>
+                      setControls((prev) => ({ ...prev, runTango: e.target.checked }))
+                    }
                     disabled={isExecuting}
                     className="h-4 w-4 rounded border-gray-300 cursor-pointer disabled:cursor-not-allowed"
                   />
@@ -504,7 +557,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                     type="checkbox"
                     id="run-s4pred"
                     checked={controls.runS4pred}
-                    onChange={(e) => setControls(prev => ({ ...prev, runS4pred: e.target.checked }))}
+                    onChange={(e) =>
+                      setControls((prev) => ({ ...prev, runS4pred: e.target.checked }))
+                    }
                     disabled={isExecuting}
                     className="h-4 w-4 rounded border-gray-300 cursor-pointer disabled:cursor-not-allowed"
                   />
@@ -520,7 +575,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
             <Info className="h-4 w-4" />
             <AlertDescription>
               <div className="space-y-1">
-                <div className="text-xs font-mono text-muted-foreground">Final UniProt API Query:</div>
+                <div className="text-xs font-mono text-muted-foreground">
+                  Final UniProt API Query:
+                </div>
                 <div className="text-sm font-mono bg-muted p-2 rounded break-all">
                   {displayApiQuery}
                 </div>
@@ -533,8 +590,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
             </AlertDescription>
           </Alert>
         )}
+
+        <AnalysisProgress isActive={isExecuting} peptideCount={controls.size} />
       </CardContent>
     </Card>
   );
 }
-

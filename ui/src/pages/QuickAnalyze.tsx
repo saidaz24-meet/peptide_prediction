@@ -23,7 +23,11 @@ import { S4PredChart } from "@/components/S4PredChart";
 import { ConsensusCard } from "@/components/ConsensusCard";
 import { useDatasetStore } from "@/stores/datasetStore";
 
-async function predictSequence(sequence: string, entry?: string, thresholdConfig?: ThresholdConfig): Promise<Peptide> {
+async function predictSequence(
+  sequence: string,
+  entry?: string,
+  thresholdConfig?: ThresholdConfig
+): Promise<Peptide> {
   const response = await apiPredictOne(sequence, entry, thresholdConfig);
   return mapApiRowToPeptide(response.row, "/api/predict");
 }
@@ -56,7 +60,9 @@ function ScreenTransition({
   return (
     <motion.div
       initial={{ clipPath: `circle(${from}px at ${clickPosition.x}px ${clickPosition.y}px)` }}
-      animate={{ clipPath: `circle(${isEntering ? to : from}px at ${clickPosition.x}px ${clickPosition.y}px)` }}
+      animate={{
+        clipPath: `circle(${isEntering ? to : from}px at ${clickPosition.x}px ${clickPosition.y}px)`,
+      }}
       transition={{ duration: 0.6, ease: cubicBezier(0.22, 1, 0.36, 1) }}
       onUpdate={(latest) => {
         const m = /circle\((\d+\.?\d*)px/.exec(String((latest as any).clipPath));
@@ -83,7 +89,9 @@ export default function QuickAnalyze() {
   const navigate = useNavigate();
 
   // Threshold configuration
-  const [thresholdMode, setThresholdMode] = useState<'default' | 'recommended' | 'custom'>('default');
+  const [thresholdMode, setThresholdMode] = useState<"default" | "recommended" | "custom">(
+    "recommended"
+  );
   const [customThresholds, setCustomThresholds] = useState({
     muHCutoff: 0.0,
     hydroCutoff: 0.0,
@@ -105,12 +113,12 @@ export default function QuickAnalyze() {
       const thresholdConfig: ThresholdConfig = {
         mode: thresholdMode,
         version: "1.0.0",
-        ...(thresholdMode === 'custom' && { custom: customThresholds }),
+        ...(thresholdMode === "custom" && { custom: customThresholds }),
       };
       const res = await predictSequence(sequence, entry, thresholdConfig);
       setPeptide(res);
       // Store source for recalculate
-      useDatasetStore.getState().setLastRun('predict', { sequence, entry }, thresholdConfig);
+      useDatasetStore.getState().setLastRun("predict", { sequence, entry }, thresholdConfig);
       toast.success("Prediction ready");
     } catch (err: any) {
       toast.error(err?.message || "Prediction failed");
@@ -215,7 +223,7 @@ export default function QuickAnalyze() {
                 <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    Sequences shorter than 5 aa cannot be analyzed by TANGO.
+                    {sequence.trim().length} aa — too short for TANGO (&lt;5 aa minimum)
                   </AlertDescription>
                 </Alert>
               )}
@@ -223,7 +231,8 @@ export default function QuickAnalyze() {
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    Short sequences (&lt;15 aa) produce unreliable secondary structure predictions. Biochemical properties remain valid.
+                    {sequence.trim().length} aa — S4PRED may be unreliable below 15 aa. Biochemical
+                    properties remain valid.
                   </AlertDescription>
                 </Alert>
               )}
@@ -231,7 +240,8 @@ export default function QuickAnalyze() {
                 <Alert>
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    Long sequences (&gt;100 aa) may decrease TANGO prediction accuracy. S4PRED remains reliable.
+                    {sequence.trim().length} aa — reduced TANGO accuracy above 100 aa. S4PRED
+                    remains reliable.
                   </AlertDescription>
                 </Alert>
               )}
@@ -259,7 +269,11 @@ export default function QuickAnalyze() {
 
         {/* ==================== RESULTS ==================== */}
         {p && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
             {/* ── Header: Entry + Length + Badges + Actions ── */}
             <Card>
               <CardHeader>
@@ -339,10 +353,14 @@ export default function QuickAnalyze() {
               <Card>
                 <CardContent className="p-4">
                   <div className="text-2xl font-bold text-helix">
-                    {typeof p.s4predHelixPercent === "number" ? `${p.s4predHelixPercent.toFixed(0)}%` : "N/A"}
+                    {typeof p.s4predHelixPercent === "number"
+                      ? `${p.s4predHelixPercent.toFixed(0)}%`
+                      : "N/A"}
                   </div>
                   <div className="text-sm text-muted-foreground">S4PRED Helix</div>
-                  <div className="text-[10px] text-muted-foreground/60">neural network prediction</div>
+                  <div className="text-[10px] text-muted-foreground/60">
+                    neural network prediction
+                  </div>
                 </CardContent>
               </Card>
             </div>
@@ -356,7 +374,8 @@ export default function QuickAnalyze() {
                 <CardHeader>
                   <CardTitle>Helical Wheel Projection</CardTitle>
                   <CardDescription>
-                    Schiffer-Edmundson axial view. The red arrow shows the hydrophobic moment direction.
+                    Schiffer-Edmundson axial view. The red arrow shows the hydrophobic moment
+                    direction.
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex justify-center">
@@ -374,7 +393,8 @@ export default function QuickAnalyze() {
                 <CardHeader>
                   <CardTitle>TANGO Aggregation Profile</CardTitle>
                   <CardDescription>
-                    Per-residue aggregation propensity. High scores indicate amyloid-forming regions.
+                    Per-residue aggregation propensity. High scores indicate amyloid-forming
+                    regions.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -400,16 +420,19 @@ export default function QuickAnalyze() {
               <CardContent className="space-y-2 text-sm text-muted-foreground">
                 <p>
                   <strong className="text-foreground">Charge</strong> and{" "}
-                  <strong className="text-foreground">hydrophobicity</strong> help screen antimicrobial and
-                  amyloid-prone candidates. Higher hydrophobicity with positive charge can suggest membrane activity.
+                  <strong className="text-foreground">hydrophobicity</strong> help screen
+                  antimicrobial and amyloid-prone candidates. Higher hydrophobicity with positive
+                  charge can suggest membrane activity.
                 </p>
                 <p>
-                  <strong className="text-foreground">Hydrophobic moment</strong> measures amphipathicity —
-                  the asymmetry of hydrophobic residue distribution around a helix axis.
+                  <strong className="text-foreground">Hydrophobic moment</strong> measures
+                  amphipathicity — the asymmetry of hydrophobic residue distribution around a helix
+                  axis.
                 </p>
                 <p>
-                  TANGO and S4PRED predictions show "N/A" if those tools are not installed on the server.
-                  Biochemical properties (charge, hydrophobicity, hydrophobic moment) are always computed.
+                  TANGO and S4PRED predictions show "N/A" if those tools are not installed on the
+                  server. Biochemical properties (charge, hydrophobicity, hydrophobic moment) are
+                  always computed.
                 </p>
               </CardContent>
             </Card>

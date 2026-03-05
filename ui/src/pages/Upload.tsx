@@ -52,10 +52,12 @@ export default function Upload() {
   const [currentStep, setCurrentStep] = useState(0);
   const [localFile, setLocalFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [uploadMode, setUploadMode] = useState<'file' | 'uniprot'>('file');
+  const [uploadMode, setUploadMode] = useState<"file" | "uniprot">("file");
 
   // threshold configuration
-  const [thresholdMode, setThresholdMode] = useState<'default' | 'recommended' | 'custom'>('default');
+  const [thresholdMode, setThresholdMode] = useState<"default" | "recommended" | "custom">(
+    "recommended"
+  );
   const [customThresholds, setCustomThresholds] = useState({
     muHCutoff: 0.0,
     hydroCutoff: 0.0,
@@ -66,7 +68,15 @@ export default function Upload() {
   const [qc, setQc] = useState<null | { rejectedCount: number; download: () => void }>(null);
 
   // store
-  const { rawData, isLoading, setRawPreview, ingestBackendRows, setLoading, setLastRun, setSourceFile } = useDatasetStore();
+  const {
+    rawData,
+    isLoading,
+    setRawPreview,
+    ingestBackendRows,
+    setLoading,
+    setLastRun,
+    setSourceFile,
+  } = useDatasetStore();
   const navigate = useNavigate();
   const progressPercent = ((currentStep + 1) / steps.length) * 100;
 
@@ -93,10 +103,12 @@ export default function Upload() {
             return;
           }
 
-          const xlHeaders = (jsonData[0] as string[]).map(h => String(h ?? ""));
-          const xlRows = jsonData.slice(1, 201).map(row => {
+          const xlHeaders = (jsonData[0] as string[]).map((h) => String(h ?? ""));
+          const xlRows = jsonData.slice(1, 201).map((row) => {
             const obj: Record<string, any> = {};
-            xlHeaders.forEach((h, i) => { obj[h] = row[i] ?? ""; });
+            xlHeaders.forEach((h, i) => {
+              obj[h] = row[i] ?? "";
+            });
             return obj;
           });
 
@@ -110,17 +122,22 @@ export default function Upload() {
           // QC check for invalid sequences
           const pickSeq = (r: any) =>
             r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
-          const allRows = jsonData.slice(1).map(row => {
+          const allRows = jsonData.slice(1).map((row) => {
             const obj: Record<string, any> = {};
-            xlHeaders.forEach((h, i) => { obj[h] = row[i] ?? ""; });
+            xlHeaders.forEach((h, i) => {
+              obj[h] = row[i] ?? "";
+            });
             return obj;
           });
-          const rejected = allRows.filter(r => {
+          const rejected = allRows.filter((r) => {
             const seq = String(pickSeq(r));
             return seq && !isValidSeq(seq);
           });
           if (rejected.length > 0) {
-            setQc({ rejectedCount: rejected.length, download: () => exportCsv("rejected_rows.csv", rejected) });
+            setQc({
+              rejectedCount: rejected.length,
+              download: () => exportCsv("rejected_rows.csv", rejected),
+            });
           } else {
             setQc(null);
           }
@@ -140,8 +157,11 @@ export default function Upload() {
       delimiter: isTSV ? "\t" : undefined,
       complete: (res) => {
         const rowsObj = (res.data as any[]).filter(Boolean);
-        const headers =
-          res.meta.fields?.length ? res.meta.fields : rowsObj.length ? Object.keys(rowsObj[0]) : [];
+        const headers = res.meta.fields?.length
+          ? res.meta.fields
+          : rowsObj.length
+            ? Object.keys(rowsObj[0])
+            : [];
 
         const previewData = {
           fileName: file.name,
@@ -151,8 +171,7 @@ export default function Upload() {
         };
         setRawPreview(previewData as any);
 
-        const pickSeq = (r: any) =>
-          r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
+        const pickSeq = (r: any) => r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
         const rejected: any[] = [];
         for (const r of rowsObj) {
           const seq = String(pickSeq(r));
@@ -180,16 +199,16 @@ export default function Upload() {
     if (!localFile) return;
     try {
       setIsAnalyzing(true);
-      
+
       // Build thresholdConfig from state
       const thresholdConfig: ThresholdConfig = {
         mode: thresholdMode,
         version: "1.0.0",
-        ...(thresholdMode === 'custom' && { custom: customThresholds }),
+        ...(thresholdMode === "custom" && { custom: customThresholds }),
       };
-      
+
       // Store run input/config for reproduce and recalculate
-      setLastRun('upload', localFile, thresholdConfig);
+      setLastRun("upload", localFile, thresholdConfig);
       setSourceFile(localFile);
 
       const { rows, meta } = (await uploadCSV(localFile, thresholdConfig)) as any; // POST /api/upload-csv
@@ -205,7 +224,11 @@ export default function Upload() {
   return (
     <div className="min-h-screen bg-gradient-surface">
       <div className="container mx-auto px-4 py-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-4xl mx-auto"
+        >
           {/* Header & progress */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Upload & Process Dataset</h1>
@@ -227,13 +250,15 @@ export default function Upload() {
                           isCompleted
                             ? "bg-primary border-primary text-primary-foreground"
                             : isActive
-                            ? "border-primary text-primary"
-                            : "border-muted text-muted-foreground"
+                              ? "border-primary text-primary"
+                              : "border-muted text-muted-foreground"
                         }`}
                       >
                         <Icon className="w-4 h-4" />
                       </div>
-                      <span className={`text-sm font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
+                      <span
+                        className={`text-sm font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}
+                      >
                         {step.title}
                       </span>
                     </div>
@@ -251,15 +276,15 @@ export default function Upload() {
                   {/* Upload Mode Selector */}
                   <div className="flex gap-4 justify-center">
                     <Button
-                      variant={uploadMode === 'file' ? 'default' : 'outline'}
-                      onClick={() => setUploadMode('file')}
+                      variant={uploadMode === "file" ? "default" : "outline"}
+                      onClick={() => setUploadMode("file")}
                     >
                       <FileText className="w-4 h-4 mr-2" />
                       Upload File
                     </Button>
                     <Button
-                      variant={uploadMode === 'uniprot' ? 'default' : 'outline'}
-                      onClick={() => setUploadMode('uniprot')}
+                      variant={uploadMode === "uniprot" ? "default" : "outline"}
+                      onClick={() => setUploadMode("uniprot")}
                     >
                       <Search className="w-4 h-4 mr-2" />
                       Query UniProt
@@ -267,14 +292,19 @@ export default function Upload() {
                   </div>
 
                   {/* Try Example Data */}
-                  {uploadMode === 'file' && (
+                  {uploadMode === "file" && (
                     <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-2">Or try an example dataset:</p>
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Or try an example dataset:
+                      </p>
                       <div className="flex gap-2 justify-center flex-wrap">
                         {[
-                          { label: 'Antimicrobial Peptides (12)', file: '/example/antimicrobial_peptides.csv' },
-                          { label: 'Amyloid Peptides (9)', file: '/example/amyloid_peptides.csv' },
-                          { label: 'Venom Peptides (16)', file: '/example/peptide_data.csv' },
+                          {
+                            label: "Antimicrobial Peptides (12)",
+                            file: "/example/antimicrobial_peptides.csv",
+                          },
+                          { label: "Amyloid Peptides (9)", file: "/example/amyloid_peptides.csv" },
+                          { label: "Venom Peptides (16)", file: "/example/peptide_data.csv" },
                         ].map((ex) => (
                           <Button
                             key={ex.file}
@@ -285,11 +315,15 @@ export default function Upload() {
                               try {
                                 const resp = await fetch(ex.file);
                                 const text = await resp.text();
-                                const blob = new Blob([text], { type: 'text/csv' });
-                                const file = new File([blob], ex.file.split('/').pop() || 'example.csv', { type: 'text/csv' });
+                                const blob = new Blob([text], { type: "text/csv" });
+                                const file = new File(
+                                  [blob],
+                                  ex.file.split("/").pop() || "example.csv",
+                                  { type: "text/csv" }
+                                );
                                 handleLocalPreview(file);
                               } catch {
-                                toast.error('Failed to load example dataset');
+                                toast.error("Failed to load example dataset");
                               }
                             }}
                           >
@@ -301,7 +335,7 @@ export default function Upload() {
                   )}
 
                   {/* File Upload */}
-                  {uploadMode === 'file' && (
+                  {uploadMode === "file" && (
                     <UploadDropzone
                       onFileSelected={(f: File) => handleLocalPreview(f)}
                       onFileProcessed={() => setCurrentStep(1)}
@@ -309,18 +343,18 @@ export default function Upload() {
                   )}
 
                   {/* UniProt Query */}
-                  {uploadMode === 'uniprot' && (
+                  {uploadMode === "uniprot" && (
                     <UniProtQueryInput
                       onQueryExecuted={(rows, meta) => {
                         // Convert UniProt query results to the format expected by the store
                         if (rows && rows.length > 0) {
                           // Ingest rows directly (they're already in the right format from backend)
                           ingestBackendRows(rows, meta);
-                          
+
                           // Navigate to results page
-                          navigate('/results');
+                          navigate("/results");
                         } else {
-                          toast.error('No results returned from UniProt');
+                          toast.error("No results returned from UniProt");
                         }
                       }}
                       onLoadingChange={(loading) => {
@@ -334,15 +368,16 @@ export default function Upload() {
               {currentStep === 1 && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                   {!rawData ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      Loading preview...
-                    </div>
+                    <div className="text-center py-8 text-muted-foreground">Loading preview...</div>
                   ) : (
                     <>
                       {qc && qc.rejectedCount > 0 && (
                         <Alert>
                           <AlertDescription className="flex items-center justify-between">
-                            <span>{qc.rejectedCount} rows have invalid sequences (will be filtered during analysis).</span>
+                            <span>
+                              {qc.rejectedCount} rows with invalid sequences (filtered during
+                              analysis).
+                            </span>
                             <Button variant="outline" size="sm" onClick={qc.download}>
                               Download rejected_rows.csv
                             </Button>
@@ -357,35 +392,50 @@ export default function Upload() {
                             Columns are auto-detected. Click Analyze to process your data.
                           </p>
                         </div>
-                        <Badge variant="secondary">{rawData.rowCount ?? rawData.rows?.length ?? 0} rows</Badge>
+                        <Badge variant="secondary">
+                          {rawData.rowCount ?? rawData.rows?.length ?? 0} rows
+                        </Badge>
                       </div>
 
                       <DataPreview data={rawData} />
 
                       {/* Sequence length summary */}
-                      {rawData.rows && rawData.rows.length > 0 && (() => {
-                        const pickSeq = (r: any) =>
-                          r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
-                        const lengths = rawData.rows.map(r => String(pickSeq(r)).length).filter(l => l > 0);
-                        const short = lengths.filter(l => l < 15).length;
-                        const optimal = lengths.filter(l => l >= 15 && l <= 100).length;
-                        const long = lengths.filter(l => l > 100).length;
-                        const hasWarnings = short > 0 || long > 0;
-                        if (!hasWarnings) return null;
-                        return (
-                          <Alert>
-                            <AlertTriangle className="h-4 w-4" />
-                            <AlertDescription>
-                              <div className="text-sm space-y-1">
-                                <p className="font-medium">Sequence length summary:</p>
-                                {short > 0 && <p>&lt;15 aa: {short} sequences (S4PRED may be unreliable)</p>}
-                                <p>15–100 aa: {optimal} sequences (optimal range)</p>
-                                {long > 0 && <p>&gt;100 aa: {long} sequences (TANGO accuracy may decrease)</p>}
-                              </div>
-                            </AlertDescription>
-                          </Alert>
-                        );
-                      })()}
+                      {rawData.rows &&
+                        rawData.rows.length > 0 &&
+                        (() => {
+                          const pickSeq = (r: any) =>
+                            r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
+                          const lengths = rawData.rows
+                            .map((r) => String(pickSeq(r)).length)
+                            .filter((l) => l > 0);
+                          const short = lengths.filter((l) => l < 15).length;
+                          const optimal = lengths.filter((l) => l >= 15 && l <= 100).length;
+                          const long = lengths.filter((l) => l > 100).length;
+                          const hasWarnings = short > 0 || long > 0;
+                          if (!hasWarnings) return null;
+                          return (
+                            <Alert>
+                              <AlertTriangle className="h-4 w-4" />
+                              <AlertDescription>
+                                <div className="text-sm space-y-1">
+                                  {short > 0 && (
+                                    <p>
+                                      {short} sequences too short (&lt;15 aa) — S4PRED may be
+                                      unreliable
+                                    </p>
+                                  )}
+                                  <p>{optimal} sequences in optimal range (15–100 aa)</p>
+                                  {long > 0 && (
+                                    <p>
+                                      {long} sequences too long (&gt;100 aa) — reduced TANGO
+                                      accuracy
+                                    </p>
+                                  )}
+                                </div>
+                              </AlertDescription>
+                            </Alert>
+                          );
+                        })()}
 
                       {/* Auto-detected columns info */}
                       {rawData.headers && rawData.headers.length > 0 && (
@@ -393,10 +443,14 @@ export default function Upload() {
                           <p className="text-sm font-medium mb-2">Detected columns:</p>
                           <div className="flex flex-wrap gap-2">
                             {rawData.headers.slice(0, 8).map((h: string) => (
-                              <Badge key={h} variant="outline" className="text-xs">{h}</Badge>
+                              <Badge key={h} variant="outline" className="text-xs">
+                                {h}
+                              </Badge>
                             ))}
                             {rawData.headers.length > 8 && (
-                              <Badge variant="outline" className="text-xs">+{rawData.headers.length - 8} more</Badge>
+                              <Badge variant="outline" className="text-xs">
+                                +{rawData.headers.length - 8} more
+                              </Badge>
                             )}
                           </div>
                         </div>

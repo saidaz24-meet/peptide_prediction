@@ -326,7 +326,8 @@ def get_avg_uH_by_segments(sequence: str, segments: list) -> Optional[float]:
         return total_muH / total_length if total_length > 0 else None
 
     except Exception as e:
-        print(f"[DEBUG] Error in get_avg_uH_by_segments: {e}")
+        from services.logger import log_debug
+        log_debug("uH_segment_error", f"Error in get_avg_uH_by_segments: {e}")
         return None  # Return None on error
 
 def check_secondary_structure_prediction_content(secondary_structure_prediction_conf: list) -> float:

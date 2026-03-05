@@ -244,7 +244,11 @@ def _write_simple_bat(records: List[Tuple[str, str]], script_path: str) -> List[
         abs_bin = os.path.abspath(os.path.join(TANGO_DIR, "bin", "tango"))  # will fail later with clear error
     lines = []
     lines.append("#!/bin/bash\n")
-    lines.append("set -euo pipefail\n")
+    # Use set -u (undefined variables) but NOT set -e (exit on error).
+    # If one peptide's TANGO call fails, the script must continue with the
+    # remaining peptides. The failed peptide's output will be empty/partial,
+    # which process_tango_output handles gracefully.
+    lines.append("set -u\n")
     # Use absolute path to binary (computed at script generation time)
     lines.append(f'BIN="{abs_bin}"\n')
     # Ensure binary is executable and not quarantined (macOS safety — no-op on Linux)
@@ -263,11 +267,11 @@ def _write_simple_bat(records: List[Tuple[str, str]], script_path: str) -> List[
             "tango_entry_id": safe,
             "expected_output": expected_output,
         })
-        # Tango inline args format (what your colleague used)
-        # Output to current directory (run_dir) where script is executed
-        # Since cwd=run_dir, just use relative path
+        # Each TANGO call uses || true to ensure the script continues
+        # even if the binary returns non-zero for this peptide.
+        # stderr is redirected to /dev/null to avoid noise in script output.
         lines.append(
-            f'"$BIN" {safe} nt="N" ct="N" ph="7" te="298" io="0.1" tf="0" seq="{seq}" > "{expected_output}"\n'
+            f'"$BIN" {safe} nt="N" ct="N" ph="7" te="298" io="0.1" tf="0" seq="{seq}" > "{expected_output}" 2>/dev/null || true\n'
         )
     with open(script_path, "w", encoding="utf-8") as fh:
         fh.writelines(lines)
@@ -801,6 +805,11 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
 
             if not res:
                 bad_ctr += 1
+                # Mark as attempted: TANGO ran but output was empty/unparseable.
+                # This distinguishes "TANGO ran, no SSW data" (→ -1) from
+                # "TANGO didn't run" (→ None/Missing).
+                results_by_entry[entry]["Tango attempted"] = True
+                results_by_entry[entry]["Tango has data"] = False
                 continue
 
             analysed = __analyse_tango_results(res) or {}
@@ -877,13 +886,15 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
         database["Tango Beta max"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("Tango Beta max"))
         database["Tango Helix max"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("Tango Helix max"))
         database["Tango Aggregation max"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("Tango Aggregation max"))
-        
+        database["Tango attempted"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("Tango attempted", False))
+
         # Regression check: verify all columns have correct length
         expected_len = len(database)
         for col in ["SSW fragments", "SSW score", "SSW diff", "SSW helix percentage",
                     "SSW beta percentage", "Tango Beta curve", "Tango Helix curve",
                     "Tango Turn curve", "Tango Aggregation curve",
-                    "Tango has data", "Tango Beta max", "Tango Helix max", "Tango Aggregation max"]:
+                    "Tango has data", "Tango Beta max", "Tango Helix max", "Tango Aggregation max",
+                    "Tango attempted"]:
             if col in database.columns:
                 actual_len = len(database[col])
                 if actual_len != expected_len:
@@ -898,10 +909,15 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
             "bad_count": bad_ctr,
             "total_entries": len(entry_set),
         })
+        # "requested" = entries actually submitted to TANGO (in mapping),
+        # NOT total DataFrame rows.  Returning len(entry_set) here was a bug:
+        # it inflated "requested" to include entries < 5 AA that were never
+        # submitted, causing upload_service to misclassify status as PARTIAL.
+        mapped_count = len(mapping_lookup) if mapping_lookup else len(entry_set)
         result = {
             "parsed_ok": ok_ctr,
             "parsed_bad": bad_ctr,
-            "requested": len(entry_set),
+            "requested": mapped_count,
         }
         # If zero outputs, provide structured error
         if ok_ctr == 0:
@@ -1033,7 +1049,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
         return result
 
     # ---------- Nothing: defaults ----------
-    print("[TANGO][WARN] No run directory or batch output found; filling defaults.")
+    log_warning("tango_defaults", "No run directory or batch output found; filling defaults.")
     n = len(database)
     # Use index-aligned Series to ensure proper alignment
     # Use None (not -1/0) for missing metrics to indicate data unavailability
@@ -1252,14 +1268,22 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
     """
     Mark 'SSW prediction' = 1 when SSW diff is <= avg threshold; else -1.
     Uses index-aligned Series to ensure proper DataFrame alignment.
-    
+
     Threshold calculation strategy (env var SSW_DIFF_THRESHOLD_STRATEGY):
     - "mean" (default): Use mean of valid SSW diff values
     - "median": Use median of valid SSW diff values
     - "fixed": Use fixed value from SSW_DIFF_THRESHOLD_FIXED (default: 0.0)
     - "multiplier": Use mean * SSW_DIFF_THRESHOLD_MULTIPLIER (default: 1.0)
-    
+
     Fallback threshold when no valid diffs (env var SSW_DIFF_THRESHOLD_FALLBACK, default: 0.0)
+
+    Single-peptide vs batch threshold behavior:
+        - Single peptide: mean([x]) = x, so x < x is always False. Uses
+          fallback_threshold (0.0) instead to avoid degenerate comparison.
+        - Batch (>1 valid diffs): Uses dataset mean/median as threshold.
+        - This is INHERENT and CORRECT: a single peptide has no cohort to
+          compute a meaningful average from. The sswDiffThresholdUsed value
+          in meta.thresholds documents which threshold was actually applied.
     """
     import os
     from services.logger import log_warning
@@ -1324,9 +1348,14 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
         beta_pct = row.get("SSW beta percentage")
 
         # Determine if TANGO actually ran for this row
-        # TANGO ran if we have helix or beta percentages (even if 0.0)
+        # TANGO ran if we have helix or beta percentages (even if 0.0),
+        # OR if the "Tango attempted" flag is set (TANGO ran but output was
+        # empty/unparseable — still means "no switch", not "unknown").
+        tango_attempted = bool(row.get("Tango attempted", False))
+        tango_has_data = bool(row.get("Tango has data", False))
         tango_ran = (helix_pct is not None and not (isinstance(helix_pct, float) and math.isnan(helix_pct))) or \
-                    (beta_pct is not None and not (isinstance(beta_pct, float) and math.isnan(beta_pct)))
+                    (beta_pct is not None and not (isinstance(beta_pct, float) and math.isnan(beta_pct))) or \
+                    tango_attempted or tango_has_data
 
         # Guard: Handle missing SSW diff
         if ssw_diff_val is None or (isinstance(ssw_diff_val, float) and (math.isnan(ssw_diff_val) or not math.isfinite(ssw_diff_val))):

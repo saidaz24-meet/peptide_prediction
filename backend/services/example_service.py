@@ -15,6 +15,7 @@ from services.dataframe_utils import (
     BIOCHEM_COLS, TANGO_COLS
 )
 from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
+from services.logger import log_error, log_warning, log_info
 
 
 # Example dataset config
@@ -71,20 +72,20 @@ def load_example_data(recalc: int = 0) -> dict:
                     # For example dataset, use latest run (backward compatibility)
                     tango.process_tango_output(df, run_dir=None)
                 except ValueError as e:
-                    print(f"[TANGO][ERROR] {e}")
-                    print("[TANGO] Provider status: FAILED - continuing without Tango results")
+                    log_error("tango_output", str(e), stage="example")
+                    log_error("tango_output", "Provider status: FAILED - continuing without Tango results", stage="example")
                 except Exception as e:
-                    print(f"[TANGO][WARN] Unexpected error during output processing: {e}")
-                
+                    log_warning("tango_output", f"Unexpected error during output processing: {e}", stage="example")
+
                 try:
                     tango.filter_by_avg_diff(df, "Example", {"Example": {}})
                 except ValueError as e:
-                    print(f"[TANGO][ERROR] {e}")
-                    print("[TANGO] Provider status: FAILED - SSW prediction computation failed")
+                    log_error("tango_filter", str(e), stage="example")
+                    log_error("tango_filter", "Provider status: FAILED - SSW prediction computation failed", stage="example")
                 except Exception as e:
-                    print(f"[WARN] Tango filter failed (example): {e}")
+                    log_warning("tango_filter", f"Tango filter failed (example): {e}", stage="example")
         except Exception as e:
-            print(f"[WARN] Tango parse failed (example): {e}")
+            log_warning("tango_parse", f"Tango parse failed (example): {e}", stage="example")
 
     # Always compute final FF flags on the DataFrame we're returning
     ensure_cols(df)
@@ -107,7 +108,7 @@ def load_example_data(recalc: int = 0) -> dict:
         "thresholdConfigResolved": {"mode": "default", "version": "1.0.0"},
         "thresholds": {},
     })
-    print(f"[EXAMPLE] rows={len(df)} • Tango rows={ssw_rows} • recalc={recalc}")
+    log_info("example_loaded", f"rows={len(df)} • Tango rows={ssw_rows} • recalc={recalc}", stage="example")
 
     # Normalize to canonical camelCase using PeptideSchema (with provider status - Principle B)
     rows_out = normalize_rows_for_ui(

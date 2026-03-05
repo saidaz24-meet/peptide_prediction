@@ -1,6 +1,6 @@
 # Testing Guide
 
-**Last Updated**: 2026-02-16
+**Last Updated**: 2026-03-05
 
 ---
 
@@ -32,7 +32,7 @@ USE_TANGO=0 USE_S4PRED=0 .venv/bin/python -m pytest tests/test_api_contracts.py 
 make test-unit
 ```
 
-### All Tests (235 passing)
+### All Tests (323 passing)
 
 ```bash
 cd backend
@@ -86,9 +86,28 @@ USE_TANGO=0 USE_S4PRED=0 .venv/bin/python -m pytest tests/test_*_golden.py -v
 
 ## Frontend Tests
 
-**Status**: No automated tests currently configured. Type checking via `tsc --noEmit`.
+**Status**: 77 tests passing via Vitest + jsdom + @testing-library/react.
 
-**Manual Testing**:
+### Run Frontend Tests
+
+```bash
+cd ui
+npx vitest run          # All tests (77 passing)
+npx vitest run --watch  # Watch mode
+```
+
+### Test Files
+
+| File | Tests | Coverage |
+|------|-------|----------|
+| `src/lib/__tests__/normalization.test.ts` | ~15 | Numeric normalization, edge cases |
+| `src/lib/__tests__/ranking.test.ts` | ~25 | Multi-metric ranking, weight sliders |
+| `src/lib/__tests__/spearman.test.ts` | ~10 | Spearman rank correlation |
+| `src/lib/__tests__/consensus.test.ts` | ~15 | Consensus pipeline logic |
+| `src/lib/__tests__/peptideMapper.test.ts` | ~12 | API → frontend type mapping |
+
+### Manual Testing
+
 1. Start dev server: `cd ui && npm run dev`
 2. Open `http://localhost:5173`
 3. Test Upload, Quick Analyze, Results, PeptideDetail pages
@@ -167,7 +186,7 @@ checks/smoke_uniprot.sh          # UniProt pipeline
 
 ## Known Test Failures
 
-**Status**: No known failures. All 235 tests pass deterministically.
+**Status**: No known failures. All 323 backend tests + 77 frontend tests pass deterministically.
 
 **If tests fail**:
 1. Check `USE_TANGO=0 USE_S4PRED=0` is set (tests don't require external tools)

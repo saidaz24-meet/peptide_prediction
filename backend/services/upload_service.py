@@ -19,7 +19,7 @@ import tango
 import s4pred
 from config import settings
 from calculations.biochem import calculate_biochemical_features as calc_biochem
-from services.logger import log_info, log_warning, log_error, get_trace_id
+from services.logger import log_info, log_warning, log_error, log_debug, get_trace_id
 from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
 from services.thresholds import resolve_thresholds
 from services.normalize import (
@@ -37,35 +37,15 @@ from services.dataframe_utils import (
 )
 from schemas.api_models import RowsResponse, PeptideRow, Meta, ProviderStatusSummary
 from services.provider_status_builder import build_provider_meta
+from services.provider_state import (
+    get_last_provider_status,
+    get_last_run_dir,
+    set_last_provider_status,
+    set_last_run_dir,
+)
 
 # Provider flags are read dynamically from settings to avoid caching issues
 # Use settings.USE_TANGO, settings.USE_S4PRED directly
-
-# Global state for provider status tracking (shared with server.py)
-_last_provider_status: Dict[str, Any] = {}
-_last_run_dir: Optional[str] = None
-
-
-def get_last_provider_status() -> Optional[Dict[str, Any]]:
-    """Get the last provider status (for /api/providers/last-run endpoint)."""
-    return _last_provider_status.copy() if _last_provider_status else None
-
-
-def get_last_run_dir() -> Optional[str]:
-    """Get the last TANGO run directory."""
-    return _last_run_dir
-
-
-def set_last_provider_status(status: Dict[str, Any]) -> None:
-    """Set the last provider status (called by both upload and uniprot flows)."""
-    global _last_provider_status
-    _last_provider_status = status.copy()
-
-
-def set_last_run_dir(run_dir: Optional[str]) -> None:
-    """Set the last TANGO run directory."""
-    global _last_run_dir
-    _last_run_dir = run_dir
 
 
 class UploadProcessingError(Exception):
@@ -338,14 +318,21 @@ def run_tango_processing(
             elif 0 < parsed_ok < requested:
                 tango_provider_status = "PARTIAL"
                 tango_provider_reason = f"Only {parsed_ok}/{requested} sequences processed successfully"
-                if "SSW diff" in df.columns:
-                    mask_no_valid = df["SSW diff"].isna()
-                    if mask_no_valid.any():
-                        df.loc[mask_no_valid, "SSW prediction"] = None
-                        df.loc[mask_no_valid, "SSW score"] = None
-                        df.loc[mask_no_valid, "SSW diff"] = None
-                        df.loc[mask_no_valid, "SSW helix percentage"] = None
-                        df.loc[mask_no_valid, "SSW beta percentage"] = None
+                # Only nullify SSW fields for entries where TANGO genuinely
+                # did NOT produce data. Do NOT use "SSW diff".isna() — entries
+                # can have valid TANGO output (Tango has data = True) but still
+                # have SSW diff = None (no helix-beta overlap).  Those entries
+                # should keep their SSW prediction (-1 = no switch).
+                if "Tango has data" in df.columns:
+                    mask_no_tango = ~df["Tango has data"].fillna(False).astype(bool)
+                    # Also exclude entries that were at least attempted
+                    if "Tango attempted" in df.columns:
+                        mask_no_tango = mask_no_tango & ~df["Tango attempted"].fillna(False).astype(bool)
+                    if mask_no_tango.any():
+                        for col in ["SSW prediction", "SSW score", "SSW diff",
+                                    "SSW helix percentage", "SSW beta percentage"]:
+                            if col in df.columns:
+                                df.loc[mask_no_tango, col] = None
             elif parsed_ok == requested and requested > 0:
                 tango_provider_status = "AVAILABLE"
                 tango_provider_reason = None
@@ -529,16 +516,16 @@ def compute_ssw_stats(rows_out: List[Dict[str, Any]], trace_entry: Optional[str]
 
     # Debug: Show which entries are counted as positive
     if trace_entry:
-        print(f"[DEBUG_TRACE][SSW_COUNT] Total positives: {ssw_positives}/{len(rows_out)} ({ssw_percent}%)")
-        print(f"  Positive entries: {ssw_positive_entries[:10]}{'...' if len(ssw_positive_entries) > 10 else ''}")
+        log_debug("ssw_count", f"Total positives: {ssw_positives}/{len(rows_out)} ({ssw_percent}%)", entry=trace_entry)
+        log_debug("ssw_count", f"Positive entries: {ssw_positive_entries[:10]}{'...' if len(ssw_positive_entries) > 10 else ''}", entry=trace_entry)
         if trace_entry in ssw_positive_entries:
-            print(f"  ✓ Entry {trace_entry} IS counted as positive")
+            log_debug("ssw_count", f"Entry {trace_entry} IS counted as positive", entry=trace_entry)
         else:
             trace_row_out = [r for r in rows_out if str(r.get("id", "")).strip() == str(trace_entry).strip()]
             if trace_row_out:
                 trace_row = trace_row_out[0]
                 ssw_val = trace_row.get("sswPrediction")
-                print(f"  ✗ Entry {trace_entry} NOT counted as positive (value: {ssw_val}, type: {type(ssw_val).__name__})")
+                log_debug("ssw_count", f"Entry {trace_entry} NOT counted as positive (value: {ssw_val}, type: {type(ssw_val).__name__})", entry=trace_entry)
 
     return ssw_positives, ssw_valid_count, ssw_percent
 
@@ -635,8 +622,6 @@ def process_upload_dataframe(
     Raises:
         UploadProcessingError: For processing errors that should be returned as HTTP errors
     """
-    global _last_provider_status, _last_run_dir
-
     # Performance timing: FF-Helix computation
     ff_helix_start_time = time.time()
     log_info("ff_helix_compute_start", "Computing FF-Helix % for all sequences")
@@ -686,7 +671,12 @@ def process_upload_dataframe(
     biochem_start_time = time.time()
     log_info("biochem_compute_start", "Computing biochemical features (Charge, Hydrophobicity, μH)")
     calc_biochem(df)
-    apply_ff_flags(df)
+
+    # Resolve thresholds BEFORE apply_ff_flags so user thresholds are wired in
+    threshold_mode = (threshold_config_requested or {}).get("mode", "default")
+    pre_resolved = resolve_thresholds(threshold_config_requested, df)
+    ff_thresholds_used = apply_ff_flags(df, resolved_thresholds=pre_resolved, threshold_mode=threshold_mode)
+
     _finalize_ui_aliases(df)
     finalize_ff_fields(df)
     biochem_elapsed = (time.time() - biochem_start_time) * 1000
@@ -778,11 +768,12 @@ def process_upload_dataframe(
         s4pred_stats=s4pred_stats,
     )
 
-    # Update global state for /api/providers/last-run endpoint
-    _last_provider_status = provider_status_meta.copy()
-    _last_provider_status["total_rows"] = len(df)
-    _last_provider_status["ssw_rows_with_data"] = ssw_hits
-    _last_run_dir = tango._latest_run_dir()
+    # Update global state for /api/providers/last-run endpoint (thread-safe)
+    _status_snapshot = provider_status_meta.copy()
+    _status_snapshot["total_rows"] = len(df)
+    _status_snapshot["ssw_rows_with_data"] = ssw_hits
+    set_last_provider_status(_status_snapshot)
+    set_last_run_dir(tango._latest_run_dir())
 
     # Compute reproducibility primitives
     repro_run_id, trace_id, inputs_hash, config_hash, provider_status_summary, resolved_thresholds = compute_reproducibility_primitives(
@@ -806,7 +797,7 @@ def process_upload_dataframe(
         # Threshold configuration
         "thresholdConfigRequested": threshold_config_requested,
         "thresholdConfigResolved": threshold_config_resolved,
-        "thresholds": resolved_thresholds,
+        "thresholds": {**resolved_thresholds, **ff_thresholds_used},
     })
 
     # ISSUE-018: Validate response through Pydantic model

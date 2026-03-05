@@ -45,12 +45,12 @@ if settings.SENTRY_DSN and not _running_under_pytest:
             debug=settings.SENTRY_DEBUG,
         )
         SENTRY_INITIALIZED = True
-        print(f"[SENTRY] Initialized successfully (environment={settings.ENVIRONMENT}, release={release or 'not set'})")
+        log_info("sentry_init", f"Initialized successfully (environment={settings.ENVIRONMENT}, release={release or 'not set'})")
     except Exception as e:
-        print(f"[SENTRY] Failed to initialize: {e}")
+        log_error("sentry_init", f"Failed to initialize: {e}")
         SENTRY_INITIALIZED = False
 else:
-    print("[SENTRY] No DSN provided (SENTRY_DSN env var not set), Sentry disabled")
+    log_info("sentry_init", "No DSN provided (SENTRY_DSN env var not set), Sentry disabled")
 
 # Create FastAPI app
 app = FastAPI(title="Peptide Prediction Service")

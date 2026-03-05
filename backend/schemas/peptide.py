@@ -126,7 +126,7 @@ class PeptideSchema(BaseModel):
 
     # FF flags and scores (database-level classification)
     # Reference: 260120_Alpha_and_SSW_FF_Predictor/main.py
-    # TODO: FF-Helix threshold parameters pending verification with Peleg before paper submission.
+    # Thresholds verified against Peleg's reference dataset (2026-02-26). Fallback: H=0.417, uH=0.388.
     ff_helix_flag: Optional[int] = Field(None, alias="FF-Helix (Jpred)")
     ff_helix_score: Optional[float] = Field(None, alias="FF-Helix score")
     ff_ssw_flag: Optional[int] = Field(None, alias="FF-Secondary structure switch")

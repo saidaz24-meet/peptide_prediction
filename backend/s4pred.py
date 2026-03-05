@@ -624,6 +624,12 @@ def filter_by_s4pred_diff(
     Reference bug fixed: sequences with diff=-1 (no SSW fragments) were classified
     as positive because -1 < avg_diff. We now correctly classify them as -1.
 
+    Single-peptide vs batch threshold behavior:
+        - Single peptide (<=1 valid diffs): uses fallback 0.0 instead of
+          mean([x]) = x, which would make x < x always False.
+        - Batch (>1 valid diffs): uses dataset mean as threshold.
+        - This is inherent and correct: a single peptide has no cohort.
+
     Args:
         database: DataFrame with S4PRED columns
 

@@ -442,7 +442,7 @@ All results are:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    YOUR BROWSER                          │
+│                    THE BROWSER                          │
 │                                                          │
 │  React App (TypeScript)                                  │
 │  ├── Upload page (CSV / UniProt query)                   │

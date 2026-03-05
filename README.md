@@ -207,7 +207,7 @@ tools/               # External tools (gitignored, volume-mounted into Docker)
 | [docs/active/ACTIVE_CONTEXT.md](docs/active/ACTIVE_CONTEXT.md) | Developers | Architecture overview, entry points, data flow, key modules |
 | [docs/active/CONTRACTS.md](docs/active/CONTRACTS.md) | Developers | API endpoints, request/response shapes, SSW semantics |
 | [docs/active/TESTING_GUIDE.md](docs/active/TESTING_GUIDE.md) | Developers | Test commands, golden tests, debugging strategies |
-| [docs/active/DEPLOYMENT_GUIDE.md](docs/active/DEPLOYMENT_GUIDE.md) | DevOps | Step-by-step VM deployment with Docker + Caddy |
+| [docs/active/DEPLOYMENT.md](docs/active/DEPLOYMENT.md) | DevOps | Step-by-step VM deployment with Docker + Caddy |
 | [docs/active/MASTER_DEV_DOC.md](docs/active/MASTER_DEV_DOC.md) | Tech leads | Strategic decisions, roadmap priorities, infrastructure checklist |
 
 ---

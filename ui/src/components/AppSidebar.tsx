@@ -129,7 +129,25 @@ function NavContent({
 
 export function AppSidebar() {
   const isMobile = useIsMobile();
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(() => {
+    try {
+      return localStorage.getItem("pvl-sidebar-collapsed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleCollapsed = () => {
+    setCollapsed((c) => {
+      const next = !c;
+      try {
+        localStorage.setItem("pvl-sidebar-collapsed", String(next));
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
   const [mobileOpen, setMobileOpen] = useState(false);
 
   // Mobile: use Sheet (slide-out drawer)
@@ -196,7 +214,7 @@ export function AppSidebar() {
               variant="ghost"
               size="icon"
               className="w-full"
-              onClick={() => setCollapsed((c) => !c)}
+              onClick={toggleCollapsed}
               aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               <PanelLeft

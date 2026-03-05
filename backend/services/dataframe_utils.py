@@ -1,15 +1,16 @@
 """
 DataFrame utility functions for data processing.
 """
+
 import io
-from typing import List
+from typing import Dict, List, Optional
 import pandas as pd
 from fastapi import HTTPException
 from auxiliary import ff_helix_percent, ff_helix_cores
+from config import settings
 
 
 # Column constants
-JPRED_COLS = ["Helix fragments (Jpred)", "Helix score (Jpred)"]
 TANGO_COLS = ["SSW prediction", "SSW score"]
 BIOCHEM_COLS = ["Charge", "Hydrophobicity", "Full length uH"]
 
@@ -33,12 +34,20 @@ def ensure_ff_cols(df: pd.DataFrame) -> None:
 def ensure_cols(df: pd.DataFrame) -> None:
     """Ensure all required columns exist with default values."""
     required_cols = [
-        "Charge", "Hydrophobicity", "Full length uH", "Helix (Jpred) uH",
-        "Beta full length uH", "SSW prediction", "SSW score", "SSW diff",
-        "SSW helix percentage", "SSW beta percentage",
-        "FF-Secondary structure switch", "FF-Helix (Jpred)"
+        "Charge",
+        "Hydrophobicity",
+        "Full length uH",
+        "Helix (Jpred) uH",
+        "Beta full length uH",
+        "SSW prediction",
+        "SSW score",
+        "SSW diff",
+        "SSW helix percentage",
+        "SSW beta percentage",
+        "FF-Secondary structure switch",
+        "FF-Helix (Jpred)",
     ]
-    
+
     for col in required_cols:
         if col not in df.columns:
             if col == "Helix fragments (Jpred)":
@@ -60,9 +69,15 @@ def ff_flags(df: pd.DataFrame) -> None:
 def ensure_computed_cols(df: pd.DataFrame) -> None:
     """Ensure computed columns exist with default values."""
     for c in [
-        "Charge", "Hydrophobicity", "Full length uH", "Helix (Jpred) uH",
-        "Helix fragments (Jpred)", "Helix score (Jpred)",
-        "SSW prediction", "SSW score", "Beta full length uH"
+        "Charge",
+        "Hydrophobicity",
+        "Full length uH",
+        "Helix (Jpred) uH",
+        "Helix fragments (Jpred)",
+        "Helix score (Jpred)",
+        "SSW prediction",
+        "SSW score",
+        "Beta full length uH",
     ]:
         if c not in df.columns:
             if c == "Helix fragments (Jpred)":
@@ -72,13 +87,30 @@ def ensure_computed_cols(df: pd.DataFrame) -> None:
                 df[c] = None  # Use None instead of -1 for missing data
 
 
-def apply_ff_flags(df: pd.DataFrame) -> None:
+def apply_ff_flags(
+    df: pd.DataFrame,
+    resolved_thresholds: Optional[Dict[str, float]] = None,
+    threshold_mode: str = "default",
+) -> Dict[str, float]:
     """
     Apply fibril-forming (FF) flags and scores based on computed metrics.
 
     Reference: 260120_Alpha_and_SSW_FF_Predictor/main.py
     - ssw_fibril_formation_prediction_by_method (FF-SSW)
     - helix_fibril_formation_prediction_by_method (FF-Helix)
+
+    Args:
+        df: DataFrame with peptide data (modified in place).
+        resolved_thresholds: Optional dict with user thresholds:
+            - hydroCutoff: overrides data-average hydrophobicity for FF-SSW
+            - muHCutoff: overrides data-average helix uH for FF-Helix
+        threshold_mode: "default" uses data-average, "custom"/"recommended"
+            uses resolved_thresholds values.
+
+    Returns:
+        Dict with actual thresholds used:
+            - ssw_hydro_threshold: float (hydrophobicity threshold for FF-SSW)
+            - helix_uH_threshold: float (uH threshold for FF-Helix)
 
     Outputs (DataFrame columns):
     - FF-Secondary structure switch: 1 (candidate) / -1 (not candidate) / None (no data)
@@ -90,9 +122,9 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
     -  1 = peptide IS a fibrillar candidate
     - -1 = peptide is NOT a fibrillar candidate (data available but below threshold)
     - None/null = data unavailable (provider didn't run)
-
-    TODO: FF-Helix threshold parameters pending verification with Peleg before paper submission.
     """
+    use_custom = threshold_mode in ("custom", "recommended") and resolved_thresholds is not None
+
     # --- Compute Beta full length uH if not present ---
     # Beta uH = hydrophobic_moment(seq, angle=160) — beta-sheet geometry
     # Needed for FF-SSW score formula
@@ -102,14 +134,25 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
     # --- FF-SSW flag and score ---
     # Reference: avg hydrophobicity of rows WITH valid SSW prediction (not -1)
     ssw_col = "SSW prediction"
+    ssw_hydro_threshold = float("nan")
+
     if ssw_col in df.columns:
+        # Compute data-average hydrophobicity (always, for reference)
         valid_ssw_mask = df[ssw_col].notna() & (df[ssw_col] != -1)
         if valid_ssw_mask.any() and "Hydrophobicity" in df.columns:
-            ssw_avg_H = pd.to_numeric(
+            data_avg_H = pd.to_numeric(
                 df.loc[valid_ssw_mask, "Hydrophobicity"], errors="coerce"
             ).mean()
         else:
-            ssw_avg_H = float("nan")
+            data_avg_H = float("nan")
+
+        # Choose threshold: custom overrides data-average, Peleg fallback for NaN
+        if use_custom and "hydroCutoff" in resolved_thresholds:
+            ssw_hydro_threshold = float(resolved_thresholds["hydroCutoff"])
+        elif pd.notna(data_avg_H):
+            ssw_hydro_threshold = data_avg_H
+        else:
+            ssw_hydro_threshold = settings.PELEG_DEFAULT_HYDRO_THRESHOLD
 
         ff_ssw_flags = []
         ff_ssw_scores = []
@@ -123,9 +166,9 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
                 continue
 
             # SSW data available — compute flag
-            if ssw_val != -1 and pd.notna(ssw_avg_H):
+            if ssw_val != -1 and pd.notna(ssw_hydro_threshold):
                 h = r.get("Hydrophobicity")
-                if pd.notna(h) and h >= ssw_avg_H:
+                if pd.notna(h) and h >= ssw_hydro_threshold:
                     ff_ssw_flags.append(1)
                 else:
                     ff_ssw_flags.append(-1)
@@ -159,6 +202,7 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
     helix_pred_col = None
     helix_uh_col = None
     helix_score_col = None
+    helix_uH_threshold = float("nan")
 
     # Check for S4PRED helix data
     if "Helix prediction (S4PRED)" in df.columns:
@@ -174,15 +218,21 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
         helix_score_col = "Helix score (Jpred)" if "Helix score (Jpred)" in df.columns else None
 
     if helix_pred_col and helix_uh_col and helix_uh_col in df.columns:
-        # Reference: avg uH of rows where helix_prediction != -1
+        # Compute data-average uH (always, for reference)
         valid_helix_mask = df[helix_pred_col].notna() & (df[helix_pred_col] != -1)
         valid_uh_mask = valid_helix_mask & df[helix_uh_col].notna()
         if valid_uh_mask.any():
-            helix_avg_uH = pd.to_numeric(
-                df.loc[valid_uh_mask, helix_uh_col], errors="coerce"
-            ).mean()
+            data_avg_uH = pd.to_numeric(df.loc[valid_uh_mask, helix_uh_col], errors="coerce").mean()
         else:
-            helix_avg_uH = float("nan")
+            data_avg_uH = float("nan")
+
+        # Choose threshold: custom overrides data-average, Peleg fallback for NaN
+        if use_custom and "muHCutoff" in resolved_thresholds:
+            helix_uH_threshold = float(resolved_thresholds["muHCutoff"])
+        elif pd.notna(data_avg_uH):
+            helix_uH_threshold = data_avg_uH
+        else:
+            helix_uH_threshold = settings.PELEG_DEFAULT_HELIX_UH_THRESHOLD
 
         ff_helix_flags = []
         ff_helix_scores = []
@@ -197,8 +247,8 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
                 continue
 
             # Helix data available — compute flag
-            if pred_val != -1 and pd.notna(helix_avg_uH) and pd.notna(uh_val):
-                if uh_val >= helix_avg_uH:
+            if pred_val != -1 and pd.notna(helix_uH_threshold) and pd.notna(uh_val):
+                if uh_val >= helix_uH_threshold:
                     ff_helix_flags.append(1)
                 else:
                     ff_helix_flags.append(-1)
@@ -207,8 +257,12 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
 
             # Score: helix_uH + helix_score
             score_val = r.get(helix_score_col) if helix_score_col else None
-            if (uh_val is not None and not (isinstance(uh_val, float) and pd.isna(uh_val))
-                    and score_val is not None and not (isinstance(score_val, float) and pd.isna(score_val))):
+            if (
+                uh_val is not None
+                and not (isinstance(uh_val, float) and pd.isna(uh_val))
+                and score_val is not None
+                and not (isinstance(score_val, float) and pd.isna(score_val))
+            ):
                 try:
                     ff_helix_scores.append(float(uh_val) + float(score_val))
                 except (TypeError, ValueError):
@@ -221,6 +275,15 @@ def apply_ff_flags(df: pd.DataFrame) -> None:
     else:
         df["FF-Helix (Jpred)"] = None
         df["FF-Helix score"] = None
+
+    return {
+        "ssw_hydro_threshold": ssw_hydro_threshold
+        if pd.notna(ssw_hydro_threshold)
+        else settings.PELEG_DEFAULT_HYDRO_THRESHOLD,
+        "helix_uH_threshold": helix_uH_threshold
+        if pd.notna(helix_uH_threshold)
+        else settings.PELEG_DEFAULT_HELIX_UH_THRESHOLD,
+    }
 
 
 def _compute_beta_uh(df: pd.DataFrame) -> None:
@@ -258,10 +321,15 @@ def _compute_helix_uh(df: pd.DataFrame, fragments_col: str, uh_col: str) -> None
     for _, row in df.iterrows():
         seq = row.get("Sequence", "")
         fragments = row.get(fragments_col)
-        if (seq and isinstance(seq, str) and not pd.isna(seq)
-                and fragments is not None
-                and not (isinstance(fragments, float) and pd.isna(fragments))
-                and isinstance(fragments, list) and len(fragments) > 0):
+        if (
+            seq
+            and isinstance(seq, str)
+            and not pd.isna(seq)
+            and fragments is not None
+            and not (isinstance(fragments, float) and pd.isna(fragments))
+            and isinstance(fragments, list)
+            and len(fragments) > 0
+        ):
             corrected_seq = get_corrected_sequence(seq)
             uh = get_avg_uH_by_segments(corrected_seq, fragments)
             uh_values.append(uh)
@@ -293,11 +361,11 @@ def ssw_positive_percent(df: pd.DataFrame) -> float:
 def require_cols(df: pd.DataFrame, cols: List[str]) -> None:
     """
     Validate that required columns exist in the DataFrame.
-    
+
     Args:
         df: DataFrame to validate
         cols: List of required column names
-    
+
     Raises:
         HTTPException 400: If any required columns are missing
     """
@@ -308,19 +376,23 @@ def require_cols(df: pd.DataFrame, cols: List[str]) -> None:
         suggestions = {}
         for col in missing:
             col_lower = col.lower()
-            matches = [c for c in available if c.lower() == col_lower or col_lower in c.lower() or c.lower() in col_lower]
+            matches = [
+                c
+                for c in available
+                if c.lower() == col_lower or col_lower in c.lower() or c.lower() in col_lower
+            ]
             if matches:
                 suggestions[col] = matches[:3]  # Top 3 matches
-        
+
         suggestion_text = ""
         if suggestions:
             suggestion_parts = []
             for req_col, matches in suggestions.items():
                 # Build quoted matches list to avoid nested f-string syntax issues
-                quoted_matches = ', '.join(f"'{m}'" for m in matches)
+                quoted_matches = ", ".join(f"'{m}'" for m in matches)
                 suggestion_parts.append(f"  '{req_col}' might be: {quoted_matches}")
             suggestion_text = "\n" + "\n".join(suggestion_parts)
-        
+
         detail_msg = (
             f"Missing required column(s): {missing}. "
             f"Available columns: {available}. "
@@ -330,45 +402,47 @@ def require_cols(df: pd.DataFrame, cols: List[str]) -> None:
         )
         if suggestion_text:
             detail_msg += suggestion_text
-        
+
         raise HTTPException(400, detail=detail_msg)
 
 
 def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
     """
     Read CSV/TSV/XLS(X) with intelligent delimiter detection and BOM handling.
-    
+
     Supported formats:
     - .csv, .txt (comma-separated)
     - .tsv (tab-separated)
     - .xlsx, .xls (Excel files)
-    
+
     Normalization:
     - Strips UTF-8 BOM if present (utf-8-sig encoding)
     - Normalizes line endings (handled by pandas)
     - Auto-detects delimiter when file extension is ambiguous
-    
+
     Args:
         raw: File contents as bytes
         filename: Original filename (used for extension-based detection)
-    
+
     Returns:
         DataFrame with parsed data
-    
+
     Raises:
         ValueError: If file format is not supported or parsing fails
     """
     fn = filename.lower() if filename else ""
-    
+
     # Excel files (.xlsx, .xls)
     if fn.endswith((".xlsx", ".xls")):
         try:
             bio = io.BytesIO(raw)
-            return pd.read_excel(bio, engine='openpyxl' if fn.endswith('.xlsx') else None)
+            return pd.read_excel(bio, engine="openpyxl" if fn.endswith(".xlsx") else None)
         except Exception as e:
-            raise ValueError(f"Failed to parse Excel file {filename}: {e}. "
-                           f"Ensure file is a valid .xlsx or .xls file. "
-                           f"If using .xlsx, openpyxl must be installed.")
+            raise ValueError(
+                f"Failed to parse Excel file {filename}: {e}. "
+                f"Ensure file is a valid .xlsx or .xls file. "
+                f"If using .xlsx, openpyxl must be installed."
+            )
 
     # TSV files (.tsv) - tab-separated
     if fn.endswith(".tsv"):
@@ -377,11 +451,12 @@ def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
                 io.BytesIO(raw),
                 sep="\t",
                 encoding="utf-8-sig",  # Strips BOM
-                engine="python"  # More lenient with malformed files
+                engine="python",  # More lenient with malformed files
             )
         except Exception as e:
-            raise ValueError(f"Failed to parse TSV file {filename}: {e}. "
-                           f"Ensure file uses tab-separated values.")
+            raise ValueError(
+                f"Failed to parse TSV file {filename}: {e}. Ensure file uses tab-separated values."
+            )
 
     # CSV or TXT files - try extension-based detection, then auto-detect
     if fn.endswith((".csv", ".txt")):
@@ -392,7 +467,7 @@ def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
                     io.BytesIO(raw),
                     sep=",",  # Explicit comma for .csv
                     encoding="utf-8-sig",  # Strips BOM
-                    engine="python"
+                    engine="python",
                 )
             except Exception:
                 # Fallback: let pandas auto-detect delimiter
@@ -401,11 +476,13 @@ def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
                         io.BytesIO(raw),
                         sep=None,  # Auto-detect
                         engine="python",
-                        encoding="utf-8-sig"
+                        encoding="utf-8-sig",
                     )
                 except Exception as e:
-                    raise ValueError(f"Failed to parse CSV file {filename}: {e}. "
-                                   f"Ensure file uses comma-separated values.")
+                    raise ValueError(
+                        f"Failed to parse CSV file {filename}: {e}. "
+                        f"Ensure file uses comma-separated values."
+                    )
 
         # .txt files - auto-detect delimiter (could be CSV or TSV)
         else:
@@ -415,23 +492,17 @@ def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
                     io.BytesIO(raw),
                     sep=None,  # Auto-detect delimiter
                     engine="python",
-                    encoding="utf-8-sig"
+                    encoding="utf-8-sig",
                 )
             except Exception:
                 # Fallback: try tab, then comma
                 try:
                     return pd.read_csv(
-                        io.BytesIO(raw),
-                        sep="\t",
-                        encoding="utf-8-sig",
-                        engine="python"
+                        io.BytesIO(raw), sep="\t", encoding="utf-8-sig", engine="python"
                     )
                 except Exception:
                     return pd.read_csv(
-                        io.BytesIO(raw),
-                        sep=",",
-                        encoding="utf-8-sig",
-                        engine="python"
+                        io.BytesIO(raw), sep=",", encoding="utf-8-sig", engine="python"
                     )
 
     # Unknown extension - try auto-detection
@@ -440,10 +511,11 @@ def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
             io.BytesIO(raw),
             sep=None,  # Auto-detect delimiter
             engine="python",
-            encoding="utf-8-sig"
+            encoding="utf-8-sig",
         )
     except Exception as e:
-        raise ValueError(f"Unsupported file format: {filename}. "
-                       f"Accepted formats: .csv, .tsv, .xlsx, .xls, .txt. "
-                       f"Error: {e}")
-
+        raise ValueError(
+            f"Unsupported file format: {filename}. "
+            f"Accepted formats: .csv, .tsv, .xlsx, .xls, .txt. "
+            f"Error: {e}"
+        )

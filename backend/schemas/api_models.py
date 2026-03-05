@@ -71,7 +71,7 @@ class PeptideRow(BaseModel):
     # FF flags and scores (database-level binary classification)
     # Produced by: backend/services/dataframe_utils.py:apply_ff_flags()
     # Reference: 260120_Alpha_and_SSW_FF_Predictor/main.py
-    # TODO: FF-Helix threshold parameters pending verification with Peleg before paper submission.
+    # Thresholds verified against Peleg's reference dataset (2026-02-26). Fallback: H=0.417, uH=0.388.
     ffHelixFlag: Optional[int] = Field(None, description="FF-Helix flag: 1 (candidate), -1 (not candidate), null (no data). S4PRED-based.")
     ffHelixScore: Optional[float] = Field(None, description="FF-Helix score: helix_uH + helix_score")
     ffSswFlag: Optional[int] = Field(None, description="FF-SSW flag: 1 (candidate), -1 (not candidate), null (no data)")

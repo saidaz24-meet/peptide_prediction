@@ -214,9 +214,9 @@ def _run_analysis_pipeline(
         df_normalized, trace_entry=None, sentry_initialized=sentry_initialized,
     )
 
-    # Biochem + finalize
+    # Biochem + finalize (UniProt queries use default thresholds)
     calc_biochem(df_normalized)
-    apply_ff_flags(df_normalized)
+    apply_ff_flags(df_normalized)  # default mode, no user thresholds
     _finalize_ui_aliases(df_normalized)
     finalize_ff_fields(df_normalized)
 

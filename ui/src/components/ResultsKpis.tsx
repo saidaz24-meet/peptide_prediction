@@ -1,9 +1,11 @@
-import { motion } from 'framer-motion';
-import { TrendingUp, Users, Zap, BarChart3 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { DatasetStats, DatasetMetadata } from '@/types/peptide';
-import { useNavigate } from 'react-router-dom';
-import { MetricId } from '@/types/metrics';
+import { motion } from "framer-motion";
+import { TrendingUp, Users, Heater, FlaskConical } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { DatasetStats, DatasetMetadata } from "@/types/peptide";
+import { useNavigate } from "react-router-dom";
+import { MetricId } from "@/types/metrics";
+import { Abbr } from "@/components/Abbr";
+import { useChartSelection } from "@/stores/chartSelectionStore";
 
 interface ResultsKpisProps {
   stats: DatasetStats | null;
@@ -12,6 +14,7 @@ interface ResultsKpisProps {
 
 export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
   const navigate = useNavigate();
+  const { setTableFilter, setActiveTab } = useChartSelection();
 
   if (!stats) {
     return (
@@ -35,10 +38,10 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
   // AVAILABLE or PARTIAL means TANGO ran and produced output
   // Note: We don't check 'ran' field - 'status' is authoritative
   const tangoStatus = meta?.provider_status?.tango?.status;
-  const tangoAvailable = tangoStatus === 'AVAILABLE' || tangoStatus === 'PARTIAL';
+  const tangoAvailable = tangoStatus === "AVAILABLE" || tangoStatus === "PARTIAL";
 
   const s4predStatus = meta?.provider_status?.s4pred?.status;
-  const s4predAvailable = s4predStatus === 'AVAILABLE' || s4predStatus === 'PARTIAL';
+  const s4predAvailable = s4predStatus === "AVAILABLE" || s4predStatus === "PARTIAL";
 
   const ffAvailable = (stats.ffHelixAvailable ?? 0) > 0;
   const sswAvailable = (stats.sswAvailable ?? 0) > 0;
@@ -46,61 +49,99 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
   // Helper to format percentage or show N/A
   const formatPercent = (value: number | null | undefined, decimals: number = 1): string => {
     if (value === null || value === undefined || Number.isNaN(value)) {
-      return 'N/A';
+      return "N/A";
     }
     return `${value.toFixed(decimals)}%`;
   };
 
   const kpis = [
     {
-      title: 'Total Peptides',
+      title: "Total Peptides",
       value: stats.totalPeptides.toLocaleString(),
       icon: Users,
-      color: 'text-primary',
-      bgColor: 'bg-primary/10',
+      color: "text-primary",
+      bgColor: "bg-primary/10",
       metricId: null as MetricId | null,
-      onClick: () => {}, // Total peptides doesn't have a detail page
+      onClick: () => {
+        setTableFilter(null);
+        setActiveTab("data");
+      },
+      clickable: true,
     },
     {
-      title: 'TANGO SSW+',
-      // NO LYING UI: If TANGO didn't run, show N/A (not 0%)
-      value: tangoAvailable
-        ? formatPercent(stats.sswPositivePercent)
-        : 'N/A',
-      icon: TrendingUp,
-      color: 'text-chameleon-positive',
-      bgColor: 'bg-chameleon-positive/10',
-      metricId: 'ssw-positive' as MetricId,
-      onClick: () => navigate('/metrics/ssw-positive'),
-      tooltip: !tangoAvailable 
-        ? 'TANGO did not run or is unavailable' 
-        : (stats.sswPositivePercent === null || stats.sswPositivePercent === undefined) && (sswAvailable ?? 0) === 0 
-        ? 'TANGO output not available' 
-        : undefined,
-    },
-    {
-      title: 'Avg Hydrophobicity',
-      value: stats.meanHydrophobicity.toFixed(2),
-      icon: Zap,
-      color: 'text-accent',
-      bgColor: 'bg-accent/10',
-      metricId: 'hydrophobicity' as MetricId,
-      onClick: () => navigate('/metrics/hydrophobicity'),
-    },
-    {
-      title: 'Agg Hotspots',
-      value: tangoAvailable && stats.aggHotspotPercent != null
-        ? `${stats.aggHotspotPercent.toFixed(0)}%`
-        : 'N/A',
-      icon: BarChart3,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-600/10',
+      title: (
+        <>
+          % <Abbr title="Fibril-Forming Helix">FF Helix</Abbr>
+        </>
+      ),
+      titleKey: "ff-helix",
+      value: formatPercent(stats.ffHelixCandidatePercent),
+      icon: Heater,
+      color: "text-green-600",
+      bgColor: "bg-green-600/10",
       metricId: null as MetricId | null,
-      onClick: () => {},
-      subtitle: 'TANGO Agg Max > 5%',
+      onClick: () => {
+        setTableFilter({ label: "FF-Helix Candidates", field: "ffHelixFlag", value: 1 });
+        setActiveTab("data");
+      },
+      clickable: true,
+      subtitle: (
+        <>
+          <Abbr title="Secondary Structure Prediction">S4PRED</Abbr> helix +{" "}
+          <Abbr title="Hydrophobic moment">uH</Abbr> {">"} avg
+        </>
+      ),
+      tooltip:
+        "Percentage of peptides classified as FF-Helix candidates (helix uH above cohort average)",
+    },
+    {
+      title: (
+        <>
+          {" "}
+          % <Abbr title="Fibril-Forming Structural Switching">FF SSW</Abbr>
+        </>
+      ),
+      titleKey: "ff-ssw",
+      value: tangoAvailable ? formatPercent(stats.ffSswCandidatePercent) : "N/A",
+      icon: FlaskConical,
+      color: "text-blue-600",
+      bgColor: "bg-blue-600/10",
+      metricId: null as MetricId | null,
+      onClick: () => {
+        setTableFilter({ label: "FF-SSW Candidates", field: "ffSswFlag", value: 1 });
+        setActiveTab("data");
+      },
+      clickable: true,
+      subtitle: (
+        <>
+          <Abbr title="Structural Switching (TANGO)">SSW</Abbr> and H {">"}= avg
+        </>
+      ),
       tooltip: !tangoAvailable
-        ? 'TANGO did not run or is unavailable'
-        : 'Percentage of peptides with peak TANGO aggregation score above 5%',
+        ? "TANGO did not run or is unavailable"
+        : "Percentage of peptides classified as FF-SSW candidates (SSW + hydrophobicity above cohort average)",
+    },
+    {
+      title: (
+        <>
+          {" "}
+          % <Abbr title="Structural Switching (TANGO)">SSW</Abbr>
+        </>
+      ),
+      titleKey: "ssw",
+      value: tangoAvailable ? formatPercent(stats.sswPositivePercent) : "N/A",
+      icon: TrendingUp,
+      color: "text-chameleon-positive",
+      bgColor: "bg-chameleon-positive/10",
+      metricId: "ssw-positive" as MetricId,
+      onClick: () => {
+        setTableFilter({ label: "SSW Positive", field: "sswPrediction", value: 1 });
+        setActiveTab("data");
+      },
+      clickable: true,
+      tooltip: !tangoAvailable
+        ? "TANGO did not run or is unavailable"
+        : "Percentage of peptides with TANGO SSW prediction",
     },
   ];
 
@@ -110,34 +151,34 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
         const Icon = kpi.icon;
         return (
           <motion.div
-            key={kpi.title}
+            key={"titleKey" in kpi ? kpi.titleKey : String(kpi.title)}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: index * 0.1 }}
           >
             <Card
-              className={`shadow-soft transition-shadow ${kpi.metricId ? 'cursor-pointer hover:shadow-medium active:scale-[0.98]' : ''}`}
-              onClick={kpi.metricId ? kpi.onClick : undefined}
+              className={`shadow-soft transition-all cursor-pointer hover:shadow-medium hover:-translate-y-0.5 active:scale-[0.98]`}
+              onClick={kpi.onClick}
             >
               <CardContent className="p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-sm text-muted-foreground mb-1">
-                      {kpi.title}
-                    </p>
+                    <p className="text-sm text-muted-foreground mb-1">{kpi.title}</p>
                     <motion.p
                       className="text-3xl font-bold"
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
-                      transition={{ delay: index * 0.1 + 0.2, type: 'spring' }}
+                      transition={{ delay: index * 0.1 + 0.2, type: "spring" }}
                     >
                       {kpi.value}
                     </motion.p>
-                    {'subtitle' in kpi && kpi.subtitle && (
+                    {"subtitle" in kpi && kpi.subtitle && (
                       <p className="text-xs text-muted-foreground mt-0.5">{kpi.subtitle}</p>
                     )}
                   </div>
-                  <div className={`w-12 h-12 rounded-lg ${kpi.bgColor} flex items-center justify-center`}>
+                  <div
+                    className={`w-12 h-12 rounded-lg ${kpi.bgColor} flex items-center justify-center`}
+                  >
                     <Icon className={`w-6 h-6 ${kpi.color}`} />
                   </div>
                 </div>

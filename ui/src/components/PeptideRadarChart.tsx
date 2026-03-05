@@ -35,11 +35,6 @@ export function PeptideRadarChart({ peptide, cohortStats }: PeptideRadarChartPro
     return Math.max(0, Math.min(1, Math.abs(value) / 10));
   };
 
-  const normalizeLength = (value: number) => {
-    // Normalize length, typical range: 10 to 100
-    return Math.max(0, Math.min(1, (value - 10) / 90));
-  };
-
   const normalizeMuH = (value: number) => {
     // μH range: 0 to 1, already normalized
     return Math.max(0, Math.min(1, value));
@@ -65,15 +60,6 @@ export function PeptideRadarChart({ peptide, cohortStats }: PeptideRadarChartPro
     });
   }
 
-  if (peptide.length !== null) {
-    data.push({
-      metric: 'Length',
-      peptide: normalizeLength(peptide.length),
-      cohort: normalizeLength(cohortStats.meanLength),
-      fullMark: 1,
-    });
-  }
-
   // Add μH if available
   if (peptide.muH !== undefined) {
     const cohortMeanMuH = cohortStats.meanMuH ?? 0.3;
@@ -81,22 +67,6 @@ export function PeptideRadarChart({ peptide, cohortStats }: PeptideRadarChartPro
       metric: 'μH',
       peptide: normalizeMuH(peptide.muH),
       cohort: normalizeMuH(cohortMeanMuH),
-      fullMark: 1,
-    });
-  }
-
-  // S4PRED Helix % on radar (primary helix metric)
-  if (peptide.s4predHelixPercent !== undefined &&
-      peptide.s4predHelixPercent !== null &&
-      peptide.s4predHelixPercent >= 0 &&
-      peptide.s4predHelixPercent <= 100 &&
-      cohortStats.meanS4predHelixPercent !== null &&
-      cohortStats.meanS4predHelixPercent !== undefined &&
-      cohortStats.meanS4predHelixPercent >= 0) {
-    data.push({
-      metric: 'S4PRED Helix %',
-      peptide: peptide.s4predHelixPercent / 100,
-      cohort: cohortStats.meanS4predHelixPercent / 100,
       fullMark: 1,
     });
   }

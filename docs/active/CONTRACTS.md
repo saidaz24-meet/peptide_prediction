@@ -30,6 +30,63 @@ The `sswPrediction` field indicates structural switch propensity:
 
 **Threshold source**: `backend/tango.py:filter_by_avg_diff()`
 
+### SSW Threshold: Single vs Batch
+
+| Scenario | Threshold used | Why |
+|----------|---------------|-----|
+| **Single peptide** | `fallback_threshold` (0.0) | `mean([x]) = x` → `x < x` always false. Fallback avoids degenerate comparison. |
+| **Batch (>1 seq)** | Dataset mean/median | Cohort-relative classification. |
+| **No valid diffs** | `fallback_threshold` (0.0) | No data to compute average from. |
+
+This is **inherent and correct**: a single peptide has no cohort to compute a meaningful average from. The `sswDiffThresholdUsed` value in `meta.thresholds` documents which threshold was actually applied.
+
+---
+
+## Threshold System
+
+### Threshold Categories
+
+| Category | Keys | Behavior |
+|----------|------|----------|
+| **User-configurable** | `muHCutoff`, `hydroCutoff`, `ffHelixPercentThreshold` | UI-visible, sent to backend, override internal defaults |
+| **Internal (data-driven)** | `ssw_hydro_threshold`, `helix_uH_threshold` | Computed by `apply_ff_flags()`, used for FF flag classification |
+| **Structural (fixed)** | `MIN_SEGMENT_LENGTH`, `MAX_GAP`, `MIN_S4PRED_SCORE` | Env-var configurable, never exposed in UI |
+
+### Threshold Modes
+
+| Mode | Behavior |
+|------|----------|
+| `default` | Uses default values (muHCutoff=0.0, hydroCutoff=0.0, ffHelixPercentThreshold=50.0). `apply_ff_flags()` computes thresholds from data average. |
+| `recommended` | Computes thresholds from dataset median. Passes to `apply_ff_flags()` to override data-average. |
+| `custom` | User-specified values. Passes to `apply_ff_flags()` to override data-average. |
+
+### Peleg Fallback Thresholds (Single-Sequence Mode)
+
+When there is no cohort to compute a data-average (single-sequence via QuickAnalyze), `apply_ff_flags()` falls back to Peleg's dataset-average constants:
+
+| Threshold | Peleg Default | Env Var | Used For |
+|-----------|--------------|---------|----------|
+| `ssw_hydro_threshold` | `0.417` | `PELEG_DEFAULT_HYDRO_THRESHOLD` | FF-SSW flag (hydrophobicity >= threshold) |
+| `helix_uH_threshold` | `0.388` | `PELEG_DEFAULT_HELIX_UH_THRESHOLD` | FF-Helix flag (helix uH >= threshold) |
+
+These values are derived from Peleg's rigorously tested reference dataset and provide scientifically grounded defaults when no cohort is available.
+
+### `meta.thresholds` Response Shape
+
+```json
+{
+  "muHCutoff": 0.0,
+  "hydroCutoff": 0.0,
+  "ffHelixPercentThreshold": 50.0,
+  "ssw_hydro_threshold": 0.35,
+  "helix_uH_threshold": 0.30
+}
+```
+
+- `muHCutoff`, `hydroCutoff`, `ffHelixPercentThreshold`: Resolved user thresholds
+- `ssw_hydro_threshold`: Actual hydrophobicity threshold used for FF-SSW flag
+- `helix_uH_threshold`: Actual helix uH threshold used for FF-Helix flag
+
 ---
 
 ## Endpoints

@@ -21,8 +21,8 @@
  * - If provider status is OFF → show "Off" badge with tooltip "Tango is disabled"
  * - If provider status is UNAVAILABLE → show "Failed" badge with tooltip (reason)
  * - If provider status is PARTIAL or AVAILABLE:
- *   - If sswPrediction is 1 → show "Positive" badge
- *   - If sswPrediction is -1 → show "Negative" badge
+ *   - If sswPrediction is 1 → show "SSW" badge
+ *   - If sswPrediction is -1 → show "No SSW" badge
  *   - If sswPrediction is 0 → show "Uncertain" badge
  *   - If sswPrediction is null → show "Missing" badge (output missing for this peptide)
  *
@@ -33,11 +33,17 @@
 // Canonical uppercase status values
 export type TangoProviderStatus = 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
 
+export type NegativeDetail =
+  | 'no_helical_content'   // TANGO helix% = 0 → no helix to switch from
+  | 'no_overlap'           // Helix exists but no helix-beta overlap
+  | 'below_threshold'      // Overlap exists but diff >= threshold (genuine negative)
+  | 'unknown';             // Default when detail not available
+
 export type TangoDisplayState =
   | { type: 'off'; reason?: string }
   | { type: 'failed'; reason: string }
   | { type: 'positive' }
-  | { type: 'negative' }
+  | { type: 'negative'; detail?: NegativeDetail }
   | { type: 'uncertain' }
   | { type: 'missing'; reason: string }
   | { type: 'na'; reason: string };  // truly not applicable
@@ -83,17 +89,28 @@ export function normalizeProviderStatus(status: string | undefined | null): Tang
 }
 
 /**
+ * Additional SSW context for classifying negative predictions.
+ * Lets the UI explain WHY a peptide is negative (no helix, no overlap, or genuine negative).
+ */
+export interface SswContext {
+  sswHelixPercentage?: number | null;  // From TANGO helix curve
+  sswDiff?: number | null;             // SSW diff value (null = no overlap)
+}
+
+/**
  * Determine the display state for a Tango-dependent value.
  *
  * @param providerStatus - The Tango provider status from provider_status
  * @param sswPrediction - The SSW prediction value (1, -1, 0, null)
  * @param hasTangoData - Whether Tango curves/data exist (even if sswPrediction is null)
+ * @param sswContext - Optional SSW context for richer negative classification
  * @returns TangoDisplayState indicating how to render the value
  */
 export function getTangoDisplayState(
   providerStatus: ProviderStatusInfo | undefined,
   sswPrediction: number | null | undefined,
-  hasTangoData: boolean = false
+  hasTangoData: boolean = false,
+  sswContext?: SswContext
 ): TangoDisplayState {
   // Normalize status to canonical uppercase
   const status = normalizeProviderStatus(providerStatus?.status as string);
@@ -136,7 +153,9 @@ export function getTangoDisplayState(
     return { type: 'positive' };
   }
   if (sswPrediction === -1) {
-    return { type: 'negative' };
+    // Classify the negative reason for researcher context
+    const detail = classifyNegativeDetail(sswContext);
+    return { type: 'negative', detail };
   }
   if (sswPrediction === 0) {
     return { type: 'uncertain' };
@@ -147,6 +166,34 @@ export function getTangoDisplayState(
     type: 'missing',
     reason: `Unexpected SSW prediction value: ${sswPrediction}`,
   };
+}
+
+/**
+ * Classify the reason for a negative SSW prediction.
+ *
+ * Uses the SSW context (helix%, diff) to distinguish between:
+ * 1. No helical content detected by TANGO (helix% = 0)
+ * 2. Helix exists but no helix-beta overlap (diff is null)
+ * 3. Overlap exists but diff >= threshold (genuine negative)
+ */
+function classifyNegativeDetail(ctx?: SswContext): NegativeDetail {
+  if (!ctx) return 'unknown';
+
+  const helixPct = ctx.sswHelixPercentage;
+  const diff = ctx.sswDiff;
+
+  // No helical content from TANGO's Boltzmann partition function
+  if (helixPct === 0 || helixPct === null || helixPct === undefined) {
+    return 'no_helical_content';
+  }
+
+  // Has helix but no overlap with beta (diff not computed)
+  if (diff === null || diff === undefined) {
+    return 'no_overlap';
+  }
+
+  // Has overlap but diff >= threshold → genuine negative
+  return 'below_threshold';
 }
 
 /**
@@ -178,18 +225,25 @@ export function getTangoDisplayProps(state: TangoDisplayState): {
       };
     case 'positive':
       return {
-        label: 'Positive',
+        label: 'SSW',
         variant: 'default',
-        tooltip: 'SSW prediction: structural switch predicted',
+        tooltip: 'Structural switching predicted by TANGO',
         icon: 'check',
       };
-    case 'negative':
+    case 'negative': {
+      const negativeTooltips: Record<NegativeDetail, string> = {
+        no_helical_content: 'No SSW — no helical content detected by TANGO',
+        no_overlap: 'No SSW — helix and beta regions do not overlap',
+        below_threshold: 'No SSW — overlap found but below significance threshold',
+        unknown: 'No structural switch predicted',
+      };
       return {
-        label: 'Negative',
+        label: 'No SSW',
         variant: 'secondary',
-        tooltip: 'SSW prediction: no structural switch',
+        tooltip: negativeTooltips[state.detail ?? 'unknown'],
         icon: 'x',
       };
+    }
     case 'uncertain':
       return {
         label: 'Uncertain',

@@ -63,7 +63,7 @@ const RESIDUE_STYLES: Record<string, ResidueStyle> = {
   Q: { fill: '#FF69B4', text: '#000', category: 'polar', label: 'Polar' },
   S: { fill: '#9370DB', text: '#FFF', category: 'polar', label: 'Polar (hydroxyl)' },
   T: { fill: '#9370DB', text: '#FFF', category: 'polar', label: 'Polar (hydroxyl)' },
-  P: { fill: '#32CD32', text: '#000', category: 'special', label: 'Helix breaker' },
+  P: { fill: '#32CD32', text: '#000', category: 'special', label: 'Imino acid' },
 };
 
 const DEFAULT_STYLE: ResidueStyle = {
@@ -168,7 +168,7 @@ const LEGEND_ORDER: { category: ResidueCategory; label: string; fill: string }[]
   { category: 'negative',    label: 'Acidic (-)',       fill: '#DC143C' },
   { category: 'polar',       label: 'Polar',            fill: '#9370DB' },
   { category: 'small',       label: 'Small / Neutral', fill: '#C8C8C8' },
-  { category: 'special',     label: 'Helix breaker',   fill: '#32CD32' },
+  { category: 'special',     label: 'Imino acid',   fill: '#32CD32' },
 ];
 
 // ---------------------------------------------------------------------------

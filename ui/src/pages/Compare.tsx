@@ -1,37 +1,60 @@
-import { useState, useMemo, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useDropzone } from 'react-dropzone';
-import { Upload, ArrowRight, Info } from 'lucide-react';
+import { useState, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
+import { useDropzone } from "react-dropzone";
+import { Upload, ArrowRight, Info } from "lucide-react";
 import {
   ResponsiveContainer,
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ScatterChart, Scatter,
-} from 'recharts';
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ScatterChart,
+  Scatter,
+} from "recharts";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { useDatasetStore } from '@/stores/datasetStore';
-import { uploadCSV } from '@/lib/api';
-import { mapApiRowToPeptide } from '@/lib/peptideMapper';
-import type { Peptide, DatasetStats } from '@/types/peptide';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useDatasetStore } from "@/stores/datasetStore";
+import { uploadCSV } from "@/lib/api";
+import { mapApiRowToPeptide } from "@/lib/peptideMapper";
+import type { Peptide, DatasetStats } from "@/types/peptide";
 
 // Colors for the two cohorts
-const COHORT_A_COLOR = 'hsl(210, 80%, 55%)'; // blue
-const COHORT_B_COLOR = 'hsl(25, 85%, 55%)';  // orange
+const COHORT_A_COLOR = "hsl(210, 80%, 55%)"; // blue
+const COHORT_B_COLOR = "hsl(25, 85%, 55%)"; // orange
 
 function computeStats(peptides: Peptide[]): DatasetStats {
   const n = peptides.length;
-  const mean = (arr: number[]) => arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0;
+  const mean = (arr: number[]) => (arr.length ? arr.reduce((s, v) => s + v, 0) / arr.length : 0);
 
-  const hVals = peptides.map(p => p.hydrophobicity).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-  const cVals = peptides.map(p => Math.abs(p.charge ?? 0)).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-  const muHVals = peptides.map(p => p.muH).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-  const ffVals = peptides.map(p => p.ffHelixPercent).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-  const s4Vals = peptides.map(p => p.s4predHelixPercent).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
-  const lenVals = peptides.map(p => p.length).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+  const hVals = peptides
+    .map((p) => p.hydrophobicity)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const cVals = peptides
+    .map((p) => Math.abs(p.charge ?? 0))
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const muHVals = peptides
+    .map((p) => p.muH)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const ffVals = peptides
+    .map((p) => p.ffHelixPercent)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const s4Vals = peptides
+    .map((p) => p.s4predHelixPercent)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+  const lenVals = peptides
+    .map((p) => p.length)
+    .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
 
-  const sswPos = peptides.filter(p => p.sswPrediction === 1).length;
-  const sswTotal = peptides.filter(p => p.sswPrediction !== null && p.sswPrediction !== undefined).length;
+  const sswPos = peptides.filter((p) => p.sswPrediction === 1).length;
+  const sswTotal = peptides.filter(
+    (p) => p.sswPrediction !== null && p.sswPrediction !== undefined
+  ).length;
 
   return {
     totalPeptides: n,
@@ -46,27 +69,29 @@ function computeStats(peptides: Peptide[]): DatasetStats {
 }
 
 function fmt(v: number | null | undefined, d = 2): string {
-  if (v === null || v === undefined || !Number.isFinite(v)) return 'N/A';
+  if (v === null || v === undefined || !Number.isFinite(v)) return "N/A";
   return v.toFixed(d);
 }
 
 function deltaStr(a: number | null | undefined, b: number | null | undefined): string {
-  if (a == null || b == null || !Number.isFinite(a) || !Number.isFinite(b)) return '-';
+  if (a == null || b == null || !Number.isFinite(a) || !Number.isFinite(b)) return "-";
   const diff = b - a;
-  const sign = diff >= 0 ? '+' : '';
+  const sign = diff >= 0 ? "+" : "";
   return `${sign}${diff.toFixed(2)}`;
 }
 
 function deltaColor(a: number | null | undefined, b: number | null | undefined): string {
-  if (a == null || b == null) return 'text-muted-foreground';
+  if (a == null || b == null) return "text-muted-foreground";
   const diff = b - a;
-  if (Math.abs(diff) < 0.01) return 'text-muted-foreground';
-  return diff > 0 ? 'text-green-600' : 'text-red-500';
+  if (Math.abs(diff) < 0.01) return "text-muted-foreground";
+  return diff > 0 ? "text-green-600" : "text-red-500";
 }
 
 /** Build overlay histogram data for two cohorts */
 function buildHistogram(
-  valsA: number[], valsB: number[], bins = 10
+  valsA: number[],
+  valsB: number[],
+  bins = 10
 ): { range: string; A: number; B: number }[] {
   const all = [...valsA, ...valsB];
   if (all.length === 0) return [];
@@ -81,8 +106,8 @@ function buildHistogram(
     const isLast = i === bins - 1;
     return {
       range: `${lo.toFixed(2)}`,
-      A: valsA.filter(v => isLast ? (v >= lo && v <= hi) : (v >= lo && v < hi)).length,
-      B: valsB.filter(v => isLast ? (v >= lo && v <= hi) : (v >= lo && v < hi)).length,
+      A: valsA.filter((v) => (isLast ? v >= lo && v <= hi : v >= lo && v < hi)).length,
+      B: valsB.filter((v) => (isLast ? v >= lo && v <= hi : v >= lo && v < hi)).length,
     };
   });
 }
@@ -94,7 +119,7 @@ export default function Compare() {
   const [cohortB, setCohortB] = useState<Peptide[] | null>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [bFilename, setBFilename] = useState<string>('');
+  const [bFilename, setBFilename] = useState<string>("");
 
   const cohortA = peptides;
 
@@ -108,74 +133,150 @@ export default function Compare() {
       const rows = response.rows || response.data || [];
       const mapped = rows
         .map((r: any, idx: number) => {
-          try { return mapApiRowToPeptide(r, `compare[${idx}]`); }
-          catch { return null; }
+          try {
+            return mapApiRowToPeptide(r, `compare[${idx}]`);
+          } catch {
+            return null;
+          }
         })
         .filter((p: any): p is Peptide => p !== null);
 
       if (mapped.length === 0) {
-        setError('No valid peptides found in comparison file.');
+        setError("No valid peptides found in comparison file.");
       } else {
         setCohortB(mapped);
       }
     } catch (err: any) {
-      setError(err?.message || 'Failed to process comparison file.');
+      setError(err?.message || "Failed to process comparison file.");
     } finally {
       setUploading(false);
     }
   }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop: (accepted) => { if (accepted.length > 0) processFile(accepted[0]); },
-    accept: { 'text/csv': ['.csv', '.tsv', '.txt'] },
+    onDrop: (accepted) => {
+      if (accepted.length > 0) processFile(accepted[0]);
+    },
+    accept: { "text/csv": [".csv", ".tsv", ".txt"] },
     multiple: false,
     disabled: uploading,
   });
 
   // Stats
   const statsA = useMemo(() => computeStats(cohortA), [cohortA]);
-  const statsB = useMemo(() => cohortB ? computeStats(cohortB) : null, [cohortB]);
+  const statsB = useMemo(() => (cohortB ? computeStats(cohortB) : null), [cohortB]);
 
   // Histogram data
-  const hydroHistA = useMemo(() => cohortA.map(p => p.hydrophobicity).filter((v): v is number => typeof v === 'number' && Number.isFinite(v)), [cohortA]);
-  const hydroHistB = useMemo(() => (cohortB ?? []).map(p => p.hydrophobicity).filter((v): v is number => typeof v === 'number' && Number.isFinite(v)), [cohortB]);
+  const hydroHistA = useMemo(
+    () =>
+      cohortA
+        .map((p) => p.hydrophobicity)
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v)),
+    [cohortA]
+  );
+  const hydroHistB = useMemo(
+    () =>
+      (cohortB ?? [])
+        .map((p) => p.hydrophobicity)
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v)),
+    [cohortB]
+  );
   const hydroHist = useMemo(() => buildHistogram(hydroHistA, hydroHistB), [hydroHistA, hydroHistB]);
 
-  const lenHistA = useMemo(() => cohortA.map(p => p.length).filter((v): v is number => typeof v === 'number' && Number.isFinite(v)), [cohortA]);
-  const lenHistB = useMemo(() => (cohortB ?? []).map(p => p.length).filter((v): v is number => typeof v === 'number' && Number.isFinite(v)), [cohortB]);
+  const lenHistA = useMemo(
+    () =>
+      cohortA
+        .map((p) => p.length)
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v)),
+    [cohortA]
+  );
+  const lenHistB = useMemo(
+    () =>
+      (cohortB ?? [])
+        .map((p) => p.length)
+        .filter((v): v is number => typeof v === "number" && Number.isFinite(v)),
+    [cohortB]
+  );
   const lenHist = useMemo(() => buildHistogram(lenHistA, lenHistB), [lenHistA, lenHistB]);
 
   // Scatter data (H vs μH) for both cohorts
-  const scatterA = useMemo(() =>
-    cohortA
-      .filter(p => typeof p.muH === 'number' && Number.isFinite(p.muH))
-      .map(p => ({ h: p.hydrophobicity, muH: p.muH as number })),
-    [cohortA]);
-  const scatterB = useMemo(() =>
-    (cohortB ?? [])
-      .filter(p => typeof p.muH === 'number' && Number.isFinite(p.muH))
-      .map(p => ({ h: p.hydrophobicity, muH: p.muH as number })),
-    [cohortB]);
+  const scatterA = useMemo(
+    () =>
+      cohortA
+        .filter((p) => typeof p.muH === "number" && Number.isFinite(p.muH))
+        .map((p) => ({ h: p.hydrophobicity, muH: p.muH as number })),
+    [cohortA]
+  );
+  const scatterB = useMemo(
+    () =>
+      (cohortB ?? [])
+        .filter((p) => typeof p.muH === "number" && Number.isFinite(p.muH))
+        .map((p) => ({ h: p.hydrophobicity, muH: p.muH as number })),
+    [cohortB]
+  );
 
   // Redirect if no primary dataset
   if (cohortA.length === 0) {
     return (
       <div className="p-8 max-w-4xl mx-auto text-center space-y-4">
         <h1 className="text-2xl font-bold">Cohort Comparison</h1>
-        <p className="text-muted-foreground">Upload a primary dataset first, then return here to compare.</p>
-        <Button onClick={() => navigate('/upload')}>Go to Upload</Button>
+        <p className="text-muted-foreground">
+          Upload a primary dataset first, then return here to compare.
+        </p>
+        <Button onClick={() => navigate("/upload")}>Go to Upload</Button>
       </div>
     );
   }
 
   const metrics = [
-    { label: 'Total Peptides', a: String(statsA.totalPeptides), b: statsB ? String(statsB.totalPeptides) : '-', delta: null },
-    { label: 'TANGO SSW+ %', a: fmt(statsA.sswPositivePercent, 1), b: fmt(statsB?.sswPositivePercent, 1), delta: deltaStr(statsA.sswPositivePercent, statsB?.sswPositivePercent), deltaCls: deltaColor(statsA.sswPositivePercent, statsB?.sswPositivePercent) },
-    { label: 'Mean H', a: fmt(statsA.meanHydrophobicity), b: fmt(statsB?.meanHydrophobicity), delta: deltaStr(statsA.meanHydrophobicity, statsB?.meanHydrophobicity), deltaCls: deltaColor(statsA.meanHydrophobicity, statsB?.meanHydrophobicity) },
-    { label: 'Mean |Charge|', a: fmt(statsA.meanCharge), b: fmt(statsB?.meanCharge), delta: deltaStr(statsA.meanCharge, statsB?.meanCharge), deltaCls: deltaColor(statsA.meanCharge, statsB?.meanCharge) },
-    { label: 'Mean μH', a: fmt(statsA.meanMuH), b: fmt(statsB?.meanMuH), delta: deltaStr(statsA.meanMuH, statsB?.meanMuH), deltaCls: deltaColor(statsA.meanMuH, statsB?.meanMuH) },
-    { label: 'Mean S4PRED Helix %', a: fmt(statsA.meanS4predHelixPercent, 1), b: fmt(statsB?.meanS4predHelixPercent, 1), delta: deltaStr(statsA.meanS4predHelixPercent, statsB?.meanS4predHelixPercent), deltaCls: deltaColor(statsA.meanS4predHelixPercent, statsB?.meanS4predHelixPercent) },
-    { label: 'Mean Length', a: fmt(statsA.meanLength, 1), b: fmt(statsB?.meanLength, 1), delta: deltaStr(statsA.meanLength, statsB?.meanLength), deltaCls: deltaColor(statsA.meanLength, statsB?.meanLength) },
+    {
+      label: "Total Peptides",
+      a: String(statsA.totalPeptides),
+      b: statsB ? String(statsB.totalPeptides) : "-",
+      delta: null,
+    },
+    {
+      label: "TANGO SSW %",
+      a: fmt(statsA.sswPositivePercent, 1),
+      b: fmt(statsB?.sswPositivePercent, 1),
+      delta: deltaStr(statsA.sswPositivePercent, statsB?.sswPositivePercent),
+      deltaCls: deltaColor(statsA.sswPositivePercent, statsB?.sswPositivePercent),
+    },
+    {
+      label: "Mean H",
+      a: fmt(statsA.meanHydrophobicity),
+      b: fmt(statsB?.meanHydrophobicity),
+      delta: deltaStr(statsA.meanHydrophobicity, statsB?.meanHydrophobicity),
+      deltaCls: deltaColor(statsA.meanHydrophobicity, statsB?.meanHydrophobicity),
+    },
+    {
+      label: "Mean |Charge|",
+      a: fmt(statsA.meanCharge),
+      b: fmt(statsB?.meanCharge),
+      delta: deltaStr(statsA.meanCharge, statsB?.meanCharge),
+      deltaCls: deltaColor(statsA.meanCharge, statsB?.meanCharge),
+    },
+    {
+      label: "Mean μH",
+      a: fmt(statsA.meanMuH),
+      b: fmt(statsB?.meanMuH),
+      delta: deltaStr(statsA.meanMuH, statsB?.meanMuH),
+      deltaCls: deltaColor(statsA.meanMuH, statsB?.meanMuH),
+    },
+    {
+      label: "Mean S4PRED Helix %",
+      a: fmt(statsA.meanS4predHelixPercent, 1),
+      b: fmt(statsB?.meanS4predHelixPercent, 1),
+      delta: deltaStr(statsA.meanS4predHelixPercent, statsB?.meanS4predHelixPercent),
+      deltaCls: deltaColor(statsA.meanS4predHelixPercent, statsB?.meanS4predHelixPercent),
+    },
+    {
+      label: "Mean Length",
+      a: fmt(statsA.meanLength, 1),
+      b: fmt(statsB?.meanLength, 1),
+      delta: deltaStr(statsA.meanLength, statsB?.meanLength),
+      deltaCls: deltaColor(statsA.meanLength, statsB?.meanLength),
+    },
   ];
 
   return (
@@ -193,15 +294,23 @@ export default function Compare() {
         <Card
           {...getRootProps()}
           className={`border-2 border-dashed cursor-pointer transition-colors ${
-            isDragActive ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50 hover:bg-muted/30'
-          } ${uploading ? 'pointer-events-none opacity-60' : ''}`}
+            isDragActive
+              ? "border-primary bg-primary/5"
+              : "border-border hover:border-primary/50 hover:bg-muted/30"
+          } ${uploading ? "pointer-events-none opacity-60" : ""}`}
         >
           <input {...getInputProps()} />
           <CardContent className="flex flex-col items-center justify-center py-10 space-y-4">
-            <Upload className={`h-10 w-10 ${isDragActive ? 'text-primary' : 'text-muted-foreground'}`} />
+            <Upload
+              className={`h-10 w-10 ${isDragActive ? "text-primary" : "text-muted-foreground"}`}
+            />
             <div className="text-center space-y-1">
               <p className="font-medium">
-                {uploading ? 'Processing...' : isDragActive ? 'Drop your file here' : 'Upload Comparison Dataset'}
+                {uploading
+                  ? "Processing..."
+                  : isDragActive
+                    ? "Drop your file here"
+                    : "Upload Comparison Dataset"}
               </p>
               <p className="text-sm text-muted-foreground">
                 Drag & drop a CSV file, or click to browse. Same format as your primary dataset.
@@ -218,23 +327,51 @@ export default function Compare() {
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COHORT_A_COLOR }} />
             <span className="font-medium">Cohort A</span>
-            <span className="text-muted-foreground">({statsA.totalPeptides} peptides — current dataset)</span>
+            <span className="text-muted-foreground">
+              ({statsA.totalPeptides} peptides — current dataset)
+            </span>
           </div>
           <ArrowRight className="w-4 h-4 text-muted-foreground" />
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COHORT_B_COLOR }} />
             <span className="font-medium">Cohort B</span>
-            <span className="text-muted-foreground">({statsB?.totalPeptides} peptides — {bFilename})</span>
+            <span className="text-muted-foreground">
+              ({statsB?.totalPeptides} peptides — {bFilename})
+            </span>
           </div>
           <Button
             variant="outline"
             size="sm"
-            onClick={() => { setCohortB(null); setError(null); }}
+            onClick={() => {
+              setCohortB(null);
+              setError(null);
+            }}
           >
             Change
           </Button>
         </div>
       )}
+
+      {/* Cohort size imbalance warning */}
+      {cohortB &&
+        statsB &&
+        (() => {
+          const a = statsA.totalPeptides;
+          const b = statsB.totalPeptides;
+          const maxN = Math.max(a, b);
+          const minN = Math.min(a, b);
+          const pctDiff = maxN > 0 ? Math.round(((maxN - minN) / maxN) * 100) : 0;
+          if (pctDiff <= 20) return null;
+          return (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                Cohort A (N={a}) and Cohort B (N={b}) differ in size by {pctDiff}%. Statistical
+                comparisons may be skewed by unequal sample sizes.
+              </AlertDescription>
+            </Alert>
+          );
+        })()}
 
       {/* Comparison table */}
       {cohortB && (
@@ -251,8 +388,18 @@ export default function Compare() {
                   <thead>
                     <tr className="border-b">
                       <th className="text-left py-2 pr-4 font-medium">Metric</th>
-                      <th className="text-right py-2 px-4 font-medium" style={{ color: COHORT_A_COLOR }}>Cohort A</th>
-                      <th className="text-right py-2 px-4 font-medium" style={{ color: COHORT_B_COLOR }}>Cohort B</th>
+                      <th
+                        className="text-right py-2 px-4 font-medium"
+                        style={{ color: COHORT_A_COLOR }}
+                      >
+                        Cohort A
+                      </th>
+                      <th
+                        className="text-right py-2 px-4 font-medium"
+                        style={{ color: COHORT_B_COLOR }}
+                      >
+                        Cohort B
+                      </th>
                       <th className="text-right py-2 pl-4 font-medium">Delta (B−A)</th>
                     </tr>
                   </thead>
@@ -262,8 +409,10 @@ export default function Compare() {
                         <td className="py-2 pr-4 text-muted-foreground">{row.label}</td>
                         <td className="text-right py-2 px-4 font-mono">{row.a}</td>
                         <td className="text-right py-2 px-4 font-mono">{row.b}</td>
-                        <td className={`text-right py-2 pl-4 font-mono ${row.deltaCls || 'text-muted-foreground'}`}>
-                          {row.delta ?? '-'}
+                        <td
+                          className={`text-right py-2 pl-4 font-mono ${row.deltaCls || "text-muted-foreground"}`}
+                        >
+                          {row.delta ?? "-"}
                         </td>
                       </tr>
                     ))}
@@ -286,7 +435,13 @@ export default function Compare() {
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={hydroHist} barGap={0}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="range" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+                      <XAxis
+                        dataKey="range"
+                        tick={{ fontSize: 10 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
                       <YAxis allowDecimals={false} />
                       <Tooltip />
                       <Legend />
@@ -313,7 +468,13 @@ export default function Compare() {
                   <ResponsiveContainer width="100%" height={280}>
                     <BarChart data={lenHist} barGap={0}>
                       <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="range" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={60} />
+                      <XAxis
+                        dataKey="range"
+                        tick={{ fontSize: 10 }}
+                        angle={-45}
+                        textAnchor="end"
+                        height={60}
+                      />
                       <YAxis allowDecimals={false} />
                       <Tooltip />
                       <Legend />
@@ -341,7 +502,7 @@ export default function Compare() {
                 </div>
               </CardHeader>
               <CardContent>
-                {(scatterA.length > 0 || scatterB.length > 0) ? (
+                {scatterA.length > 0 || scatterB.length > 0 ? (
                   <ResponsiveContainer width="100%" height={350}>
                     <ScatterChart margin={{ top: 10, right: 30, bottom: 20, left: 20 }}>
                       <CartesianGrid strokeDasharray="3 3" />
@@ -350,14 +511,19 @@ export default function Compare() {
                         dataKey="h"
                         name="Hydrophobicity"
                         tickFormatter={(v: number) => v.toFixed(2)}
-                        label={{ value: 'Hydrophobicity', position: 'insideBottom', offset: -10, fontSize: 11 }}
+                        label={{
+                          value: "Hydrophobicity",
+                          position: "insideBottom",
+                          offset: -10,
+                          fontSize: 11,
+                        }}
                       />
                       <YAxis
                         type="number"
                         dataKey="muH"
                         name="μH"
                         tickFormatter={(v: number) => v.toFixed(2)}
-                        label={{ value: 'μH', angle: -90, position: 'insideLeft', fontSize: 11 }}
+                        label={{ value: "μH", angle: -90, position: "insideLeft", fontSize: 11 }}
                       />
                       <Tooltip
                         content={({ payload }) => {
@@ -372,8 +538,18 @@ export default function Compare() {
                         }}
                       />
                       <Legend />
-                      <Scatter data={scatterA} name="Cohort A" fill={COHORT_A_COLOR} opacity={0.6} />
-                      <Scatter data={scatterB} name="Cohort B" fill={COHORT_B_COLOR} opacity={0.6} />
+                      <Scatter
+                        data={scatterA}
+                        name="Cohort A"
+                        fill={COHORT_A_COLOR}
+                        opacity={0.6}
+                      />
+                      <Scatter
+                        data={scatterB}
+                        name="Cohort B"
+                        fill={COHORT_B_COLOR}
+                        opacity={0.6}
+                      />
                     </ScatterChart>
                   </ResponsiveContainer>
                 ) : (

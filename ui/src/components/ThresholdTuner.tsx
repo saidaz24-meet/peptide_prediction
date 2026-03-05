@@ -16,6 +16,7 @@ import { classificationSummary } from '@/lib/thresholds';
 import { useDatasetStore } from '@/stores/datasetStore';
 import { toast } from 'sonner';
 import type { Peptide } from '@/types/peptide';
+import { Abbr } from '@/components/Abbr';
 
 interface ThresholdTunerProps {
   peptides: Peptide[];
@@ -133,7 +134,7 @@ export function ThresholdTuner({ peptides }: ThresholdTunerProps) {
         <div className="space-y-4">
           <div>
             <div className="flex justify-between text-sm mb-1.5">
-              <span>μH Cutoff</span>
+              <span><Abbr title="Hydrophobic moment">μH</Abbr> Cutoff</span>
               <span className="tabular-nums text-muted-foreground">{active.muHCutoff.toFixed(2)}</span>
             </div>
             <Slider

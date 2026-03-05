@@ -2,7 +2,7 @@ import jsPDF from "jspdf";
 import type { Peptide, DatasetStats, DatasetMetadata } from "@/types/peptide";
 import type { ResolvedThresholds } from "@/lib/thresholds";
 import { DEFAULT_THRESHOLDS } from "@/lib/thresholds";
-import { scorePeptide } from "@/stores/datasetStore";
+import { rankPeptides, METRIC_LABELS, type RankingWeights } from "@/lib/ranking";
 
 // ---- PDF report constants ----
 const MARGIN = 40;
@@ -11,8 +11,6 @@ const HEADER_FONT = 11;
 const BODY_FONT = 9;
 const TABLE_FONT = 8;
 const COL_GAP = 6;
-
-type Weights = { wH: number; wCharge: number; wMuH: number; wFfHelix: number; wFfSsw: number };
 
 function fmt(v: number | null | undefined, decimals = 2): string {
   if (v === null || v === undefined || !Number.isFinite(v)) return "N/A";
@@ -51,15 +49,13 @@ export function exportShortlistPDF(
   peptides: Peptide[],
   stats: DatasetStats,
   meta: DatasetMetadata | null,
-  weights: Weights,
+  weights: RankingWeights,
   topN: number = 10,
-  thresholds: ResolvedThresholds | number = 50.0,
+  thresholds: ResolvedThresholds | number = 50.0
 ) {
   // Backward compat: accept number (old ffHelixThreshold) or full ResolvedThresholds
   const resolvedThresholds: ResolvedThresholds =
-    typeof thresholds === 'number'
-      ? { ...DEFAULT_THRESHOLDS }
-      : thresholds;
+    typeof thresholds === "number" ? { ...DEFAULT_THRESHOLDS } : thresholds;
   const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
@@ -85,7 +81,9 @@ export function exportShortlistPDF(
   pdf.setFont("helvetica", "normal");
   pdf.setTextColor(100);
   const dateStr = new Date().toLocaleDateString("en-GB", {
-    year: "numeric", month: "long", day: "numeric",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
   });
   pdf.text(`Generated: ${dateStr}`, MARGIN, y);
   if ((meta as any)?.filename) {
@@ -115,7 +113,7 @@ export function exportShortlistPDF(
   pdf.setFont("helvetica", "normal");
 
   const summaryRows = [
-    ["TANGO SSW+ Rate", fmtPct(stats.sswPositivePercent)],
+    ["TANGO SSW Rate", fmtPct(stats.sswPositivePercent)],
     ["Mean Hydrophobicity", fmt(stats.meanHydrophobicity)],
     ["Mean |Charge|", fmt(stats.meanCharge)],
     ["Mean μH", fmt(stats.meanMuH)],
@@ -149,8 +147,7 @@ export function exportShortlistPDF(
 
   // Detect if custom or server thresholds
   const isServerDefault =
-    resolvedThresholds.muHCutoff === 0.0 &&
-    resolvedThresholds.hydroCutoff === 0.0;
+    resolvedThresholds.muHCutoff === 0.0 && resolvedThresholds.hydroCutoff === 0.0;
   const thresholdSource = isServerDefault ? "Original (server)" : "Custom (client-adjusted)";
 
   const thresholdRows = [
@@ -172,42 +169,46 @@ export function exportShortlistPDF(
   y += 16;
 
   // ================================================================
-  // 3. TOP-N RANKED PEPTIDES
+  // 3. TOP-N RANKED PEPTIDES (percentile-based)
   // ================================================================
-  // Score and rank
-  const ranked = peptides
-    .map((p) => ({ p, score: scorePeptide(p, weights) }))
-    .sort((a, b) => b.score - a.score)
-    .slice(0, Math.max(1, topN));
+  const tangoAvailable = tangoStatus !== "OFF" && tangoStatus !== "UNAVAILABLE";
+  const allRankings = rankPeptides(peptides, weights, { tangoAvailable });
+  const ranked = [...allRankings]
+    .sort((a, b) => b.compositeScore - a.compositeScore)
+    .slice(0, Math.max(1, topN))
+    .map((r, i) => ({
+      rank: i + 1,
+      p: peptides.find((p) => p.id === r.peptideId)!,
+      r,
+    }))
+    .filter((x) => x.p != null);
 
   pdf.setFontSize(HEADER_FONT);
   pdf.setFont("helvetica", "bold");
-  pdf.text(`Top ${ranked.length} Candidate Peptides (by weighted score)`, MARGIN, y);
+  pdf.text(`Top ${ranked.length} Candidate Peptides (by percentile score)`, MARGIN, y);
   y += 4;
 
   pdf.setFontSize(TABLE_FONT);
   pdf.setFont("helvetica", "normal");
   pdf.setTextColor(100);
-  pdf.text(
-    `Weights — H: ${weights.wH}  Charge: ${weights.wCharge}  μH: ${weights.wMuH}  FF Helix: ${weights.wFfHelix}  FF SSW: ${weights.wFfSsw}`,
-    MARGIN, y + LINE_H,
-  );
+  const weightStr = Object.entries(weights)
+    .map(([k, v]) => `${METRIC_LABELS[k as keyof typeof METRIC_LABELS] ?? k}: ${v}`)
+    .join("  ");
+  pdf.text(`Weights — ${weightStr}`, MARGIN, y + LINE_H);
   pdf.setTextColor(0);
   y += LINE_H + 10;
 
-  // Table columns: Rank, ID, Seq (truncated), Length, H, Charge, μH, FF Helix, FF SSW, SSW, Score
+  // Table columns: Rank, ID, Seq, Len, Composite, Physico, Structural, Agg
   const cols = [
-    { header: "#",         width: 22 },
-    { header: "ID",        width: 85 },
-    { header: "Sequence",  width: 160 },
-    { header: "Len",       width: 28 },
-    { header: "H",         width: 42 },
-    { header: "|Q|",       width: 42 },
-    { header: "μH",        width: 42 },
-    { header: "FF Hlx",    width: 42 },
-    { header: "FF SSW",    width: 42 },
-    { header: "SSW",       width: 48 },
-    { header: "Score",     width: 45 },
+    { header: "#", width: 22 },
+    { header: "ID", width: 85 },
+    { header: "Sequence", width: 160 },
+    { header: "Len", width: 28 },
+    { header: "Score", width: 42 },
+    { header: "Physico", width: 42 },
+    { header: "Struct", width: 42 },
+    { header: "Agg", width: 42 },
+    { header: "SSW", width: 48 },
   ];
 
   // Table header
@@ -227,7 +228,7 @@ export function exportShortlistPDF(
   pdf.setFontSize(TABLE_FONT);
   for (let i = 0; i < ranked.length; i++) {
     checkPage(LINE_H + 4);
-    const { p, score } = ranked[i];
+    const { p, r: ranking } = ranked[i];
 
     // Alternate row background
     if (i % 2 === 0) {
@@ -235,25 +236,20 @@ export function exportShortlistPDF(
       pdf.rect(MARGIN, y - 10, pageW - 2 * MARGIN, LINE_H, "F");
     }
 
-    const seqTrunc = p.sequence.length > 30
-      ? p.sequence.slice(0, 27) + "..."
-      : p.sequence;
+    const seqTrunc = p.sequence.length > 30 ? p.sequence.slice(0, 27) + "..." : p.sequence;
 
-    const ffHelixLabel = p.ffHelixFlag === 1 ? "Yes" : p.ffHelixFlag === -1 ? "No" : "-";
-    const ffSswLabel = p.ffSswFlag === 1 ? "Yes" : p.ffSswFlag === -1 ? "No" : "-";
+    const fmtScore = (v: number | null) => (v != null ? Math.round(v).toString() : "-");
 
     const row = [
       String(i + 1),
       p.id.length > 15 ? p.id.slice(0, 13) + ".." : p.id,
       seqTrunc,
       p.length !== null ? String(p.length) : "-",
-      fmt(p.hydrophobicity),
-      fmt(p.charge !== null ? Math.abs(p.charge) : null),
-      fmt(p.muH),
-      ffHelixLabel,
-      ffSswLabel,
+      fmtScore(ranking.compositeScore),
+      fmtScore(ranking.categoryScores.physicochemical),
+      fmtScore(ranking.categoryScores.structural),
+      fmtScore(ranking.categoryScores.aggregation),
       sswLabel(p.sswPrediction),
-      score.toFixed(2),
     ];
 
     x = MARGIN;
@@ -283,10 +279,11 @@ export function exportShortlistPDF(
   const notes = [
     "Hydrophobicity: Fauchere-Pliska scale, mean per-residue value.",
     "μH (Hydrophobic Moment): Eisenberg consensus, α-helix angle (100°).",
-    "CF Propensity %: Chou-Fasman (1978) context-free helix propensity (legacy metric).",
-    "S4PRED Helix %: Neural network secondary structure prediction (primary helix metric).",
-    "TANGO SSW: Structural Switch prediction from TANGO aggregation analysis.",
-    "Ranking Score = wH×H + wCharge×|Charge| + wμH×μH + wFfHelix×(ffHelixFlag=1 ? 1 : 0) + wFfSsw×(ffSswFlag=1 ? 1 : 0).",
+    "FF-Helix %: Chou-Fasman (1978) context-free helix propensity.",
+    "SSW Score: Secondary Structure Switch score from TANGO aggregation analysis.",
+    "TANGO Agg Max: Maximum aggregation propensity from TANGO per-residue analysis.",
+    "Ranking: Percentile-based (0-100). Each metric is converted to a percentile rank",
+    "  within the cohort. Composite = weighted average of metric percentiles.",
     "",
     "Generated by Peptide Visual Lab (PVL) — https://github.com/your-org/peptide-visual-lab",
   ];
