@@ -129,6 +129,121 @@ Full PeptideDetail-parity: SequenceTrack, HelicalWheel, S4PRED chart, TANGO heat
 
 ---
 
+## Phase E: Docker & Infrastructure Optimization
+
+**Goal**: Production-grade Docker workflow — pull GHCR images locally, optimize builds, prepare K8s migration path.
+
+### Current State (2026-03-05)
+- **GHCR images**: `ghcr.io/saidaz24-meet/peptide_prediction/backend:main` and `frontend:main` auto-published on every push to main
+- **Local images**: `pvl-backend:test` (3.41GB, 1 month old), `pvl-frontend:test` (105MB) — STALE
+- **3 compose files**: `docker-compose.yml` (dev), `docker-compose.prod.yml` (production/Nginx), `docker-compose.caddy.yml` (production/Caddy+HTTPS)
+- **Backend image**: ~800MB (CPU-only PyTorch), multi-stage build
+- **Frontend image**: ~105MB (Nginx + static assets), 3-stage build
+- **Tools**: Volume-mounted at `/opt/tools` (TANGO binary + S4PRED weights)
+
+### E1. Local GHCR Pull & Run (Immediate)
+**Effort**: 2h | **Status**: TODO
+
+Replace stale local builds with fresh GHCR images:
+```bash
+# Pull latest images from GHCR
+docker pull ghcr.io/saidaz24-meet/peptide_prediction/backend:main
+docker pull ghcr.io/saidaz24-meet/peptide_prediction/frontend:main
+
+# Tag for local use
+docker tag ghcr.io/saidaz24-meet/peptide_prediction/backend:main pvl-backend:latest
+docker tag ghcr.io/saidaz24-meet/peptide_prediction/frontend:main pvl-frontend:latest
+```
+
+**Tasks**:
+- Add `docker-compose.ghcr.yml` that uses `image:` instead of `build:` — pulls from GHCR
+- Add `make docker-pull` target to Makefile
+- Clean stale local images (`pvl-backend:test`, `pvl-frontend:test`, dangling `<none>`)
+- Verify health check passes after pull
+
+### E2. Compose File Consolidation
+**Effort**: 4h | **Status**: TODO
+
+Current: 3 separate compose files with duplicated service definitions.
+Target: 1 base compose + override files.
+
+```
+docker/
+  docker-compose.yml          # Base: service definitions, volumes, networks
+  docker-compose.override.yml # Dev: source mounts, hot reload, debug logging
+  docker-compose.prod.yml     # Prod: resource limits, JSON logging, restart: always
+  docker-compose.caddy.yml    # Prod+HTTPS: Caddy reverse proxy, auto-TLS
+```
+
+**Key changes**:
+- Base compose uses `image:` pointing to GHCR (default = pull from registry)
+- Dev override adds `build:` context for local development
+- Prod override adds resource limits, logging, restart policy
+- `make dev` = `docker compose up` (uses base + override)
+- `make prod` = `docker compose -f ... -f docker-compose.prod.yml up`
+
+### E3. Image Size Optimization
+**Effort**: 4h | **Status**: TODO
+
+Backend is 800MB — target 600MB:
+- Audit installed packages: `pip list --format=freeze | wc -l`
+- Split heavy deps (pandas, torch) into requirements layers
+- Use `--no-cache-dir` explicitly (already done via BuildKit cache mount)
+- Consider Alpine base for frontend nginx (already using `nginx:alpine`)
+- Pin base images by SHA digest (currently by tag — TD in ROADMAP)
+
+### E4. Docker Workflow for K8s Readiness
+**Effort**: 8h | **Status**: TODO
+
+Prepare Docker images for seamless K8s migration:
+
+| Item | Current | Target |
+|------|---------|--------|
+| Image registry | GHCR (github) | GHCR + optional Harbor (DESY) |
+| Image tagging | `main`, `sha-xxx` | `main`, `sha-xxx`, semver `v1.0.0` |
+| Config injection | ENV vars in compose | ENV vars → ConfigMap/Secret compatible |
+| Health probes | `curl` in HEALTHCHECK | Liveness + readiness endpoints (`/api/health`, `/api/ready`) |
+| Graceful shutdown | `tini` init | SIGTERM handler, connection draining |
+| Secrets | `.env` file | `.env` → K8s Secret (no code change) |
+| Volume mounts | Host bind mounts | Named volumes → PVC (no code change) |
+| Logging | JSON to stdout | Same (K8s collects stdout natively) |
+
+**Tasks**:
+- Add `/api/ready` endpoint (checks S4PRED model loaded, TANGO binary accessible)
+- Add SIGTERM graceful shutdown handler in `api/main.py`
+- Add `GHCR_REGISTRY` variable to compose for easy registry swaps
+- Document image promotion workflow: `sha-xxx` → `main` → `v1.0.0`
+- Test: `docker run --rm pvl-backend:latest python -c "from api.main import app; print('OK')"`
+
+### E5. Local Development Docker Experience
+**Effort**: 4h | **Status**: TODO
+
+Make `docker compose up` just work for new developers:
+
+```bash
+# One-command setup
+make docker-dev    # Builds + starts with hot reload
+make docker-prod   # Builds + starts production mode
+make docker-pull   # Pulls latest from GHCR (no build needed)
+make docker-clean  # Remove old images, volumes, build cache
+make docker-logs   # Tail logs
+make docker-shell  # Shell into backend container
+```
+
+- Add `docker/.env.example` with all required vars documented
+- Add `scripts/docker-setup.sh` that checks: Docker installed? Tools dir exists? .env created?
+- Add compose `profiles` for optional services (future: Redis, DuckDB)
+
+### E6. Multi-Architecture Build (Future)
+**Effort**: 8h | **Status**: BLOCKED (needs DESY VM arch info)
+
+Current images are `linux/amd64` only. For Apple Silicon dev + Linux prod:
+- Add `docker buildx build --platform linux/amd64,linux/arm64`
+- TANGO binary is x86_64 only → ARM builds skip TANGO or use Rosetta
+- S4PRED/PyTorch works on both architectures
+
+---
+
 ## Phase C: Platform Scale — DESY Kubernetes
 
 DESY K8s confirmed long-term (2026-02-22). Docker images already K8s-ready. Details pending.
