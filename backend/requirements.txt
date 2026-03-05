@@ -1,16 +1,21 @@
-fastapi
-uvicorn[standard]
-pandas
-numpy
-openpyxl
-python-multipart
-httpx
-python-dotenv
-sentry-sdk[fastapi]
-pytest
-# S4PRED dependencies
-torch
-# Dev tools for linting, formatting, and type checking
-ruff
-mypy
-pre-commit
+# Core web framework
+fastapi>=0.117,<1.0
+uvicorn[standard]>=0.37,<1.0
+
+# Data processing
+pandas>=2.3,<3.0
+numpy>=2.3,<3.0
+openpyxl>=3.1,<4.0
+
+# HTTP & middleware
+python-multipart>=0.0.20,<1.0
+httpx>=0.28,<1.0
+python-dotenv>=1.1,<2.0
+
+# Observability
+sentry-sdk[fastapi]>=2.49,<3.0
+
+# S4PRED neural network inference
+# Note: In Docker, use CPU-only torch via --extra-index-url
+# (see Dockerfile.backend for details)
+torch>=2.10,<3.0

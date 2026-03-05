@@ -47,7 +47,10 @@
     --chameleon-negative: 220 8.9% 46.1%;
     --helix: 211 96% 68%;
     --helix-foreground: 0 0% 100%;
-    
+    --beta: 25 95% 53%;
+    --beta-foreground: 0 0% 100%;
+    --coil: 220 8.9% 66%;
+
     /* Borders and inputs */
     --border: 220 13% 91%;
     --input: 220 13% 91%;
@@ -116,7 +119,10 @@
     --chameleon-negative: 220 8.9% 46.1%;
     --helix: 211 96% 68%;
     --helix-foreground: 0 0% 100%;
-    
+    --beta: 25 95% 53%;
+    --beta-foreground: 0 0% 100%;
+    --coil: 220 8.9% 66%;
+
     --border: 220 27% 16%;
     --input: 220 27% 16%;
     --ring: 258 90% 66%;
@@ -146,4 +152,36 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* ExpandableChart: force chart descendants to fill dialog height.
+   .chart-expanded is absolutely positioned inside a sized parent
+   so percentage-based children resolve correctly. */
+.chart-expanded {
+  display: flex;
+  flex-direction: column;
+  /* Expanded margins: generous room for axis labels in full-screen dialog */
+  padding: 12px 24px 20px 28px;
+}
+.chart-expanded > * {
+  flex-shrink: 0;
+}
+.chart-expanded > *:last-child {
+  flex: 1 1 0%;
+  min-height: 0;
+}
+/* Override ChartContainer's fixed h-[300px] and aspect-video */
+.chart-expanded [data-chart] {
+  height: 100% !important;
+  aspect-ratio: unset !important;
+}
+/* Fallback: ensure Recharts responsive containers fill expanded dialog */
+.chart-expanded .recharts-responsive-container {
+  height: 100% !important;
+}
+/* Smooth zoom transitions for chart SVG redraws */
+.chart-expanded svg .recharts-cartesian-grid,
+.chart-expanded svg .recharts-xAxis,
+.chart-expanded svg .recharts-yAxis {
+  transition: transform 0.15s ease-out;
 }

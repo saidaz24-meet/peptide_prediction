@@ -19,7 +19,7 @@ import tango
 import s4pred
 from config import settings
 from calculations.biochem import calculate_biochemical_features as calc_biochem
-from services.logger import log_info, log_warning, log_error, get_trace_id
+from services.logger import log_info, log_warning, log_error, log_debug, get_trace_id
 from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
 from services.thresholds import resolve_thresholds
 from services.normalize import (
@@ -36,35 +36,16 @@ from services.dataframe_utils import (
     fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
 )
 from schemas.api_models import RowsResponse, PeptideRow, Meta, ProviderStatusSummary
+from services.provider_status_builder import build_provider_meta
+from services.provider_state import (
+    get_last_provider_status,
+    get_last_run_dir,
+    set_last_provider_status,
+    set_last_run_dir,
+)
 
 # Provider flags are read dynamically from settings to avoid caching issues
-# Use settings.USE_TANGO, settings.USE_PSIPRED, settings.USE_JPRED directly
-
-# Global state for provider status tracking (shared with server.py)
-_last_provider_status: Dict[str, Any] = {}
-_last_run_dir: Optional[str] = None
-
-
-def get_last_provider_status() -> Optional[Dict[str, Any]]:
-    """Get the last provider status (for /api/providers/last-run endpoint)."""
-    return _last_provider_status.copy() if _last_provider_status else None
-
-
-def get_last_run_dir() -> Optional[str]:
-    """Get the last TANGO run directory."""
-    return _last_run_dir
-
-
-def set_last_provider_status(status: Dict[str, Any]) -> None:
-    """Set the last provider status (called by both upload and uniprot flows)."""
-    global _last_provider_status
-    _last_provider_status = status.copy()
-
-
-def set_last_run_dir(run_dir: Optional[str]) -> None:
-    """Set the last TANGO run directory."""
-    global _last_run_dir
-    _last_run_dir = run_dir
+# Use settings.USE_TANGO, settings.USE_S4PRED directly
 
 
 class UploadProcessingError(Exception):
@@ -74,34 +55,6 @@ class UploadProcessingError(Exception):
         self.message = message
         self.detail = detail or {}
         self.status_code = status_code
-
-
-def _run_secondary_structure_provider(df: pd.DataFrame, trace_entry: Optional[str], sentry_initialized: bool) -> None:
-    """Run secondary structure prediction via provider interface."""
-    psipred_start_time = time.time()
-    from services.secondary_structure import get_provider
-    try:
-        provider = get_provider()
-        log_info("secondary_structure_start", f"Starting {provider.get_name()} processing")
-        provider.run(df)
-        psipred_elapsed = (time.time() - psipred_start_time) * 1000
-        log_info("secondary_structure_complete", f"{provider.get_name()} processing complete",
-                **{"psipred_time_ms": round(psipred_elapsed, 2)})
-    except Exception as e:
-        trace_id = get_trace_id()
-        log_error("secondary_structure_error", f"Secondary structure provider error: {e}",
-                stage="psipred", **{"error": str(e), "entry": trace_entry})
-
-        if sentry_initialized:
-            with sentry_sdk.push_scope() as scope:
-                scope.set_tag("provider", "psipred")
-                scope.set_tag("stage", "execution")
-                scope.set_tag("endpoint", "upload-csv")
-                scope.set_context("psipred_error", {
-                    "trace_id": trace_id,
-                    "entry": trace_entry,
-                })
-                sentry_sdk.capture_exception(e, level="error")
 
 
 def _set_ssw_fields_to_none(df: pd.DataFrame) -> None:
@@ -115,13 +68,20 @@ def _set_ssw_fields_to_none(df: pd.DataFrame) -> None:
     df["SSW prediction"] = pd.Series([None] * n, index=df.index, dtype=object)
 
 
-def _run_tango_processing(
+def run_tango_processing(
     df: pd.DataFrame,
     trace_entry: Optional[str],
-    sentry_initialized: bool
+    sentry_initialized: bool,
+    tango_requested: bool = True,
 ) -> Tuple[Dict[str, Any], str, Optional[str], bool, Optional[str]]:
     """
     Run TANGO processing pipeline.
+
+    Args:
+        df: DataFrame with Entry and Sequence columns
+        trace_entry: Optional entry ID for tracing
+        sentry_initialized: Whether Sentry is available
+        tango_requested: Whether TANGO was requested (False = skip even if USE_TANGO=1)
 
     Returns:
         Tuple of (tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir)
@@ -130,15 +90,20 @@ def _run_tango_processing(
     tango_provider_status = "OFF"
     tango_provider_reason = None
     tango_enabled_flag = settings.USE_TANGO
-    tango_requested_flag = True  # Upload CSV always requests Tango if enabled
+    tango_requested_flag = tango_requested
     tango_ran = False
     run_dir = None
+
+    # Early exit if caller opted out of TANGO
+    if not tango_requested_flag:
+        tango_provider_status = "OFF"
+        tango_provider_reason = "Not requested (run_tango=false)"
+        return tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir
 
     try:
         if tango_enabled_flag:
             # Build fresh records (Entry, Sequence) from df
-            existed = tango.get_all_existed_tango_results_entries()
-            records = tango.create_tango_input(df, existed_tango_results=existed, force=True)
+            records = tango.build_records_from_dataframe(df)
             requested = len(records) if records else 0
             tango_stats["requested"] = requested
 
@@ -293,7 +258,7 @@ def _run_tango_processing(
                 tango_provider_reason = f"Unexpected error: {str(e)}"
                 _set_ssw_fields_to_none(df)
 
-            # Step 3: ensure %Helix / %β present from Tango if PSIPRED is off
+            # Step 3: ensure %Helix / %β present from Tango if S4PRED is off
             _fill_percent_from_tango_if_missing(df)
 
             # Produce SSW prediction column used by the SSW badge
@@ -353,14 +318,21 @@ def _run_tango_processing(
             elif 0 < parsed_ok < requested:
                 tango_provider_status = "PARTIAL"
                 tango_provider_reason = f"Only {parsed_ok}/{requested} sequences processed successfully"
-                if "SSW diff" in df.columns:
-                    mask_no_valid = df["SSW diff"].isna()
-                    if mask_no_valid.any():
-                        df.loc[mask_no_valid, "SSW prediction"] = None
-                        df.loc[mask_no_valid, "SSW score"] = None
-                        df.loc[mask_no_valid, "SSW diff"] = None
-                        df.loc[mask_no_valid, "SSW helix percentage"] = None
-                        df.loc[mask_no_valid, "SSW beta percentage"] = None
+                # Only nullify SSW fields for entries where TANGO genuinely
+                # did NOT produce data. Do NOT use "SSW diff".isna() — entries
+                # can have valid TANGO output (Tango has data = True) but still
+                # have SSW diff = None (no helix-beta overlap).  Those entries
+                # should keep their SSW prediction (-1 = no switch).
+                if "Tango has data" in df.columns:
+                    mask_no_tango = ~df["Tango has data"].fillna(False).astype(bool)
+                    # Also exclude entries that were at least attempted
+                    if "Tango attempted" in df.columns:
+                        mask_no_tango = mask_no_tango & ~df["Tango attempted"].fillna(False).astype(bool)
+                    if mask_no_tango.any():
+                        for col in ["SSW prediction", "SSW score", "SSW diff",
+                                    "SSW helix percentage", "SSW beta percentage"]:
+                            if col in df.columns:
+                                df.loc[mask_no_tango, col] = None
             elif parsed_ok == requested and requested > 0:
                 tango_provider_status = "AVAILABLE"
                 tango_provider_reason = None
@@ -405,7 +377,7 @@ def _run_tango_processing(
     return tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir
 
 
-def _run_s4pred_processing(
+def run_s4pred_processing(
     df: pd.DataFrame,
     trace_entry: Optional[str],
     sentry_initialized: bool
@@ -521,7 +493,7 @@ def _run_s4pred_processing(
     return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
 
 
-def _compute_ssw_stats(rows_out: List[Dict[str, Any]], trace_entry: Optional[str]) -> Tuple[int, int, float]:
+def compute_ssw_stats(rows_out: List[Dict[str, Any]], trace_entry: Optional[str]) -> Tuple[int, int, float]:
     """
     Compute SSW positive statistics from final normalized rows.
 
@@ -544,21 +516,21 @@ def _compute_ssw_stats(rows_out: List[Dict[str, Any]], trace_entry: Optional[str
 
     # Debug: Show which entries are counted as positive
     if trace_entry:
-        print(f"[DEBUG_TRACE][SSW_COUNT] Total positives: {ssw_positives}/{len(rows_out)} ({ssw_percent}%)")
-        print(f"  Positive entries: {ssw_positive_entries[:10]}{'...' if len(ssw_positive_entries) > 10 else ''}")
+        log_debug("ssw_count", f"Total positives: {ssw_positives}/{len(rows_out)} ({ssw_percent}%)", entry=trace_entry)
+        log_debug("ssw_count", f"Positive entries: {ssw_positive_entries[:10]}{'...' if len(ssw_positive_entries) > 10 else ''}", entry=trace_entry)
         if trace_entry in ssw_positive_entries:
-            print(f"  ✓ Entry {trace_entry} IS counted as positive")
+            log_debug("ssw_count", f"Entry {trace_entry} IS counted as positive", entry=trace_entry)
         else:
             trace_row_out = [r for r in rows_out if str(r.get("id", "")).strip() == str(trace_entry).strip()]
             if trace_row_out:
                 trace_row = trace_row_out[0]
                 ssw_val = trace_row.get("sswPrediction")
-                print(f"  ✗ Entry {trace_entry} NOT counted as positive (value: {ssw_val}, type: {type(ssw_val).__name__})")
+                log_debug("ssw_count", f"Entry {trace_entry} NOT counted as positive (value: {ssw_val}, type: {type(ssw_val).__name__})", entry=trace_entry)
 
     return ssw_positives, ssw_valid_count, ssw_percent
 
 
-def _compute_reproducibility_primitives(
+def compute_reproducibility_primitives(
     df: pd.DataFrame,
     threshold_config_requested: Optional[Dict[str, Any]],
     tango_stats: Dict[str, Any],
@@ -596,8 +568,6 @@ def _compute_reproducibility_primitives(
     # 4. Compute config_hash from configuration flags/options
     config_dict = {
         "USE_TANGO": settings.USE_TANGO,
-        "USE_PSIPRED": settings.USE_PSIPRED,
-        "USE_JPRED": settings.USE_JPRED,
         "USE_S4PRED": settings.USE_S4PRED,
     }
     config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
@@ -618,12 +588,6 @@ def _compute_reproducibility_primitives(
             "parsed_ok": s4pred_stats.get("parsed_ok", 0),
             "parsed_bad": s4pred_stats.get("parsed_bad", 0),
         } if s4pred_enabled_flag else None,
-        "psipred": {
-            "status": "OFF" if not settings.USE_PSIPRED else "UNKNOWN",
-        },
-        "jpred": {
-            "status": "OFF",
-        },
     }
 
     # 6. Resolve thresholds (deterministic computation based on mode)
@@ -658,8 +622,6 @@ def process_upload_dataframe(
     Raises:
         UploadProcessingError: For processing errors that should be returned as HTTP errors
     """
-    global _last_provider_status, _last_run_dir
-
     # Performance timing: FF-Helix computation
     ff_helix_start_time = time.time()
     log_info("ff_helix_compute_start", "Computing FF-Helix % for all sequences")
@@ -669,24 +631,20 @@ def process_upload_dataframe(
     log_info("ff_helix_complete", f"Computed FF-Helix for {len(df)} peptides",
             **{"ff_helix_time_ms": round(ff_helix_elapsed, 2)})
 
-    # Secondary structure prediction via provider interface
-    _run_secondary_structure_provider(df, trace_entry, sentry_initialized)
-
     # --- TANGO processing ---
-    tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = _run_tango_processing(
+    tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = run_tango_processing(
         df, trace_entry, sentry_initialized
     )
     tango_enabled_flag = settings.USE_TANGO
     tango_requested_flag = True
 
     # --- S4PRED processing ---
-    s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = _run_s4pred_processing(
+    s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = run_s4pred_processing(
         df, trace_entry, sentry_initialized
     )
     s4pred_enabled_flag = settings.USE_S4PRED
 
-    # JPred disabled - kept for reference only
-    jpred_hits = 0
+    # Count SSW hits (rows with valid TANGO predictions)
     if "SSW prediction" in df.columns:
         ssw_hits = int(df["SSW prediction"].notna().sum())
     else:
@@ -713,7 +671,12 @@ def process_upload_dataframe(
     biochem_start_time = time.time()
     log_info("biochem_compute_start", "Computing biochemical features (Charge, Hydrophobicity, μH)")
     calc_biochem(df)
-    apply_ff_flags(df)
+
+    # Resolve thresholds BEFORE apply_ff_flags so user thresholds are wired in
+    threshold_mode = (threshold_config_requested or {}).get("mode", "default")
+    pre_resolved = resolve_thresholds(threshold_config_requested, df)
+    ff_thresholds_used = apply_ff_flags(df, resolved_thresholds=pre_resolved, threshold_mode=threshold_mode)
+
     _finalize_ui_aliases(df)
     finalize_ff_fields(df)
     biochem_elapsed = (time.time() - biochem_start_time) * 1000
@@ -739,8 +702,6 @@ def process_upload_dataframe(
         df,
         is_single_row=False,
         tango_enabled=settings.USE_TANGO,
-        psipred_enabled=settings.USE_PSIPRED,
-        jpred_enabled=settings.USE_JPRED,
         s4pred_enabled=settings.USE_S4PRED
     )
     normalize_ui_elapsed = (time.time() - normalize_ui_start_time) * 1000
@@ -778,7 +739,7 @@ def process_upload_dataframe(
             log_warning("trace_entry_not_found", f"Entry {trace_entry} not found in normalized rows", entry=trace_entry)
 
     # Compute SSW positive stats
-    ssw_positives, ssw_valid_count, ssw_percent = _compute_ssw_stats(rows_out, trace_entry)
+    ssw_positives, ssw_valid_count, ssw_percent = compute_ssw_stats(rows_out, trace_entry)
 
     ff_avail = int((pd.to_numeric(df.get("FF-Helix %", pd.Series([-1]*len(df))), errors="coerce") != -1).sum())
 
@@ -786,7 +747,6 @@ def process_upload_dataframe(
 
     log_info("upload_complete", f"Upload processing complete", stage="response", run_id=tango_run_dir_basename, **{
         "total_rows": len(df),
-        "jpred_hits": jpred_hits,
         "ssw_hits": ssw_hits,
         "ssw_positive_percent": ssw_percent,
         "ssw_positives": ssw_positives,
@@ -794,51 +754,38 @@ def process_upload_dataframe(
     })
 
     # Build provider status metadata
-    provider_status_meta = {
-        "tango": {
-            "enabled": tango_enabled_flag,
-            "requested": tango_requested_flag,
-            "ran": tango_ran,
-            "status": tango_provider_status,
-            "reason": tango_provider_reason,
-            "stats": tango_stats,
-        },
-        "s4pred": {
-            "enabled": s4pred_enabled_flag,
-            "requested": s4pred_enabled_flag,  # S4PRED is requested if enabled
-            "ran": s4pred_ran,
-            "status": s4pred_provider_status,
-            "reason": s4pred_provider_reason,
-            "stats": s4pred_stats,
-        },
-        "psipred": {
-            "status": "OFF",
-            "reason": "PSIPRED not enabled",
-            "stats": {"requested": 0, "parsed_ok": 0, "parsed_bad": 0},
-        },
-        "jpred": {
-            "status": "OFF",
-            "reason": "JPred disabled",
-            "stats": {"requested": 0, "parsed_ok": 0, "parsed_bad": 0},
-        },
-    }
+    provider_status_meta = build_provider_meta(
+        tango_enabled=tango_enabled_flag,
+        tango_ran=tango_ran,
+        tango_status=tango_provider_status,
+        tango_reason=tango_provider_reason,
+        tango_stats=tango_stats,
+        tango_requested=tango_requested_flag,
+        s4pred_enabled=s4pred_enabled_flag,
+        s4pred_ran=s4pred_ran,
+        s4pred_status=s4pred_provider_status,
+        s4pred_reason=s4pred_provider_reason,
+        s4pred_stats=s4pred_stats,
+    )
 
-    # Update global state for /api/providers/last-run endpoint
-    _last_provider_status = provider_status_meta.copy()
-    _last_provider_status["total_rows"] = len(df)
-    _last_provider_status["ssw_rows_with_data"] = ssw_hits
-    _last_run_dir = tango._latest_run_dir()
+    # Update global state for /api/providers/last-run endpoint (thread-safe)
+    _status_snapshot = provider_status_meta.copy()
+    _status_snapshot["total_rows"] = len(df)
+    _status_snapshot["ssw_rows_with_data"] = ssw_hits
+    set_last_provider_status(_status_snapshot)
+    set_last_run_dir(tango._latest_run_dir())
 
     # Compute reproducibility primitives
-    repro_run_id, trace_id, inputs_hash, config_hash, provider_status_summary, resolved_thresholds = _compute_reproducibility_primitives(
+    repro_run_id, trace_id, inputs_hash, config_hash, provider_status_summary, resolved_thresholds = compute_reproducibility_primitives(
         df, threshold_config_requested, tango_stats, tango_enabled_flag, tango_provider_status,
         s4pred_stats=s4pred_stats, s4pred_enabled_flag=s4pred_enabled_flag, s4pred_provider_status=s4pred_provider_status
     )
 
     # Build meta dict (ISSUE-018: schema enforcement)
     meta_dict = ensure_trace_id_in_meta({
-        "use_jpred": False, "use_tango": settings.USE_TANGO,
-        "jpred_rows": jpred_hits, "ssw_rows": ssw_hits,
+        "use_tango": settings.USE_TANGO,
+        "use_s4pred": settings.USE_S4PRED,
+        "ssw_rows": ssw_hits,
         "valid_seq_rows": int(df["Sequence"].notna().sum()),
         "provider_status": provider_status_meta,
         # Reproducibility primitives
@@ -850,7 +797,7 @@ def process_upload_dataframe(
         # Threshold configuration
         "thresholdConfigRequested": threshold_config_requested,
         "thresholdConfigResolved": threshold_config_resolved,
-        "thresholds": resolved_thresholds,
+        "thresholds": {**resolved_thresholds, **ff_thresholds_used},
     })
 
     # ISSUE-018: Validate response through Pydantic model

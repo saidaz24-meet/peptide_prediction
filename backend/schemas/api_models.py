@@ -58,11 +58,24 @@ class PeptideRow(BaseModel):
     tangoBetaMax: Optional[float] = Field(None, description="Max value of Tango Beta curve")
     tangoHelixMax: Optional[float] = Field(None, description="Max value of Tango Helix curve")
     tangoHasData: Optional[bool] = Field(None, description="True if any Tango curves are available (non-empty)")
+    # TANGO per-residue curves (for aggregation heatmap visualization)
+    tangoAggCurve: Optional[List[float]] = Field(None, description="TANGO per-residue aggregation prediction curve")
+    tangoBetaCurve: Optional[List[float]] = Field(None, description="TANGO per-residue beta prediction curve")
+    tangoHelixCurve: Optional[List[float]] = Field(None, description="TANGO per-residue helix prediction curve")
     
-    # FF-Helix
+    # FF-Helix (local propensity)
     # Produced by: backend/auxiliary.py:ff_helix_percent() and ff_helix_cores()
     ffHelixPercent: Optional[float] = Field(None, description="FF-Helix percentage (from 'ff_helix_percent' field, alias: 'FF-Helix %')")
     ffHelixFragments: Optional[List[Any]] = Field(None, description="FF Helix fragments (from 'ff_helix_fragments' field, alias: 'FF Helix fragments')")
+
+    # FF flags and scores (database-level binary classification)
+    # Produced by: backend/services/dataframe_utils.py:apply_ff_flags()
+    # Reference: 260120_Alpha_and_SSW_FF_Predictor/main.py
+    # Thresholds verified against Peleg's reference dataset (2026-02-26). Fallback: H=0.417, uH=0.388.
+    ffHelixFlag: Optional[int] = Field(None, description="FF-Helix flag: 1 (candidate), -1 (not candidate), null (no data). S4PRED-based.")
+    ffHelixScore: Optional[float] = Field(None, description="FF-Helix score: helix_uH + helix_score")
+    ffSswFlag: Optional[int] = Field(None, description="FF-SSW flag: 1 (candidate), -1 (not candidate), null (no data)")
+    ffSswScore: Optional[float] = Field(None, description="FF-SSW score: Hydrophobicity + Beta_uH + Full_length_uH + SSW_prediction")
 
     # S4PRED secondary structure predictions
     # Produced by: backend/s4pred.py:analyse_s4pred_result() - matches reference implementation
@@ -93,7 +106,7 @@ class PeptideRow(BaseModel):
     # Provider status (Principle B: mandatory provider status)
     # Produced by: backend/services/provider_tracking.py:create_provider_status_for_row()
     # Added during normalization: backend/services/normalize.py:normalize_rows_for_ui()
-    providerStatus: Optional[PeptideProviderStatus] = Field(None, description="Provider status for TANGO/PSIPRED/JPRED")
+    providerStatus: Optional[PeptideProviderStatus] = Field(None, description="Provider status for TANGO/S4PRED")
     
     # Unknown/extra fields
     # Any fields not in the canonical schema go here
@@ -120,7 +133,9 @@ class PeptideRow(BaseModel):
             'hydrophobicity', 'charge', 'muH',
             'sswPrediction', 'sswScore', 'sswDiff', 'sswHelixPercentage', 'sswBetaPercentage',
             'tangoAggMax', 'tangoBetaMax', 'tangoHelixMax', 'tangoHasData',
+            'tangoAggCurve', 'tangoBetaCurve', 'tangoHelixCurve',
             'ffHelixPercent', 'ffHelixFragments',
+            'ffHelixFlag', 'ffHelixScore', 'ffSswFlag', 'ffSswScore',
             # S4PRED fields
             's4predHelixPrediction', 's4predHelixFragments', 's4predHelixScore', 's4predHelixPercent',
             's4predSswPrediction', 's4predSswFragments', 's4predSswScore', 's4predSswDiff',
@@ -157,8 +172,6 @@ class ProviderStatusSummary(BaseModel):
 
     tango: Optional[Dict[str, Any]] = Field(None, description="TANGO provider status summary with keys: status, requested, parsed_ok, parsed_bad")
     s4pred: Optional[Dict[str, Any]] = Field(None, description="S4PRED provider status summary with keys: status, requested, parsed_ok, parsed_bad")
-    psipred: Optional[Dict[str, Any]] = Field(None, description="PSIPRED provider status summary with keys: status")
-    jpred: Optional[Dict[str, Any]] = Field(None, description="JPRED provider status summary (always OFF) with keys: status")
 
 
 class Meta(BaseModel):
@@ -172,9 +185,8 @@ class Meta(BaseModel):
     model_config = ConfigDict(extra="ignore")
     
     # Provider flags
-    use_jpred: bool = Field(..., description="JPred enabled flag (always False, JPred disabled)")
     use_tango: bool = Field(..., description="TANGO enabled flag (from USE_TANGO env var)")
-    jpred_rows: int = Field(..., description="Number of rows with JPred data (always 0)")
+    use_s4pred: bool = Field(default=True, description="S4PRED enabled flag (from USE_S4PRED env var)")
     ssw_rows: int = Field(..., description="Number of rows with SSW/TANGO data")
     valid_seq_rows: int = Field(..., description="Number of rows with valid sequences")
     

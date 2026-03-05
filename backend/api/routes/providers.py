@@ -6,7 +6,6 @@ import tango
 from services.provider_state import get_last_provider_status, get_last_run_dir
 from config import settings
 import os
-import shutil
 import subprocess
 
 router = APIRouter()
@@ -46,19 +45,17 @@ async def providers_last_run():
         return {
             "note": "No dataset processed yet. Load a dataset via /api/upload-csv or /api/uniprot/execute first.",
             "tango": None,
-            "psipred": None,
-            "jpred": None,
+            "s4pred": None,
             "run_dirs": {
                 "tango": None,
             }
         }
-    
+
     latest_tango_dir = get_last_run_dir() or tango._latest_run_dir()
-    
+
     return {
         "tango": last_status.get("tango"),
-        "psipred": last_status.get("psipred"),
-        "jpred": last_status.get("jpred"),
+        "s4pred": last_status.get("s4pred"),
         "run_dirs": {
             "tango": latest_tango_dir,
         },
@@ -122,29 +119,16 @@ async def diagnose_tango():
             result["reason"] = f"Docker check failed: {str(e)}"
         return result
     
-    # Native mode: check binary
-    bin_path = os.path.join(tango.TANGO_DIR, "bin", "tango")
-    bin_path_abs = os.path.abspath(bin_path)
-    
-    tango_bin_env = os.getenv("TANGO_BIN")
-    if tango_bin_env and os.path.exists(tango_bin_env):
-        bin_path_abs = os.path.abspath(tango_bin_env)
-    elif not os.path.exists(bin_path):
-        which_path = shutil.which("tango")
-        if which_path:
-            bin_path_abs = os.path.abspath(which_path)
-        else:
-            result["status"] = "missing"
-            result["reason"] = f"TANGO binary not found at {bin_path_abs} and not in PATH"
-            return result
-    
-    result["path"] = bin_path_abs
-    
-    if not os.path.exists(bin_path_abs):
+    # Native mode: use centralized platform-aware resolver
+    bin_path_abs = tango._resolve_tango_bin()
+
+    if not bin_path_abs:
         result["status"] = "missing"
-        result["reason"] = f"TANGO binary not found at {bin_path_abs}"
+        result["reason"] = "TANGO binary not found (checked TANGO_BINARY_PATH, tools/tango/bin/, backend/Tango/bin/, and PATH)"
         return result
-    
+
+    result["path"] = bin_path_abs
+
     if not os.access(bin_path_abs, os.X_OK):
         result["status"] = "no-exec-permission"
         result["reason"] = f"TANGO binary at {bin_path_abs} is not executable"

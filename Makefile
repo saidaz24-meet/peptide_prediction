@@ -29,18 +29,18 @@ test:
 	@echo "Running Python tests..."
 	@cd backend && \
 	if [ -f .venv/bin/python ]; then \
-		USE_TANGO=0 USE_PSIPRED=0 .venv/bin/python -m pytest tests/ -v --tb=short; \
+		USE_TANGO=0 USE_S4PRED=0 .venv/bin/python -m pytest tests/ -v --tb=short; \
 	else \
-		USE_TANGO=0 USE_PSIPRED=0 python3 -m pytest tests/ -v --tb=short; \
+		USE_TANGO=0 USE_S4PRED=0 python3 -m pytest tests/ -v --tb=short; \
 	fi
 
 test-unit:
 	@echo "Running fast unit tests..."
 	@cd backend && \
 	if [ -f .venv/bin/python ]; then \
-		USE_TANGO=0 USE_PSIPRED=0 .venv/bin/python -m pytest tests/test_api_contracts.py tests/test_uniprot_query_parsing.py tests/test_uniprot_sort.py tests/test_trace_id.py -v --tb=short; \
+		USE_TANGO=0 USE_S4PRED=0 .venv/bin/python -m pytest tests/test_api_contracts.py tests/test_uniprot_query_parsing.py tests/test_uniprot_sort.py tests/test_trace_id.py -v --tb=short; \
 	else \
-		USE_TANGO=0 USE_PSIPRED=0 python3 -m pytest tests/test_api_contracts.py tests/test_uniprot_query_parsing.py tests/test_uniprot_sort.py tests/test_trace_id.py -v --tb=short; \
+		USE_TANGO=0 USE_S4PRED=0 python3 -m pytest tests/test_api_contracts.py tests/test_uniprot_query_parsing.py tests/test_uniprot_sort.py tests/test_trace_id.py -v --tb=short; \
 	fi
 
 # Lint targets

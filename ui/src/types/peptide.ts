@@ -47,8 +47,6 @@ export type SingleProviderStatus = {
 export type ProviderStatus = {
   tango?: SingleProviderStatus;
   s4pred?: SingleProviderStatus;
-  psipred?: SingleProviderStatus;
-  jpred?: SingleProviderStatus;
 };
 
 // ----- Core Peptide model used across the UI -----
@@ -83,24 +81,17 @@ export type Peptide = {
   ffHelixPercent?: number | null;                            // "FF-Helix %"
   ffHelixFragments?: Array<SegmentTuple> | Segment[];        // "FF Helix fragments"
 
+  // FF flags (database-level binary classification from reference implementation)
+  // Thresholds verified against Peleg's reference dataset (2026-02-26). Fallback: H=0.417, uH=0.388.
+  ffHelixFlag?: number | null;    // 1 (candidate), -1 (not candidate), null (no data). S4PRED-based.
+  ffHelixScore?: number | null;   // helix_uH + helix_score
+  ffSswFlag?: number | null;      // 1 (candidate), -1 (not candidate), null (no data)
+  ffSswScore?: number | null;     // Hydrophobicity + Beta_uH + Full_length_uH + SSW_prediction
+
   // ----- Unified secondary-structure percentages used by Results table -----
-  // These are filled by the mapper from PSIPRED if present, otherwise Tango fallback.
-  helixPercent?: number | null;   // preferred: PSIPRED helix %; fallback: "SSW helix percentage"
-  betaPercent?: number | null;    // preferred: PSIPRED beta %;  fallback: "SSW beta percentage"
-
-  // Optional JPred block
-  jpred?: {
-    helixFragments?: Array<SegmentTuple> | Segment[];
-    helixScore?: number | null;
-  };
-
-  // --- Optional PSIPRED curves + segments
-  psipred?: {
-    pH?: number[]; // per-residue P(helix)
-    pE?: number[]; // per-residue P(beta)
-    pC?: number[]; // per-residue P(coil)
-    helixSegments?: Array<[number, number]>;
-  };
+  // These are filled by the mapper from S4PRED if present, otherwise Tango fallback.
+  helixPercent?: number | null;   // preferred: S4PRED helix %; fallback: "SSW helix percentage"
+  betaPercent?: number | null;    // preferred: S4PRED beta %;  fallback: "SSW beta percentage"
 
   // --- Optional Tango per-residue curves
   tango?: {
@@ -173,12 +164,7 @@ export type ColumnMapping = {
   ff_helix_percent?: string;       // maps to Peptide.ffHelixPercent
   ff_helix_fragments?: string;
 
-  // JPred
-  jpred_helix_percent?: string;    // (if you ever store it)
-  jpred_helix_fragments?: string;
-  jpred_helix_score?: string;
-
-  // ----- NEW: optional direct mapping for unified columns -----
+  // ----- Optional direct mapping for unified columns -----
   helix_percent?: string;          // maps to Peptide.helixPercent
   beta_percent?: string;           // maps to Peptide.betaPercent
 
@@ -194,13 +180,21 @@ export type DatasetStats = {
   sswPositivePercent: number | null; // null when TANGO unavailable
   meanHydrophobicity: number;
   meanCharge: number;
+  meanMuH: number | null; // null when no μH data available
   meanFFHelixPercent: number | null; // null when no FF-Helix data available
   meanLength: number;
 
+  meanS4predHelixPercent: number | null; // null when no S4PRED data available
+
+  // FF candidate percentages
+  ffHelixCandidatePercent?: number | null; // % of peptides with ffHelixFlag === 1
+  ffSswCandidatePercent?: number | null;   // % of peptides with ffSswFlag === 1 (gated on TANGO)
+
   // availability counts for better UI display
-  jpredAvailable?: number;
+  s4predAvailable?: number;
   ffHelixAvailable?: number;
   sswAvailable?: number;
+  aggHotspotPercent?: number | null;
 };
 
 // ----- Raw CSV load shape -----
@@ -258,15 +252,13 @@ export type DatasetMetadata = {
   traceId?: string;
   inputsHash?: string;
   configHash?: string;
-  use_jpred?: boolean;
-  jpred_rows?: number;
   use_tango?: boolean;
+  use_s4pred?: boolean;
   ssw_rows?: number;
   valid_seq_rows?: number;
   thresholds?: {
     muHCutoff: number;
     hydroCutoff: number;
-    ffHelixPercentThreshold: number;
   };
   thresholdConfigRequested?: ThresholdConfig | null;
   thresholdConfigResolved?: ThresholdConfig | null;
@@ -274,7 +266,5 @@ export type DatasetMetadata = {
   provider_status?: {
     tango?: SingleProviderStatus;
     s4pred?: SingleProviderStatus;
-    psipred?: SingleProviderStatus;
-    jpred?: SingleProviderStatus;
   };
 };

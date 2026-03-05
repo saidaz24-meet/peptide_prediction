@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
+import logging
 
 from config import settings
 from services.logger import get_logger, set_trace_id, log_info, log_error
@@ -18,29 +20,37 @@ from services.trace_helpers import get_trace_id_for_response
 from api.routes import health, example, upload, predict, providers, uniprot, feedback
 
 # Initialize Sentry before FastAPI app creation
+# Skip Sentry during test runs — test-triggered errors (invalid sort, missing columns,
+# TANGO binding) are expected and should not pollute the Sentry dashboard.
 SENTRY_INITIALIZED = False
-if settings.SENTRY_DSN:
+_running_under_pytest = "pytest" in os.environ.get("_", "") or "pytest" in " ".join(os.sys.argv)
+if settings.SENTRY_DSN and not _running_under_pytest:
     try:
         release = settings.SENTRY_RELEASE
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
             integrations=[
                 FastApiIntegration(),
+                LoggingIntegration(
+                    level=logging.WARNING,
+                    event_level=logging.ERROR,
+                ),
             ],
             send_default_pii=True,
-            traces_sample_rate=0.1,
-            profiles_sample_rate=0.1,
+            # Free tier: 100% sampling OK for low-traffic research tool
+            traces_sample_rate=1.0,
+            profiles_sample_rate=1.0,
             environment=settings.ENVIRONMENT,
             release=release,
             debug=settings.SENTRY_DEBUG,
         )
         SENTRY_INITIALIZED = True
-        print(f"[SENTRY] Initialized successfully (environment={settings.ENVIRONMENT}, release={release or 'not set'})")
+        log_info("sentry_init", f"Initialized successfully (environment={settings.ENVIRONMENT}, release={release or 'not set'})")
     except Exception as e:
-        print(f"[SENTRY] Failed to initialize: {e}")
+        log_error("sentry_init", f"Failed to initialize: {e}")
         SENTRY_INITIALIZED = False
 else:
-    print("[SENTRY] No DSN provided (SENTRY_DSN env var not set), Sentry disabled")
+    log_info("sentry_init", "No DSN provided (SENTRY_DSN env var not set), Sentry disabled")
 
 # Create FastAPI app
 app = FastAPI(title="Peptide Prediction Service")
@@ -112,8 +122,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Content-Type", "X-Trace-Id"],
 )
 
 # Add TraceIdMiddleware last (so it executes first/outermost and captures all requests)
@@ -129,7 +139,7 @@ app.include_router(uniprot.router)
 app.include_router(feedback.router)
 
 # Log boot message
-log_info("boot", f"USE_JPRED={settings.USE_JPRED} • USE_TANGO={settings.USE_TANGO} • USE_S4PRED={settings.USE_S4PRED}")
+log_info("boot", f"USE_TANGO={settings.USE_TANGO} • USE_S4PRED={settings.USE_S4PRED}")
 
 # Export app and SENTRY_INITIALIZED for use in server.py
 __all__ = ["app", "SENTRY_INITIALIZED"]

@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Optional, Dict, Any
 import pickle
 
+from services.logger import log_warning
+
 # Cache directory (in backend/cache/)
 CACHE_DIR = Path(__file__).parent.parent / "cache"
 CACHE_DIR.mkdir(exist_ok=True)
@@ -31,7 +33,7 @@ def cache_key(sequence: str, provider: Optional[str] = None) -> str:
     
     Args:
         sequence: Amino acid sequence
-        provider: Optional provider name (e.g., "tango", "psipred") for provider-specific caching
+        provider: Optional provider name (e.g., "tango", "s4pred") for provider-specific caching
     
     Returns:
         Cache key string (filename-safe)
@@ -63,7 +65,7 @@ def cache_get(key: str) -> Optional[Dict[str, Any]]:
             return pickle.load(f)
     except Exception as e:
         # Cache corruption - remove bad file
-        print(f"[CACHE][WARN] Failed to load cache {key}: {e}")
+        log_warning("cache_load_failed", f"Failed to load cache {key}: {e}")
         try:
             cache_file.unlink()
         except Exception:
@@ -90,7 +92,7 @@ def cache_set(key: str, data: Dict[str, Any], ttl_seconds: Optional[int] = None)
         with open(cache_file, 'wb') as f:
             pickle.dump(cache_data, f)
     except Exception as e:
-        print(f"[CACHE][WARN] Failed to write cache {key}: {e}")
+        log_warning("cache_write_failed", f"Failed to write cache {key}: {e}")
 
 
 def cache_clear(sequence: Optional[str] = None) -> int:

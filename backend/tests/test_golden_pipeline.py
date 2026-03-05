@@ -45,11 +45,11 @@ finally:
 def run_pipeline_on_csv(csv_path: str, skip_external_tools: bool = True) -> pd.DataFrame:
     """
     Run the core pipeline (parsing + biochem calculations) on a CSV file.
-    Mimics the logic from /api/upload-csv but skips Tango/JPred/PSIPRED.
-    
+    Mimics the logic from /api/upload-csv but skips TANGO/S4PRED.
+
     Args:
         csv_path: Path to CSV file
-        skip_external_tools: If True, skip Tango/JPred/PSIPRED (for faster tests)
+        skip_external_tools: If True, skip TANGO/S4PRED (for faster tests)
     
     Returns:
         Processed DataFrame
@@ -95,7 +95,7 @@ def run_pipeline_on_csv(csv_path: str, skip_external_tools: bool = True) -> pd.D
     
     # Skip external tools for fast tests
     if not skip_external_tools:
-        # TODO: Add Tango/JPred/PSIPRED if needed for more comprehensive tests
+        # TODO: Add TANGO/S4PRED if needed for more comprehensive tests
         pass
     
     # Compute biochemical features
@@ -337,7 +337,7 @@ def test_result_alignment_after_shuffle():
     })
     
     # Simulate processing: assign results by Entry ID (like our fixed code does)
-    # In real code, this happens in process_tango_output, process_jpred_output, etc.
+    # In real code, this happens in process_tango_output, etc.
     test_results = {
         "P12345": {"score": 100, "fragments": [[1, 3]]},
         "P67890": {"score": 200, "fragments": [[2, 4]]},

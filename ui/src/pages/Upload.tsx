@@ -11,14 +11,16 @@ import { useDatasetStore } from "@/stores/datasetStore";
 import { uploadCSV } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
+import * as XLSX from "xlsx";
 import AppFooter from "@/components/AppFooter";
 import { UploadDropzone } from "@/components/UploadDropzone";
 import { UniProtQueryInput } from "@/components/UniProtQueryInput";
+import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertTriangle } from "lucide-react";
 import { Search } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
+import { ThresholdConfigPanel } from "@/components/ThresholdConfigPanel";
 import type { ThresholdConfig } from "@/types/peptide";
 
 const steps = [
@@ -50,28 +52,37 @@ export default function Upload() {
   const [currentStep, setCurrentStep] = useState(0);
   const [localFile, setLocalFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [uploadMode, setUploadMode] = useState<'file' | 'uniprot'>('file');
+  const [uploadMode, setUploadMode] = useState<"file" | "uniprot">("file");
 
   // threshold configuration
-  const [thresholdMode, setThresholdMode] = useState<'default' | 'recommended' | 'custom'>('default');
+  const [thresholdMode, setThresholdMode] = useState<"default" | "recommended" | "custom">(
+    "recommended"
+  );
   const [customThresholds, setCustomThresholds] = useState({
     muHCutoff: 0.0,
     hydroCutoff: 0.0,
-    ffHelixPercentThreshold: 50.0,
+    aggThreshold: 5.0,
   });
 
   // preview QC banner
   const [qc, setQc] = useState<null | { rejectedCount: number; download: () => void }>(null);
 
   // store
-  const { rawData, isLoading, setRawPreview, ingestBackendRows, setLoading, setLastRun } = useDatasetStore();
+  const {
+    rawData,
+    isLoading,
+    setRawPreview,
+    ingestBackendRows,
+    setLoading,
+    setLastRun,
+    setSourceFile,
+  } = useDatasetStore();
   const navigate = useNavigate();
   const progressPercent = ((currentStep + 1) / steps.length) * 100;
 
   // ---- CSV/TSV preview (XLSX skips preview) ----
   const handleLocalPreview = (file: File) => {
-    console.log('[Upload] handleLocalPreview called with file:', file.name);
-    setLocalFile(file); // <— KEY: remember the file so Analyze can enable
+    setLocalFile(file);
     setQc(null);
 
     const name = file.name.toLowerCase();
@@ -79,41 +90,88 @@ export default function Upload() {
     const isXLSX = name.endsWith(".xlsx") || name.endsWith(".xls");
 
     if (isXLSX) {
-      // Skip client preview; backend will read Excel directly.
-      console.log('[Upload] Excel file detected, skipping preview');
-      setRawPreview({ fileName: file.name, headers: [], rows: [], rowCount: 0 } as any);
-      setCurrentStep(1);
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        try {
+          const data = new Uint8Array(evt.target?.result as ArrayBuffer);
+          const workbook = XLSX.read(data, { type: "array" });
+          const ws = workbook.Sheets[workbook.SheetNames[0]];
+          const jsonData = XLSX.utils.sheet_to_json(ws, { header: 1 }) as any[][];
+
+          if (jsonData.length < 2) {
+            toast.error("Excel file has no data rows");
+            return;
+          }
+
+          const xlHeaders = (jsonData[0] as string[]).map((h) => String(h ?? ""));
+          const xlRows = jsonData.slice(1, 201).map((row) => {
+            const obj: Record<string, any> = {};
+            xlHeaders.forEach((h, i) => {
+              obj[h] = row[i] ?? "";
+            });
+            return obj;
+          });
+
+          setRawPreview({
+            fileName: file.name,
+            headers: xlHeaders,
+            rows: xlRows,
+            rowCount: jsonData.length - 1,
+          } as any);
+
+          // QC check for invalid sequences
+          const pickSeq = (r: any) =>
+            r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
+          const allRows = jsonData.slice(1).map((row) => {
+            const obj: Record<string, any> = {};
+            xlHeaders.forEach((h, i) => {
+              obj[h] = row[i] ?? "";
+            });
+            return obj;
+          });
+          const rejected = allRows.filter((r) => {
+            const seq = String(pickSeq(r));
+            return seq && !isValidSeq(seq);
+          });
+          if (rejected.length > 0) {
+            setQc({
+              rejectedCount: rejected.length,
+              download: () => exportCsv("rejected_rows.csv", rejected),
+            });
+          } else {
+            setQc(null);
+          }
+
+          setCurrentStep(1);
+        } catch (err: any) {
+          toast.error(`Failed to read Excel file: ${err?.message || err}`);
+        }
+      };
+      reader.readAsArrayBuffer(file);
       return;
     }
 
-    console.log('[Upload] Parsing CSV/TSV file...');
     Papa.parse(file, {
       header: true,
       skipEmptyLines: "greedy",
       delimiter: isTSV ? "\t" : undefined,
       complete: (res) => {
-        console.log('[Upload] Papa.parse complete, rows:', res.data?.length);
         const rowsObj = (res.data as any[]).filter(Boolean);
-        const headers =
-          res.meta.fields?.length ? res.meta.fields : rowsObj.length ? Object.keys(rowsObj[0]) : [];
+        const headers = res.meta.fields?.length
+          ? res.meta.fields
+          : rowsObj.length
+            ? Object.keys(rowsObj[0])
+            : [];
 
-        console.log('[Upload] Headers:', headers);
-
-        // For preview, we don't need strict validation - just show all rows
-        // Validation will happen on the backend during analysis
         const previewData = {
           fileName: file.name,
           headers,
-          rows: rowsObj.slice(0, 200), // Show first 200 rows for preview
+          rows: rowsObj.slice(0, 200),
           rowCount: rowsObj.length,
         };
-        
-        console.log('[Upload] Setting raw preview data:', previewData);
         setRawPreview(previewData as any);
 
-        // Optional: still do validation to show warnings, but don't filter
-        const pickSeq = (r: any) =>
-          r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
+        const pickSeq = (r: any) => r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
         const rejected: any[] = [];
         for (const r of rowsObj) {
           const seq = String(pickSeq(r));
@@ -122,8 +180,6 @@ export default function Upload() {
           }
         }
 
-        console.log('[Upload] Rejected (invalid sequences):', rejected.length);
-
         if (rejected.length > 0) {
           setQc({
             rejectedCount: rejected.length,
@@ -131,12 +187,9 @@ export default function Upload() {
           });
         } else setQc(null);
 
-        console.log('[Upload] Advancing to step 1');
         setCurrentStep(1);
-        console.log('[Upload] Step should now be 1, rawData:', previewData);
       },
       error: (err) => {
-        console.error('[Upload] Papa.parse error:', err);
         toast.error(`Failed to read file: ${err.message}`);
       },
     });
@@ -146,17 +199,18 @@ export default function Upload() {
     if (!localFile) return;
     try {
       setIsAnalyzing(true);
-      
+
       // Build thresholdConfig from state
       const thresholdConfig: ThresholdConfig = {
         mode: thresholdMode,
         version: "1.0.0",
-        ...(thresholdMode === 'custom' && { custom: customThresholds }),
+        ...(thresholdMode === "custom" && { custom: customThresholds }),
       };
-      
-      // Store run input/config for reproduce
-      setLastRun('upload', localFile, thresholdConfig);
-      
+
+      // Store run input/config for reproduce and recalculate
+      setLastRun("upload", localFile, thresholdConfig);
+      setSourceFile(localFile);
+
       const { rows, meta } = (await uploadCSV(localFile, thresholdConfig)) as any; // POST /api/upload-csv
       ingestBackendRows(rows, meta);
       navigate("/results");
@@ -170,7 +224,11 @@ export default function Upload() {
   return (
     <div className="min-h-screen bg-gradient-surface">
       <div className="container mx-auto px-4 py-8">
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-4xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-4xl mx-auto"
+        >
           {/* Header & progress */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold text-foreground mb-2">Upload & Process Dataset</h1>
@@ -192,13 +250,15 @@ export default function Upload() {
                           isCompleted
                             ? "bg-primary border-primary text-primary-foreground"
                             : isActive
-                            ? "border-primary text-primary"
-                            : "border-muted text-muted-foreground"
+                              ? "border-primary text-primary"
+                              : "border-muted text-muted-foreground"
                         }`}
                       >
                         <Icon className="w-4 h-4" />
                       </div>
-                      <span className={`text-sm font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}>
+                      <span
+                        className={`text-sm font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}
+                      >
                         {step.title}
                       </span>
                     </div>
@@ -216,23 +276,66 @@ export default function Upload() {
                   {/* Upload Mode Selector */}
                   <div className="flex gap-4 justify-center">
                     <Button
-                      variant={uploadMode === 'file' ? 'default' : 'outline'}
-                      onClick={() => setUploadMode('file')}
+                      variant={uploadMode === "file" ? "default" : "outline"}
+                      onClick={() => setUploadMode("file")}
                     >
                       <FileText className="w-4 h-4 mr-2" />
                       Upload File
                     </Button>
                     <Button
-                      variant={uploadMode === 'uniprot' ? 'default' : 'outline'}
-                      onClick={() => setUploadMode('uniprot')}
+                      variant={uploadMode === "uniprot" ? "default" : "outline"}
+                      onClick={() => setUploadMode("uniprot")}
                     >
                       <Search className="w-4 h-4 mr-2" />
                       Query UniProt
                     </Button>
                   </div>
 
+                  {/* Try Example Data */}
+                  {uploadMode === "file" && (
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground mb-2">
+                        Or try an example dataset:
+                      </p>
+                      <div className="flex gap-2 justify-center flex-wrap">
+                        {[
+                          {
+                            label: "Antimicrobial Peptides (12)",
+                            file: "/example/antimicrobial_peptides.csv",
+                          },
+                          { label: "Amyloid Peptides (9)", file: "/example/amyloid_peptides.csv" },
+                          { label: "Venom Peptides (16)", file: "/example/peptide_data.csv" },
+                        ].map((ex) => (
+                          <Button
+                            key={ex.file}
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs h-7"
+                            onClick={async () => {
+                              try {
+                                const resp = await fetch(ex.file);
+                                const text = await resp.text();
+                                const blob = new Blob([text], { type: "text/csv" });
+                                const file = new File(
+                                  [blob],
+                                  ex.file.split("/").pop() || "example.csv",
+                                  { type: "text/csv" }
+                                );
+                                handleLocalPreview(file);
+                              } catch {
+                                toast.error("Failed to load example dataset");
+                              }
+                            }}
+                          >
+                            {ex.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   {/* File Upload */}
-                  {uploadMode === 'file' && (
+                  {uploadMode === "file" && (
                     <UploadDropzone
                       onFileSelected={(f: File) => handleLocalPreview(f)}
                       onFileProcessed={() => setCurrentStep(1)}
@@ -240,18 +343,18 @@ export default function Upload() {
                   )}
 
                   {/* UniProt Query */}
-                  {uploadMode === 'uniprot' && (
+                  {uploadMode === "uniprot" && (
                     <UniProtQueryInput
                       onQueryExecuted={(rows, meta) => {
                         // Convert UniProt query results to the format expected by the store
                         if (rows && rows.length > 0) {
                           // Ingest rows directly (they're already in the right format from backend)
                           ingestBackendRows(rows, meta);
-                          
+
                           // Navigate to results page
-                          navigate('/results');
+                          navigate("/results");
                         } else {
-                          toast.error('No results returned from UniProt');
+                          toast.error("No results returned from UniProt");
                         }
                       }}
                       onLoadingChange={(loading) => {
@@ -265,15 +368,16 @@ export default function Upload() {
               {currentStep === 1 && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                   {!rawData ? (
-                    <div className="text-center py-8 text-muted-foreground">
-                      Loading preview...
-                    </div>
+                    <div className="text-center py-8 text-muted-foreground">Loading preview...</div>
                   ) : (
                     <>
                       {qc && qc.rejectedCount > 0 && (
                         <Alert>
                           <AlertDescription className="flex items-center justify-between">
-                            <span>{qc.rejectedCount} rows have invalid sequences (will be filtered during analysis).</span>
+                            <span>
+                              {qc.rejectedCount} rows with invalid sequences (filtered during
+                              analysis).
+                            </span>
                             <Button variant="outline" size="sm" onClick={qc.download}>
                               Download rejected_rows.csv
                             </Button>
@@ -288,10 +392,50 @@ export default function Upload() {
                             Columns are auto-detected. Click Analyze to process your data.
                           </p>
                         </div>
-                        <Badge variant="secondary">{rawData.rowCount ?? rawData.rows?.length ?? 0} rows</Badge>
+                        <Badge variant="secondary">
+                          {rawData.rowCount ?? rawData.rows?.length ?? 0} rows
+                        </Badge>
                       </div>
 
                       <DataPreview data={rawData} />
+
+                      {/* Sequence length summary */}
+                      {rawData.rows &&
+                        rawData.rows.length > 0 &&
+                        (() => {
+                          const pickSeq = (r: any) =>
+                            r.Sequence ?? r.sequence ?? r.seq ?? r.SEQUENCE ?? r.Seq ?? "";
+                          const lengths = rawData.rows
+                            .map((r) => String(pickSeq(r)).length)
+                            .filter((l) => l > 0);
+                          const short = lengths.filter((l) => l < 15).length;
+                          const optimal = lengths.filter((l) => l >= 15 && l <= 100).length;
+                          const long = lengths.filter((l) => l > 100).length;
+                          const hasWarnings = short > 0 || long > 0;
+                          if (!hasWarnings) return null;
+                          return (
+                            <Alert>
+                              <AlertTriangle className="h-4 w-4" />
+                              <AlertDescription>
+                                <div className="text-sm space-y-1">
+                                  {short > 0 && (
+                                    <p>
+                                      {short} sequences too short (&lt;15 aa) — S4PRED may be
+                                      unreliable
+                                    </p>
+                                  )}
+                                  <p>{optimal} sequences in optimal range (15–100 aa)</p>
+                                  {long > 0 && (
+                                    <p>
+                                      {long} sequences too long (&gt;100 aa) — reduced TANGO
+                                      accuracy
+                                    </p>
+                                  )}
+                                </div>
+                              </AlertDescription>
+                            </Alert>
+                          );
+                        })()}
 
                       {/* Auto-detected columns info */}
                       {rawData.headers && rawData.headers.length > 0 && (
@@ -299,85 +443,31 @@ export default function Upload() {
                           <p className="text-sm font-medium mb-2">Detected columns:</p>
                           <div className="flex flex-wrap gap-2">
                             {rawData.headers.slice(0, 8).map((h: string) => (
-                              <Badge key={h} variant="outline" className="text-xs">{h}</Badge>
+                              <Badge key={h} variant="outline" className="text-xs">
+                                {h}
+                              </Badge>
                             ))}
                             {rawData.headers.length > 8 && (
-                              <Badge variant="outline" className="text-xs">+{rawData.headers.length - 8} more</Badge>
+                              <Badge variant="outline" className="text-xs">
+                                +{rawData.headers.length - 8} more
+                              </Badge>
                             )}
                           </div>
                         </div>
                       )}
 
                       {/* Threshold Configuration (collapsed by default) */}
-                      <details className="border rounded-lg">
-                        <summary className="px-4 py-3 cursor-pointer text-sm font-medium hover:bg-muted/50">
-                          Advanced: Threshold Configuration
-                        </summary>
-                        <div className="px-4 pb-4 space-y-4">
-                          <div>
-                            <Label htmlFor="threshold-mode">Threshold Mode</Label>
-                            <Select value={thresholdMode} onValueChange={(v: 'default' | 'recommended' | 'custom') => setThresholdMode(v)}>
-                              <SelectTrigger id="threshold-mode" className="w-full">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="default">Default</SelectItem>
-                                <SelectItem value="recommended">Recommended (computed from data)</SelectItem>
-                                <SelectItem value="custom">Custom</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {thresholdMode === 'default' && 'Use default threshold values'}
-                              {thresholdMode === 'recommended' && 'Compute thresholds from data using median'}
-                              {thresholdMode === 'custom' && 'Set custom threshold values'}
-                            </p>
-                          </div>
-
-                          {thresholdMode === 'custom' && (
-                            <div className="grid grid-cols-3 gap-4">
-                              <div>
-                                <Label htmlFor="muH-cutoff">μH Cutoff</Label>
-                                <input
-                                  id="muH-cutoff"
-                                  type="number"
-                                  step="0.1"
-                                  className="w-full mt-1 px-3 py-2 border rounded-md"
-                                  value={customThresholds.muHCutoff}
-                                  onChange={(e) => setCustomThresholds({ ...customThresholds, muHCutoff: parseFloat(e.target.value) || 0 })}
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor="hydro-cutoff">Hydrophobicity Cutoff</Label>
-                                <input
-                                  id="hydro-cutoff"
-                                  type="number"
-                                  step="0.1"
-                                  className="w-full mt-1 px-3 py-2 border rounded-md"
-                                  value={customThresholds.hydroCutoff}
-                                  onChange={(e) => setCustomThresholds({ ...customThresholds, hydroCutoff: parseFloat(e.target.value) || 0 })}
-                                />
-                              </div>
-                              <div>
-                                <Label htmlFor="ffHelix-threshold">FF-Helix % Threshold</Label>
-                                <input
-                                  id="ffHelix-threshold"
-                                  type="number"
-                                  step="0.1"
-                                  min="0"
-                                  max="100"
-                                  className="w-full mt-1 px-3 py-2 border rounded-md"
-                                  value={customThresholds.ffHelixPercentThreshold}
-                                  onChange={(e) => setCustomThresholds({ ...customThresholds, ffHelixPercentThreshold: parseFloat(e.target.value) || 50 })}
-                                />
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </details>
+                      <ThresholdConfigPanel
+                        thresholdMode={thresholdMode}
+                        onModeChange={setThresholdMode}
+                        customThresholds={customThresholds}
+                        onCustomChange={setCustomThresholds}
+                        variant="details"
+                      />
                     </>
                   )}
 
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <Button variant="outline" onClick={() => setCurrentStep(0)}>
                       Back
                     </Button>
@@ -385,6 +475,10 @@ export default function Upload() {
                       {isAnalyzing ? "Analyzing…" : "Analyze Dataset"}
                     </Button>
                   </div>
+                  <AnalysisProgress
+                    isActive={isAnalyzing}
+                    peptideCount={rawData?.rowCount ?? rawData?.rows?.length ?? 0}
+                  />
                 </motion.div>
               )}
             </CardContent>

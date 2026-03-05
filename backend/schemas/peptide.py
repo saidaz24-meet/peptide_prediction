@@ -77,8 +77,12 @@ class PeptideSchema(BaseModel):
     tango_beta_max: Optional[float] = Field(None, alias="Tango Beta max")
     tango_helix_max: Optional[float] = Field(None, alias="Tango Helix max")
     tango_has_data: Optional[bool] = Field(None, alias="Tango has data")
+    # TANGO per-residue curves (for aggregation heatmap in PeptideDetail)
+    tango_agg_curve: Optional[List[float]] = Field(None, alias="Tango Aggregation curve")
+    tango_beta_curve: Optional[List[float]] = Field(None, alias="Tango Beta curve")
+    tango_helix_curve: Optional[List[float]] = Field(None, alias="Tango Helix curve")
 
-    @field_validator('ssw_score', 'ssw_diff', 'ssw_helix_percentage', 'ssw_beta_percentage', 'ff_helix_percent', 'hydrophobicity', 'charge', 'mu_h', 'tango_agg_max', 'tango_beta_max', 'tango_helix_max', 's4pred_helix_score', 's4pred_helix_percent', 's4pred_ssw_score', 's4pred_ssw_diff', 's4pred_ssw_helix_percent', 's4pred_ssw_beta_percent', 's4pred_ssw_percent', mode='before')
+    @field_validator('ssw_score', 'ssw_diff', 'ssw_helix_percentage', 'ssw_beta_percentage', 'ff_helix_percent', 'ff_helix_score', 'ff_ssw_score', 'hydrophobicity', 'charge', 'mu_h', 'tango_agg_max', 'tango_beta_max', 'tango_helix_max', 's4pred_helix_score', 's4pred_helix_percent', 's4pred_ssw_score', 's4pred_ssw_diff', 's4pred_ssw_helix_percent', 's4pred_ssw_beta_percent', 's4pred_ssw_percent', mode='before')
     @classmethod
     def coerce_nan_to_none(cls, v: Any) -> Optional[float]:
         """Coerce NaN/inf to None for Optional[float] fields."""
@@ -97,7 +101,7 @@ class PeptideSchema(BaseModel):
                 return None
         return v
 
-    @field_validator('ssw_prediction', 'length', 's4pred_helix_prediction', 's4pred_ssw_prediction', mode='before')
+    @field_validator('ssw_prediction', 'length', 's4pred_helix_prediction', 's4pred_ssw_prediction', 'ff_helix_flag', 'ff_ssw_flag', mode='before')
     @classmethod
     def coerce_nan_to_none_int(cls, v: Any) -> Optional[int]:
         """Coerce NaN/inf to None for Optional[int] fields."""
@@ -116,9 +120,17 @@ class PeptideSchema(BaseModel):
                 return None
         return v
 
-    # FF-Helix
+    # FF-Helix (local propensity)
     ff_helix_percent: Optional[float] = Field(None, alias="FF-Helix %")
     ff_helix_fragments: Optional[List[Any]] = Field(None, alias="FF Helix fragments")
+
+    # FF flags and scores (database-level classification)
+    # Reference: 260120_Alpha_and_SSW_FF_Predictor/main.py
+    # Thresholds verified against Peleg's reference dataset (2026-02-26). Fallback: H=0.417, uH=0.388.
+    ff_helix_flag: Optional[int] = Field(None, alias="FF-Helix (Jpred)")
+    ff_helix_score: Optional[float] = Field(None, alias="FF-Helix score")
+    ff_ssw_flag: Optional[int] = Field(None, alias="FF-Secondary structure switch")
+    ff_ssw_score: Optional[float] = Field(None, alias="FF-SSW score")
 
     # S4PRED secondary structure predictions
     # Reference column names from 260120_Alpha_and_SSW_FF_Predictor/s4pred.py

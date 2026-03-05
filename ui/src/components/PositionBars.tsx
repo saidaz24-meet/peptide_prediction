@@ -25,31 +25,30 @@ export function PositionBars({ peptide, allPeptides }: PositionBarsProps) {
   const getPercentileLabel = (percentile: number) => {
     if (percentile >= 90) return 'Top 10%';
     if (percentile >= 75) return 'Top 25%';
-    if (percentile >= 50) return 'Above Average';
-    if (percentile >= 25) return 'Below Average';
+    if (percentile >= 50) return 'Above median';
+    if (percentile >= 25) return 'Below median';
     return 'Bottom 25%';
   };
 
-  const metrics = [
-    {
+  const metrics: { label: string; value: number; allValues: number[]; formatter: (v: number) => string }[] = [];
+
+  if (peptide.hydrophobicity !== null) {
+    metrics.push({
       label: 'Hydrophobicity',
       value: peptide.hydrophobicity,
-      allValues: allPeptides.map(p => p.hydrophobicity),
+      allValues: allPeptides.map(p => p.hydrophobicity).filter((v): v is number => v !== null),
       formatter: (v: number) => v.toFixed(2),
-    },
-    {
+    });
+  }
+
+  if (peptide.charge !== null) {
+    metrics.push({
       label: 'Charge (absolute)',
       value: Math.abs(peptide.charge),
-      allValues: allPeptides.map(p => Math.abs(p.charge)),
+      allValues: allPeptides.map(p => p.charge).filter((v): v is number => v !== null).map(v => Math.abs(v)),
       formatter: (v: number) => v.toFixed(1),
-    },
-    {
-      label: 'Length',
-      value: peptide.length,
-      allValues: allPeptides.map(p => p.length),
-      formatter: (v: number) => v.toString(),
-    },
-  ];
+    });
+  }
 
   // Add μH if available
   if (peptide.muH !== undefined) {
@@ -60,26 +59,6 @@ export function PositionBars({ peptide, allPeptides }: PositionBarsProps) {
         value: peptide.muH,
         allValues: peptidesWithMuH.map(p => p.muH!),
         formatter: (v: number) => v.toFixed(2),
-      });
-    }
-  }
-
-  // Add FF-Helix if available (only show in detailed view, not main dashboard)
-  // Filter out invalid values (negative or >100)
-  if (peptide.ffHelixPercent !== undefined && 
-      peptide.ffHelixPercent >= 0 && 
-      peptide.ffHelixPercent <= 100) {
-    const peptidesWithHelix = allPeptides.filter(
-      p => p.ffHelixPercent !== undefined && 
-           p.ffHelixPercent >= 0 && 
-           p.ffHelixPercent <= 100
-    );
-    if (peptidesWithHelix.length > 1) {
-      metrics.push({
-        label: 'FF-Helix %',
-        value: peptide.ffHelixPercent,
-        allValues: peptidesWithHelix.map(p => p.ffHelixPercent!),
-        formatter: (v: number) => `${v.toFixed(1)}%`,
       });
     }
   }
@@ -129,10 +108,10 @@ export function PositionBars({ peptide, allPeptides }: PositionBarsProps) {
         <h4 className="font-medium text-sm mb-2">Interpretation</h4>
         <div className="space-y-1 text-xs text-muted-foreground">
           <p>
-            Percentiles show where this peptide ranks compared to the entire dataset.
+            Percentiles show where this peptide ranks <strong>within this dataset</strong> (not absolute).
           </p>
           <p>
-            Higher percentiles indicate the peptide has higher values for that metric than most other peptides.
+            A peptide at the 30th percentile has lower values than 70% of the cohort — this does not imply the value is inherently low.
           </p>
         </div>
       </div>

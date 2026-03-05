@@ -35,60 +35,38 @@ export function PeptideRadarChart({ peptide, cohortStats }: PeptideRadarChartPro
     return Math.max(0, Math.min(1, Math.abs(value) / 10));
   };
 
-  const normalizeLength = (value: number) => {
-    // Normalize length, typical range: 10 to 100
-    return Math.max(0, Math.min(1, (value - 10) / 90));
-  };
-
   const normalizeMuH = (value: number) => {
     // μH range: 0 to 1, already normalized
     return Math.max(0, Math.min(1, value));
   };
 
-  const data = [
-    {
+  const data: { metric: string; peptide: number; cohort: number; fullMark: number }[] = [];
+
+  if (peptide.hydrophobicity !== null) {
+    data.push({
       metric: 'Hydrophobicity',
       peptide: normalizeHydrophobicity(peptide.hydrophobicity),
       cohort: normalizeHydrophobicity(cohortStats.meanHydrophobicity),
       fullMark: 1,
-    },
-    {
+    });
+  }
+
+  if (peptide.charge !== null) {
+    data.push({
       metric: 'Charge (abs)',
       peptide: normalizeCharge(peptide.charge),
       cohort: normalizeCharge(cohortStats.meanCharge),
       fullMark: 1,
-    },
-    {
-      metric: 'Length',
-      peptide: normalizeLength(peptide.length),
-      cohort: normalizeLength(cohortStats.meanLength),
-      fullMark: 1,
-    },
-  ];
+    });
+  }
 
   // Add μH if available
   if (peptide.muH !== undefined) {
-    // Calculate cohort mean μH
-    const cohortMeanMuH = 0.3; // Default fallback, should be calculated from actual cohort
+    const cohortMeanMuH = cohortStats.meanMuH ?? 0.3;
     data.push({
       metric: 'μH',
       peptide: normalizeMuH(peptide.muH),
       cohort: normalizeMuH(cohortMeanMuH),
-      fullMark: 1,
-    });
-  }
-
-  // Add FF-Helix if available (filter invalid values)
-  if (peptide.ffHelixPercent !== undefined && 
-      peptide.ffHelixPercent >= 0 && 
-      peptide.ffHelixPercent <= 100 &&
-      cohortStats.meanFFHelixPercent !== null &&
-      cohortStats.meanFFHelixPercent !== undefined &&
-      cohortStats.meanFFHelixPercent >= 0) {
-    data.push({
-      metric: 'FF-Helix %',
-      peptide: peptide.ffHelixPercent / 100, // Normalize to 0-1
-      cohort: cohortStats.meanFFHelixPercent / 100,
       fullMark: 1,
     });
   }
@@ -135,10 +113,10 @@ export function PeptideRadarChart({ peptide, cohortStats }: PeptideRadarChartPro
             strokeWidth={1}
             strokeDasharray="3 3"
           />
-          <ChartTooltip 
+          <ChartTooltip
             content={<ChartTooltipContent />}
             formatter={(value: number, name: string) => [
-              `${(value * 100).toFixed(1)}%`,
+              `${(value * 100).toFixed(1)}% `,
               name
             ]}
           />

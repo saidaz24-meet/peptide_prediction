@@ -8,28 +8,73 @@ import type {
 } from '../types/peptide';
 
 import { mapApiRowToPeptide } from "@/lib/peptideMapper";
+import { uploadCSV, predictOne as apiPredictOne } from "@/lib/api";
 import type { Peptide, ThresholdConfig } from "@/types/peptide";
+import type { ResolvedThresholds } from "@/lib/thresholds";
 
-// --- SMART RANKING (weights + scorer) ---
-export const useThresholds = create<{
-  wH: number; wCharge: number; wMuH: number; wHelix: number;
+// --- RANKING STORE (percentile-based, replaces z-score approach) ---
+import {
+  rankPeptides,
+  DEFAULT_WEIGHTS,
+  PRESETS,
+  type RankingWeights,
+  type RankingMetric,
+  type RankingPreset,
+} from '@/lib/ranking';
+
+export const useRankingStore = create<{
+  weights: RankingWeights;
   topN: number;
-  setWeights: (partial: Partial<{wH:number;wCharge:number;wMuH:number;wHelix:number;topN:number}>) => void;
+  preset: RankingPreset | 'custom';
+  setWeight: (metric: RankingMetric, value: number) => void;
+  setTopN: (n: number) => void;
+  applyPreset: (preset: RankingPreset) => void;
+  resetWeights: () => void;
 }>(set => ({
-  wH: 1, wCharge: 1, wMuH: 1, wHelix: 1, topN: 10,
+  weights: { ...DEFAULT_WEIGHTS },
+  topN: 10,
+  preset: 'equal',
+  setWeight: (metric, value) => set(state => ({
+    weights: { ...state.weights, [metric]: value },
+    preset: 'custom',
+  })),
+  setTopN: (n) => set({ topN: Math.max(1, n) }),
+  applyPreset: (preset) => set({
+    weights: { ...PRESETS[preset] },
+    preset,
+  }),
+  resetWeights: () => set({
+    weights: { ...DEFAULT_WEIGHTS },
+    preset: 'equal',
+  }),
+}));
+
+// Re-export ranking types and functions for convenience
+export { rankPeptides, DEFAULT_WEIGHTS, PRESETS };
+export type { RankingWeights, RankingMetric, RankingPreset };
+
+// --- DEPRECATED: Legacy z-score exports (used by report.ts until migration) ---
+/** @deprecated Use useRankingStore instead */
+export const useThresholds = create<{
+  wH: number; wCharge: number; wMuH: number; wFfHelix: number; wFfSsw: number;
+  topN: number;
+  setWeights: (partial: Partial<{wH:number;wCharge:number;wMuH:number;wFfHelix:number;wFfSsw:number;topN:number}>) => void;
+}>(set => ({
+  wH: 1, wCharge: 1, wMuH: 1, wFfHelix: 1, wFfSsw: 1, topN: 10,
   setWeights: (partial) => set(partial),
 }));
 
+/** @deprecated Use rankPeptides() from ranking.ts instead */
 export function scorePeptide(
   p: Peptide,
-  w: { wH:number; wCharge:number; wMuH:number; wHelix:number },
-  ffHelixThreshold: number = 50.0  // Default threshold, can be overridden from meta.thresholds
+  w: { wH:number; wCharge:number; wMuH:number; wFfHelix:number; wFfSsw:number },
 ){
   const h = Number(p.hydrophobicity ?? 0);
   const c = Math.abs(Number(p.charge ?? 0));
   const m = Number(p.muH ?? 0);
-  const helix = p.ffHelixPercent && p.ffHelixPercent >= ffHelixThreshold ? 1 : 0;
-  return w.wH*h + w.wCharge*c + w.wMuH*m + w.wHelix*helix;
+  const ffHelix = p.ffHelixFlag === 1 ? 1 : 0;
+  const ffSsw = p.ffSswFlag === 1 ? 1 : 0;
+  return w.wH*h + w.wCharge*c + w.wMuH*m + w.wFfHelix*ffHelix + w.wFfSsw*ffSsw;
 }
 
 type BackendRow = Record<string, any>;
@@ -54,6 +99,9 @@ interface DatasetState {
   lastRunInput: RunInput | null;  // File or { sequence, entry }
   lastRunConfig: ThresholdConfig | null;
 
+  // Volatile source references (not persisted — for recalculate)
+  sourceFile: File | null;
+
   setRawData: (data: ParsedCSVData) => void;
   setRawPreview: (data: ParsedCSVData) => void;
   setPeptides: (peptides: Peptide[]) => void;
@@ -67,6 +115,8 @@ interface DatasetState {
   getPeptideById: (id: string) => Peptide | undefined;
   setLastRun: (type: 'upload' | 'predict', input: RunInput, config: ThresholdConfig | null) => void;
   getLastRun: () => { type: 'upload' | 'predict' | null; input: RunInput | null; config: ThresholdConfig | null };
+  setSourceFile: (file: File | null) => void;
+  recalculate: (thresholds: ResolvedThresholds) => Promise<'server' | 'client' | 'none'>;
 }
 
 const initialState: Omit<
@@ -84,6 +134,8 @@ const initialState: Omit<
   | 'getPeptideById'
   | 'setLastRun'
   | 'getLastRun'
+  | 'setSourceFile'
+  | 'recalculate'
 > = {
   rawData: null,
   peptides: [],
@@ -95,6 +147,7 @@ const initialState: Omit<
   lastRunType: null,
   lastRunInput: null,
   lastRunConfig: null,
+  sourceFile: null,
 };
 
 export const useDatasetStore = create<DatasetState>()(
@@ -111,42 +164,11 @@ export const useDatasetStore = create<DatasetState>()(
       },
 
       ingestBackendRows: (rows: BackendRow[], meta?: DatasetMetadata) => {
-        // Debug entry (can be set via localStorage or URL param)
-        const debugEntry = (typeof window !== 'undefined' && window.localStorage?.getItem('DEBUG_ENTRY')) || 
-                          new URLSearchParams(window.location.search).get('debug_entry') || '';
-        
-        if (debugEntry) {
-          console.log(`[DEBUG_TRACE][FRONTEND_RECEIVE] Looking for entry: ${debugEntry}`);
-          const debugRow = rows.find(r => String(r.id || r.entry || '').trim() === debugEntry.trim());
-          if (debugRow) {
-            console.log(`[DEBUG_TRACE][FRONTEND_RECEIVE] Found entry ${debugEntry}:`, debugRow);
-            console.log(`  Raw backend row keys (SSW-related):`,
-              Object.keys(debugRow).filter(k => k.toLowerCase().includes('ssw') ||
-                k.toLowerCase().includes('helix') || k.toLowerCase().includes('beta')));
-            for (const key of ['id', 'sswPrediction', 'sswHelixPercentage', 
-                             'sswBetaPercentage', 'ffHelixPercent']) {
-              if (key in debugRow) {
-                console.log(`  ${key}: ${debugRow[key]} (type: ${typeof debugRow[key]})`);
-              }
-            }
-          } else {
-            console.log(`[DEBUG_TRACE][FRONTEND_RECEIVE] Entry ${debugEntry} not found in rows`);
-          }
-        }
-
         const mapped: Peptide[] = rows
           .map((r: BackendRow, idx: number) => {
             try {
-              // Source is always from backend API (upload-csv, uniprot, or example)
               const source = '/api/ingestBackendRows';
               const mapped_pep = mapApiRowToPeptide(r, `${source}[${idx}]`);
-              // Debug: Log mapping for traced entry
-              if (debugEntry && String(mapped_pep.id).trim() === debugEntry.trim()) {
-                console.log(`[DEBUG_TRACE][FRONTEND_MAP] Entry ${debugEntry} after mapping:`, mapped_pep);
-                console.log(`  sswPrediction: ${mapped_pep.sswPrediction} (type: ${typeof mapped_pep.sswPrediction})`);
-                console.log(`  sswHelixPercentage: ${mapped_pep.sswHelixPct} (type: ${typeof mapped_pep.sswHelixPct})`);
-                console.log(`  sswBetaPercentage: ${mapped_pep.sswBetaPct} (type: ${typeof mapped_pep.sswBetaPct})`);
-              }
               return mapped_pep;
             } catch (error) {
               console.warn(`[datasetStore] Failed to map row ${idx}:`, r, 'Error:', error);
@@ -209,23 +231,6 @@ export const useDatasetStore = create<DatasetState>()(
           ? (sswPositive / sswValidPeptides.length) * 100 
           : null;
         
-        // Debug: Log stats computation for traced entry
-        const debugEntry = (typeof window !== 'undefined' && window.localStorage?.getItem('DEBUG_ENTRY')) || 
-                          new URLSearchParams(window.location.search).get('debug_entry') || '';
-        if (debugEntry) {
-          const debugPep = peptides.find(p => String(p.id).trim() === debugEntry.trim());
-          if (debugPep) {
-            console.log(`[DEBUG_TRACE][FRONTEND_STATS] Entry ${debugEntry} in stats calculation:`);
-          const sswPred = debugPep.sswPrediction;
-          console.log(`  sswPrediction: ${sswPred} (type: ${typeof sswPred})`);
-          console.log(`  Is counted as positive: ${sswPred === 1}`);
-          }
-          console.log(`[DEBUG_TRACE][FRONTEND_STATS] Final computed stats:`);
-          console.log(`  sswPositive: ${sswPositive}`);
-          console.log(`  sswPositivePercent: ${sswPositivePercent !== null ? `${sswPositivePercent}%` : 'N/A'}`);
-          console.log(`  Total peptides: ${totalPeptides}`);
-        }
-
         // Helper for means (returns null if no valid values)
         const mean = (arr: number[]): number | null => {
           if (arr.length === 0) return null;
@@ -243,6 +248,12 @@ export const useDatasetStore = create<DatasetState>()(
           peptides.map((p) => p.length).filter((v): v is number => typeof v === 'number' && !Number.isNaN(v))
         ) ?? 0;
 
+        // μH stats
+        const muHVals = peptides
+          .map((p) => p.muH)
+          .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+        const meanMuH = muHVals.length > 0 ? (mean(muHVals) ?? null) : null;
+
         // FF-Helix stats (only count peptides where we have data)
         // FF-Helix is always computed (no provider dependency), but may be null/undefined
         const helixVals = peptides
@@ -250,27 +261,17 @@ export const useDatasetStore = create<DatasetState>()(
           .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
         const meanFFHelixPercent = helixVals.length > 0 ? mean(helixVals) : null;
         
-        // CSV path guard: one-time console warning if all FF-Helix values are 0/null on CSV path but non-zero on UniProt
-        // This helps diagnose mapping issues between CSV normalization and UI
-        if (meanFFHelixPercent === null || meanFFHelixPercent === 0) {
-          const sampleVals = peptides.slice(0, 3).map(p => ({
-            id: p.id,
-            ffHelixPercent: p.ffHelixPercent,
-            type: typeof p.ffHelixPercent,
-          }));
-          console.warn(
-            '[CSV_FF_HELIX_GUARD] FF-Helix mean is null or 0. Sample values:',
-            sampleVals,
-            'Total peptides:', peptides.length,
-            'Valid FF-Helix count:', helixVals.length
-          );
-        }
+        // S4PRED Helix % stats
+        const s4predHelixVals = peptides
+          .map((p) => p.s4predHelixPercent)
+          .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v));
+        const meanS4predHelixPercent = s4predHelixVals.length > 0 ? mean(s4predHelixVals) : null;
 
         // Count availability of different prediction types
-        const jpredAvailable = peptides.filter(p => 
-          p.providerStatus?.jpred?.status === "available" && 
-          p.jpred?.helixFragments && p.jpred.helixFragments.length > 0
-        ).length;
+        const s4predAvailable = peptides.filter(p => {
+          const st = p.providerStatus?.s4pred?.status?.toUpperCase();
+          return st === "AVAILABLE" || st === "PARTIAL";
+        }).length;
         const ffHelixAvailable = peptides.filter(p => 
           typeof p.ffHelixPercent === 'number' && !Number.isNaN(p.ffHelixPercent)
         ).length;
@@ -288,17 +289,42 @@ export const useDatasetStore = create<DatasetState>()(
           return true;
         }).length;
 
+        // Aggregation hotspot count (tangoAggMax > aggThreshold)
+        // Denominator: peptides WITH TANGO data (not all peptides)
+        const aggThreshold = (meta?.thresholds as any)?.aggThreshold ?? 5.0;
+        const tangoDataPeptides = !tangoUnavailable
+          ? peptides.filter(p => typeof p.tangoAggMax === 'number')
+          : [];
+        const aggHotspots = tangoDataPeptides.filter(p => (p.tangoAggMax as number) > aggThreshold).length;
+        const aggHotspotPercent = tangoDataPeptides.length > 0
+          ? (aggHotspots / tangoDataPeptides.length) * 100
+          : null;
+
+        // FF-Helix candidate count: ffHelixFlag === 1
+        const ffHelixCandidates = peptides.filter(p => p.ffHelixFlag === 1).length;
+        const ffHelixCandidatePercent = totalPeptides > 0 ? (ffHelixCandidates / totalPeptides) * 100 : null;
+
+        // FF-SSW candidate count: ffSswFlag === 1 (gated on TANGO availability)
+        const ffSswCandidates = peptides.filter(p => p.ffSswFlag === 1).length;
+        const ffSswCandidatePercent = (!tangoUnavailable && totalPeptides > 0)
+          ? (ffSswCandidates / totalPeptides) * 100 : null;
+
         const stats: DatasetStats = {
           totalPeptides,
           sswPositivePercent,
           meanHydrophobicity,
           meanCharge,
+          meanMuH,
           meanFFHelixPercent,
+          meanS4predHelixPercent,
           meanLength,
+          ffHelixCandidatePercent,
+          ffSswCandidatePercent,
           // Add these for better UI display
-          jpredAvailable,
+          s4predAvailable,
           ffHelixAvailable,
           sswAvailable,
+          aggHotspotPercent,
         };
 
         // Regression check: verify table positives match stats positives
@@ -325,14 +351,16 @@ export const useDatasetStore = create<DatasetState>()(
           // In production, you might want to throw or report to monitoring
         }
 
-        console.log('[DEBUG] Calculated stats:', stats); // Debug log
-
         set({ stats });
       },
 
       setLoading: (isLoading) => set({ isLoading }),
       setError: (error) => set({ error }),
-      resetData: () => set({ ...initialState }),
+      resetData: () => {
+        set({ ...initialState });
+        // Also clear persisted data from localStorage to prevent resurrection
+        try { localStorage.removeItem('peptide-dataset-storage'); } catch {}
+      },
       getPeptideById: (id) => get().peptides.find((p) => p.id === id),
       
       // Reproduce run state management
@@ -352,29 +380,114 @@ export const useDatasetStore = create<DatasetState>()(
           config: state.lastRunConfig,
         };
       },
+
+      setSourceFile: (file) => set({ sourceFile: file }),
+
+      recalculate: async (thresholds) => {
+        const state = get();
+        const thresholdConfig: ThresholdConfig = {
+          mode: 'custom',
+          version: '1.0.0',
+          custom: thresholds,
+        };
+
+        // Case 1: Upload source file available → re-POST
+        if (state.sourceFile) {
+          set({ isLoading: true });
+          try {
+            const { rows, meta } = (await uploadCSV(state.sourceFile, thresholdConfig)) as any;
+            const mapped: Peptide[] = rows
+              .map((r: BackendRow, idx: number) => {
+                try {
+                  return mapApiRowToPeptide(r, `/api/recalculate[${idx}]`);
+                } catch { return null; }
+              })
+              .filter((p: Peptide | null): p is Peptide => p !== null);
+            set({ peptides: mapped, meta: meta || null, lastRunConfig: thresholdConfig });
+            get().calculateStats();
+            return 'server';
+          } finally {
+            set({ isLoading: false });
+          }
+        }
+
+        // Case 2: Predict source (single sequence) → re-POST
+        if (state.lastRunType === 'predict' && state.lastRunInput && typeof state.lastRunInput === 'object' && 'sequence' in state.lastRunInput) {
+          const input = state.lastRunInput as { sequence: string; entry?: string };
+          set({ isLoading: true });
+          try {
+            const response = await apiPredictOne(input.sequence, input.entry, thresholdConfig);
+            const peptide = mapApiRowToPeptide(response.row, '/api/recalculate');
+            set({ peptides: [peptide], lastRunConfig: thresholdConfig });
+            get().calculateStats();
+            return 'server';
+          } finally {
+            set({ isLoading: false });
+          }
+        }
+
+        // Case 3: No source available → client-side only (aggFlags already applied via thresholdStore)
+        return 'none';
+      },
     }),
     {
       name: 'peptide-dataset-storage',
+      version: 2,  // Bump when persisted schema changes
+      migrate: (persisted: any, version: number) => {
+        // v0/v1 → v2: added peptides, stats, meta to persist
+        if (version < 2) {
+          return {
+            ...initialState,
+            columnMapping: persisted?.columnMapping ?? {},
+            lastRunType: persisted?.lastRunType ?? null,
+            lastRunInput: persisted?.lastRunInput ?? null,
+            lastRunConfig: persisted?.lastRunConfig ?? null,
+          };
+        }
+        return persisted;
+      },
       partialize: (state) => ({
+        // Persist prediction results so they survive page refresh
+        peptides: state.peptides,
+        stats: state.stats,
+        meta: state.meta,
         columnMapping: state.columnMapping,
         // Only persist config and predict input (not File objects)
         lastRunType: state.lastRunType,
         lastRunInput: state.lastRunType === 'predict' ? state.lastRunInput : null,  // Don't persist File
         lastRunConfig: state.lastRunConfig,
       }),
+      storage: {
+        getItem: (name) => {
+          try { return localStorage.getItem(name); } catch { return null; }
+        },
+        setItem: (name, value) => {
+          try {
+            localStorage.setItem(name, value);
+          } catch (e: any) {
+            if (e?.name === 'QuotaExceededError') {
+              // Drop per-residue curves to fit within 5MB localStorage limit
+              try {
+                const parsed = JSON.parse(value);
+                if (parsed?.state?.peptides) {
+                  parsed.state.peptides = parsed.state.peptides.map((p: any) => {
+                    const { tango, s4predCurve, ...rest } = p;
+                    return rest;
+                  });
+                  localStorage.setItem(name, JSON.stringify(parsed));
+                }
+              } catch {
+                // Last resort: clear persisted data rather than silently losing updates
+                localStorage.removeItem(name);
+              }
+            }
+          }
+        },
+        removeItem: (name) => {
+          try { localStorage.removeItem(name); } catch {}
+        },
+      },
     }
   )
 );
 
-// --- Flag threshold store (unchanged) ---
-type FlagsState = {
-  muHCutoff: number;
-  hydroCutoff: number;
-  setFlags: (p: Partial<Pick<FlagsState, 'muHCutoff' | 'hydroCutoff'>>) => void;
-};
-
-export const useFlags = create<FlagsState>((set) => ({
-  muHCutoff: 0,
-  hydroCutoff: 0,
-  setFlags: (p) => set(p),
-}));

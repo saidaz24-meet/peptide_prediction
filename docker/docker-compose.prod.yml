@@ -25,7 +25,7 @@ services:
       - pvl-runs:/data/runs
       - pvl-uploads:/data/uploads
       # Tool assets (volume-mounted per Strategy A)
-      - ${TOOLS_HOST_PATH:-./tools}:/opt/tools:ro
+      - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
       # Runtime cache
       - pvl-cache:/app/.run_cache
     environment:
@@ -37,7 +37,6 @@ services:
       # Provider flags
       - USE_TANGO=${USE_TANGO:-0}
       - USE_S4PRED=${USE_S4PRED:-1}
-      - USE_JPRED=0
       # CORS
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
       # Tool paths
@@ -75,6 +74,7 @@ services:
       dockerfile: docker/Dockerfile.frontend
       args:
         VITE_API_URL: /api
+        VITE_SENTRY_DSN: ${SENTRY_DSN:-}
     image: pvl-frontend:latest
     container_name: pvl-frontend
     ports:

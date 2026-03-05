@@ -1,0 +1,139 @@
+# =============================================================================
+# Peptide Visual Lab - Docker Compose (Caddy + Auto-HTTPS)
+#
+# Quick switch from Nginx to Caddy:
+#   1. Set DOMAIN=your-domain.desy.de in .env
+#   2. Run: docker compose -f docker/docker-compose.caddy.yml up -d
+#   3. Caddy auto-provisions Let's Encrypt certificates
+#
+# For local development (no HTTPS):
+#   DOMAIN=localhost docker compose -f docker/docker-compose.caddy.yml up -d
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Backend API Service (same as prod)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      args:
+        PYTHON_VERSION: "3.11"
+    image: pvl-backend:latest
+    container_name: pvl-backend
+    volumes:
+      - pvl-runs:/data/runs
+      - pvl-uploads:/data/uploads
+      - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
+      - pvl-cache:/app/.run_cache
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8000
+      - USE_TANGO=${USE_TANGO:-1}
+      - USE_S4PRED=${USE_S4PRED:-1}
+      - CORS_ORIGINS=https://${DOMAIN:-localhost},http://${DOMAIN:-localhost}
+      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
+      - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Frontend + Reverse Proxy (Caddy with auto-HTTPS)
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2-alpine
+    container_name: pvl-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"   # HTTP/3
+    volumes:
+      # Caddyfile configuration
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # TLS certificate storage (persists across restarts)
+      - caddy-data:/data
+      - caddy-config:/config
+      # Frontend static files (built by frontend builder)
+      - frontend-dist:/srv:ro
+    environment:
+      - DOMAIN=${DOMAIN:-localhost}
+    depends_on:
+      backend:
+        condition: service_healthy
+      frontend-builder:
+        condition: service_completed_successfully
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Frontend Builder (builds once, exits, shares dist volume with Caddy)
+  # ---------------------------------------------------------------------------
+  frontend-builder:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_URL: /api
+        VITE_SENTRY_DSN: ${SENTRY_DSN:-}
+    container_name: pvl-frontend-builder
+    # Copy built assets to shared volume, then exit
+    entrypoint: ["/bin/sh", "-c", "cp -r /usr/share/nginx/html/* /output/ && echo 'Frontend assets copied to /output'"]
+    volumes:
+      - frontend-dist:/output
+
+# =============================================================================
+# Named Volumes
+# =============================================================================
+volumes:
+  pvl-runs:
+    driver: local
+  pvl-uploads:
+    driver: local
+  pvl-cache:
+    driver: local
+  # Caddy TLS certificate storage
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local
+  # Shared frontend assets
+  frontend-dist:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  default:
+    name: pvl-network

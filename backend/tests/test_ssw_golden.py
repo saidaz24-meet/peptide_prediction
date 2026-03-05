@@ -8,7 +8,6 @@ Key thresholds (from reference config.py):
 - MIN_SEGMENT_LENGTH = 5
 - MAX_GAP = 3
 - MIN_TANGO_SCORE = 0
-- MIN_JPRED_SCORE = 7
 """
 import pytest
 from statistics import mean
@@ -72,16 +71,12 @@ class TestGetSecondaryStructureSegments:
         segments = auxiliary.get_secondary_structure_segments(prediction, "Tango")
         assert segments == []
 
-    def test_jpred_higher_threshold(self):
-        """JPred uses higher threshold (MIN_JPRED_SCORE=7)."""
-        # Scores below 7 should not pass JPred threshold
-        prediction = [0, 5, 5, 5, 5, 5, 5, 0]  # All below 7
-        segments = auxiliary.get_secondary_structure_segments(prediction, "Jpred")
-        # Should be rejected or find no valid segments
-        # (depends on mean/median check)
-        assert len(segments) == 0 or all(
-            mean(prediction[s:e+1]) >= 7 for s, e in segments
-        )
+    def test_unknown_method_uses_negative_inf_threshold(self):
+        """Unknown prediction methods use -inf threshold (permissive)."""
+        # Any positive values should form segments with -inf threshold
+        prediction = [0, 1, 1, 1, 1, 1, 1, 0]
+        segments = auxiliary.get_secondary_structure_segments(prediction, "Unknown")
+        assert len(segments) >= 1
 
 
 class TestFindSecondaryStructureSwitchSegments:

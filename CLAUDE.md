@@ -1,5 +1,24 @@
 # Claude Agent Instructions
 
+## Project Vision
+
+**Peptide Visual Lab (PVL)** is an all-in-one prediction and visualization web server for peptide researchers.
+
+**Problem**: Researchers studying peptide aggregation, structural switching, and fibril formation lack a single web tool that combines these analyses with interactive visualization. Existing tools (PASTA 2.0, Waltz, AGGRESCAN) are single-algorithm, non-visual, or offline-only.
+
+**Solution**: PVL combines aggregation propensity (TANGO), secondary structure prediction (S4PRED), and fibril-forming helix detection (FF-Helix) in one web interface with publication-ready visualizations. It is a research instrument, not a feature collection.
+
+**Long-term vision**: Open-source reference tool (MIT) → Zenodo DOI → JOSS paper → ELIXIR bio.tools registration. The tool must be scientifically correct first, user-friendly second, feature-rich last.
+
+## Architectural Principles
+
+1. **Single sequence and batch MUST produce identical results** for the same peptide. If the same sequence is submitted via Quick Analyze or CSV upload, every computed value must match exactly.
+2. **`api_models.py` is the single source of truth** — never change response schemas without explicit approval.
+3. **JSON `null` only** — never use `-1`, `"N/A"`, or empty string as sentinel values.
+4. **Every calculation must be deterministic and reproducible** — same input, same config, same output.
+5. **Foundation before features** — never ship new features on top of inconsistent pipelines. Fix correctness first.
+6. **Always use plan mode** before multi-file changes so the user sees the bigger picture.
+
 ## Documentation Access Rule
 
 **STRICT**: Default read only `CLAUDE.md` + `docs/active/*`. These are the ONLY authoritative documentation files.
@@ -9,14 +28,15 @@
 - **TESTING_GUIDE.md** — Test commands, local setup, known failures
 - **CONTRACTS.md** — API endpoints, request/response shapes, UI requirements
 - **KNOWN_ISSUES.md** — Known bugs, limitations, workarounds
-- **FILES_TO_TOUCH.md** — Hot files most likely to be edited
+- **PELEG_REVIEW_TASKS.md** — Holistic review task chunks (current priority)
+- **MASTER_DEV_DOC.md** — Consolidated architecture + decisions reference
+- **DEPLOYMENT.md** — VM specs, step-by-step deployment, K8s plan
+- **ROADMAP.md** — Strategic position, Phase A/B/C tasks, completed history
+- **DEVELOPER_REFERENCE.md** — Pipeline internals, null semantics, debugging
+- **SPECIALS.md** — Special handling rules
 
-**DO NOT READ**:
-- `docs/_archive/**` — Historical/archived docs (ignored)
-- `docs/legacy/**` — Legacy docs (ignored)
-- `docs/reference/**` — Reference docs (use active context instead)
-- `docs/user/**` — User-specific docs (ignored)
-- Any markdown files outside `docs/active/` (unless explicitly requested)
+**DO NOT READ** unless explicitly requested:
+- Any markdown files outside `docs/active/`
 
 **Before opening new files outside docs/active/**:
 1. Propose top 3 files you want to read
@@ -76,42 +96,54 @@ make test
    - Add features incrementally
    - Avoid refactoring unless requested
 
-3. **Invariants** (from DEV_CONTEXT.md):
+3. **Invariants**:
    - Entry IDs must align between input and output
    - Response keys must be camelCase
    - FF-Helix% always computed (no external dependency)
+   - S4PRED is primary predictor (PSIPRED removed)
 
-## Code Quality
+## Key Files Reference
 
-- **Linting**: `make lint` must pass
-- **Type checking**: `make typecheck` should pass (warnings acceptable for existing code)
-- **Tests**: `make test` must pass before considering work complete
+### Backend Core
+| File | Purpose |
+|------|---------|
+| `backend/server.py` | Compatibility shim (~15 LOC, deprecated) |
+| `backend/tango.py` | TANGO runner/parser (~1400 LOC) |
+| `backend/s4pred.py` | S4PRED runner/analyzer (~670 LOC) |
+| `backend/auxiliary.py` | FF-Helix + SSW helpers (~370 LOC) |
+| `backend/biochem_calculation.py` | Charge, hydrophobicity, μH (~85 LOC) |
+| `backend/config.py` | Centralized settings (~245 LOC) |
+| `backend/services/normalize.py` | Response normalization (~740 LOC) |
+| `backend/schemas/api_models.py` | **CANONICAL** API contract (protected) |
+| `backend/consensus.py` | Consensus pipeline logic |
+| `backend/services/provider_state.py` | Provider state tracking |
+| `backend/services/uniprot_execute_service.py` | UniProt query execution (~635 LOC) |
 
-## File Organization
-
-- Backend: `backend/` (FastAPI, services, calculations, tests)
-- Frontend: `ui/` (React, TypeScript, pages, components)
-- Tests: `backend/tests/test_*.py`
-- Schemas: `backend/schemas/api_models.py`
+### Frontend Core
+| File | Purpose |
+|------|---------|
+| `ui/src/pages/Results.tsx` | Main dashboard |
+| `ui/src/pages/PeptideDetail.tsx` | Peptide deep-dive |
+| `ui/src/stores/datasetStore.ts` | Zustand: peptide data + stats |
+| `ui/src/stores/thresholdStore.ts` | Zustand: threshold presets + re-classification |
+| `ui/src/stores/chartSelectionStore.ts` | Zustand: chart filter state |
+| `ui/src/lib/peptideMapper.ts` | API → frontend type mapping |
+| `ui/src/types/peptide.ts` | Canonical frontend type definitions |
 
 ## Quick Reference
-
 ```bash
-# Setup
-cd backend && pip install -r requirements.txt
-cd ../ui && npm install
-
 # Development
-make test       # Run tests
-make lint       # Check code quality
-make fmt        # Format code
-make ci         # Full CI pipeline
+make test           # All tests (deterministic, no network)
+make test-unit      # Fast unit tests
+make lint           # Code quality
+make typecheck      # Type checking
+make fmt            # Format code
+make ci             # Full pipeline
+make smoke-tango    # Verify TANGO binary works
+make contract-check # Verify backend↔UI contract sync
 
-# Context
-docs/active/ACTIVE_CONTEXT.md  # Architecture overview
-docs/active/CONTRACTS.md       # API contracts
-docs/active/TESTING_GUIDE.md  # Testing commands
-docs/active/FILES_TO_TOUCH.md # Hot files reference
-docs/active/KNOWN_ISSUES.md    # Known issues
+# Predictor flags
+USE_TANGO=1     # Enable TANGO
+USE_S4PRED=1    # Enable S4PRED (primary)
 ```
 

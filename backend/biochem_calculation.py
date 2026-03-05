@@ -17,7 +17,7 @@ def __get_hydrophobic_moment_vec(seq) -> list:
     """
     hydro = []
     for aa in seq:
-        hydro.append(Fauchere_Pliska.get(aa))
+        hydro.append(Fauchere_Pliska.get(aa, 0.0))
     return hydro
 
 
@@ -44,7 +44,10 @@ def hydrophobic_moment(peptide_sequence, angle=100) -> float:
         sum_cos += hv * math.cos(rad_inc)
         sum_sin += hv * math.sin(rad_inc)
 
-    return math.sqrt(sum_cos ** 2 + sum_sin ** 2) / len(hydro)
+    result = math.sqrt(sum_cos ** 2 + sum_sin ** 2) / len(hydro)
+    if math.isnan(result) or not math.isfinite(result):
+        return 0.0
+    return result
 
 
 def total_charge(sequence) -> float:
@@ -77,5 +80,5 @@ def hydrophobicity(sequence: str) -> tuple:
 
     hydrophobicity_list = []
     for aa in sequence:
-        hydrophobicity_list.append(Fauchere_Pliska[aa])
+        hydrophobicity_list.append(Fauchere_Pliska.get(aa, 0.0))
     return statistics.mean(hydrophobicity_list)

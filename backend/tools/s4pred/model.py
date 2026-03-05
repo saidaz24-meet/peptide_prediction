@@ -130,7 +130,7 @@ class S4PREDPredictor:
 
     def format_ss2(self, data: List, ss: np.ndarray, ss_conf: np.ndarray) -> List[str]:
         """
-        Format output in PSIPRED VFORMAT .ss2 style.
+        Format output in .ss2 style (PSIPRED-compatible format).
 
         Args:
             data: [name, int_sequence, str_sequence]
@@ -140,7 +140,7 @@ class S4PREDPredictor:
         Returns:
             List of lines for .ss2 file
         """
-        lines = ['# PSIPRED VFORMAT (S4PRED V1.2.4)\n']
+        lines = ['# S4PRED V1.2.4 (.ss2 format)\n']
         for i in range(len(ss)):
             lines.append(
                 "%4d %c %c  %6.3f %6.3f %6.3f" % (

@@ -36,6 +36,12 @@ backend/Psipred/work/
 #  ------------------------------
 
 
+# 🧠 MODEL WEIGHTS & TOOL BINARIES (volume-mounted, not committed)
+tools/
+*.pt
+*.pth
+*.onnx
+
 # 📦 NODE (Frontend)
 ui/.next/
 ui/node_modules/
@@ -79,6 +85,7 @@ docs/**/*.tmp.*
 docs/**/*.cache.*
 *.ai-temp.*
 *.claude-temp.*
+.claude/settings.local.json
 # Keep fixtures and active docs, but ignore generated content
 !backend/tests/fixtures/**
 !docs/active/**

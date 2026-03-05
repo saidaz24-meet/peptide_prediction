@@ -255,8 +255,9 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
     """
     result = row_dict.copy()
     
-    # TANGO fields: if TANGO is not available/failed/not_configured, nullify ALL TANGO fields
-    if provider_status.tango.status != "AVAILABLE":
+    # TANGO fields: if TANGO is OFF or UNAVAILABLE, nullify ALL TANGO fields
+    # PARTIAL means some peptides have data — preserve it, let per-row nulls handle the rest
+    if provider_status.tango.status in ("OFF", "UNAVAILABLE"):
         # All TANGO/SSW fields must be null when provider not available
         tango_fields = [
             "sswPrediction", "sswScore", "sswDiff",
@@ -265,6 +266,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
             # Nested tango object fields
             "tangoAgg", "tangoBeta", "tangoHelix", "tangoTurn",
             "tangoAggregationCurve", "tangoBetaCurve", "tangoHelixCurve", "tangoTurnCurve",
+            "tangoAggCurve",  # camelCase versions (post-normalization)
             "sswFragments", "tangoFragments",
         ]
         for field in tango_fields:
@@ -307,95 +309,6 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
             if not has_real_data:
                 result["tango"] = None
     
-    # PSIPRED fields: if PSIPRED is not available/failed/not_configured, nullify ALL PSIPRED fields
-    if provider_status.psipred.status != "AVAILABLE":
-        # All PSIPRED fields must be null when provider not available
-        psipred_fields = [
-            "psipredHelixPercentage", "psipredBetaPercentage",  # Direct PSIPRED percentages
-            "helixPercent", "betaPercent",  # Unified secondary structure fields (PSIPRED preferred)
-            # Nested psipred object fields (if present as top-level)
-            "psipredPH", "psipredPE", "psipredPC", "psipredHelixSegments",
-            "psipredFragments", "psipredSegments",
-        ]
-        for field in psipred_fields:
-            if field in result:
-                result[field] = None
-        
-        # Handle nested psipred object
-        if "psipred" in result and isinstance(result["psipred"], dict):
-            result["psipred"] = None
-    else:
-        # Provider is available: only nullify fake defaults, preserve real zeros
-        # Note: 0.0 for percentages might be real (e.g., 0% helix content), so preserve it
-        psipred_fake_defaults = {
-            "psipredHelixPercentage": [-1],  # -1 is invalid for percentages, but preserve 0.0 (real zero)
-            "psipredBetaPercentage": [-1],   # -1 is invalid for percentages, but preserve 0.0 (real zero)
-            # Note: helixPercent and betaPercent might come from TANGO fallback, so be conservative
-            # Only nullify -1, preserve 0.0 (could be real zero or TANGO fallback)
-            "helixPercent": [-1],
-            "betaPercent": [-1],
-            "psipredFragments": [-1, None, "", "-", []],
-            "psipredSegments": [-1, None, "", "-", []],
-        }
-        for field, fake_values in psipred_fake_defaults.items():
-            if field in result:
-                value = result[field]
-                if value in fake_values or _is_fake_default(value):
-                    result[field] = None
-        
-        # Handle nested psipred object: nullify if all fields are empty/None/fake defaults
-        if "psipred" in result and isinstance(result["psipred"], dict):
-            psipred_obj = result["psipred"]
-            has_real_data = False
-            for k in ["pH", "pE", "pC", "helixSegments"]:
-                val = psipred_obj.get(k)
-                if val is not None and not _is_fake_default(val):
-                    has_real_data = True
-                    break
-            if not has_real_data:
-                result["psipred"] = None
-    
-    # JPred fields: if JPred is not available/failed/not_configured, nullify ALL JPred fields
-    if provider_status.jpred.status != "AVAILABLE":
-        # All JPred fields must be null when provider not available
-        jpred_fields = [
-            "jpredHelixFragments", "jpredHelixScore",
-            "jpredFragments", "jpredSegments",
-            # Nested jpred object fields (if present as top-level)
-        ]
-        for field in jpred_fields:
-            if field in result:
-                result[field] = None
-
-        # Handle nested jpred object
-        if "jpred" in result and isinstance(result["jpred"], dict):
-            result["jpred"] = None
-    else:
-        # Provider is available: only nullify fake defaults
-        jpred_fake_defaults = {
-            "jpredHelixFragments": [-1, None, "", "-", []],
-            "jpredHelixScore": [-1],
-            "jpredFragments": [-1, None, "", "-", []],
-            "jpredSegments": [-1, None, "", "-", []],
-        }
-        for field, fake_values in jpred_fake_defaults.items():
-            if field in result:
-                value = result[field]
-                if value in fake_values or _is_fake_default(value):
-                    result[field] = None
-
-        # Handle nested jpred object: nullify if all fields are empty/None/fake defaults
-        if "jpred" in result and isinstance(result["jpred"], dict):
-            jpred_obj = result["jpred"]
-            has_real_data = False
-            for k in ["helixFragments", "helixScore"]:
-                val = jpred_obj.get(k)
-                if val is not None and not _is_fake_default(val):
-                    has_real_data = True
-                    break
-            if not has_real_data:
-                result["jpred"] = None
-
     # S4PRED fields: if S4PRED is not available/failed/not_configured, nullify ALL S4PRED fields
     if provider_status.s4pred.status != "AVAILABLE":
         # All S4PRED fields must be null when provider not available
@@ -463,11 +376,9 @@ def _sanitize_for_json(obj, field_name: str = None):
     # primitives
     if isinstance(obj, float):
         if math.isfinite(obj):
-            # Convert -1.0 to None (fake default for missing numeric data)
-            # EXCEPT: never convert legitimate floats that happen to be -1.0
-            # In practice, -1.0 should not be a valid float value in this domain
-            if obj == -1.0:
-                return None
+            # NOTE: Do NOT convert -1.0 to None here.
+            # Legitimate floats can be -1.0 (e.g., charge, hydrophobicity).
+            # Field-specific fake-default handling is done by _convert_fake_defaults_to_null.
             return obj
         return None  # NaN/inf -> None
     if isinstance(obj, int):
@@ -476,7 +387,7 @@ def _sanitize_for_json(obj, field_name: str = None):
         # - s4predSswPrediction (S4PRED): -1 = "no SSW detected"
         # - s4predHelixPrediction (S4PRED): -1 = "no helix detected"
         # All other -1 values are fake defaults and should be None
-        prediction_fields = {"sswPrediction", "s4predSswPrediction", "s4predHelixPrediction"}
+        prediction_fields = {"sswPrediction", "s4predSswPrediction", "s4predHelixPrediction", "ffHelixFlag", "ffSswFlag"}
         if obj == -1 and field_name not in prediction_fields:
             return None
         return obj
@@ -516,9 +427,7 @@ def normalize_rows_for_ui(
     df: pd.DataFrame,
     is_single_row: bool = False,
     tango_enabled: bool = True,
-    psipred_enabled: bool = True,
-    jpred_enabled: bool = False,
-    s4pred_enabled: bool = False
+    s4pred_enabled: bool = True
 ):
     """
     Normalize DataFrame rows for UI consumption.
@@ -570,12 +479,8 @@ def normalize_rows_for_ui(
             provider_status = create_provider_status_for_row(
                 row,
                 tango_enabled=tango_enabled,
-                psipred_enabled=psipred_enabled,
-                jpred_enabled=jpred_enabled,
                 s4pred_enabled=s4pred_enabled,
                 tango_output_available=tango_output_available,
-                psipred_output_available=len(row.get("Helix fragments (Psipred)", [])) > 0,
-                jpred_output_available=len(row.get("Helix fragments (Jpred)", [])) > 0,
                 s4pred_output_available=s4pred_output_available,
             )
             normalized["providerStatus"] = provider_status.model_dump()
@@ -603,12 +508,8 @@ def normalize_rows_for_ui(
             fallback_provider_status = create_provider_status_for_row(
                 row,
                 tango_enabled=tango_enabled,
-                psipred_enabled=psipred_enabled,
-                jpred_enabled=jpred_enabled,
                 s4pred_enabled=s4pred_enabled,
                 tango_output_available=False,  # Fallback assumes no provider output
-                psipred_output_available=False,
-                jpred_output_available=False,
                 s4pred_output_available=False,
             )
 
@@ -717,12 +618,8 @@ def normalize_rows_for_ui(
                 provider_status = create_provider_status_for_row(
                     row_for_status,
                     tango_enabled=tango_enabled,
-                    psipred_enabled=psipred_enabled,
-                    jpred_enabled=jpred_enabled,
                     s4pred_enabled=s4pred_enabled,
                     tango_output_available=tango_output_available,
-                    psipred_output_available=len(row_dict.get("Helix fragments (Psipred)", [])) > 0,
-                    jpred_output_available=len(row_dict.get("Helix fragments (Jpred)", [])) > 0,
                     s4pred_output_available=s4pred_output_available,
                 )
                 normalized["providerStatus"] = provider_status.model_dump()
@@ -749,12 +646,8 @@ def normalize_rows_for_ui(
                 fallback_provider_status = create_provider_status_for_row(
                     row_for_status,
                     tango_enabled=tango_enabled,
-                    psipred_enabled=psipred_enabled,
-                    jpred_enabled=jpred_enabled,
                     s4pred_enabled=s4pred_enabled,
                     tango_output_available=False,
-                    psipred_output_available=False,
-                    jpred_output_available=False,
                     s4pred_output_available=False,
                 )
 
