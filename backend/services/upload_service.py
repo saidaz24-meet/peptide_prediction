@@ -4,45 +4,45 @@ Upload processing service.
 Core DataFrame processing logic for file uploads.
 HTTP-specific concerns (file validation, UploadFile handling) remain in server.py.
 """
-import os
+import hashlib
 import json
+import os
 import time
 import uuid
-import hashlib
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 import sentry_sdk
 
 import auxiliary
-import tango
 import s4pred
-from config import settings
+import tango
 from calculations.biochem import calculate_biochemical_features as calc_biochem
-from services.logger import log_info, log_warning, log_error, log_debug, get_trace_id
-from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
-from services.thresholds import resolve_thresholds
+from config import settings
+from schemas.api_models import Meta, PeptideRow, RowsResponse
+from services.dataframe_utils import (
+    apply_ff_flags,
+    ensure_computed_cols,
+    ensure_ff_cols,
+)
+from services.dataframe_utils import (
+    fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
+)
+from services.logger import get_trace_id, log_debug, log_error, log_info, log_warning
 from services.normalize import (
-    normalize_cols,
-    finalize_ui_aliases as _finalize_ui_aliases,
     finalize_ff_fields,
     normalize_rows_for_ui,
 )
-from services.dataframe_utils import (
-    require_cols,
-    ensure_ff_cols,
-    ensure_computed_cols,
-    apply_ff_flags,
-    fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
+from services.normalize import (
+    finalize_ui_aliases as _finalize_ui_aliases,
 )
-from schemas.api_models import RowsResponse, PeptideRow, Meta, ProviderStatusSummary
-from services.provider_status_builder import build_provider_meta
 from services.provider_state import (
-    get_last_provider_status,
-    get_last_run_dir,
     set_last_provider_status,
     set_last_run_dir,
 )
+from services.provider_status_builder import build_provider_meta
+from services.thresholds import resolve_thresholds
+from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
 
 # Provider flags are read dynamically from settings to avoid caching issues
 # Use settings.USE_TANGO, settings.USE_S4PRED directly
@@ -216,7 +216,7 @@ def run_tango_processing(
                         message="TANGO produced 0 outputs",
                         detail=error_detail,
                         status_code=500
-                    )
+                    ) from e
 
                 # Catch alignment errors and report clearly
                 trace_id = get_trace_id()
@@ -745,7 +745,7 @@ def process_upload_dataframe(
 
     tango_run_dir_basename = os.path.basename(run_dir) if run_dir else None
 
-    log_info("upload_complete", f"Upload processing complete", stage="response", run_id=tango_run_dir_basename, **{
+    log_info("upload_complete", "Upload processing complete", stage="response", run_id=tango_run_dir_basename, **{
         "total_rows": len(df),
         "ssw_hits": ssw_hits,
         "ssw_positive_percent": ssw_percent,

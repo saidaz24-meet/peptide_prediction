@@ -16,6 +16,7 @@ Usage:
 import os
 from pathlib import Path
 from typing import List, Optional
+
 from dotenv import load_dotenv
 
 # Load .env file from backend directory (if it exists)

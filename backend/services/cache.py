@@ -5,11 +5,9 @@ Principle C: Add caching early by sequence hash.
 Cache key = hash(sequence) to enable future precompute without heavy infra.
 """
 import hashlib
-import json
-import os
-from pathlib import Path
-from typing import Optional, Dict, Any
 import pickle
+from pathlib import Path
+from typing import Any, Dict, Optional
 
 from services.logger import log_warning
 
@@ -30,11 +28,11 @@ def sequence_hash(sequence: str) -> str:
 def cache_key(sequence: str, provider: Optional[str] = None) -> str:
     """
     Generate cache key for a sequence (and optional provider).
-    
+
     Args:
         sequence: Amino acid sequence
         provider: Optional provider name (e.g., "tango", "s4pred") for provider-specific caching
-    
+
     Returns:
         Cache key string (filename-safe)
     """
@@ -52,14 +50,14 @@ def get_cache_path(key: str) -> Path:
 def cache_get(key: str) -> Optional[Dict[str, Any]]:
     """
     Retrieve cached result for a key.
-    
+
     Returns:
         Cached data dict or None if not found/invalid
     """
     cache_file = get_cache_path(key)
     if not cache_file.exists():
         return None
-    
+
     try:
         with open(cache_file, 'rb') as f:
             return pickle.load(f)
@@ -76,7 +74,7 @@ def cache_get(key: str) -> Optional[Dict[str, Any]]:
 def cache_set(key: str, data: Dict[str, Any], ttl_seconds: Optional[int] = None) -> None:
     """
     Store data in cache.
-    
+
     Args:
         key: Cache key (from cache_key())
         data: Data to cache (must be serializable)
@@ -98,10 +96,10 @@ def cache_set(key: str, data: Dict[str, Any], ttl_seconds: Optional[int] = None)
 def cache_clear(sequence: Optional[str] = None) -> int:
     """
     Clear cache entries.
-    
+
     Args:
         sequence: If provided, clear only cache for this sequence. Otherwise clear all.
-    
+
     Returns:
         Number of files deleted
     """

@@ -1,17 +1,18 @@
 # backend/tango.py
-import os
-import re
 import json
-import platform
-import subprocess
-import shutil
 import math
+import os
+import platform
+import re
+import shutil
+import subprocess
 from datetime import datetime
-from typing import List, Tuple, Dict, Any, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
+
 import auxiliary
-from services.logger import get_logger, get_trace_id, log_info, log_warning, log_error
+from services.logger import get_logger, get_trace_id, log_error, log_info, log_warning
 
 logger = get_logger()
 
@@ -396,11 +397,11 @@ def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> str:
             env_hints[env_var] = val
 
     # Common kwargs for _write_run_meta
-    meta_common = dict(
-        cmd=cmd, run_dir_abs=run_dir_abs, bin_path_abs=bin_path_abs,
-        env_hints=env_hints, input_files=input_files,
-        inputs_requested=len(records), entry_mapping=entry_mapping
-    )
+    meta_common = {
+        "cmd": cmd, "run_dir_abs": run_dir_abs, "bin_path_abs": bin_path_abs,
+        "env_hints": env_hints, "input_files": input_files,
+        "inputs_requested": len(records), "entry_mapping": entry_mapping
+    }
 
     # Check if binary exists before attempting execution
     if not os.path.exists(bin_path):
@@ -527,7 +528,10 @@ def __get_peptide_tango_result(filepath: str) -> Optional[dict]:
                     a = float(parts[idx_map["aggregation"]]) if "aggregation" in idx_map else 0.0
                 except Exception:
                     continue
-                beta.append(b); helix.append(h); turn.append(t); agg.append(a)
+                beta.append(b)
+                helix.append(h)
+                turn.append(t)
+                agg.append(a)
 
             if len(beta) >= 3:
                 return {
@@ -557,7 +561,10 @@ def __get_peptide_tango_result(filepath: str) -> Optional[dict]:
     if len(good) >= 3:
         beta, helix, turn, agg = [], [], [], []
         for b,h,t,a in good:
-            beta.append(b); helix.append(h); turn.append(t); agg.append(a)
+            beta.append(b)
+            helix.append(h)
+            turn.append(t)
+            agg.append(a)
         return {
             "Name": name,
             "Beta prediction": beta,
@@ -715,7 +722,10 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
         _diffs.append(None)   # Use None instead of 0 for missing SSW diff
         _h_pct.append(None)   # Use None for missing percentage
         _b_pct.append(None)   # Use None for missing percentage
-        _cb.append([]); _ch.append([]); _ct.append([]); _ca.append([])
+        _cb.append([])
+        _ch.append([])
+        _ct.append([])
+        _ca.append([])
 
     _ensure_dirs()
     # Use explicit run_dir if provided, otherwise fall back to latest (for backward compatibility only)
@@ -727,7 +737,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
             raise ValueError("process_tango_output: run_dir is None and _latest_run_dir() returned None. "
                            "In request flows, always pass explicit run_dir from the runner.")
 
-    trace_id = get_trace_id()
+    get_trace_id()
     log_info("tango_parse_start", f"Parsing TANGO outputs from {run_dir}", **{"run_dir": run_dir})
 
     # ---------- INVARIANT: Read entry_mapping from run_meta.json ----------
@@ -845,7 +855,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
                 "Tango Helix max": tango_helix_max,
                 "Tango Aggregation max": tango_agg_max,
             }
-            
+
             # Debug tracing for specific entry (avoid circular import)
             debug_entry = os.getenv("DEBUG_ENTRY", "").strip()
             if debug_entry and str(entry).strip() == str(debug_entry).strip():
@@ -859,7 +869,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
                     "ssw_avg_score": analysed.get('SSW_avg_score'),
                     "helix_beta_diff": analysed.get('Helix_and_beta_diff'),
                 })
-            
+
             ok_ctr += 1
 
         log_info("tango_parse_progress", f"Parsed {ok_ctr} OK, {bad_ctr} missing/failed", **{
@@ -867,7 +877,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
             "bad_count": bad_ctr,
             "total_entries": len(entry_set),
         })
-        
+
         # Assign using Entry-aligned mapping (.map() ensures alignment by stable key)
         # This eliminates ndarray length mismatch errors
         # Use None (not -1/0) for missing metrics to indicate data unavailability
@@ -903,7 +913,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
                         f"expected {expected_len} (DataFrame rows), got {actual_len}. "
                         f"TANGO provider status: FAILED - assignment alignment error."
                     )
-        
+
         log_info("tango_parse_complete", f"Tango parsing/merge complete: {ok_ctr} OK, {bad_ctr} BAD/empty", **{
             "ok_count": ok_ctr,
             "bad_count": bad_ctr,
@@ -986,7 +996,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
                     "SSW helix percentage": None,  # Use None instead of 0.0
                     "SSW beta percentage": None,   # Use None instead of 0.0
                 }
-        
+
         bad_ctr, ok_ctr = 0, 0
         if df_out is not None and name_col:
             # Match by Entry and populate results_by_entry
@@ -1001,7 +1011,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
                     bad_ctr += 1
         else:
             bad_ctr = len(results_by_entry)
-        
+
         # Assign using Entry-aligned mapping (eliminates ndarray length mismatch)
         # Use None (not -1/0) for missing metrics to indicate data unavailability
         database["SSW fragments"] = database[KEY].map(lambda e: results_by_entry.get(str(e).strip(), {}).get("SSW fragments", "-"))
@@ -1110,11 +1120,11 @@ def _read_run_meta_reason(run_dir: Optional[str]) -> Optional[str]:
     """
     if not run_dir or not os.path.isdir(run_dir):
         return None
-    
+
     meta_path = os.path.join(run_dir, "run_meta.json")
     if not os.path.exists(meta_path):
         return None
-    
+
     try:
         with open(meta_path, "r", encoding="utf-8") as f:
             meta = json.load(f)
@@ -1286,12 +1296,13 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
           in meta.thresholds documents which threshold was actually applied.
     """
     import os
+
     from services.logger import log_warning
-    
+
     if "SSW diff" not in database.columns:
         # Use None (not -1) to indicate missing data
         database["SSW diff"] = pd.Series([None] * len(database), index=database.index, dtype=object)
-    
+
     # Get threshold strategy from config (with fallback for backward compatibility)
     try:
         from config import settings
@@ -1305,7 +1316,7 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
         fallback_threshold = float(os.getenv("SSW_DIFF_THRESHOLD_FALLBACK", "0.0"))
         fixed_threshold = float(os.getenv("SSW_DIFF_THRESHOLD_FIXED", "0.0"))
         multiplier = float(os.getenv("SSW_DIFF_THRESHOLD_MULTIPLIER", "1.0"))
-    
+
     # Calculate threshold based on strategy
     # Gate: Only use rows with valid TANGO metrics (SSW diff is not None and not NaN)
     valid_diffs = database[database["SSW diff"].notna()]["SSW diff"]
@@ -1331,9 +1342,9 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
             # Unknown strategy, fall back to mean
             log_warning("ssw_diff_unknown_strategy", f"Unknown threshold strategy '{strategy}', using 'mean'", **{"strategy": strategy})
             avg_diff = valid_diffs.mean()
-    
+
     statistical_result_dict[database_name]['4 SSW helix and beta difference threshold'] = avg_diff
-    
+
     # Build predictions as index-aligned Series (not raw list)
     # Gate: Only compute SSW prediction for rows with valid TANGO metrics (SSW diff is not None and not NaN)
     # For rows without valid TANGO metrics, set sswPrediction = None (not -1, not 0, not 1)
@@ -1342,7 +1353,7 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
     # The comparison operator determines when to mark as 1 (default: "<" to match reference)
     comparison_op = os.getenv("SSW_DIFF_COMPARISON", "<").strip()
     preds = []
-    for idx, row in database.iterrows():
+    for _idx, row in database.iterrows():
         ssw_diff_val = row["SSW diff"]
         helix_pct = row.get("SSW helix percentage")
         beta_pct = row.get("SSW beta percentage")
@@ -1377,14 +1388,14 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
         else:
             # Default to "<" (reference behavior: prediction = 1 if diff < avg_diff)
             preds.append(1 if ssw_diff_val < avg_diff else -1)
-    
+
     # Assign using index-aligned Series to ensure proper alignment
     # Use object dtype to allow None values
     preds_series = pd.Series(preds, index=database.index, dtype=object)
-    
+
     # Sanitize: replace any NaN values with None (shouldn't happen, but defensive)
     preds_series = preds_series.apply(lambda x: None if (isinstance(x, float) and (math.isnan(x) or not math.isfinite(x))) else x)
-    
+
     # Assertion: verify length matches before assignment
     if len(preds_series) != len(database):
         raise ValueError(
@@ -1392,7 +1403,7 @@ def filter_by_avg_diff(database: pd.DataFrame, database_name: str, statistical_r
             f"expected {len(database)} (DataFrame rows), got {len(preds_series)}. "
             f"TANGO provider status: FAILED - assignment alignment error."
         )
-    
+
     database["SSW prediction"] = preds_series
 
 

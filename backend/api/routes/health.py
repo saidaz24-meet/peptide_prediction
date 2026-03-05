@@ -4,7 +4,9 @@ Health check and dependency status endpoints.
 import os
 import time
 from typing import Any, Dict
-from fastapi import APIRouter, HTTPException
+
+from fastapi import APIRouter
+
 from config import settings
 
 router = APIRouter()
@@ -95,8 +97,8 @@ def _check_s4pred_availability() -> Dict[str, Any]:
 
 def _check_uniprot_connectivity() -> Dict[str, Any]:
     """Check UniProt API connectivity (optional external dependency)."""
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     result = {
         "available": False,

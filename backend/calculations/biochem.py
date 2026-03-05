@@ -3,12 +3,14 @@ Biochemical calculation functions for peptide analysis.
 Extracted from server.py and batch_process.py to remove duplication.
 """
 import pandas as pd
-import biochem_calculation
+
 import auxiliary
+import biochem_calculation
+
 
 def sanitize_seq(s: str) -> str:
     """Sanitize sequence to canonical 20 amino acids."""
-    AA20 = set(list("ACDEFGHIKLMNPQRSTVWY"))
+    AA20 = set("ACDEFGHIKLMNPQRSTVWY")
     s = (s or "").upper()
     s = "".join([ch for ch in s if ch in AA20])
     return s
@@ -17,7 +19,7 @@ def _to_segments(val):
     """Parse segment data from various formats."""
     import json
     import re
-    
+
     if val is None or (isinstance(val, (int, float)) and val == -1):
         return []
     if isinstance(val, (list, tuple)):
@@ -43,18 +45,18 @@ def _to_segments(val):
 def calculate_biochemical_features(df: pd.DataFrame, use_strict_validation: bool = True) -> None:
     """
     Calculate biochemical features for peptide sequences.
-    
+
     Adds columns: Charge, Hydrophobicity, Full length uH, Helix (Jpred) uH, Beta full length uH
-    
+
     Args:
         df: DataFrame with 'Sequence' column and optionally 'Helix fragments (Jpred)'
         use_strict_validation: If True, mark invalid sequences as NaN instead of computing
     """
     charges, hydros, uh_full, uh_helix, uh_beta = [], [], [], [], []
-    
+
     for _, r in df.iterrows():
         seq_raw = str(r["Sequence"])
-        
+
         if use_strict_validation:
             # Server.py style: sanitize first, fallback to corrected, mark invalid as NaN
             seq = sanitize_seq(seq_raw) or auxiliary.get_corrected_sequence(seq_raw)
@@ -66,20 +68,20 @@ def calculate_biochemical_features(df: pd.DataFrame, use_strict_validation: bool
                 uh_helix.append(float("nan"))
                 uh_beta.append(float("nan"))
                 continue
-            
+
             # robustly parse helix fragments
             helix_frags = _to_segments(r.get("Helix fragments (Jpred)", []))
         else:
             # batch_process.py style: use corrected sequence directly
             seq = auxiliary.get_corrected_sequence(seq_raw)
             helix_frags = r.get("Helix fragments (Jpred)", [])
-        
+
         charges.append(biochem_calculation.total_charge(seq))
         hydros.append(biochem_calculation.hydrophobicity(seq))
         uh_full.append(biochem_calculation.hydrophobic_moment(seq))
         uh_helix.append(auxiliary.get_avg_uH_by_segments(seq, helix_frags))
         uh_beta.append(biochem_calculation.hydrophobic_moment(seq, angle=160))
-    
+
     df["Charge"] = charges
     df["Hydrophobicity"] = hydros
     df["Full length uH"] = uh_full

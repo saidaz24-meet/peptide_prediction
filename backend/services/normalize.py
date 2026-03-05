@@ -2,16 +2,18 @@
 DataFrame normalization and column finalization functions.
 Extracted from server.py to remove duplication across endpoints.
 """
-import pandas as pd
-import re
 import math
+import re
 from typing import Dict, List, Optional
+
+import pandas as pd
 from fastapi import HTTPException
+
+from schemas.api_models import PeptideRow
 from schemas.peptide import PeptideSchema
 from schemas.provider_status import PeptideProviderStatus
-from schemas.api_models import PeptideRow
+from services.logger import get_logger, log_info, log_warning
 from services.provider_tracking import create_provider_status_for_row
-from services.logger import get_logger, get_trace_id, log_info, log_warning
 
 logger = get_logger()
 
@@ -40,23 +42,23 @@ def canonicalize_headers(df: pd.DataFrame) -> pd.DataFrame:
     normalized = {orig: _norm(orig) for orig in df.columns}
     rename = {}
     ambiguous = {}  # Track which canonical names have multiple matches
-    
+
     for canon, opts in HEADER_SYNONYMS.items():
         matches = []
-        
+
         # Step 1: Try exact match (highest priority)
         for orig, normed in normalized.items():
             if normed == canon:
                 matches.append(orig)
                 break  # Exact match wins, stop searching
-        
+
         # Step 2: If no exact match, try exact match against synonym list
         if not matches:
             for orig, normed in normalized.items():
                 if normed in opts:
                     matches.append(orig)
                     break  # First exact match in synonym list wins
-        
+
         # Step 3: If still no match, try word-boundary substring matching (lower priority)
         if not matches:
             for opt in opts:
@@ -68,13 +70,13 @@ def canonicalize_headers(df: pd.DataFrame) -> pd.DataFrame:
                         break  # First match wins
                 if matches:
                     break
-        
+
         # Check for ambiguous matches
         if len(matches) > 1:
             ambiguous[canon] = matches
         elif len(matches) == 1:
             rename[matches[0]] = canon
-    
+
     # Raise error if ambiguous matches found
     if ambiguous:
         error_details = []
@@ -84,13 +86,13 @@ def canonicalize_headers(df: pd.DataFrame) -> pd.DataFrame:
                 f"Ambiguous header '{canon}': multiple columns matched: {cols}. "
                 f"Expected one of: {synonyms}"
             )
-        
+
         raise HTTPException(
             status_code=400,
             detail=f"Ambiguous column headers detected. {'; '.join(error_details)}. "
                    f"Available columns: {list(df.columns)}"
         )
-    
+
     return df.rename(columns=rename)
 
 def normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
@@ -100,7 +102,7 @@ def normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
     """
     # canonicalize_headers may raise HTTPException 400 - let it propagate
     df = canonicalize_headers(df)
-    
+
     # Ensure required columns exist
     if "entry" in df.columns:
         df = df.rename(columns={"entry": "Entry"})
@@ -112,49 +114,49 @@ def normalize_cols(df: pd.DataFrame) -> pd.DataFrame:
         df = df.rename(columns={"organism": "Organism"})
     if "name" in df.columns:
         df = df.rename(columns={"name": "Protein name"})
-    
+
     return df
 
 def create_single_sequence_df(sequence: str, entry: Optional[str] = None) -> pd.DataFrame:
     """
     Create and validate a DataFrame for a single peptide sequence.
     Validates sequence is non-empty and creates proper column structure.
-    
+
     Args:
         sequence: Raw peptide sequence string
         entry: Optional entry/ID string (defaults to "adhoc")
-    
+
     Returns:
         DataFrame with columns: Entry, Sequence, Length
-    
+
     Raises:
         HTTPException 400 if sequence is empty or invalid
     """
     import auxiliary
-    
+
     if not sequence or not sequence.strip():
         raise HTTPException(
             status_code=400,
             detail="Sequence is required and cannot be empty"
         )
-    
+
     # Get corrected sequence (handles non-standard AAs)
     seq = auxiliary.get_corrected_sequence(sequence.strip())
-    
+
     # Validate sequence is not empty after correction
     if not seq or len(seq) == 0:
         raise HTTPException(
             status_code=400,
             detail=f"Sequence became empty after correction. Original: {sequence[:50]}"
         )
-    
+
     # Create DataFrame with canonical column names (same as CSV path)
     df = pd.DataFrame([{
         "Entry": (entry or "adhoc").strip(),
         "Sequence": seq,
         "Length": len(seq)
     }])
-    
+
     return df
 
 def finalize_ui_aliases(df: pd.DataFrame) -> None:
@@ -208,7 +210,7 @@ def finalize_ff_fields(df: pd.DataFrame) -> None:
 def _is_fake_default(value) -> bool:
     """
     Check if a value is a fake default (placeholder for missing data).
-    
+
     Fake defaults include:
     - -1 for numeric fields (not available marker)
     - Empty string or "-" for string fields
@@ -234,27 +236,27 @@ def _is_fake_default(value) -> bool:
 def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProviderStatus) -> dict:
     """
     Convert fake defaults to null based on provider status.
-    
+
     Principle C: Missing provider outputs become null, not fake defaults.
     Strict null semantics at API boundary: if provider didn't run or is unavailable,
     ALL provider-owned fields must be null (not -1, not empty string, not 0).
-    
+
     Logic:
     - If provider is NOT available: nullify ALL provider-owned fields (regardless of value)
     - If provider IS available: only nullify fake defaults (-1, empty string, "-", empty lists), preserve legitimate zeros
-    
+
     Fake defaults:
     - -1 for numeric fields (not available marker)
     - Empty string ("") or "-" for string fields
     - Empty lists [] or empty dicts {} when provider didn't run
     - NaN/inf values
-    
+
     Preserve legitimate values when provider ran:
     - 0.0 for percentages (real zero percentage, not missing)
     - -1 for sswPrediction when provider available (valid: means "no switch")
     """
     result = row_dict.copy()
-    
+
     # TANGO fields: if TANGO is OFF or UNAVAILABLE, nullify ALL TANGO fields
     # PARTIAL means some peptides have data — preserve it, let per-row nulls handle the rest
     if provider_status.tango.status in ("OFF", "UNAVAILABLE"):
@@ -272,7 +274,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
         for field in tango_fields:
             if field in result:
                 result[field] = None
-        
+
         # Handle nested tango object
         if "tango" in result and isinstance(result["tango"], dict):
             result["tango"] = None
@@ -296,7 +298,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
                 value = result[field]
                 if value in fake_values or _is_fake_default(value):
                     result[field] = None
-        
+
         # Handle nested tango object: nullify if all curves are empty/None/fake defaults
         if "tango" in result and isinstance(result["tango"], dict):
             tango_obj = result["tango"]
@@ -308,7 +310,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
                     break
             if not has_real_data:
                 result["tango"] = None
-    
+
     # S4PRED fields: if S4PRED is not available/failed/not_configured, nullify ALL S4PRED fields
     if provider_status.s4pred.status != "AVAILABLE":
         # All S4PRED fields must be null when provider not available
@@ -431,15 +433,15 @@ def normalize_rows_for_ui(
 ):
     """
     Normalize DataFrame rows for UI consumption.
-    
+
     ALWAYS returns camelCase format through PeptideSchema.to_camel_dict().
     This ensures /api/predict and /api/upload-csv return the SAME canonical format.
-    
+
     Args:
         df: DataFrame with peptide data
         is_single_row: If True, return single dict with camelCase keys (for /api/predict);
                        If False, return list of dicts with camelCase keys (for CSV upload)
-    
+
     Returns:
         Single dict (if is_single_row=True) or list of dicts (if is_single_row=False)
         Both use camelCase keys (id, sequence, charge, etc.) - NOT capitalized (Entry, Sequence)
@@ -448,13 +450,13 @@ def normalize_rows_for_ui(
     def normalize_single_row(row: pd.Series) -> dict:
         """
         Normalize a single DataFrame row to camelCase dict.
-        
+
         Uses PeptideSchema.parse_obj() and to_camel_dict() to ensure canonical format.
         """
         try:
             # Convert row to dict with CSV header keys (PeptideSchema expects these aliases)
             row_dict = row.to_dict()
-            
+
             # Sanitize SSW-related fields: convert NaN/inf to None before Pydantic validation
             ssw_fields = ["SSW prediction", "SSW score", "SSW diff", "SSW helix percentage", "SSW beta percentage"]
             for field in ssw_fields:
@@ -463,10 +465,10 @@ def normalize_rows_for_ui(
 
             # Use PeptideSchema to validate and normalize
             peptide_obj = PeptideSchema.parse_obj(row_dict)
-            
+
             # Convert to camelCase for UI (canonical format)
             normalized = peptide_obj.to_camel_dict()
-            
+
             # Add provider status (Principle B: mandatory provider status)
             # Determine status based on data presence in DataFrame row
             # Note: SSW prediction can be -1 (no switch), 0 (uncertain), or 1 (switch predicted)
@@ -484,7 +486,7 @@ def normalize_rows_for_ui(
                 s4pred_output_available=s4pred_output_available,
             )
             normalized["providerStatus"] = provider_status.model_dump()
-            
+
             # Convert fake defaults to null (Principle C: no fake defaults)
             normalized = _convert_fake_defaults_to_null(normalized, provider_status)
 
@@ -524,7 +526,7 @@ def normalize_rows_for_ui(
                         ff_helix_val = None
                 except (ValueError, TypeError):
                     ff_helix_val = None
-            
+
             fallback = {
                 "id": str(row.get("Entry", "")),
                 "sequence": str(row.get("Sequence", "")),
@@ -552,7 +554,7 @@ def normalize_rows_for_ui(
             except Exception as e:
                 log_warning("peptide_row_fallback_validation_failed", f"Fallback row validation failed: {e}", entry=entry_id, **{"error": str(e)})
                 return sanitized_fallback
-    
+
     if is_single_row:
         # Single row normalization (for /api/predict)
         # Use same normalization path as multi-row to ensure canonical camelCase format
@@ -564,32 +566,32 @@ def normalize_rows_for_ui(
         # This converts DataFrame to list of dicts in one operation, avoiding Series creation per row
         rows_dict_list = df.to_dict('records')
         rows_out = []
-        
+
         # Check for debug entry (avoid circular import)
         import os
         debug_entry = os.getenv("DEBUG_ENTRY", "").strip()
-        
+
         # Log first 3 rows after normalization for CSV FF-Helix debugging
         log_first_n = 3
         rows_logged = 0
-        
+
         # OPTIMIZATION: Pre-compute column access patterns to avoid repeated lookups
         # Get column indices for faster access (if needed)
-        col_indices = {col: i for i, col in enumerate(df.columns)}
-        
+        {col: i for i, col in enumerate(df.columns)}
+
         for idx, row_dict in enumerate(rows_dict_list):
             # OPTIMIZATION: row_dict is already a dict, no need to call to_dict()
             # Convert to Series only when needed for provider status calculation
             # (create_provider_status_for_row expects a Series, so we create it lazily)
             row_series = None  # Lazy creation
-            
-            def get_row_series():
+
+            def get_row_series(_idx=idx):
                 """Lazy creation of Series for provider status calculation"""
                 nonlocal row_series
                 if row_series is None:
-                    row_series = df.iloc[idx]
+                    row_series = df.iloc[_idx]
                 return row_series
-            
+
             # Use row_dict directly for normalization (faster than Series)
             try:
                 # Sanitize SSW-related fields: convert NaN/inf to None before Pydantic validation
@@ -597,13 +599,13 @@ def normalize_rows_for_ui(
                 for field in ssw_fields:
                     if field in row_dict:
                         row_dict[field] = none_if_nan(row_dict[field])
-                
+
                 # Use PeptideSchema to validate and normalize
                 peptide_obj = PeptideSchema.parse_obj(row_dict)
-                
+
                 # Convert to camelCase for UI (canonical format)
                 normalized = peptide_obj.to_camel_dict()
-                
+
                 # Add provider status (Principle B: mandatory provider status)
                 # Determine status based on data presence in DataFrame row
                 # Note: SSW prediction can be -1 (no switch), 0 (uncertain), or 1 (switch predicted)
@@ -623,7 +625,7 @@ def normalize_rows_for_ui(
                     s4pred_output_available=s4pred_output_available,
                 )
                 normalized["providerStatus"] = provider_status.model_dump()
-                
+
                 # Convert fake defaults to null (Principle C: no fake defaults)
                 normalized = _convert_fake_defaults_to_null(normalized, provider_status)
 
@@ -661,7 +663,7 @@ def normalize_rows_for_ui(
                             ff_helix_val = None
                     except (ValueError, TypeError):
                         ff_helix_val = None
-                
+
                 fallback = {
                     "id": str(row_dict.get("Entry", "")),
                     "sequence": str(row_dict.get("Sequence", "")),
@@ -689,30 +691,30 @@ def normalize_rows_for_ui(
                     entry_id = str(row_dict.get("Entry", "unknown"))
                     log_warning("peptide_row_fallback_validation_failed", f"Fallback row validation failed: {e}", entry=entry_id, **{"error": str(e)})
                     normalized = sanitized_fallback
-            
+
             # Debug logging for first N rows
             entry_id = str(row_dict.get("Entry", "")).strip()
             if rows_logged < log_first_n:
                 # OPTIMIZATION: row_dict already exists, no need to call to_dict()
                 ff_helix_val = row_dict.get("FF-Helix %")
                 ff_helix_type = type(ff_helix_val).__name__ if ff_helix_val is not None else "None"
-                log_info("csv_normalize_sample", f"CSV normalization sample row {rows_logged + 1}/{log_first_n}", 
+                log_info("csv_normalize_sample", f"CSV normalization sample row {rows_logged + 1}/{log_first_n}",
                         entry=entry_id,
                         ffHelixPercent_raw=str(ff_helix_val) if ff_helix_val is not None else "None",
                         ffHelixPercent_type=ff_helix_type,
                         ffHelixPercent_is_na=pd.isna(ff_helix_val) if ff_helix_val is not None else True,
                         all_ff_keys=[k for k in row_dict.keys() if 'FF' in k or 'Helix' in k or 'helix' in k.lower()])
-                
+
                 ff_helix_camel = normalized.get("ffHelixPercent")
                 ff_helix_camel_type = type(ff_helix_camel).__name__ if ff_helix_camel is not None else "None"
-                log_info("csv_normalize_after", f"After PeptideSchema normalization (sample {rows_logged + 1}/{log_first_n})", 
+                log_info("csv_normalize_after", f"After PeptideSchema normalization (sample {rows_logged + 1}/{log_first_n})",
                         entry=entry_id,
                         ffHelixPercent=str(ff_helix_camel) if ff_helix_camel is not None else "None",
                         ffHelixPercent_type=ff_helix_camel_type,
                         ffHelixPercent_is_na=pd.isna(ff_helix_camel) if ff_helix_camel is not None else True,
                         all_ff_keys_camel=[k for k in normalized.keys() if 'ff' in k.lower() or 'helix' in k.lower()])
                 rows_logged += 1
-            
+
             # Debug: Log before/after PeptideSchema normalization for debug entry
             if debug_entry and entry_id == debug_entry:
                 # OPTIMIZATION: row_dict already exists, no need to call to_dict()
@@ -722,15 +724,15 @@ def normalize_rows_for_ui(
                 for key in ["SSW prediction", "SSW helix percentage", "SSW beta percentage"]:
                     if key in row_dict:
                         log_info("normalize_field", f"{key}: {row_dict[key]}", entry=entry_id, **{"field": key, "value": str(row_dict[key]), "type": type(row_dict[key]).__name__})
-                
+
                 log_info("normalize_after", f"After PeptideSchema normalization for entry {entry_id}", entry=entry_id, **{
                     "ssw_keys": [k for k in normalized.keys() if 'ssw' in k.lower() or 'helix' in k.lower() or 'beta' in k.lower()]
                 })
                 for key in ["id", "sswPrediction", "sswHelixPercentage", "sswBetaPercentage"]:
                     if key in normalized:
                         log_info("normalize_field", f"{key}: {normalized[key]}", entry=entry_id, **{"field": key, "value": str(normalized[key]), "type": type(normalized[key]).__name__})
-            
+
             rows_out.append(normalized)
-        
+
         return rows_out
 

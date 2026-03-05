@@ -1,23 +1,22 @@
 """
 Main FastAPI application setup and router registration.
 """
+import logging
 import os
 import uuid
-from fastapi import FastAPI, Request, HTTPException
+
+import sentry_sdk
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from starlette.middleware.base import BaseHTTPMiddleware
-import sentry_sdk
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
-import logging
-
-from config import settings
-from services.logger import get_logger, set_trace_id, log_info, log_error
-from services.trace_helpers import get_trace_id_for_response
+from starlette.middleware.base import BaseHTTPMiddleware
 
 # Import routers
-from api.routes import health, example, upload, predict, providers, uniprot, feedback
+from api.routes import example, feedback, health, predict, providers, uniprot, upload
+from config import settings
+from services.logger import get_logger, log_error, log_info, set_trace_id
 
 # Initialize Sentry before FastAPI app creation
 # Skip Sentry during test runs — test-triggered errors (invalid sort, missing columns,
@@ -67,7 +66,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         sentry_sdk.capture_exception(exc, level="error")
     elif exc.status_code in [400, 401, 403, 404, 422]:
         sentry_sdk.capture_exception(exc, level="warning")
-    
+
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail}
@@ -89,17 +88,17 @@ class TraceIdMiddleware(BaseHTTPMiddleware):
         trace_id = request.headers.get("X-Trace-Id") or str(uuid.uuid4())
         set_trace_id(trace_id)
         request.state.trace_id = trace_id
-        
+
         log_info("request_start", f"{request.method} {request.url.path}", **{
             "method": request.method,
             "path": request.url.path,
             "stage": "request",
         })
-        
+
         try:
             response = await call_next(request)
             response.headers["X-Trace-Id"] = trace_id
-            
+
             log_info("request_end", f"{request.method} {request.url.path} {response.status_code}", **{
                 "method": request.method,
                 "path": request.url.path,

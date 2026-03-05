@@ -1,7 +1,8 @@
 """
 Feedback submission endpoint.
 """
-from fastapi import APIRouter, Request, Body, HTTPException
+from fastapi import APIRouter, Body, HTTPException, Request
+
 from schemas.feedback import FeedbackRequest
 from services.feedback_service import check_rate_limit, process_feedback
 
@@ -25,4 +26,4 @@ async def submit_feedback(request: Request, feedback_data: FeedbackRequest = Bod
     try:
         return await process_feedback(client_ip, feedback_data, SENTRY_INITIALIZED)
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e)) from e

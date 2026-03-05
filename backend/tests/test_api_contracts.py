@@ -11,8 +11,10 @@ Or with environment variables to disable providers:
     USE_TANGO=0 USE_S4PRED=0 python -m pytest tests/test_api_contracts.py -v
 """
 import os
+
 import pytest
 from fastapi.testclient import TestClient
+
 from api.main import app
 
 # Disable providers for fast tests (set env vars before importing server)
@@ -60,7 +62,7 @@ REQUIRED_KEYS = [
 
 class TestPredictContract:
     """Test /api/predict endpoint contract."""
-    
+
     def test_predict_returns_camelcase_keys(self):
         """Assert /api/predict returns camelCase keys in row field, not capitalized."""
         response = client.post(
@@ -70,30 +72,30 @@ class TestPredictContract:
                 "entry": TEST_ENTRY,
             },
         )
-        
+
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
         data = response.json()
-        
+
         # Assert response structure: {row: {...}, meta: {...}}
         assert "row" in data, "Response must have 'row' field"
         assert "meta" in data, "Response must have 'meta' field"
-        
+
         row = data["row"]
-        
+
         # Assert required keys are present in row (camelCase)
         for key in REQUIRED_KEYS:
             assert key in row, f"Row missing required key '{key}'. Keys: {list(row.keys())}"
-        
+
         # Assert forbidden keys are NOT present (capitalized/CSV format)
         for key in FORBIDDEN_KEYS:
             assert key not in row, f"Row contains forbidden key '{key}' (should be camelCase). Keys: {list(row.keys())}"
-        
+
         # Assert specific required fields
         assert "id" in row, "Row must have 'id' field (camelCase)"
         assert "sequence" in row, "Row must have 'sequence' field (camelCase)"
         assert row["id"] == TEST_ENTRY, f"Expected id={TEST_ENTRY}, got {row['id']}"
         assert row["sequence"] == TEST_SEQUENCE, f"Expected sequence={TEST_SEQUENCE}, got {row['sequence']}"
-    
+
     def test_predict_has_meta_field(self):
         """Assert /api/predict includes meta field with required structure."""
         response = client.post(
@@ -103,20 +105,20 @@ class TestPredictContract:
                 "entry": TEST_ENTRY,
             },
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         # Meta field is required and must be a dict
         assert "meta" in data, "Response must have 'meta' field"
         assert isinstance(data["meta"], dict), "meta field must be a dict"
-        
+
         # Assert meta has required fields
         meta = data["meta"]
         assert "use_s4pred" in meta, "meta must have 'use_s4pred' field"
         assert "use_tango" in meta, "meta must have 'use_tango' field"
         assert "thresholds" in meta, "meta must have 'thresholds' field"
-    
+
     def test_predict_no_entry_uses_default(self):
         """Test /api/predict without entry parameter (should default to 'adhoc')."""
         response = client.post(
@@ -126,10 +128,10 @@ class TestPredictContract:
                 # entry not provided
             },
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert "row" in data
         row = data["row"]
         assert "id" in row
@@ -140,80 +142,80 @@ class TestPredictContract:
 
 class TestUploadCsvContract:
     """Test /api/upload-csv endpoint contract."""
-    
+
     def test_upload_csv_returns_rows_and_meta(self):
         """Assert /api/upload-csv returns {rows, meta} structure."""
         response = client.post(
             "/api/upload-csv",
             files={"file": ("test.csv", TEST_CSV_CONTENT, "text/csv")},
         )
-        
+
         assert response.status_code == 200, f"Expected 200, got {response.status_code}: {response.text}"
         data = response.json()
-        
+
         # Assert top-level structure
         assert "rows" in data, "Response must have 'rows' field"
         assert "meta" in data, "Response must have 'meta' field"
-        
+
         # Assert types
         assert isinstance(data["rows"], list), "rows must be a list"
         assert isinstance(data["meta"], dict), "meta must be a dict"
-        
+
         # Assert rows is not empty
         assert len(data["rows"]) > 0, "rows must contain at least one item"
-    
+
     def test_upload_csv_rows_have_camelcase_keys(self):
         """Assert each row in /api/upload-csv has camelCase keys."""
         response = client.post(
             "/api/upload-csv",
             files={"file": ("test.csv", TEST_CSV_CONTENT, "text/csv")},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert len(data["rows"]) > 0, "rows must not be empty"
-        
+
         # Check first row
         first_row = data["rows"][0]
-        
+
         # Assert required keys are present (camelCase)
         for key in REQUIRED_KEYS:
             assert key in first_row, f"Row missing required key '{key}'. Keys: {list(first_row.keys())}"
-        
+
         # Assert forbidden keys are NOT present (capitalized/CSV format)
         for key in FORBIDDEN_KEYS:
             assert key not in first_row, f"Row contains forbidden key '{key}' (should be camelCase). Keys: {list(first_row.keys())}"
-        
+
         # Assert specific required fields
         assert "id" in first_row, "Row must have 'id' field (camelCase)"
         assert "sequence" in first_row, "Row must have 'sequence' field (camelCase)"
         assert isinstance(first_row["id"], str), "id must be a string"
         assert isinstance(first_row["sequence"], str), "sequence must be a string"
         assert len(first_row["sequence"]) > 0, "sequence must not be empty"
-    
+
     def test_upload_csv_all_rows_have_consistent_format(self):
         """Assert all rows in /api/upload-csv have consistent camelCase format."""
         response = client.post(
             "/api/upload-csv",
             files={"file": ("test.csv", TEST_CSV_CONTENT, "text/csv")},
         )
-        
+
         assert response.status_code == 200
         data = response.json()
-        
+
         assert len(data["rows"]) >= 2, "Test CSV has 2 rows, should get at least 2"
-        
+
         # Check all rows
         for i, row in enumerate(data["rows"]):
             # Assert required keys
             for key in REQUIRED_KEYS:
                 assert key in row, f"Row {i} missing required key '{key}'"
-            
+
             # Assert forbidden keys are NOT present
             for key in FORBIDDEN_KEYS:
                 assert key not in row, f"Row {i} contains forbidden key '{key}' (should be camelCase)"
-            
+
             # Assert id and sequence are present and valid
             assert "id" in row, f"Row {i} must have 'id' field"
             assert "sequence" in row, f"Row {i} must have 'sequence' field"
@@ -295,7 +297,7 @@ class TestUploadCsvContract:
 
 class TestUniprotExecuteContract:
     """Test /api/uniprot/execute endpoint contract."""
-    
+
     @pytest.mark.skipif(
         os.getenv("SKIP_UNIPROT_TESTS", "0") == "1",
         reason="UniProt tests require network access. Set SKIP_UNIPROT_TESTS=0 to run."
@@ -312,27 +314,27 @@ class TestUniprotExecuteContract:
                 "run_psipred": False,
             },
         )
-        
+
         # May fail if UniProt API is unavailable, but if it succeeds, check contract
         if response.status_code == 200:
             data = response.json()
-            
+
             # Assert top-level structure (same as upload-csv)
             assert "rows" in data, "Response must have 'rows' field"
             assert "meta" in data, "Response must have 'meta' field"
-            
+
             # Assert types
             assert isinstance(data["rows"], list), "rows must be a list"
             assert isinstance(data["meta"], dict), "meta must be a dict"
-            
+
             # If rows exist, check format
             if len(data["rows"]) > 0:
                 first_row = data["rows"][0]
-                
+
                 # Assert required keys (camelCase)
                 for key in REQUIRED_KEYS:
                     assert key in first_row, f"Row missing required key '{key}'"
-                
+
                 # Assert forbidden keys are NOT present
                 for key in FORBIDDEN_KEYS:
                     assert key not in first_row, f"Row contains forbidden key '{key}' (should be camelCase)"
@@ -340,7 +342,7 @@ class TestUniprotExecuteContract:
             # If UniProt is unavailable, that's OK - test is skipped or will fail gracefully
             # Log the status for debugging
             pytest.skip(f"UniProt API unavailable (status {response.status_code}): {response.text}")
-    
+
     @pytest.mark.skipif(
         os.getenv("SKIP_UNIPROT_TESTS", "0") == "1",
         reason="UniProt tests require network access. Set SKIP_UNIPROT_TESTS=0 to run."
@@ -357,17 +359,17 @@ class TestUniprotExecuteContract:
                 "run_psipred": False,
             },
         )
-        
+
         if response.status_code == 200:
             data = response.json()
-            
+
             if len(data["rows"]) > 0:
                 first_row = data["rows"][0]
-                
+
                 # Assert required keys
                 assert "id" in first_row, "Row must have 'id' field (camelCase)"
                 assert "sequence" in first_row, "Row must have 'sequence' field (camelCase)"
-                
+
                 # Assert forbidden keys are NOT present
                 for key in FORBIDDEN_KEYS:
                     assert key not in first_row, f"Row contains forbidden key '{key}' (should be camelCase)"
@@ -536,7 +538,7 @@ class TestContractConsistency:
         predict_data = predict_response.json()
         assert "row" in predict_data
         predict_row = predict_data["row"]
-        
+
         # Get response from /api/upload-csv
         upload_response = client.post(
             "/api/upload-csv",
@@ -546,14 +548,14 @@ class TestContractConsistency:
         upload_data = upload_response.json()
         assert len(upload_data["rows"]) > 0
         upload_row = upload_data["rows"][0]
-        
+
         # Both should have camelCase keys
         # Check that they both have 'id' and 'sequence' (not 'Entry' and 'Sequence')
         assert "id" in predict_row, "/api/predict row must have 'id' (camelCase)"
         assert "id" in upload_row, "/api/upload-csv rows must have 'id' (camelCase)"
         assert "sequence" in predict_row, "/api/predict row must have 'sequence' (camelCase)"
         assert "sequence" in upload_row, "/api/upload-csv rows must have 'sequence' (camelCase)"
-        
+
         # Both should NOT have capitalized keys
         assert "Entry" not in predict_row, "/api/predict row must NOT have 'Entry' (capitalized)"
         assert "Entry" not in upload_row, "/api/upload-csv rows must NOT have 'Entry' (capitalized)"

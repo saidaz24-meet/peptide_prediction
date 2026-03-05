@@ -1,7 +1,8 @@
 """
 Pydantic schemas for UniProt query parsing and execution.
 """
-from typing import Optional, Literal
+from typing import Literal, Optional
+
 from pydantic import BaseModel, Field
 
 

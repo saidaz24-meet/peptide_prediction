@@ -1,12 +1,14 @@
 """
 Provider status and diagnostic endpoints.
 """
-from fastapi import APIRouter
-import tango
-from services.provider_state import get_last_provider_status, get_last_run_dir
-from config import settings
 import os
 import subprocess
+
+from fastapi import APIRouter
+
+import tango
+from config import settings
+from services.provider_state import get_last_provider_status, get_last_run_dir
 
 router = APIRouter()
 
@@ -40,7 +42,7 @@ async def providers_last_run():
     Includes provider status, reasons, stats, and run directory paths for debugging.
     """
     last_status = get_last_provider_status()
-    
+
     if last_status is None:
         return {
             "note": "No dataset processed yet. Load a dataset via /api/upload-csv or /api/uniprot/execute first.",
@@ -74,14 +76,14 @@ async def diagnose_tango():
     """
     use_docker = settings.TANGO_MODE != "simple"
     docker_image = os.getenv("TANGO_DOCKER_IMAGE", "desy-tango")
-    
+
     result = {
         "status": "unknown",
         "path": None,
         "version": None,
         "reason": None,
     }
-    
+
     # Docker mode: check if image exists
     if use_docker:
         try:
@@ -118,7 +120,7 @@ async def diagnose_tango():
             result["status"] = "container-missing"
             result["reason"] = f"Docker check failed: {str(e)}"
         return result
-    
+
     # Native mode: use centralized platform-aware resolver
     bin_path_abs = tango._resolve_tango_bin()
 
@@ -133,7 +135,7 @@ async def diagnose_tango():
         result["status"] = "no-exec-permission"
         result["reason"] = f"TANGO binary at {bin_path_abs} is not executable"
         return result
-    
+
     try:
         version_proc = subprocess.run(
             [bin_path_abs, "--version"],
@@ -159,7 +161,7 @@ async def diagnose_tango():
         result["reason"] = "Version check timed out (binary may be slow to start)"
     except Exception as e:
         result["reason"] = f"Version check failed: {str(e)}"
-    
+
     result["status"] = "found"
     return result
 

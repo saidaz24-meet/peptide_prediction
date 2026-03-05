@@ -5,10 +5,9 @@ Parses user input to classify query type (accession, keyword, organism, combinat
 and builds valid UniProt API search strings.
 """
 import re
-from typing import Dict, List, Optional, Literal, Tuple
+from dataclasses import dataclass
 from enum import Enum
-from dataclasses import dataclass
-from dataclasses import dataclass
+from typing import List, Optional
 
 # UniProt accession patterns (see https://www.uniprot.org/help/accession_numbers):
 # Classic (6 chars): [OPQ][0-9][A-Z0-9]{3}[0-9] e.g., P12345, Q9UNL2
@@ -49,7 +48,7 @@ class ParsedUniProtQuery:
     organism_id: Optional[str] = None
     organism_name: Optional[str] = None
     error: Optional[str] = None
-    
+
     def __post_init__(self):
         """Ensure mode is QueryMode enum if passed as string"""
         if isinstance(self.mode, str):
@@ -59,10 +58,10 @@ class ParsedUniProtQuery:
 def normalize_query(text: str) -> str:
     """
     Normalize query text: strip whitespace, handle case.
-    
+
     Args:
         text: Raw input text
-    
+
     Returns:
         Normalized string
     """
@@ -78,24 +77,24 @@ def normalize_query(text: str) -> str:
 def detect_accession(text: str) -> Optional[str]:
     """
     Detect if text contains a UniProt accession number.
-    
+
     Args:
         text: Query text
-    
+
     Returns:
         Accession string if detected, None otherwise
     """
     normalized = normalize_query(text)
     if not normalized:
         return None
-    
+
     # Split by spaces/commas and check each part
     parts = re.split(r'[,\s]+', normalized)
     for part in parts:
         part = part.strip()
         if ACCESSION_PATTERN.match(part):
             return part.upper()  # UniProt accessions are case-insensitive but typically uppercase
-    
+
     return None
 
 
@@ -193,13 +192,13 @@ def extract_keyword(text: str, exclude_patterns: Optional[List[str]] = None) -> 
 def parse_uniprot_query(text: str) -> ParsedUniProtQuery:
     """
     Parse UniProt query text and classify into mode.
-    
+
     Args:
         text: Raw query input from user
-    
+
     Returns:
         ParsedUniProtQuery with mode, components, and API query string
-    
+
     Examples:
         "P12345" -> accession mode
         "amyloid" -> keyword mode
@@ -207,7 +206,7 @@ def parse_uniprot_query(text: str) -> ParsedUniProtQuery:
         "amyloid organism_id:9606" -> keyword_organism mode
     """
     normalized = normalize_query(text)
-    
+
     # Initialize with defaults, then update fields
     result = ParsedUniProtQuery(
         mode=QueryMode.UNKNOWN,
@@ -215,13 +214,13 @@ def parse_uniprot_query(text: str) -> ParsedUniProtQuery:
         normalized_query=normalized,
         api_query_string="",
     )
-    
+
     if not normalized:
         result.mode = QueryMode.UNKNOWN
         result.error = "Empty query"
         result.api_query_string = ""
         return result
-    
+
     # Step 1: Check for accession
     accession = detect_accession(normalized)
     if accession:
@@ -230,13 +229,13 @@ def parse_uniprot_query(text: str) -> ParsedUniProtQuery:
         # For accession, API query is direct
         result.api_query_string = f"accession:{accession}"
         return result
-    
+
     # Step 2: Check for organism ID
     organism_id = detect_organism_id(normalized)
-    
+
     # Step 3: Extract keyword (excluding organism patterns)
     keyword = extract_keyword(normalized)
-    
+
     # Step 4: Classify mode
     if organism_id and keyword:
         result.mode = QueryMode.KEYWORD_ORGANISM
@@ -256,7 +255,7 @@ def parse_uniprot_query(text: str) -> ParsedUniProtQuery:
         result.mode = QueryMode.UNKNOWN
         result.error = "Could not parse query. Expected: accession (e.g., P12345), keyword, or organism_id (e.g., 9606)"
         result.api_query_string = normalized  # Fallback: use normalized input as-is
-    
+
     return result
 
 
@@ -273,7 +272,7 @@ def build_uniprot_export_url(
 ) -> str:
     """
     Build UniProt REST API export URL with query controls.
-    
+
     Args:
         query_string: UniProt API query string (e.g., "accession:P12345")
         format: Export format (tsv, csv, xlsx, fasta, etc.)
@@ -284,22 +283,22 @@ def build_uniprot_export_url(
         sort: Sort order ("score" = best match first, "length_asc", "length_desc", "organism_name")
         include_isoforms: Include isoform sequences
         size: Maximum number of results (default 500)
-    
+
     Returns:
         Full UniProt API URL
     """
     base_url = "https://rest.uniprot.org/uniprotkb/search"
-    
+
     # Build query string with filters
     query_parts = [query_string]
-    
+
     # Reviewed/unreviewed filter
     if reviewed is True:
         query_parts.append("reviewed:true")
     elif reviewed is False:
         query_parts.append("reviewed:false")
     # If None, include both (no filter)
-    
+
     # Length filters - only add if at least one bound is set
     # UniProt API range syntax: length:[min TO max] or length:[min TO *] or length:[* TO max]
     # IMPORTANT: Avoid wildcard (*) when possible - UniProt may reject patterns like length:[* TO 6]
@@ -319,10 +318,10 @@ def build_uniprot_export_url(
             # For larger max values, wildcard is acceptable
             query_parts.append(f"length:[* TO {length_max}]")
     # If both are None: DO NOT append length clause
-    
+
     # Combine query parts
     final_query = " AND ".join(query_parts)
-    
+
     # Default columns for peptide analysis
     default_columns = [
         "accession",
@@ -333,10 +332,10 @@ def build_uniprot_export_url(
         "sequence",
         "length",
     ]
-    
+
     columns_to_use = columns if columns else default_columns
     fields = ",".join(columns_to_use)
-    
+
     # Build query parameters
     params = {
         "query": final_query,
@@ -344,7 +343,7 @@ def build_uniprot_export_url(
         "fields": fields,
         "size": size,
     }
-    
+
     # Add sorting with strict allowlist
     # Accept both underscore format (length_asc) and space format (length asc)
     # UniProt API expects space format, so we normalize underscore to space
@@ -380,15 +379,15 @@ def build_uniprot_export_url(
                 f"Allowed values: {sorted(ALLOWED_SORT_VALUES)} or omit for best match"
             )
     # If sort is "score" or None, omit it (UniProt defaults to score)
-    
+
     # Include isoforms if requested (this is handled in the query, not as a parameter)
     # For isoforms, we might need to adjust the query or handle differently
     # UniProt REST API doesn't have a direct "include_isoforms" parameter
     # Instead, isoforms are typically included if the accession includes them
-    
+
     # Build URL with proper encoding using httpx.URL
     import httpx
     url = httpx.URL(base_url, params=params)
-    
+
     return str(url)
 

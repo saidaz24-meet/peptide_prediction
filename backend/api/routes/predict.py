@@ -2,11 +2,13 @@
 Single sequence prediction endpoint.
 """
 from typing import Optional
+
 from fastapi import APIRouter, Form, HTTPException
+
 from schemas.api_models import PredictResponse
-from services.thresholds import parse_threshold_config
 from services.normalize import create_single_sequence_df
 from services.predict_service import process_single_sequence
+from services.thresholds import parse_threshold_config
 
 router = APIRouter()
 

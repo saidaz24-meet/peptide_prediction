@@ -1,7 +1,9 @@
-from typing import Optional, List, Any, Dict
-from pydantic import BaseModel, Field, field_validator
-import pandas as pd
 import math
+from typing import Any, List, Optional
+
+import pandas as pd
+from pydantic import BaseModel, Field, field_validator
+
 from .provider_status import PeptideProviderStatus
 
 
@@ -15,7 +17,7 @@ class PeptideSchema(BaseModel):
     entry: str = Field(..., alias="Entry")
     name: Optional[str] = Field(None, alias="Protein name")
     species: Optional[str] = Field(None, alias="Organism")
-    
+
     @classmethod
     def parse_obj(cls, obj):
         """Override parse_obj to handle NaN values in optional fields (strings, floats, ints)"""
@@ -28,7 +30,7 @@ class PeptideSchema(BaseModel):
                 "name": ["Protein name", "name"],
                 "species": ["Organism", "species"]
             }
-            for field_name, aliases in field_mappings.items():
+            for _field_name, aliases in field_mappings.items():
                 for key in aliases:
                     if key in obj:
                         val = obj[key]
@@ -40,7 +42,7 @@ class PeptideSchema(BaseModel):
                                 obj[key] = None
                         elif isinstance(val, str) and val.lower() == "nan":
                             obj[key] = None
-            
+
             # Sanitize SSW-related fields: convert NaN/inf to None
             ssw_fields = ["SSW prediction", "SSW score", "SSW diff", "SSW helix percentage", "SSW beta percentage"]
             for field in ssw_fields:
@@ -165,7 +167,7 @@ class PeptideSchema(BaseModel):
         """
         Convert validated model to camelCase keys used by the frontend types.
         Keeps base names identical (e.g. ff_helix_percent -> ffHelixPercent).
-        
+
         Canonical fields:
         - sswPrediction: -1/0/1 classification (from ssw_prediction)
         - sswHelixPercentage: numeric helix percentage (from ssw_helix_percentage)

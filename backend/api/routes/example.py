@@ -2,6 +2,7 @@
 Example dataset endpoint.
 """
 from fastapi import APIRouter
+
 from schemas.api_models import RowsResponse
 from services.example_service import load_example_data
 

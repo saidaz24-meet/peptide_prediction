@@ -17,7 +17,6 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import biochem_calculation as biochem
 
-
 FIXTURE_PATH = os.path.join(
     os.path.dirname(__file__), "fixtures", "gold_standard_sample.json"
 )

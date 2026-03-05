@@ -4,7 +4,8 @@ Provider status tracking for TANGO and S4PRED.
 Principle B: Every result must indicate provider availability.
 No fake defaults - missing outputs become null + providerStatus explains why.
 """
-from typing import Optional, Literal
+from typing import Literal, Optional
+
 from pydantic import BaseModel, Field
 
 # Provider status values - MUST match frontend types/peptide.ts ProviderStatus type

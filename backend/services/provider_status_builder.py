@@ -4,7 +4,7 @@ Shared provider status metadata builder.
 Used by both predict_service (single sequence) and upload_service (batch)
 to construct consistent provider status dicts for API responses.
 """
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 
 def build_provider_meta(

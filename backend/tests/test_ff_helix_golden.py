@@ -8,13 +8,10 @@ Our ff_helix_percent uses a Chou-Fasman sliding-window propensity scale.
 This is distinct from the reference's FF-Helix binary classification
 (which uses S4PRED helix segments + database-average μH threshold).
 """
-import pytest
 import pandas as pd
-import numpy as np
 
-from auxiliary import ff_helix_percent, ff_helix_cores, _HELIX_PROP, get_avg_uH_by_segments
-from services.dataframe_utils import apply_ff_flags, _compute_helix_uh
-
+from auxiliary import _HELIX_PROP, ff_helix_cores, ff_helix_percent, get_avg_uH_by_segments
+from services.dataframe_utils import _compute_helix_uh, apply_ff_flags
 
 # ============================================================
 # ff_helix_percent tests

@@ -3,9 +3,7 @@
 TDD: Written BEFORE implementation (backend/consensus.py).
 """
 
-import pytest
-from consensus import get_consensus_ss, dominant_ss_at_region
-
+from consensus import dominant_ss_at_region, get_consensus_ss
 
 # ──────────────────────────────────────────────────────────────────────
 # dominant_ss_at_region

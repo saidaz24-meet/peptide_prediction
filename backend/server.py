@@ -10,6 +10,6 @@ All business logic has been moved to:
 HTTP route handlers live in api/routes/*.py.
 The FastAPI app is created in api/main.py.
 """
-from api.main import app, SENTRY_INITIALIZED
+from api.main import SENTRY_INITIALIZED, app
 
 __all__ = ["app", "SENTRY_INITIALIZED"]

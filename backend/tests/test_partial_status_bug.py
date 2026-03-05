@@ -10,9 +10,10 @@ with valid TANGO data but no helix-beta overlap.
 Expected: 66 entries with valid SSW prediction, 3 with None.
 Bug produced: 42 with valid SSW prediction, 27 with None.
 """
-import sys, os, math
+import os
+import sys
+
 import pandas as pd
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import tango

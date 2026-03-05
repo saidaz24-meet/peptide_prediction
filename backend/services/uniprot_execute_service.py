@@ -11,49 +11,47 @@ Handles the full lifecycle of a UniProt query:
 
 Extracted from server.py to break the circular import chain.
 """
-import io
-import json
-import os
-import re
 import hashlib
+import json
+import re
 import uuid
-from typing import Optional, Dict, Any, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 import httpx
 import pandas as pd
-
-from config import settings
 from fastapi import HTTPException
+
+import tango
+from calculations.biochem import calculate_biochemical_features as calc_biochem
+from config import settings
 from schemas.uniprot_query import UniProtQueryExecuteRequest
-from services.uniprot_parser import parse_uniprot_query, build_uniprot_export_url
-from services.logger import log_info, log_warning, log_error
-from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
-from services.thresholds import resolve_thresholds
+from services.dataframe_utils import (
+    apply_ff_flags,
+    ensure_computed_cols,
+    ensure_ff_cols,
+    read_any_table,
+    require_cols,
+)
+from services.logger import log_error, log_info, log_warning
 from services.normalize import (
-    normalize_cols,
-    finalize_ui_aliases as _finalize_ui_aliases,
     finalize_ff_fields,
+    normalize_cols,
     normalize_rows_for_ui,
 )
-from services.dataframe_utils import (
-    require_cols,
-    ensure_ff_cols,
-    ensure_computed_cols,
-    apply_ff_flags,
-    read_any_table,
-    fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
+from services.normalize import (
+    finalize_ui_aliases as _finalize_ui_aliases,
 )
+from services.provider_status_builder import build_provider_meta
+from services.thresholds import resolve_thresholds
+from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
+from services.uniprot_parser import build_uniprot_export_url, parse_uniprot_query
 from services.upload_service import (
-    run_tango_processing,
-    run_s4pred_processing,
     UploadProcessingError,
+    run_s4pred_processing,
+    run_tango_processing,
     set_last_provider_status,
     set_last_run_dir,
 )
-from services.provider_status_builder import build_provider_meta
-from calculations.biochem import calculate_biochemical_features as calc_biochem
-import tango
-
 
 # ---------------------------------------------------------------------------
 # Query parsing + validation helpers
@@ -377,7 +375,7 @@ async def _handle_400_fallback(
         minimal_params["query"] = mq
 
     minimal_url = str(httpx.URL("https://rest.uniprot.org/uniprotkb/search", params=minimal_params))
-    log_info("uniprot_fallback_url", f"Trying minimal fallback", **{"url": minimal_url})
+    log_info("uniprot_fallback_url", "Trying minimal fallback", **{"url": minimal_url})
 
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
@@ -486,7 +484,7 @@ async def _handle_400_fallback(
         raise HTTPException(
             status_code=400,
             detail=json.dumps({"source": "uniprot", "error": error_text})
-        )
+        ) from fallback_error
 
 
 # ---------------------------------------------------------------------------
@@ -595,7 +593,7 @@ async def execute_uniprot_query(
 
     except UploadProcessingError as e:
         # Convert service errors to HTTP errors (e.g., TANGO zero outputs)
-        raise HTTPException(status_code=e.status_code, detail=json.dumps(e.detail) if e.detail else e.message)
+        raise HTTPException(status_code=e.status_code, detail=json.dumps(e.detail) if e.detail else e.message) from e
 
     except httpx.HTTPStatusError as e:
         status_code = e.response.status_code
@@ -612,18 +610,18 @@ async def execute_uniprot_query(
         elif status_code >= 500:
             error_msg = f"UniProt API server error ({status_code}): {error_text}"
             log_error("uniprot_api_error", error_msg, **{"status_code": status_code})
-            raise HTTPException(status_code=502, detail=error_msg)
+            raise HTTPException(status_code=502, detail=error_msg) from e
         else:
             error_msg = f"UniProt API error ({status_code}): {error_text}"
             log_warning("uniprot_client_error", error_msg, **{"status_code": status_code})
             raise HTTPException(status_code=400,
-                                detail=json.dumps({"source": "uniprot", "error": error_msg}))
+                                detail=json.dumps({"source": "uniprot", "error": error_msg})) from e
 
-    except httpx.TimeoutException:
+    except httpx.TimeoutException as e:
         error_msg = "UniProt API request timed out. Try reducing the result size or removing length/sort filters."
         log_error("uniprot_timeout", error_msg)
         raise HTTPException(status_code=504,
-                            detail=json.dumps({"source": "uniprot", "error": error_msg}))
+                            detail=json.dumps({"source": "uniprot", "error": error_msg})) from e
 
     except HTTPException:
         raise  # Re-raise FastAPI HTTP exceptions as-is
@@ -631,4 +629,4 @@ async def execute_uniprot_query(
     except Exception as e:
         error_msg = f"Failed to fetch from UniProt: {str(e)}"
         log_error("uniprot_error", error_msg, **{"error": str(e)})
-        raise HTTPException(status_code=500, detail=error_msg)
+        raise HTTPException(status_code=500, detail=error_msg) from e

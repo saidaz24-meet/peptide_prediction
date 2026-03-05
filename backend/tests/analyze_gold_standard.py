@@ -12,7 +12,6 @@ Outputs:
 
 import json
 import math
-import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
@@ -265,7 +264,7 @@ def analyze_ssw_prediction(df: pd.DataFrame) -> None:
         pct = 100.0 * count / total
         label = {1: "SSW+ (has SSW segments)", -1: "SSW- (no SSW segments)"}.get(val, f"unknown({val})")
         print(f"  {val:3d} -> {count:5d} ({pct:5.1f}%)  {label}")
-    print(f"\n  NOTE: This file has no null SSW predictions (all rows have TANGO data)")
+    print("\n  NOTE: This file has no null SSW predictions (all rows have TANGO data)")
 
 
 def analyze_ssw_diff(df: pd.DataFrame) -> None:

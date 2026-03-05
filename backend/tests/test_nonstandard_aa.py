@@ -11,12 +11,9 @@ Non-standard residues in UniProt sequences:
 
 These MUST NOT crash any biochem function.
 """
-import pytest
-import math
 
 import biochem_calculation
 from auxiliary import get_corrected_sequence
-
 
 # --- get_corrected_sequence ---
 

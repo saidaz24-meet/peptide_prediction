@@ -7,9 +7,11 @@ Deterministically resolves threshold configurations based on mode:
 - "recommended": Computes thresholds from dataframe using stable statistical rules
 """
 import json
-import pandas as pd
+from typing import Any, Dict, Optional, Tuple
+
 import numpy as np
-from typing import Dict, Optional, Any, Tuple
+import pandas as pd
+
 from services.logger import log_warning
 
 
@@ -78,7 +80,7 @@ def resolve_thresholds(
 ) -> Dict[str, float]:
     """
     Resolve threshold values based on configuration mode.
-    
+
     Args:
         threshold_config: Threshold configuration dict with keys:
             - mode: "default" | "recommended" | "custom"
@@ -86,18 +88,18 @@ def resolve_thresholds(
             - version: Version string (for future compatibility)
         df: DataFrame with peptide data (required for "recommended" mode)
         defaults: Optional dict of default thresholds (uses DEFAULT_THRESHOLDS if None)
-    
+
     Returns:
         Dict with resolved threshold values:
             - muHCutoff: float
             - hydroCutoff: float
             - ffHelixPercentThreshold: float
-    
+
     Rules:
         - mode "default": Returns defaults unchanged
         - mode "custom": Validates custom values and merges with defaults
         - mode "recommended": Computes thresholds from df using median (stable, deterministic)
-    
+
     Recommended mode computation rules (documented for reproducibility):
         - muHCutoff: Median of "Full length uH" column (ignoring NaN/None)
         - hydroCutoff: Median of "Hydrophobicity" column (ignoring NaN/None)
@@ -108,16 +110,16 @@ def resolve_thresholds(
         defaults = DEFAULT_THRESHOLDS.copy()
     else:
         defaults = defaults.copy()
-    
+
     # If no config provided, return defaults
     if not threshold_config:
         return defaults
-    
+
     mode = threshold_config.get("mode", "default")
-    
+
     if mode == "default":
         return defaults
-    
+
     elif mode == "custom":
         # Validate and merge custom thresholds
         custom = threshold_config.get("custom", {})
@@ -128,9 +130,9 @@ def resolve_thresholds(
                 **{"custom_type": type(custom).__name__}
             )
             return defaults
-        
+
         resolved = defaults.copy()
-        
+
         # Validate and merge each custom threshold
         for key in defaults.keys():
             if key in custom:
@@ -151,13 +153,13 @@ def resolve_thresholds(
                         **{"key": key, "value": str(value)}
                     )
                     # Keep default value
-        
+
         return resolved
-    
+
     elif mode == "recommended":
         # Compute thresholds from dataframe using median (stable, deterministic)
         resolved = defaults.copy()
-        
+
         # muHCutoff: Median of "Full length uH" column
         # Rule: Use median of all valid (finite numeric) values, ignoring NaN/None
         if "Full length uH" in df.columns:
@@ -178,7 +180,7 @@ def resolve_thresholds(
                 "Full length uH column missing for recommended muHCutoff, using default",
                 **{"default": defaults["muHCutoff"]}
             )
-        
+
         # hydroCutoff: Median of "Hydrophobicity" column
         # Rule: Use median of all valid (finite numeric) values, ignoring NaN/None
         if "Hydrophobicity" in df.columns:
@@ -199,7 +201,7 @@ def resolve_thresholds(
                 "Hydrophobicity column missing for recommended hydroCutoff, using default",
                 **{"default": defaults["hydroCutoff"]}
             )
-        
+
         # ffHelixPercentThreshold: Median of "FF-Helix %" column
         # Rule: Use median of all valid (finite numeric) values, clamped to [0, 100]
         if "FF-Helix %" in df.columns:
@@ -222,9 +224,9 @@ def resolve_thresholds(
                 "FF-Helix % column missing for recommended ffHelixPercentThreshold, using default",
                 **{"default": defaults["ffHelixPercentThreshold"]}
             )
-        
+
         return resolved
-    
+
     else:
         # Unknown mode, log warning and return defaults
         log_warning(

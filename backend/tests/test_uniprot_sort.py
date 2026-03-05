@@ -6,8 +6,8 @@ Tests:
 - (b) best match (no sort/score) works
 - (c) invalid sort is blocked
 """
-import pytest
 from fastapi.testclient import TestClient
+
 from api.main import app
 
 client = TestClient(app)
@@ -96,7 +96,7 @@ def test_uniprot_sort_allowed_values():
         "organism_name_asc",
         "organism_name_desc",
     ]
-    
+
     for sort_value in allowed_values:
         response = client.post(
             "/api/uniprot/execute",

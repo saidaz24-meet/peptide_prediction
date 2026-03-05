@@ -6,18 +6,20 @@ Unknown fields must go into `extras: dict` field.
 
 All models use strict validation - extra fields are collected into extras dict.
 """
-from typing import Optional, List, Dict, Any, Literal
-from pydantic import BaseModel, Field, ConfigDict, model_validator
+from typing import Any, Dict, List, Literal, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
 from .provider_status import PeptideProviderStatus
 
 
 class PeptideRow(BaseModel):
     """
     Canonical PeptideRow schema - strict camelCase output format.
-    
+
     This is the exact shape returned by all endpoints that return peptide data.
     All fields are camelCase (id, sequence, charge, etc.) - NOT capitalized (Entry, Sequence).
-    
+
     Source: backend/schemas/peptide.py:PeptideSchema.to_camel_dict()
     Normalization: backend/services/normalize.py:normalize_rows_for_ui()
     """
@@ -27,22 +29,22 @@ class PeptideRow(BaseModel):
         # Use enum values in JSON
         use_enum_values=True,
     )
-    
+
     # Identity & metadata
     id: str = Field(..., description="Entry/accession ID (from 'entry' field, alias: 'Entry')")
     name: Optional[str] = Field(None, description="Protein name (from 'name' field, alias: 'Protein name')")
     species: Optional[str] = Field(None, description="Organism/species (from 'species' field, alias: 'Organism')")
-    
+
     # Sequence
     sequence: str = Field(..., description="Peptide sequence (from 'sequence' field, alias: 'Sequence')")
     length: Optional[int] = Field(None, description="Sequence length (from 'length' field, alias: 'Length')")
-    
+
     # Basic biophysics
     # Produced by: backend/calculations/biochem.py:calculate_biochemical_features()
     hydrophobicity: Optional[float] = Field(None, description="Hydrophobicity score (from 'hydrophobicity' field, alias: 'Hydrophobicity')")
     charge: Optional[float] = Field(None, description="Net charge (from 'charge' field, alias: 'Charge')")
     muH: Optional[float] = Field(None, description="Full length μH (from 'mu_h' field, alias: 'Full length uH')")
-    
+
     # SSW / TANGO predictions
     # Produced by: backend/tango.py:process_tango_output() and filter_by_avg_diff()
     sswPrediction: Optional[int] = Field(None, description="SSW prediction (-1/0/1) (from 'ssw_prediction' field, alias: 'SSW prediction')")
@@ -62,7 +64,7 @@ class PeptideRow(BaseModel):
     tangoAggCurve: Optional[List[float]] = Field(None, description="TANGO per-residue aggregation prediction curve")
     tangoBetaCurve: Optional[List[float]] = Field(None, description="TANGO per-residue beta prediction curve")
     tangoHelixCurve: Optional[List[float]] = Field(None, description="TANGO per-residue helix prediction curve")
-    
+
     # FF-Helix (local propensity)
     # Produced by: backend/auxiliary.py:ff_helix_percent() and ff_helix_cores()
     ffHelixPercent: Optional[float] = Field(None, description="FF-Helix percentage (from 'ff_helix_percent' field, alias: 'FF-Helix %')")
@@ -107,26 +109,26 @@ class PeptideRow(BaseModel):
     # Produced by: backend/services/provider_tracking.py:create_provider_status_for_row()
     # Added during normalization: backend/services/normalize.py:normalize_rows_for_ui()
     providerStatus: Optional[PeptideProviderStatus] = Field(None, description="Provider status for TANGO/S4PRED")
-    
+
     # Unknown/extra fields
     # Any fields not in the canonical schema go here
     extras: Dict[str, Any] = Field(
         default_factory=dict,
         description="Additional fields not in canonical schema"
     )
-    
+
     @model_validator(mode='before')
     @classmethod
     def collect_extras(cls, data: Any) -> Any:
         """
         Collect unknown fields into extras dict.
-        
+
         This allows the model to accept extra fields (for backward compatibility)
         while still enforcing the canonical schema.
         """
         if not isinstance(data, dict):
             return data
-        
+
         # Known fields in the canonical schema
         known_fields = {
             'id', 'name', 'species', 'sequence', 'length',
@@ -143,21 +145,21 @@ class PeptideRow(BaseModel):
             's4predPHCurve', 's4predPECurve', 's4predPCCurve', 's4predSsPrediction',
             'providerStatus', 'extras'
         }
-        
+
         # Separate known and unknown fields
         known_data = {}
         extras = {}
-        
+
         for key, value in data.items():
             if key in known_fields:
                 known_data[key] = value
             else:
                 extras[key] = value
-        
+
         # Put extras into the extras field
         if extras:
             known_data['extras'] = {**(known_data.get('extras', {})), **extras}
-        
+
         return known_data
 
 
@@ -183,34 +185,34 @@ class Meta(BaseModel):
     # Use extra="ignore" to silently ignore unknown fields rather than failing
     # This allows backward compatibility while still validating known fields
     model_config = ConfigDict(extra="ignore")
-    
+
     # Provider flags
     use_tango: bool = Field(..., description="TANGO enabled flag (from USE_TANGO env var)")
     use_s4pred: bool = Field(default=True, description="S4PRED enabled flag (from USE_S4PRED env var)")
     ssw_rows: int = Field(..., description="Number of rows with SSW/TANGO data")
     valid_seq_rows: int = Field(..., description="Number of rows with valid sequences")
-    
+
     # Provider status metadata
     # Produced by: backend/server.py:upload_csv() (provider_status_meta dict)
     provider_status: Dict[str, Any] = Field(..., description="Detailed provider status per provider")
-    
+
     # Reproducibility primitives
     # Produced by: backend/server.py:upload_csv() (lines 1095-1130)
     runId: str = Field(..., description="Run ID (UUID4) for reproducibility")
     traceId: str = Field(..., description="Trace ID for request tracing")
     inputsHash: str = Field(..., description="SHA256 hash of inputs (first 16 chars)")
     configHash: str = Field(..., description="SHA256 hash of configuration (first 16 chars)")
-    
+
     # Provider status summary
     # Produced by: backend/server.py:upload_csv() (lines 1133-1146)
     providerStatusSummary: ProviderStatusSummary = Field(..., description="Provider status summary counts")
-    
+
     # Threshold configuration
     # Produced by: backend/services/thresholds.py:resolve_thresholds()
     thresholdConfigRequested: Optional[Dict[str, Any]] = Field(None, description="Requested threshold configuration")
     thresholdConfigResolved: Dict[str, Any] = Field(..., description="Resolved threshold configuration")
     thresholds: Dict[str, Any] = Field(..., description="Resolved thresholds for FF flags")
-    
+
     # UniProt-specific fields (only present in /api/uniprot/execute responses)
     source: Optional[Literal["uniprot_api"]] = Field(None, description="Data source (only for UniProt queries)")
     query: Optional[str] = Field(None, description="Original query string (only for UniProt queries)")
@@ -226,14 +228,14 @@ class Meta(BaseModel):
 class RowsResponse(BaseModel):
     """
     Response format for endpoints that return multiple peptide rows.
-    
+
     Used by:
     - POST /api/upload-csv (backend/server.py:1151-1169)
     - POST /api/uniprot/execute (backend/server.py:2018-2038)
     - GET /api/example (backend/server.py:331)
     """
     model_config = ConfigDict(extra="forbid")
-    
+
     rows: List[PeptideRow] = Field(..., description="List of peptide rows in canonical camelCase format")
     meta: Meta = Field(..., description="Metadata about the request and processing")
 
@@ -241,15 +243,15 @@ class RowsResponse(BaseModel):
 class PredictResponse(BaseModel):
     """
     Response format for POST /api/predict endpoint.
-    
+
     Returns a single peptide row with metadata.
     Source: backend/server.py:1262-1276
-    
+
     Note: For consistency with RowsResponse, we use {row, meta} structure
     instead of flat dict with meta field.
     """
     model_config = ConfigDict(extra="forbid")
-    
+
     row: PeptideRow = Field(..., description="Single peptide row in canonical camelCase format")
     meta: Meta = Field(..., description="Metadata about the prediction")
 

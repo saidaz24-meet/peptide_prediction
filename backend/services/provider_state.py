@@ -5,7 +5,7 @@ Single canonical store for last-run provider status and TANGO run directory.
 All mutations are protected by a threading.Lock to ensure thread safety.
 """
 import threading
-from typing import Optional, Dict
+from typing import Dict, Optional
 
 # Global state to track last provider status (for /api/providers/last-run)
 _last_provider_status: Optional[Dict] = None

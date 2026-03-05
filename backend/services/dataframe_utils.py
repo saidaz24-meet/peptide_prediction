@@ -4,11 +4,12 @@ DataFrame utility functions for data processing.
 
 import io
 from typing import Dict, List, Optional
+
 import pandas as pd
 from fastapi import HTTPException
-from auxiliary import ff_helix_percent, ff_helix_cores
-from config import settings
 
+from auxiliary import ff_helix_cores, ff_helix_percent
+from config import settings
 
 # Column constants
 TANGO_COLS = ["SSW prediction", "SSW score"]
@@ -291,8 +292,8 @@ def _compute_beta_uh(df: pd.DataFrame) -> None:
     Compute beta-sheet hydrophobic moment (μH with angle=160°) for each row.
     Used in FF-SSW score formula: Hydrophobicity + Beta_uH + Full_uH + SSW_prediction.
     """
-    from biochem_calculation import hydrophobic_moment
     from auxiliary import get_corrected_sequence
+    from biochem_calculation import hydrophobic_moment
 
     beta_uh_values = []
     for _, row in df.iterrows():
@@ -442,7 +443,7 @@ def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
                 f"Failed to parse Excel file {filename}: {e}. "
                 f"Ensure file is a valid .xlsx or .xls file. "
                 f"If using .xlsx, openpyxl must be installed."
-            )
+            ) from e
 
     # TSV files (.tsv) - tab-separated
     if fn.endswith(".tsv"):
@@ -456,7 +457,7 @@ def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
         except Exception as e:
             raise ValueError(
                 f"Failed to parse TSV file {filename}: {e}. Ensure file uses tab-separated values."
-            )
+            ) from e
 
     # CSV or TXT files - try extension-based detection, then auto-detect
     if fn.endswith((".csv", ".txt")):
@@ -482,7 +483,7 @@ def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
                     raise ValueError(
                         f"Failed to parse CSV file {filename}: {e}. "
                         f"Ensure file uses comma-separated values."
-                    )
+                    ) from e
 
         # .txt files - auto-detect delimiter (could be CSV or TSV)
         else:
@@ -518,4 +519,4 @@ def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
             f"Unsupported file format: {filename}. "
             f"Accepted formats: .csv, .tsv, .xlsx, .xls, .txt. "
             f"Error: {e}"
-        )
+        ) from e

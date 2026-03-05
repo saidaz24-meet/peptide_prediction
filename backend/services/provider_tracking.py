@@ -4,13 +4,9 @@ Provider status tracking utilities.
 Principle B: Every result must indicate provider availability.
 Tracks whether TANGO and S4PRED succeeded, failed, or were unavailable.
 """
-from typing import Optional
 import pandas as pd
-from schemas.provider_status import (
-    ProviderStatus,
-    PeptideProviderStatus,
-    ProviderStatusValue
-)
+
+from schemas.provider_status import PeptideProviderStatus, ProviderStatus
 
 
 def determine_tango_status(

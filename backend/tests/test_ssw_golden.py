@@ -9,8 +9,6 @@ Key thresholds (from reference config.py):
 - MAX_GAP = 3
 - MIN_TANGO_SCORE = 0
 """
-import pytest
-from statistics import mean
 
 import auxiliary
 

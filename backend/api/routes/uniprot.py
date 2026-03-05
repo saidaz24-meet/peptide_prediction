@@ -2,12 +2,22 @@
 UniProt query endpoints.
 """
 from typing import Dict
+
 from fastapi import APIRouter
+
 from schemas.api_models import RowsResponse
-from schemas.uniprot_query import UniProtQueryParseRequest, UniProtQueryParseResponse, UniProtQueryExecuteRequest
+from schemas.uniprot_query import (
+    UniProtQueryExecuteRequest,
+    UniProtQueryParseRequest,
+    UniProtQueryParseResponse,
+)
+from services.uniprot_service import (
+    parse_query as parse_uniprot_query_service,
+)
 from services.uniprot_service import (
     ping_uniprot,
-    parse_query as parse_uniprot_query_service,
+)
+from services.uniprot_service import (
     window_protein_sequences as window_sequences_service,
 )
 

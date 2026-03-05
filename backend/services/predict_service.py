@@ -4,33 +4,37 @@ Single sequence prediction service.
 Core processing logic for single sequence predictions.
 HTTP-specific concerns (Form params, HTTPException) remain in server.py.
 """
+import hashlib
 import json
 import uuid
-import hashlib
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 
 import pandas as pd
 
 import auxiliary
 import tango
-from config import settings
 from calculations.biochem import calculate_biochemical_features as calc_biochem
+from config import settings
+from schemas.api_models import Meta, PeptideRow, PredictResponse
+from services.dataframe_utils import (
+    apply_ff_flags,
+    ensure_computed_cols,
+    ensure_ff_cols,
+)
+from services.dataframe_utils import (
+    fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
+)
 from services.logger import get_trace_id, log_info, log_warning
-from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
-from services.thresholds import resolve_thresholds
 from services.normalize import (
-    finalize_ui_aliases as _finalize_ui_aliases,
     finalize_ff_fields,
     normalize_rows_for_ui,
 )
-from services.dataframe_utils import (
-    ensure_ff_cols,
-    ensure_computed_cols,
-    apply_ff_flags,
-    fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
+from services.normalize import (
+    finalize_ui_aliases as _finalize_ui_aliases,
 )
-from schemas.api_models import PredictResponse, PeptideRow, Meta
 from services.provider_status_builder import build_provider_meta
+from services.thresholds import resolve_thresholds
+from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
 
 # Provider flags are read dynamically from settings to avoid caching issues
 # Use settings.USE_TANGO, settings.USE_S4PRED directly

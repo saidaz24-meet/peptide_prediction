@@ -5,15 +5,15 @@ Handles UniProt API interactions, query parsing, and sequence windowing.
 The execute_uniprot_query function remains in server.py pending further refactoring
 to deduplicate processing logic with upload_service.py.
 """
-from typing import Dict, List, Any, Optional
+from typing import Any, Dict, List
 
 import httpx
 
-from services.uniprot_parser import parse_uniprot_query, build_uniprot_export_url
-from services.sequence_windowing import window_sequences
+from schemas.uniprot_query import UniProtQueryParseRequest, UniProtQueryParseResponse
 from services.dataframe_utils import read_any_table
 from services.logger import log_info
-from schemas.uniprot_query import UniProtQueryParseRequest, UniProtQueryParseResponse
+from services.sequence_windowing import window_sequences
+from services.uniprot_parser import build_uniprot_export_url, parse_uniprot_query
 
 
 async def ping_uniprot() -> Dict[str, Any]:

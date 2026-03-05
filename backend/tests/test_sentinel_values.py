@@ -7,8 +7,6 @@ Key invariants:
 - sswPrediction = -1 is VALID (means "no switch detected")
 - sswPrediction = null means "provider didn't run"
 """
-import pytest
-import math
 
 # Import the functions we're testing
 import auxiliary

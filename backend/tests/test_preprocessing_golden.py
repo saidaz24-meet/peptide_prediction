@@ -10,7 +10,6 @@ Key mappings (matching reference):
 - X (unknown) → A (alanine) in auxiliary, dropped in TANGO sanitizer
 - U (selenocysteine) → C (cysteine)
 """
-import pytest
 
 import auxiliary
 from tango import _sanitize_seq

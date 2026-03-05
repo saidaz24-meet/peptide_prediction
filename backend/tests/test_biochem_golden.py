@@ -4,8 +4,9 @@ These tests validate that PVL biochem functions match the reference implementati
 
 Reference: 260120_Alpha_and_SSW_FF_Predictor/biochemCalculation.py
 """
-import pytest
 import math
+
+import pytest
 
 # Import the functions we're testing
 import biochem_calculation
@@ -25,7 +26,6 @@ class TestHydrophobicMoment:
         # Position 1: cos(100°), sin(100°)
         # Position 2: cos(200°), sin(200°)
         # Position 3: cos(300°), sin(300°)
-        import math
         H = 0.31  # Fauchere-Pliska for Alanine
         cos_sum = 0.0
         sin_sum = 0.0

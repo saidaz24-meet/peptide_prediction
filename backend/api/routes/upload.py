@@ -4,16 +4,18 @@ File upload endpoint.
 import json
 import time
 from typing import Optional
-from fastapi import APIRouter, UploadFile, File, Query, Form, HTTPException
-from schemas.api_models import RowsResponse
+
+from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+
 from config import settings
-from services.logger import log_info, log_error
-from services.thresholds import parse_threshold_config
+from schemas.api_models import RowsResponse
+from services.dataframe_utils import read_any_table, require_cols
+from services.logger import log_error, log_info
 from services.normalize import normalize_cols
-from services.dataframe_utils import require_cols, read_any_table
+from services.thresholds import parse_threshold_config
 from services.upload_service import (
-    process_upload_dataframe,
     UploadProcessingError,
+    process_upload_dataframe,
 )
 
 router = APIRouter()
@@ -69,12 +71,12 @@ async def upload_csv(
                 stage="parse", **{"row_count": len(df), "upload_filename": file.filename, "parse_time_ms": round(parse_elapsed, 2)})
     except ValueError as e:
         log_error("upload_parse_failed", f"Failed to parse table: {e}", stage="parse", **{"error": str(e)})
-        raise HTTPException(400, detail=str(e))
+        raise HTTPException(400, detail=str(e)) from e
     except Exception as e:
         log_error("upload_parse_failed", f"Failed to parse table: {e}", stage="parse", **{"error": str(e)})
         raise HTTPException(400, detail=f"Failed to parse file '{file.filename}': {e}. "
                                        "Ensure file is a valid .csv, .tsv, .xlsx, or .xls file. "
-                                       "Required columns: Entry/Accession (or ID) and Sequence.")
+                                       "Required columns: Entry/Accession (or ID) and Sequence.") from e
 
     # Validate we got some data
     if len(df) == 0:
@@ -105,4 +107,4 @@ async def upload_csv(
             sentry_initialized=SENTRY_INITIALIZED
         )
     except UploadProcessingError as e:
-        raise HTTPException(status_code=e.status_code, detail=json.dumps(e.detail) if e.detail else e.message)
+        raise HTTPException(status_code=e.status_code, detail=json.dumps(e.detail) if e.detail else e.message) from e

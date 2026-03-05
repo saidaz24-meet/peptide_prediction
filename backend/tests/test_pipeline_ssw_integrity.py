@@ -12,15 +12,17 @@ Ensures that:
   5. Normalize layer doesn't drop valid SSW predictions
   6. The _sanitize_for_json function preserves -1 for prediction fields
 """
-import sys, os
-import math
+import os
+import sys
+
 import pandas as pd
-import numpy as np
-import pytest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import tango
-from services.normalize import normalize_rows_for_ui, _sanitize_for_json, _convert_fake_defaults_to_null, none_if_nan
+from services.normalize import (
+    _sanitize_for_json,
+    normalize_rows_for_ui,
+)
 from services.provider_tracking import create_provider_status_for_row
 
 
@@ -133,7 +135,7 @@ class TestFilterByAvgDiffIntegrity:
         stats = {"test": {}}
         tango.filter_by_avg_diff(df, "test", stats)
 
-        for idx, row in df.iterrows():
+        for _idx, row in df.iterrows():
             pred = row["SSW prediction"]
             entry = row["Entry"]
             assert not _is_missing(pred), f"{entry}: expected valid prediction, got {pred}"
@@ -145,7 +147,7 @@ class TestFilterByAvgDiffIntegrity:
         stats = {"test": {}}
         tango.filter_by_avg_diff(df, "test", stats)
 
-        for idx, row in df.iterrows():
+        for _idx, row in df.iterrows():
             pred = row["SSW prediction"]
             entry = row["Entry"]
             assert pred == -1, f"{entry}: TANGO attempted but empty → expected -1, got {pred}"
@@ -156,7 +158,7 @@ class TestFilterByAvgDiffIntegrity:
         stats = {"test": {}}
         tango.filter_by_avg_diff(df, "test", stats)
 
-        for idx, row in df.iterrows():
+        for _idx, row in df.iterrows():
             pred = row["SSW prediction"]
             entry = row["Entry"]
             assert _is_missing(pred), f"{entry}: TANGO not run → expected missing, got {pred}"
@@ -171,12 +173,12 @@ class TestFilterByAvgDiffIntegrity:
         empty_entries = df[df["Entry"].str.startswith("EMPTY_")]
 
         # All OK entries should have valid predictions
-        for idx, row in ok_entries.iterrows():
+        for _idx, row in ok_entries.iterrows():
             pred = row["SSW prediction"]
             assert not _is_missing(pred), f"{row['Entry']}: expected valid, got {pred}"
 
         # All empty entries should be -1 (not Missing)
-        for idx, row in empty_entries.iterrows():
+        for _idx, row in empty_entries.iterrows():
             pred = row["SSW prediction"]
             assert pred == -1, f"{row['Entry']}: expected -1, got {pred}"
 
@@ -188,7 +190,7 @@ class TestFilterByAvgDiffIntegrity:
 
         valid_count = 0
         missing_count = 0
-        for idx, row in df.iterrows():
+        for _idx, row in df.iterrows():
             pred = row["SSW prediction"]
             if _is_missing(pred):
                 missing_count += 1

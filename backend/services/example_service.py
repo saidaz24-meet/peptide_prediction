@@ -3,20 +3,25 @@ Service for loading example dataset.
 """
 import os
 import uuid
-import pandas as pd
 from pathlib import Path
+
+import pandas as pd
 from fastapi import HTTPException
-from config import settings
+
 import tango
 from calculations.biochem import calculate_biochemical_features as calc_biochem
-from services.normalize import normalize_cols, normalize_rows_for_ui
+from config import settings
 from services.dataframe_utils import (
-    has_all, has_any, ensure_cols, ff_flags,
-    BIOCHEM_COLS, TANGO_COLS
+    BIOCHEM_COLS,
+    TANGO_COLS,
+    ensure_cols,
+    ff_flags,
+    has_all,
+    has_any,
 )
+from services.logger import log_error, log_info, log_warning
+from services.normalize import normalize_cols, normalize_rows_for_ui
 from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
-from services.logger import log_error, log_warning, log_info
-
 
 # Example dataset config
 BASE_DIR = Path(__file__).resolve().parent.parent.parent  # backend/ -> project root
@@ -38,7 +43,7 @@ def load_example_data(recalc: int = 0) -> dict:
     try:
         df = pd.read_excel(EXAMPLE_PATH)  # needs openpyxl
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed reading example xlsx: {e}")
+        raise HTTPException(status_code=400, detail=f"Failed reading example xlsx: {e}") from e
 
     # Normalize essential columns but DO NOT drop precomputed fields
     try:

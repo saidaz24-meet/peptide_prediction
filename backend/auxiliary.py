@@ -1,8 +1,8 @@
 import math
 import os
-from statistics import mean
-from statistics import median
+from statistics import mean, median
 from typing import Optional
+
 import numpy as np
 import pandas as pd
 
@@ -63,23 +63,23 @@ def ff_helix_percent(seq, core_len: Optional[int] = None, thr: Optional[float] =
     s = _safe_seq_str(seq).upper().strip()
     if len(s) < core_len:
         return 0.0
-    
+
     hp = _hprop(s)
     in_core = [False] * len(s)
-    
+
     # Check each possible window
     for i in range(len(s) - core_len + 1):
         window_props = hp[i:i + core_len]
         window_mean = sum(window_props) / core_len
-        
+
         if window_mean >= thr:
             # Mark all residues in this window as part of a helix core
             for j in range(i, i + core_len):
                 in_core[j] = True
-    
+
     if not any(in_core):
         return 0.0
-    
+
     percent = round(100.0 * sum(in_core) / len(s), 1)
     # Ensure result is in valid range [0.0, 100.0]
     return max(0.0, min(100.0, percent))
@@ -110,19 +110,19 @@ def ff_helix_cores(seq, core_len: Optional[int] = None, thr: Optional[float] = N
     s = _safe_seq_str(seq).upper().strip()
     if len(s) < core_len:
         return []
-    
+
     hp = _hprop(s)
     core_marks = [False] * len(s)
-    
+
     # Mark residues that are part of qualifying windows
     for i in range(len(s) - core_len + 1):
         window_props = hp[i:i + core_len]
         window_mean = sum(window_props) / core_len
-        
+
         if window_mean >= thr:
             for j in range(i, i + core_len):
                 core_marks[j] = True
-    
+
     # Convert marks to contiguous segments
     segments = []
     i = 0
@@ -137,12 +137,12 @@ def ff_helix_cores(seq, core_len: Optional[int] = None, thr: Optional[float] = N
             segments.append([start + 1, end + 1])
         else:
             i += 1
-    
+
     return segments
 
 
 def __check_subsegment(prediction: list, start: int, end: int) -> tuple:
-    all_possible_length = [i for i in range(MIN_LENGTH, (end - start + 1 + 1))]
+    all_possible_length = list(range(MIN_LENGTH, (end - start + 1 + 1)))
     max_start = -1
     max_end = -1
     max_score = -1
@@ -189,12 +189,12 @@ def get_secondary_structure_segments(prediction: list, prediction_method: str) -
             good_segment = segment_length >= MIN_LENGTH and (mean(prediction[start:end + 1]) >= min_score or
                                                              median(prediction[start:end + 1]) >= min_score)
             if good_segment:
-                segments.append(tuple((start, end)))
+                segments.append((start, end))
             elif segment_length >= MIN_LENGTH:
                 shorter_segment_start, shorter_segment_end, shorter_segment_score = __check_subsegment(prediction,
                                                                                                        start, end)
                 if shorter_segment_end is not None and shorter_segment_start is not None and shorter_segment_score >= min_score:
-                    segments.append(tuple((shorter_segment_start, shorter_segment_end)))
+                    segments.append((shorter_segment_start, shorter_segment_end))
 
         i += 1
     return segments
@@ -273,26 +273,26 @@ def find_secondary_structure_switch_segments(beta_segments: list, helix_segments
             continue
 
         if b_start < h_start or b_start == h_start:
-            merged_segments.append(tuple((h_start, h_end)))
+            merged_segments.append((h_start, h_end))
             if h_end == b_end:
                 beta_ind += 1
             helix_ind += 1
             continue
 
         if h_start <= b_start:
-            merged_segments.append(tuple((b_start, b_end)))
+            merged_segments.append((b_start, b_end))
             if h_end == b_end:
                 helix_ind += 1
             beta_ind += 1
             continue
 
         if b_start < h_start and b_end < h_end:
-            merged_segments.append(tuple((h_start, b_end)))
+            merged_segments.append((h_start, b_end))
             beta_ind += 1
             continue
 
         if h_start < b_start and h_end < b_end:
-            merged_segments.append(tuple((b_start, h_end)))
+            merged_segments.append((b_start, h_end))
             helix_ind += 1
             continue
 

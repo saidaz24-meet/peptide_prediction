@@ -8,12 +8,13 @@ Verifies that filter_by_avg_diff correctly distinguishes:
   - Valid SSW diff → SSW prediction computed normally
 """
 import math
-import pandas as pd
-import numpy as np
-import pytest
+import os
 
 # Import from tango module
-import sys, os
+import sys
+
+import pandas as pd
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import tango
 

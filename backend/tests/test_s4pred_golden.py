@@ -6,7 +6,6 @@ and database-level SSW prediction (filter_by_s4pred_diff).
 
 Reference: 260120_Alpha_and_SSW_FF_Predictor/s4pred.py
 """
-import pytest
 import pandas as pd
 
 import s4pred

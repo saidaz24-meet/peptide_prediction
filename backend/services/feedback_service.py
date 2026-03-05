@@ -4,18 +4,17 @@ Feedback processing service.
 Handles rate limiting, screenshot validation, and Sentry event submission.
 Extracted from server.py for separation of concerns.
 """
-import os
-import time
 import base64
+import os
 import tempfile
 import threading
+import time
 from typing import Dict, List, Optional
 
 import sentry_sdk
 
 from schemas.feedback import FeedbackRequest
 from services.logger import log_warning
-
 
 # Thread-safe in-memory rate limiting for feedback (per-IP)
 _rate_limit_lock = threading.Lock()
@@ -88,8 +87,8 @@ def _decode_screenshot(screenshot_data: str) -> tuple:
 
     try:
         screenshot_bytes = base64.b64decode(base64_data)
-    except base64.binascii.Error:
-        raise ValueError("Invalid base64 screenshot data.")
+    except base64.binascii.Error as e:
+        raise ValueError("Invalid base64 screenshot data.") from e
 
     if len(screenshot_bytes) > 5 * 1024 * 1024:
         raise ValueError("Screenshot too large. Maximum size is 5MB.")

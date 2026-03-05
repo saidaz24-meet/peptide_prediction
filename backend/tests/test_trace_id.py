@@ -9,12 +9,14 @@ Ensures:
 - traceId is logged in every structured log event
 """
 
-import pytest
-from fastapi.testclient import TestClient
-from api.main import app
-
 # Disable providers for fast tests
 import os
+
+import pytest
+from fastapi.testclient import TestClient
+
+from api.main import app
+
 os.environ.setdefault("USE_TANGO", "0")
 os.environ.setdefault("USE_S4PRED", "0")
 
@@ -47,17 +49,17 @@ def test_trace_id_in_meta_upload_csv():
     import io
     csv_content = "Entry,Sequence\nP12345,ACDEFGHIKLMNPQRSTVWY"
     files = {"file": ("test.csv", io.BytesIO(csv_content.encode()), "text/csv")}
-    
+
     response = client.post("/api/upload-csv", files=files)
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "meta" in data
     assert "traceId" in data["meta"]
     trace_id = data["meta"]["traceId"]
     assert trace_id is not None
     assert len(trace_id) > 0
-    
+
     # Verify traceId matches response header
     assert response.headers["X-Trace-Id"] == trace_id
 
@@ -73,13 +75,13 @@ def test_trace_id_in_meta_predict():
     )
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "meta" in data
     assert "traceId" in data["meta"]
     trace_id = data["meta"]["traceId"]
     assert trace_id is not None
     assert len(trace_id) > 0
-    
+
     # Verify traceId matches response header
     assert response.headers["X-Trace-Id"] == trace_id
 
@@ -89,13 +91,13 @@ def test_trace_id_in_meta_example():
     response = client.get("/api/example")
     assert response.status_code == 200
     data = response.json()
-    
+
     assert "meta" in data
     assert "traceId" in data["meta"]
     trace_id = data["meta"]["traceId"]
     assert trace_id is not None
     assert len(trace_id) > 0
-    
+
     # Verify traceId matches response header
     assert response.headers["X-Trace-Id"] == trace_id
 
@@ -107,7 +109,7 @@ def test_trace_id_consistency_across_requests():
         response = client.get("/api/health")
         trace_id = response.headers["X-Trace-Id"]
         trace_ids.add(trace_id)
-    
+
     # Each request should have a unique traceId
     assert len(trace_ids) == 5
 
@@ -117,11 +119,11 @@ def test_trace_id_in_logs():
     # This test would require capturing log output, which is complex
     # For now, we verify that the middleware sets traceId in context
     # which the logger will automatically include
-    
+
     # Make a request that should generate logs
     response = client.get("/api/health")
     assert response.status_code == 200
-    
+
     # The traceId should be set in context by middleware
     # Logger will automatically include it in all log events
     # This is verified by the middleware implementation and logger formatter

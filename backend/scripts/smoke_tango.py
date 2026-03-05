@@ -14,9 +14,9 @@ Usage:
 Or via Makefile:
     make smoke-tango
 """
+import json
 import os
 import sys
-import json
 
 # Set USE_TANGO=1 to enable TANGO
 os.environ["USE_TANGO"] = "1"
@@ -47,12 +47,12 @@ def main():
 
     result = smoke_test_tango(n_inputs=n_inputs)
 
-    print(f"\nResult:")
+    print("\nResult:")
     print(json.dumps(result, indent=2, default=str))
 
     if result.get("success"):
         print("\n" + "=" * 60)
-        print(f"✅ TANGO smoke test PASSED")
+        print("✅ TANGO smoke test PASSED")
         print("=" * 60)
 
         print(f"\nInputs:          {result.get('inputs_count')}")

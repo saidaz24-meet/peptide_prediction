@@ -6,7 +6,6 @@ are correctly passed through to apply_ff_flags() and override
 data-average defaults when threshold_mode is "custom" or "recommended".
 """
 import pandas as pd
-import pytest
 
 from services.dataframe_utils import apply_ff_flags
 
@@ -112,7 +111,7 @@ class TestApplyFFFlags_CustomMode:
         """Very low custom thresholds make all candidates pass."""
         df = _simple_batch()
         thresholds = {"hydroCutoff": -10.0, "muHCutoff": -10.0, "ffHelixPercentThreshold": 0.0}
-        result = apply_ff_flags(df, resolved_thresholds=thresholds, threshold_mode="custom")
+        apply_ff_flags(df, resolved_thresholds=thresholds, threshold_mode="custom")
         # Both should be candidates (1)
         assert df["FF-Secondary structure switch"].tolist() == [1, 1]
         assert df["FF-Helix (Jpred)"].tolist() == [1, 1]
@@ -160,7 +159,7 @@ class TestApplyFFFlags_EdgeCases:
         df = _make_df([
             {"Sequence": "AAAAAA", "Hydrophobicity": 0.5, "Full length uH": 0.3},
         ])
-        result = apply_ff_flags(df)
+        apply_ff_flags(df)
         assert df["FF-Secondary structure switch"].iloc[0] is None
 
     def test_recommended_mode_same_as_default(self):
