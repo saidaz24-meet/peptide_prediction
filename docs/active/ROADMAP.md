@@ -94,7 +94,13 @@ Data-driven jsPDF with summary, top-N table, methodology notes.
 **Status**: DONE | **Effort**: 4h
 Full PeptideDetail-parity: SequenceTrack, HelicalWheel, S4PRED chart, TANGO heatmap, AlphaFold, KPI tiles.
 
-**Phase B summary**: 6/8 done. B1 (async) and B6 (cache) blocked on deployment.
+### B10. Chemical Modification Support
+**Status**: NOT STARTED | **Effort**: 16-24h | **Requested by**: Alex (2026-03-25)
+Parse peptide sequences with chemical modifications (e.g., `MWDDDAD-NH2`, terminal amide, formyl groups). TANGO and S4PRED only accept standard amino acids, so modifications must be stripped before prediction but preserved as metadata.
+**Scope**: Input parsing (inline notation like `-NH2`, `Ac-` + optional flag/dropdown), adjusted biochem calculations (charge, hydrophobicity affected by terminal modifications), UI display of detected modifications, validation rules.
+**Key constraint**: Predictors run on clean sequences; modifications only affect our own biochem calculations.
+
+**Phase B summary**: 6/9 done. B1 (async), B6 (cache), B10 (modifications) blocked on deployment or later priority.
 
 ---
 
