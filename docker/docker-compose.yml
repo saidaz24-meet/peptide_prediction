@@ -42,7 +42,7 @@ services:
       # CORS (allow frontend dev server)
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173
       # Tool paths (in mounted volumes)
-      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango
+      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
       - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
       # Optional: Sentry DSN
       - SENTRY_DSN=${SENTRY_DSN:-}

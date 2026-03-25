@@ -233,6 +233,17 @@ This is partially implemented — `finalApiQuery` state exists in `UniProtQueryI
 
 #### Solution S3: Enriched UniProt Fields
 
+**Alex's concrete example (2026-03-25)**:
+
+Searching UniProt and clicking on P84528 (RNAM_PLESA), Alex expects to see at minimum:
+- **Short name**: RNAM_PLESA
+- **Protein**: Antimicrobial ribonuclease
+- **Organism**: Pleurotus sajor-caju (Oyster mushroom)
+- **Annotation score**: 3/5
+- **Function**: "Has ribonuclease activity towards yeast tRNA and polyuracil and weak ribonuclease activity towards other polyhomoribonucleotides. Displays antimitogenic activity towards murine splenocytes and antiproliferative activity towards HepG2 hepatoma cells..."
+
+Currently PVL shows only: accession P84528, organism, and sequence. The protein name, function, and annotation score are missing — this is the core gap Alex identified.
+
 **S3a: Expand fetched fields**
 
 Current (7 fields):

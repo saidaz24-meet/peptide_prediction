@@ -356,6 +356,101 @@ _No open P1 issues._
 
 ---
 
+# Open Issues
+
+## ISSUE-018: TANGO fails in Docker on Apple Silicon Macs
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P2 |
+| **Status** | Open (workaround available) |
+| **Blast Radius** | LOW (graceful degradation — everything else works) |
+| **Root Module** | `docker/docker-compose.yml`, `backend/tango.py` |
+| **Reported by** | Alex (2026-03-25) |
+
+### Symptom
+TANGO shows "Failed" for all entries when running PVL in Docker on an Apple Silicon Mac (M1/M2/M3/M4). S4PRED also fails for the same reason (PyTorch under x86 emulation). Both predictors are independent — neither depends on the other.
+
+### Root Cause
+Docker Desktop on Apple Silicon runs Linux containers via x86_64 emulation (Rosetta/QEMU). The `tango_linux_x86_64` binary and PyTorch CPU inference may not execute correctly under this emulation layer.
+
+Additionally, `docker-compose.yml` had `TANGO_BINARY_PATH=/opt/tools/tango/bin/tango` (wrong — file doesn't exist). This fell through to platform-specific resolution which found `tango_linux_x86_64`, but the binary then failed to execute under emulation.
+
+### Fix Applied (Partial)
+- Fixed `TANGO_BINARY_PATH` in `docker-compose.yml` to use correct filename `tango_linux_x86_64`
+- Long-term fix: Multi-arch Docker build (Phase E6) or native ARM TANGO binary
+
+### Workaround
+Set `USE_TANGO=0` and `USE_S4PRED=0` in `docker-compose.yml`. All other features work: FF-Helix%, biochem calculations (charge, hydrophobicity, muH), charts, ranking, exports. Both predictors work on native Linux (the actual deployment target).
+
+### Verification
+On a Linux server or x86 Mac: `USE_TANGO=1 USE_S4PRED=1 make docker-up` should show both providers as OK.
+
+---
+
+## ISSUE-019: "Analyze Dataset" button not clickable after loading example dataset
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P1 |
+| **Status** | Open |
+| **Blast Radius** | LOW |
+| **Root Module** | `ui/src/pages/Upload.tsx` |
+| **Reported by** | Alex (2026-03-25) |
+
+### Symptom
+User clicks "Load Example Dataset" on the Upload page. Data loads and preview appears, but the "Analyze Dataset" button stays disabled/not clickable.
+
+### Analysis
+- Button disabled condition: `!localFile || isAnalyzing` (line ~474)
+- Example loader (lines 314-331) fetches CSV, creates File object, calls `handleLocalPreview(file)`
+- `handleLocalPreview` calls `setLocalFile(file)` — but possible timing issue with async fetch + state update
+- May also be a race condition between `setLocalFile` and the render cycle
+
+### Affected Files
+1. `ui/src/pages/Upload.tsx` — example loader flow + button disabled condition
+
+### Success Criteria
+- [ ] Load example dataset → "Analyze Dataset" button becomes clickable
+- [ ] Analysis completes successfully with example data
+
+---
+
+## ISSUE-020: Numbers and invalid characters silently pass through sequence validation
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P1 |
+| **Status** | Open |
+| **Blast Radius** | MEDIUM |
+| **Root Module** | `backend/auxiliary.py`, `ui/src/pages/QuickAnalyze.tsx` |
+| **Reported by** | Alex (2026-03-25) |
+
+### Symptom
+User enters `XXXX11111` in Quick Analyze → gets analyzed as `AAAA11111`. Numbers pass through to the backend and appear in the corrected sequence. Similarly, `FOFJJJFFOOO` was accepted and processed (O→K, J→L substitutions applied, but the input should have been flagged).
+
+### Root Cause
+**Backend** (`auxiliary.py:get_corrected_sequence()`): Substitutes non-standard AAs (X→A, O→K, J→L, etc.) but does NOT validate or strip non-letter characters. Numbers, symbols, spaces all pass through silently.
+
+**Frontend** (`Upload.tsx:isValidSeq()`): Has proper regex `^[A-Za-z]+$` that rejects numbers — but this validation is only used for the upload preview QC indicator, not as a hard block on QuickAnalyze submission.
+
+### Fix (Proposed)
+1. **Backend**: Add character stripping/validation in `get_corrected_sequence()`:
+   ```python
+   # Strip non-letter characters
+   sequence = re.sub(r'[^A-Za-z]', '', sequence)
+   if not sequence:
+       return ""
+   ```
+2. **Frontend QuickAnalyze**: Add hard validation before submission — reject sequences with non-letter characters with clear error message: "Sequence must contain only amino acid letters (A-Z). Numbers and symbols are not allowed."
+
+### Success Criteria
+- [ ] `XXXX11111` → rejected with clear error (or stripped to `AAAA` with warning)
+- [ ] `FOFJJJFFOOO` → accepted with substitution notice: "Non-standard amino acids corrected: O→K, J→L"
+- [ ] Pure letter sequences continue to work normally
+
+---
+
 # How to Add Issues
 
 Use this template:

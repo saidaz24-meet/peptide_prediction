@@ -100,7 +100,21 @@ Parse peptide sequences with chemical modifications (e.g., `MWDDDAD-NH2`, termin
 **Scope**: Input parsing (inline notation like `-NH2`, `Ac-` + optional flag/dropdown), adjusted biochem calculations (charge, hydrophobicity affected by terminal modifications), UI display of detected modifications, validation rules.
 **Key constraint**: Predictors run on clean sequences; modifications only affect our own biochem calculations.
 
-**Phase B summary**: 6/9 done. B1 (async), B6 (cache), B10 (modifications) blocked on deployment or later priority.
+### B11. FASTA Upload Support
+**Status**: NOT STARTED | **Effort**: 4-6h | **Requested by**: Alex (2026-03-25)
+Accept `.fasta` and `.fa` files as input. FASTA is the most common bioinformatics sequence format — researchers expect it.
+**Scope**: Backend FASTA parser (header line `>entry_name` + sequence lines → DataFrame), frontend dropzone update (add `.fasta`, `.fa` to accepted types), auto-detect format by file extension or content sniffing (lines starting with `>`).
+**Key detail**: FASTA files contain only entry names + sequences. No organism, no metadata columns. Backend should create a minimal DataFrame with `Entry` and `Sequence` columns.
+
+### B12. Upload Guidance & Limits
+**Status**: NOT STARTED | **Effort**: 2-3h | **Requested by**: Alex (2026-03-25)
+Improve the upload experience with better information:
+- Show practical entry limits during upload: "Up to ~500 sequences. Larger batches may take several minutes with TANGO enabled."
+- Add info tooltip on Upload page: "How to export from UniProt" — step-by-step guide (search → Download → choose TSV/CSV → include 'Sequence' column)
+- Show required columns: "Your file must include a 'Sequence' column. Optional: 'Entry', 'Organism', 'Length'."
+- Currently only shows "50MB max" with no guidance on entry counts or required format.
+
+**Phase B summary**: 6/11 done. B1 (async), B6 (cache), B10 (modifications), B11 (FASTA), B12 (upload guidance) are planned.
 
 ---
 
