@@ -132,6 +132,33 @@ Parse peptide sequences with chemical modifications (e.g., `MWDDDAD-NH2`, termin
 | D4 | Code-splitting / lazy routes | 4h | TODO | Main bundle is 2.4MB (warning threshold 500KB) |
 | D5 | Sidebar polish (icons-only, hover labels) | 4h | TODO | Already exists, needs refinement |
 | D6 | Theme finalization | 4h | TODO | Lock dark/light theme with consistent shadcn/ui tokens |
+| D7 | UniProt Database Search page | 10h | TODO | Dedicated `/search` route + sidebar entry. See Phase F. |
+
+---
+
+## Phase F: UniProt Search Enrichment
+
+**Full spec**: `docs/active/UNIPROT_ENRICHMENT_SPEC.md`
+**Requested by**: Alex (2026-03-25) — "one of the most useful features"
+**Goal**: Elevate UniProt from a secondary input method to a first-class research workflow.
+
+**Why this matters**: PVL is the only peptide tool with integrated UniProt search + analysis. No competitor (PASTA 2.0, Waltz, AGGRESCAN, CamSol) offers this. But the current implementation has result count discrepancies, missing metadata, and no search transparency — which erodes researcher trust.
+
+| Step | Scope | Effort | Status | Details |
+|------|-------|--------|--------|---------|
+| F1 | Search query fix | 3-4h | TODO | Full-text default (not `keyword:`), parse X-Total-Results, fix slider/cap mismatch |
+| F2 | Search summary banner | 2h | TODO | "Found 204 of 12,345 entries" + filters + "View on UniProt" link |
+| F3 | Metadata enrichment | 5-6h | TODO | Add gene_names, cc_function, annotation_score to fetch + display |
+| F4 | Dedicated `/search` page | 8-10h | TODO | Own sidebar tab, browse table with checkboxes, "Analyze Selected" (ties into D7) |
+| F5 | Browse-then-analyze | 6-8h | TODO | Lightweight browse first (metadata only), user-triggered analysis on selection |
+| F6 | Advanced search | 6-8h | TODO | "Search in" selector, raised caps, smart suggestions, pagination |
+
+**Step order**: F1 → F2 → F3 can be done independently of Phase D. F4 → F5 should be planned alongside Phase D (same design language, card patterns, progressive disclosure). F6 is polish.
+
+**Key dependencies**:
+- F3 requires `api_models.py` change (protected file, needs approval)
+- F4/F5 pair well with B1 (async jobs) — "Analyze Selected" becomes a background job
+- F5 pairs with B6 (DuckDB cache) — cache browse results and per-accession analyses
 
 ---
 
