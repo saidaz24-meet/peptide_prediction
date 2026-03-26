@@ -321,7 +321,101 @@ Step-by-step walkthrough for first-time users (react-joyride or similar). Highli
 
 ---
 
-## Technical Debt
+## Phase G: AI/LLM Integration Layer
+
+**Proposed by**: Alex (2026-03-25) — "bind AI to PVL so you can prompt for analysis"
+**Prerequisites**: Phase F (UniProt enrichment) + deployed instance + precomputed database (C1)
+**Why**: PVL already has a REST API. Wrapping it as AI-callable tools turns every analysis workflow into a natural language prompt. No competitor offers this.
+
+### G1. PVL MCP Server — Natural Language Queries (Near-term)
+**Effort**: 16-24h | **Status**: NOT STARTED | **After**: Deployment + Phase F
+
+Build an MCP (Model Context Protocol) server that exposes PVL's API as tools for Claude or any LLM.
+
+**What it enables**:
+```
+User: "Find me top 10 amyloid candidates from S.aureus with length 10-50"
+AI:   → calls PVL /api/uniprot/execute (query: "amyloid", organism: 1280, length: 10-50)
+      → calls PVL ranking with FF-Helix + SSW weights
+      → returns: "Here are the top 10 candidates ranked by aggregation propensity..."
+```
+
+**Implementation**:
+- MCP server in Python (uses `mcp` SDK) exposing tools:
+  - `search_uniprot(query, organism, length_min, length_max, reviewed)` → browse results
+  - `analyze_sequences(accessions_or_sequences)` → full PVL pipeline
+  - `get_peptide_detail(accession)` → single peptide deep-dive
+  - `rank_candidates(dataset_id, weights)` → ranked shortlist
+  - `compare_cohorts(dataset_a, dataset_b)` → cohort comparison
+- Each tool maps directly to existing PVL API endpoints
+- Add domain context as system prompt: amyloid definitions, SSW meaning, FF-Helix interpretation, aggregation thresholds
+- Returns structured data that the LLM can interpret and explain
+
+**Architecture**:
+```
+Claude / ChatGPT / Any LLM
+    |
+    v
+[PVL MCP Server] — tool definitions + domain axioms
+    |
+    v
+[PVL REST API] — existing endpoints, no changes needed
+    |
+    v
+[TANGO + S4PRED + FF-Helix + biochem]
+```
+
+**Key files**: New `mcp_server/` directory at repo root with `server.py`, `tools.py`, `prompts.py`
+
+### G2. Scientific Context & RAG — AI-Generated Annotations (Medium-term)
+**Effort**: 40-60h | **Status**: NOT STARTED | **After**: G1 + C1 (precomputed DB)
+
+Add retrieval-augmented generation (RAG) so the AI can cite real papers when explaining results.
+
+**What it enables**:
+```
+User: "Explain why P02743 is a strong amyloid candidate"
+AI:   → queries PVL for P02743 predictions
+      → retrieves relevant papers from PubMed (amyloid P-component, SAP)
+      → generates: "P02743 (Serum amyloid P-component) shows 78% FF-Helix content
+        and high aggregation propensity (TANGO score 42.3). This is consistent with
+        its known role in amyloid fibril stabilization (Pepys et al., 2006, Nature).
+        The SSW region at positions 15-28 suggests a structural switching zone..."
+```
+
+**Implementation**:
+- PubMed/PMC API integration for paper retrieval (free, no API key needed)
+- Vector embedding store for paper abstracts (ChromaDB or similar, local)
+- Domain axiom library: structured definitions of amyloids, SSW, FF-Helix, aggregation propensity, helical wheels — "unbreakable truths" the AI must respect
+- Citation verification: cross-check that cited papers actually exist and contain claimed information
+- Output format: scientific paragraph with inline citations, exportable to LaTeX/BibTeX
+
+**Risk**: AI hallucination of citations is the #1 concern. Mitigation: only cite papers returned by PubMed API search, never generate citation details from memory.
+
+**Key challenge**: Getting the "axioms" right. These are domain-specific rules:
+- "A peptide is an amyloid candidate if FF-Helix% > X AND SSW is detected AND aggregation propensity > Y"
+- "SSW (Structural Switching Window) is a region where the peptide switches between helix and beta-sheet conformations"
+- "FF-Helix (Fibril-Forming Helix) is a helical region that may participate in amyloid fibril formation"
+- These must be reviewed and approved by Peleg before deployment
+
+### G3. Generalized Scientific AI Platform (Long-term, Separate Project)
+**Effort**: 200+ hours | **Status**: IDEA | **Separate repo/project**
+
+Alex's vision: a scientific version of OpenClaw where researchers can connect their own data sources, define domain axioms, and use AI for analysis.
+
+**What it would be**:
+- Pluggable data sources: UniProt, PDB, PubMed, local CSV/databases, lab instruments
+- Pluggable analysis tools: PVL, BLAST, InterPro, custom scripts
+- Domain axiom editor: define "unbreakable truths" for your field
+- AI orchestrator: takes natural language queries, plans multi-step analysis workflows, executes them, explains results with citations
+
+**This is a startup, not a feature.** Companies like Elicit, Consensus, and Semantic Scholar are working on pieces of this with significant funding. PVL can be the proof-of-concept: "we built AI-assisted peptide analysis, and the architecture generalizes to any scientific domain."
+
+**Decision**: Park as separate project. PVL is the MVP that proves the concept. If it works well (G1 + G2), spin out the generalized platform as a separate initiative.
+
+---
+
+
 
 | ID | Issue | Priority | When to Fix |
 |----|-------|----------|-------------|
