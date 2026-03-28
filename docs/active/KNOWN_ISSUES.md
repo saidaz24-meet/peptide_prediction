@@ -514,6 +514,30 @@ Add a "Try example" button below the sequence input that pre-fills with a well-k
 
 ---
 
+## ISSUE-023: Results page crashes with "React.Children.only" on VPS
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P0 |
+| **Status** | **FIXED** (2026-03-29) |
+| **Blast Radius** | HIGH — Results page completely unusable |
+| **Root Module** | `ui/src/components/Legend.tsx` |
+| **Reported by** | Alex (via VPS at 94.130.178.182:3000) |
+
+### Symptom
+After clicking "Analyze Dataset", navigating to `/results` crashes with:
+```
+React.Children.only expected to receive a single React element child.
+```
+
+### Root Cause
+`Legend.tsx` line 102 used `<DialogContent asChild>` to wrap a `<motion.div>` for animation. The shadcn/ui `DialogContent` wrapper adds a close button (`<DialogPrimitive.Close>`) as a second child inside `DialogPrimitive.Content`. When `asChild` is passed, Radix uses `Slot` → `React.Children.only()`, which crashes because it receives 2 children (the motion.div + the close button).
+
+### Fix
+Removed `asChild` and the `<motion.div>` wrapper from `DialogContent`. The Dialog already has CSS enter/exit animations via Tailwind's `animate-in`/`animate-out`.
+
+---
+
 # How to Add Issues
 
 Use this template:

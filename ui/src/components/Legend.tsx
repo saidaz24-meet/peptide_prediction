@@ -99,24 +99,17 @@ export function Legend({ defaultOpen = false }: LegendProps) {
       <AnimatePresence>
         {dialogOpen && (
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogContent className="max-w-sm backdrop-blur-sm" asChild>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ duration: 0.2 }}
-              >
-                <DialogHeader>
-                  <DialogTitle className="flex items-center gap-2">
-                    <Info className="w-4 h-4" />
-                    Legend & Guide
-                  </DialogTitle>
-                  <DialogDescription>
-                    Quick reference for colors, metrics, and abbreviations used in PVL.
-                  </DialogDescription>
-                </DialogHeader>
-                <LegendContent />
-              </motion.div>
+            <DialogContent className="max-w-sm">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Info className="w-4 h-4" />
+                  Legend & Guide
+                </DialogTitle>
+                <DialogDescription>
+                  Quick reference for colors, metrics, and abbreviations used in PVL.
+                </DialogDescription>
+              </DialogHeader>
+              <LegendContent />
             </DialogContent>
           </Dialog>
         )}
