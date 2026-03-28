@@ -67,6 +67,7 @@ export interface Meta {
   row_count?: number | null;
   size_requested?: number | null;
   size_returned?: number | null;
+  total_available?: number | null;
   run_tango?: boolean | null;
 }
 

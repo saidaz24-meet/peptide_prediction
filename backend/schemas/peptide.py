@@ -8,8 +8,8 @@ from .provider_status import PeptideProviderStatus
 
 
 def _snake_to_camel(s: str) -> str:
-    parts = s.split('_')
-    return parts[0] + ''.join(p.title() for p in parts[1:])
+    parts = s.split("_")
+    return parts[0] + "".join(p.title() for p in parts[1:])
 
 
 class PeptideSchema(BaseModel):
@@ -17,6 +17,9 @@ class PeptideSchema(BaseModel):
     entry: str = Field(..., alias="Entry")
     name: Optional[str] = Field(None, alias="Protein name")
     species: Optional[str] = Field(None, alias="Organism")
+    gene_name: Optional[str] = Field(None, alias="Gene Names")
+    protein_function: Optional[str] = Field(None, alias="Function [CC]")
+    annotation_score: Optional[int] = Field(None, alias="Annotation")
 
     @classmethod
     def parse_obj(cls, obj):
@@ -25,10 +28,13 @@ class PeptideSchema(BaseModel):
         if isinstance(obj, dict):
             obj = obj.copy()
             import math
+
             # Handle aliases (CSV column names) and field names
             field_mappings = {
                 "name": ["Protein name", "name"],
-                "species": ["Organism", "species"]
+                "species": ["Organism", "species"],
+                "gene_name": ["Gene Names", "gene_name"],
+                "protein_function": ["Function [CC]", "protein_function"],
             }
             for _field_name, aliases in field_mappings.items():
                 for key in aliases:
@@ -38,13 +44,24 @@ class PeptideSchema(BaseModel):
                         if val is None:
                             obj[key] = None
                         elif isinstance(val, float):
-                            if pd.isna(val) or str(val).lower() == "nan" or math.isnan(val) or not math.isfinite(val):
+                            if (
+                                pd.isna(val)
+                                or str(val).lower() == "nan"
+                                or math.isnan(val)
+                                or not math.isfinite(val)
+                            ):
                                 obj[key] = None
                         elif isinstance(val, str) and val.lower() == "nan":
                             obj[key] = None
 
             # Sanitize SSW-related fields: convert NaN/inf to None
-            ssw_fields = ["SSW prediction", "SSW score", "SSW diff", "SSW helix percentage", "SSW beta percentage"]
+            ssw_fields = [
+                "SSW prediction",
+                "SSW score",
+                "SSW diff",
+                "SSW helix percentage",
+                "SSW beta percentage",
+            ]
             for field in ssw_fields:
                 if field in obj:
                     val = obj[field]
@@ -84,7 +101,29 @@ class PeptideSchema(BaseModel):
     tango_beta_curve: Optional[List[float]] = Field(None, alias="Tango Beta curve")
     tango_helix_curve: Optional[List[float]] = Field(None, alias="Tango Helix curve")
 
-    @field_validator('ssw_score', 'ssw_diff', 'ssw_helix_percentage', 'ssw_beta_percentage', 'ff_helix_percent', 'ff_helix_score', 'ff_ssw_score', 'hydrophobicity', 'charge', 'mu_h', 'tango_agg_max', 'tango_beta_max', 'tango_helix_max', 's4pred_helix_score', 's4pred_helix_percent', 's4pred_ssw_score', 's4pred_ssw_diff', 's4pred_ssw_helix_percent', 's4pred_ssw_beta_percent', 's4pred_ssw_percent', mode='before')
+    @field_validator(
+        "ssw_score",
+        "ssw_diff",
+        "ssw_helix_percentage",
+        "ssw_beta_percentage",
+        "ff_helix_percent",
+        "ff_helix_score",
+        "ff_ssw_score",
+        "hydrophobicity",
+        "charge",
+        "mu_h",
+        "tango_agg_max",
+        "tango_beta_max",
+        "tango_helix_max",
+        "s4pred_helix_score",
+        "s4pred_helix_percent",
+        "s4pred_ssw_score",
+        "s4pred_ssw_diff",
+        "s4pred_ssw_helix_percent",
+        "s4pred_ssw_beta_percent",
+        "s4pred_ssw_percent",
+        mode="before",
+    )
     @classmethod
     def coerce_nan_to_none(cls, v: Any) -> Optional[float]:
         """Coerce NaN/inf to None for Optional[float] fields."""
@@ -103,7 +142,16 @@ class PeptideSchema(BaseModel):
                 return None
         return v
 
-    @field_validator('ssw_prediction', 'length', 's4pred_helix_prediction', 's4pred_ssw_prediction', 'ff_helix_flag', 'ff_ssw_flag', mode='before')
+    @field_validator(
+        "ssw_prediction",
+        "length",
+        "s4pred_helix_prediction",
+        "s4pred_ssw_prediction",
+        "ff_helix_flag",
+        "ff_ssw_flag",
+        "annotation_score",
+        mode="before",
+    )
     @classmethod
     def coerce_nan_to_none_int(cls, v: Any) -> Optional[int]:
         """Coerce NaN/inf to None for Optional[int] fields."""

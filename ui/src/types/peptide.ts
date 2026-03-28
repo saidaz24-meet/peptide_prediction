@@ -60,6 +60,11 @@ export type Peptide = {
   name?: string | null;
   species?: string | null;
 
+  // UniProt metadata (optional, only present for UniProt-sourced data)
+  geneName?: string | null;
+  proteinFunction?: string | null;
+  annotationScore?: number | null;
+
   // sequence (required)
   sequence: string;
   length: number | null;  // null if not computed
@@ -267,4 +272,10 @@ export type DatasetMetadata = {
     tango?: SingleProviderStatus;
     s4pred?: SingleProviderStatus;
   };
+  // UniProt-specific metadata (only present for UniProt-sourced data)
+  source?: "uniprot_api" | null;
+  query?: string | null;
+  url?: string | null;
+  size_returned?: number | null;
+  total_available?: number | null;
 };

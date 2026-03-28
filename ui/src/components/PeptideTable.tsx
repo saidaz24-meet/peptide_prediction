@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
@@ -170,14 +170,29 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>(EMPTY_FILTERS);
+  const hasUniProtMeta = useMemo(
+    () => peptides.some((p) => p.geneName != null),
+    [peptides]
+  );
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     species: false, // Secondary info — available via detail view
+    geneName: false, // Shown when UniProt data is present
+    proteinFunction: false, // Shown when UniProt data is present
     s4predSswPrediction: false, // S4PRED SSW is secondary to TANGO SSW
     ffHelixPercent: false, // Chou-Fasman propensity — demoted to advanced (S4PRED Helix is primary)
     tangoSswResidues: false, // TANGO SSW residue overlap count — advanced
   });
   const navigate = useNavigate();
   const { tableFilter, setTableFilter } = useChartSelection();
+
+  // Auto-show Gene/Function columns when UniProt data is present
+  useEffect(() => {
+    setColumnVisibility((prev) => ({
+      ...prev,
+      geneName: hasUniProtMeta,
+      proteinFunction: hasUniProtMeta,
+    }));
+  }, [hasUniProtMeta]);
 
   const activeFilterCount = useMemo(() => countActiveFilters(columnFilters), [columnFilters]);
 
@@ -272,6 +287,39 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           </Button>
         ),
         cell: (info) => info.getValue() || "-",
+      }),
+      columnHelper.accessor("geneName", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            Gene
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => info.getValue() || "-",
+      }),
+      columnHelper.accessor("proteinFunction", {
+        header: () => <span className="font-medium">Function</span>,
+        cell: (info) => {
+          const val = info.getValue();
+          if (!val) return "-";
+          const truncated = val.length > 60 ? val.slice(0, 60) + "…" : val;
+          return (
+            <TooltipProvider delayDuration={200}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <span className="text-xs cursor-help">{truncated}</span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[400px] text-xs leading-relaxed">
+                  {val}
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+          );
+        },
       }),
       columnHelper.accessor("length", {
         header: ({ column }) => (

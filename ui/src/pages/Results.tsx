@@ -450,6 +450,34 @@ export default function Results() {
             );
           })()}
 
+          {/* UniProt source banner */}
+          {meta?.source === "uniprot_api" && (
+            <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-2 text-sm">
+              <span>
+                Showing <strong>{meta.size_returned}</strong>
+                {meta.total_available != null &&
+                  meta.total_available > 0 &&
+                  ` of ${meta.total_available.toLocaleString()}`}
+                {meta.query && (
+                  <>
+                    {" "}
+                    entries matching &ldquo;<em>{meta.query}</em>&rdquo;
+                  </>
+                )}
+              </span>
+              {meta.url && (
+                <a
+                  href={meta.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline text-xs"
+                >
+                  View on UniProt &rarr;
+                </a>
+              )}
+            </div>
+          )}
+
           {/* KPIs */}
           <ResultsKpis stats={stats} meta={meta} />
 

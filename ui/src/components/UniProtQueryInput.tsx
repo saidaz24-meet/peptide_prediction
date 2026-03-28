@@ -505,14 +505,14 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                   id="max-results"
                   type="number"
                   min="1"
-                  max="10000"
+                  max="500"
                   placeholder="500"
                   value={controls.size}
                   onChange={(e) => {
                     const val = parseInt(e.target.value, 10);
                     setControls((prev) => ({
                       ...prev,
-                      size: val && val > 0 ? Math.min(val, 10000) : 500,
+                      size: val && val > 0 ? Math.min(val, 500) : 500,
                     }));
                   }}
                   disabled={isExecuting}

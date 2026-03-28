@@ -318,6 +318,9 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
     id,
     name: row.name ?? row["Protein name"] ?? row.Name ?? null,
     species: row.species ?? row.Organism ?? row.Species ?? row.organism ?? null,
+    geneName: row.geneName ?? null,
+    proteinFunction: row.proteinFunction ?? null,
+    annotationScore: num(row.annotationScore, true) ?? null,
     sequence,
     length: length ?? null,  // Preserve null for missing length
 
