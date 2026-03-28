@@ -1,5 +1,6 @@
 # Peptide Visual Lab - Docker Image Publishing
 # Builds and pushes Docker images to GitHub Container Registry
+# Only triggers when code or Docker files change (not docs-only pushes)
 
 name: Docker Publish
 
@@ -7,6 +8,12 @@ on:
   push:
     branches: [main]
     tags: ['v*']
+    paths:
+      - 'backend/**'
+      - 'ui/**'
+      - 'docker/**'
+      - 'requirements*.txt'
+      - 'package*.json'
   workflow_dispatch:
 
 env:

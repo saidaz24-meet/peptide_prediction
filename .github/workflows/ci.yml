@@ -1,5 +1,6 @@
 # Peptide Visual Lab - CI Pipeline
 # Runs tests and linting on pull requests and pushes to main
+# Uses path filtering to skip unchanged areas on push events
 
 name: CI
 
@@ -20,9 +21,34 @@ env:
   NODE_VERSION: '20'
 
 jobs:
+  # Detect which areas of the codebase changed
+  changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      docker: ${{ steps.filter.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - 'backend/**'
+            frontend:
+              - 'ui/**'
+            docker:
+              - 'docker/**'
+              - 'backend/**'
+              - 'ui/**'
+
   # Backend tests and linting
   backend:
     name: Backend Tests
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     defaults:
@@ -59,6 +85,8 @@ jobs:
   # Frontend build and lint
   frontend:
     name: Frontend Build
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -97,9 +125,14 @@ jobs:
   # Docker build verification (on all PRs and main)
   docker:
     name: Docker Build
+    needs: [changes, backend, frontend]
+    if: |
+      always() &&
+      (needs.changes.outputs.docker == 'true' || github.event_name == 'pull_request') &&
+      needs.backend.result != 'failure' &&
+      needs.frontend.result != 'failure'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    needs: [backend, frontend]
 
     steps:
       - name: Checkout code
