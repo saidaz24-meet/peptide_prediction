@@ -407,6 +407,53 @@ def require_cols(df: pd.DataFrame, cols: List[str]) -> None:
         raise HTTPException(400, detail=detail_msg)
 
 
+def parse_fasta(raw: bytes, filename: str) -> pd.DataFrame:
+    """
+    Parse FASTA-formatted bytes into a DataFrame.
+
+    Args:
+        raw: File contents as bytes
+        filename: Original filename (for error messages)
+
+    Returns:
+        DataFrame with columns: Entry, Sequence, Length
+
+    Raises:
+        ValueError: If no valid FASTA entries are found
+    """
+    text = raw.decode("utf-8-sig")
+    entries = []
+    current_entry = None
+    current_seq_parts: List[str] = []
+
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith(">"):
+            # Save previous entry
+            if current_entry is not None:
+                seq = "".join(current_seq_parts)
+                entries.append({"Entry": current_entry, "Sequence": seq, "Length": len(seq)})
+            # Parse header: first word after >
+            header = line[1:].strip()
+            current_entry = header.split()[0] if header else ""
+            current_seq_parts = []
+        else:
+            if current_entry is not None:
+                current_seq_parts.append(line)
+
+    # Save last entry
+    if current_entry is not None:
+        seq = "".join(current_seq_parts)
+        entries.append({"Entry": current_entry, "Sequence": seq, "Length": len(seq)})
+
+    if not entries:
+        raise ValueError("No valid FASTA entries found")
+
+    return pd.DataFrame(entries, columns=["Entry", "Sequence", "Length"])
+
+
 def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
     """
     Read CSV/TSV/XLS(X) with intelligent delimiter detection and BOM handling.
@@ -432,6 +479,12 @@ def read_any_table(raw: bytes, filename: str) -> pd.DataFrame:
         ValueError: If file format is not supported or parsing fails
     """
     fn = filename.lower() if filename else ""
+
+    # FASTA files (.fasta, .fa, or .txt starting with >)
+    if fn.endswith((".fasta", ".fa")):
+        return parse_fasta(raw, filename)
+    if fn.endswith(".txt") and raw.lstrip(b"\xef\xbb\xbf").lstrip().startswith(b">"):
+        return parse_fasta(raw, filename)
 
     # Excel files (.xlsx, .xls)
     if fn.endswith((".xlsx", ".xls")):
