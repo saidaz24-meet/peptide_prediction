@@ -455,7 +455,7 @@ User enters `XXXX11111` in Quick Analyze → gets analyzed as `AAAA11111`. Numbe
 | Field | Value |
 |-------|-------|
 | **Priority** | P0 |
-| **Status** | Open |
+| **Status** | **FIXED** (2026-03-25, commit ae58cf7) |
 | **Blast Radius** | HIGH — blocks any dataset > 1MB |
 | **Root Module** | `docker/nginx.conf` |
 | **Reported by** | Alex (2026-03-28) |

@@ -78,6 +78,10 @@ htmlcov/
 *.cover
 .hypothesis/
 
+# 🎯 TERMINAL ORCHESTRATION (temporary coordination files)
+T*-INSTRUCTIONS.md
+PLAN.md
+
 # 🤖 DEVELOPMENT / AI GENERATED FILES
 # Generated documentation and temporary files from AI tools
 docs/**/*.generated.*
