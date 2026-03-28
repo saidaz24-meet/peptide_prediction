@@ -11,6 +11,14 @@
     "sentry": {
       "type": "http",
       "url": "https://mcp.sentry.dev/sse"
+    },
+    "refero": {
+      "command": "npx",
+      "args": ["-y", "@anthropic-ai/mcp-remote", "https://refero.design/mcp"]
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["@playwright/mcp@0.0.41"]
     }
   }
 }

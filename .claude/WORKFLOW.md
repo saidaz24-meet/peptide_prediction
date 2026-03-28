@@ -10,6 +10,7 @@
 | `/audit-ff` | Scan UI for missing FF data |
 | `/terminology-scan` | Find UI text needing simplification |
 | `/checkpoint` | Summarize session, list changes, suggest next steps |
+| `/design-audit [scope]` | Full UI/UX audit: data accuracy, visualization, responsive, a11y |
 | `/pvl-peleg-review [chunk]` | Load Peleg review workflow for a specific chunk |
 
 ## Agents (invoked automatically when relevant)
@@ -28,6 +29,8 @@
 | `pvl-frontend-patterns` | Editing React/TypeScript files |
 | `pvl-testing` | Writing or running tests |
 | `pvl-data-pipeline` | Working on prediction pipeline |
+| `ui-design-research` | Editing UI components or pages (research-first design) |
+| `auto-detect` | Always active — proactive quality + workflow detection |
 
 ## Hooks (automatic)
 
@@ -45,6 +48,13 @@
 | Puppeteer | Visual debugging, screenshot verification |
 | Sentry | Error tracking queries (authenticate on first use) |
 | Figma | Design-to-code workflow (global, always available) |
+
+### Recommended MCPs to Install
+| Server | Install Command |
+|--------|----------------|
+| Refero | `claude mcp add refero -- npx -y @anthropic-ai/mcp-remote https://refero.design/mcp` |
+| Playwright | `claude mcp add playwright -- npx @playwright/mcp@0.0.41` |
+| Magic UI | `npx -y @21st-dev/magic@latest` (needs API key) |
 
 ## Quick Make Commands
 
