@@ -2,7 +2,15 @@ import jsPDF from "jspdf";
 import type { Peptide, DatasetStats, DatasetMetadata } from "@/types/peptide";
 import type { ResolvedThresholds } from "@/lib/thresholds";
 import { DEFAULT_THRESHOLDS } from "@/lib/thresholds";
-import { rankPeptides, METRIC_LABELS, type RankingWeights } from "@/lib/ranking";
+import {
+  rankPeptides,
+  METRIC_LABELS,
+  DEFAULT_DIRECTIONS,
+  type ProportionalWeights,
+  type RankingMetric,
+  type MetricDirections,
+} from "@/lib/ranking";
+import { getConsensusSS } from "@/lib/consensus";
 
 // ---- PDF report constants ----
 const MARGIN = 40;
@@ -42,26 +50,31 @@ function hline(pdf: jsPDF, y: number, w: number) {
  * Includes:
  *  - Header with dataset metadata
  *  - Summary statistics
- *  - Top-N ranked peptides table
+ *  - Top-N ranked peptides table (v2: per-metric columns + consensus)
  *  - Methodology notes
  */
 export function exportShortlistPDF(
   peptides: Peptide[],
   stats: DatasetStats,
   meta: DatasetMetadata | null,
-  weights: RankingWeights,
+  weights: ProportionalWeights,
   topN: number = 10,
-  thresholds: ResolvedThresholds | number = 50.0
+  thresholds: ResolvedThresholds | number = 50.0,
+  activeMetrics?: RankingMetric[],
+  directions?: MetricDirections
 ) {
   // Backward compat: accept number (old ffHelixThreshold) or full ResolvedThresholds
   const resolvedThresholds: ResolvedThresholds =
     typeof thresholds === "number" ? { ...DEFAULT_THRESHOLDS } : thresholds;
+  const effectiveDirections = directions ?? DEFAULT_DIRECTIONS;
+  const effectiveMetrics: RankingMetric[] =
+    activeMetrics ?? (Object.keys(weights) as RankingMetric[]);
+
   const pdf = new jsPDF({ orientation: "landscape", unit: "pt", format: "a4" });
   const pageW = pdf.internal.pageSize.getWidth();
   const pageH = pdf.internal.pageSize.getHeight();
   let y = MARGIN;
 
-  // ---- Helper: check if we need a new page ----
   function checkPage(needed: number) {
     if (y + needed > pageH - MARGIN) {
       pdf.addPage();
@@ -92,7 +105,6 @@ export function exportShortlistPDF(
   y += LINE_H;
   pdf.text(`Total peptides: ${stats.totalPeptides}`, MARGIN, y);
 
-  // Provider status
   const tangoStatus = meta?.provider_status?.tango?.status ?? "OFF";
   const s4predStatus = meta?.provider_status?.s4pred?.status ?? "OFF";
   pdf.text(`TANGO: ${tangoStatus}  |  S4PRED: ${s4predStatus}`, MARGIN + 200, y);
@@ -145,7 +157,6 @@ export function exportShortlistPDF(
   pdf.setFontSize(BODY_FONT);
   pdf.setFont("helvetica", "normal");
 
-  // Detect if custom or server thresholds
   const isServerDefault =
     resolvedThresholds.muHCutoff === 0.0 && resolvedThresholds.hydroCutoff === 0.0;
   const thresholdSource = isServerDefault ? "Original (server)" : "Custom (client-adjusted)";
@@ -169,10 +180,13 @@ export function exportShortlistPDF(
   y += 16;
 
   // ================================================================
-  // 3. TOP-N RANKED PEPTIDES (percentile-based)
+  // 3. TOP-N RANKED PEPTIDES (v2: per-metric + consensus)
   // ================================================================
   const tangoAvailable = tangoStatus !== "OFF" && tangoStatus !== "UNAVAILABLE";
-  const allRankings = rankPeptides(peptides, weights, { tangoAvailable });
+  const allRankings = rankPeptides(peptides, weights, {
+    tangoAvailable,
+    directions: effectiveDirections,
+  });
   const ranked = [...allRankings]
     .sort((a, b) => b.compositeScore - a.compositeScore)
     .slice(0, Math.max(1, topN))
@@ -191,25 +205,35 @@ export function exportShortlistPDF(
   pdf.setFontSize(TABLE_FONT);
   pdf.setFont("helvetica", "normal");
   pdf.setTextColor(100);
-  const weightStr = Object.entries(weights)
-    .map(([k, v]) => `${METRIC_LABELS[k as keyof typeof METRIC_LABELS] ?? k}: ${v}`)
+  const weightStr = effectiveMetrics
+    .map((k) => `${METRIC_LABELS[k]}: ${Math.round(weights[k] ?? 0)}%`)
     .join("  ");
   pdf.text(`Weights — ${weightStr}`, MARGIN, y + LINE_H);
   pdf.setTextColor(0);
   y += LINE_H + 10;
 
-  // Table columns: Rank, ID, Seq, Len, Composite, Physico, Structural, Agg
+  // Table columns: #, ID, Seq, Len, Score, [per-metric], Consensus
+  const metricCols = effectiveMetrics.map((m) => ({
+    header: METRIC_LABELS[m].length > 8 ? METRIC_LABELS[m].slice(0, 8) : METRIC_LABELS[m],
+    width: 42,
+    metric: m,
+  }));
+
   const cols = [
     { header: "#", width: 22 },
-    { header: "ID", width: 85 },
-    { header: "Sequence", width: 160 },
+    { header: "ID", width: 75 },
+    { header: "Sequence", width: 140 },
     { header: "Len", width: 28 },
-    { header: "Score", width: 42 },
-    { header: "Physico", width: 42 },
-    { header: "Struct", width: 42 },
-    { header: "Agg", width: 42 },
-    { header: "SSW", width: 48 },
+    { header: "Score", width: 36 },
+    ...metricCols.map((mc) => ({ header: mc.header, width: mc.width })),
+    { header: "Tier", width: 36 },
+    { header: "SSW", width: 40 },
   ];
+
+  // Check total width and shrink if needed
+  const totalW = cols.reduce((s, c) => s + c.width + COL_GAP, 0);
+  const availW = pageW - 2 * MARGIN;
+  const scale = totalW > availW ? availW / totalW : 1;
 
   // Table header
   checkPage(LINE_H * (ranked.length + 3));
@@ -219,7 +243,7 @@ export function exportShortlistPDF(
   pdf.rect(MARGIN, y - 10, pageW - 2 * MARGIN, LINE_H + 2, "F");
   for (const col of cols) {
     pdf.text(col.header, x + 2, y);
-    x += col.width + COL_GAP;
+    x += (col.width + COL_GAP) * scale;
   }
   y += LINE_H + 2;
 
@@ -230,32 +254,30 @@ export function exportShortlistPDF(
     checkPage(LINE_H + 4);
     const { p, r: ranking } = ranked[i];
 
-    // Alternate row background
     if (i % 2 === 0) {
       pdf.setFillColor(248, 248, 248);
       pdf.rect(MARGIN, y - 10, pageW - 2 * MARGIN, LINE_H, "F");
     }
 
-    const seqTrunc = p.sequence.length > 30 ? p.sequence.slice(0, 27) + "..." : p.sequence;
-
+    const seqTrunc = p.sequence.length > 25 ? p.sequence.slice(0, 22) + "..." : p.sequence;
     const fmtScore = (v: number | null) => (v != null ? Math.round(v).toString() : "-");
+    const consensus = getConsensusSS(p);
 
     const row = [
       String(i + 1),
-      p.id.length > 15 ? p.id.slice(0, 13) + ".." : p.id,
+      p.id.length > 12 ? p.id.slice(0, 10) + ".." : p.id,
       seqTrunc,
       p.length !== null ? String(p.length) : "-",
       fmtScore(ranking.compositeScore),
-      fmtScore(ranking.categoryScores.physicochemical),
-      fmtScore(ranking.categoryScores.structural),
-      fmtScore(ranking.categoryScores.aggregation),
+      ...metricCols.map((mc) => fmtScore(ranking.metricPercentiles[mc.metric])),
+      `T${consensus.tier}`,
       sswLabel(p.sswPrediction),
     ];
 
     x = MARGIN;
     for (let c = 0; c < cols.length; c++) {
       pdf.text(row[c], x + 2, y);
-      x += cols[c].width + COL_GAP;
+      x += (cols[c].width + COL_GAP) * scale;
     }
     y += LINE_H;
   }
@@ -280,10 +302,13 @@ export function exportShortlistPDF(
     "Hydrophobicity: Fauchere-Pliska scale, mean per-residue value.",
     "μH (Hydrophobic Moment): Eisenberg consensus, α-helix angle (100°).",
     "FF-Helix %: Chou-Fasman (1978) context-free helix propensity.",
+    "S4PRED Helix %: Deep-learning secondary structure prediction (helix content).",
     "SSW Score: Secondary Structure Switch score from TANGO aggregation analysis.",
     "TANGO Agg Max: Maximum aggregation propensity from TANGO per-residue analysis.",
-    "Ranking: Percentile-based (0-100). Each metric is converted to a percentile rank",
-    "  within the cohort. Composite = weighted average of metric percentiles.",
+    "Consensus Tier: Multi-evidence classification (T1=Switch Zone, T2=Disordered,",
+    "  T3=Native Beta, T4=No Concern, T5=No Data).",
+    "Ranking: Percentile-based (0-100), proportional weights summing to 100%.",
+    "  Direction toggles invert percentiles (low=100-pct) for relevant metrics.",
     "",
     "Generated by Peptide Visual Lab (PVL) — https://github.com/your-org/peptide-visual-lab",
   ];
@@ -299,7 +324,6 @@ export function exportShortlistPDF(
 
 /**
  * Legacy screenshot-based PDF export (kept for backward compatibility).
- * Captures the visible results area as a PNG screenshot embedded in PDF.
  */
 export async function exportResultsAsPDF(rootSelector = "#results-root") {
   const { default: html2canvas } = await import("html2canvas");

@@ -1,6 +1,6 @@
 // src/pages/Results.tsx
 import { motion } from "framer-motion";
-import { Download } from "lucide-react";
+import { Download, ArrowUp, ArrowDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -10,7 +10,6 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ProviderBadge } from "@/components/ProviderBadge";
-import { Slider } from "@/components/ui/slider";
 
 import { ResultsKpis } from "@/components/ResultsKpis";
 import { ResultsCharts } from "@/components/ResultsCharts";
@@ -18,15 +17,14 @@ import { PeptideTable } from "@/components/PeptideTable";
 import { Legend } from "@/components/Legend";
 import { ThresholdTuner } from "@/components/ThresholdTuner";
 import { RankedTable } from "@/components/RankedTable";
+import { WeightBar } from "@/components/WeightBar";
 
 import { useDatasetStore } from "@/stores/datasetStore";
 import { useRankingStore, rankPeptides } from "@/stores/datasetStore";
 import {
   METRIC_LABELS,
-  METRIC_CATEGORIES,
-  CATEGORY_LABELS,
+  OPTIONAL_METRICS,
   type RankingMetric,
-  type RankingCategory,
   type RankingPreset,
 } from "@/lib/ranking";
 import { useThresholdStore } from "@/stores/thresholdStore";
@@ -37,8 +35,8 @@ import { RotateCcw, FlaskConical, Info, AlertTriangle, XCircle, X } from "lucide
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 import type { Peptide } from "@/types/peptide";
-// mapApiRowsToPeptides removed - peptides from store are already mapped
 
+import { getConsensusSS } from "@/lib/consensus";
 import { CorrelationCard } from "@/components/CorrelationCard";
 import { PeptidePreviewSheet } from "@/components/PeptidePreviewSheet";
 import { BinPeptideDialog } from "@/components/BinPeptideDialog";
@@ -86,8 +84,6 @@ function ReproduceButton({
           return;
         }
         const result = await predictOne(input.sequence, input.entry, config);
-        // For predict, we convert single result to array format for consistency
-        // result is PredictResponse: {row, meta}
         const rows = [result.row];
         const meta = result.meta || {};
         ingestBackendRows(rows, meta);
@@ -104,7 +100,6 @@ function ReproduceButton({
 
   const { type, input } = getLastRun();
   const canReproduce = type !== null;
-  // Check if file-based run lost its File object (non-serializable, lost after refresh)
   const fileLost = type === "upload" && !(input instanceof File);
 
   const tooltip = !canReproduce
@@ -133,8 +128,19 @@ export default function Results() {
   const navigate = useNavigate();
   const { activeTab, setActiveTab } = useChartSelection();
 
-  // Percentile ranking
-  const { weights, topN, preset, setWeight, setTopN, applyPreset } = useRankingStore();
+  // Ranking store v2
+  const {
+    activeMetrics,
+    weights,
+    directions,
+    topN,
+    preset,
+    toggleOptionalMetric,
+    setWeights,
+    setDirection,
+    setTopN,
+    applyPreset,
+  } = useRankingStore();
 
   // Threshold store for real-time re-classification
   const {
@@ -143,21 +149,17 @@ export default function Results() {
     isModified: thresholdsModified,
   } = useThresholdStore();
 
-  // threshold mode from meta (for display)
   const thresholdMode =
     meta?.thresholdConfigResolved?.mode || meta?.thresholdConfigRequested?.mode || "default";
 
-  // Auto-show legend for first-time visitors
   const legendDefaultOpen = useMemo(() => {
     if (localStorage.getItem("pvl-legend-seen")) return false;
     localStorage.setItem("pvl-legend-seen", "1");
     return true;
   }, []);
 
-  // Dismissible run quality banner (session only)
   const [dismissedBanners, setDismissedBanners] = useState<Set<string>>(new Set());
 
-  // Initialize threshold store from server meta.thresholds
   useEffect(() => {
     if (meta?.thresholds) {
       initFromMeta(meta.thresholds as ResolvedThresholds);
@@ -165,28 +167,25 @@ export default function Results() {
   }, [meta?.thresholds, initFromMeta]);
 
   useEffect(() => {
-    // Redirect to upload if no data
     if (peptides.length === 0) {
       navigate("/upload");
     }
   }, [peptides.length, navigate]);
 
   if (peptides.length === 0) {
-    return null; // Will redirect
+    return null;
   }
 
-  // peptides from store is already Peptide[] (mapped by ingestBackendRows)
-  // No re-mapping needed - use directly
   const peptidesTyped: Peptide[] = peptides;
 
-  // -------- Percentile-based Candidate Ranking --------
+  // -------- Ranking v2 --------
   const tangoAvailable =
     meta?.provider_status?.tango?.status !== "OFF" &&
     meta?.provider_status?.tango?.status !== "UNAVAILABLE";
 
   const rankings = useMemo(
-    () => rankPeptides(peptidesTyped, weights, { tangoAvailable }),
-    [peptidesTyped, weights, tangoAvailable]
+    () => rankPeptides(peptidesTyped, weights, { tangoAvailable, directions }),
+    [peptidesTyped, weights, tangoAvailable, directions]
   );
 
   const shortlist: Peptide[] = useMemo(() => {
@@ -220,23 +219,16 @@ export default function Results() {
       const s = String(val ?? "");
       return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
     };
-    const fmtFragments = (frags: any): string => {
-      if (!Array.isArray(frags) || frags.length === 0) return "";
-      return frags
-        .map((f: any) => {
-          if (Array.isArray(f)) return `${f[0]}-${f[1]}`;
-          if (f && typeof f === "object" && "start" in f) return `${f.start}-${f.end}`;
-          return String(f);
-        })
-        .join(";");
-    };
+
+    // Build headers from active metrics + consensus
+    const metricHeaders = activeMetrics.map((m) => METRIC_LABELS[m]);
     const headers = [
       "Rank",
       "Entry",
       "Composite Score",
-      "Physicochemical",
-      "Structural",
-      "Agg & Switch",
+      ...metricHeaders,
+      "Consensus Tier",
+      "Consensus Label",
       "Sequence",
       "Length",
       "Charge",
@@ -246,23 +238,30 @@ export default function Results() {
       "SSW score",
       "TANGO Agg Max",
       "FF-Helix %",
+      "S4PRED Helix %",
       "Species",
       "Protein names",
     ];
+
     const sortedRankings = [...rankings]
       .sort((a, b) => b.compositeScore - a.compositeScore)
       .slice(0, Math.max(1, topN));
+
     const rows = sortedRankings
       .map((r, i) => {
         const p = peptidesTyped.find((pp) => pp.id === r.peptideId);
         if (!p) return "";
+        const consensus = getConsensusSS(p);
         return [
           i + 1,
           p.id,
           r.compositeScore.toFixed(1),
-          r.categoryScores.physicochemical?.toFixed(1) ?? "",
-          r.categoryScores.structural?.toFixed(1) ?? "",
-          r.categoryScores.aggregation?.toFixed(1) ?? "",
+          ...activeMetrics.map((m) => {
+            const pct = r.metricPercentiles[m];
+            return pct != null ? pct.toFixed(1) : "";
+          }),
+          `T${consensus.tier}`,
+          consensus.label,
           p.sequence,
           p.length,
           p.charge,
@@ -272,6 +271,7 @@ export default function Results() {
           p.sswScore ?? "",
           p.tangoAggMax ?? "",
           p.ffHelixPercent ?? "",
+          p.s4predHelixPercent ?? "",
           p.species || "",
           p.name || "",
         ]
@@ -363,7 +363,16 @@ export default function Results() {
                 variant="outline"
                 size="sm"
                 onClick={() =>
-                  exportShortlistPDF(peptidesTyped, stats!, meta, weights, topN, resolvedThresholds)
+                  exportShortlistPDF(
+                    peptidesTyped,
+                    stats!,
+                    meta,
+                    weights,
+                    topN,
+                    resolvedThresholds,
+                    activeMetrics,
+                    directions
+                  )
                 }
               >
                 <Download className="w-4 h-4 mr-2" />
@@ -473,8 +482,8 @@ export default function Results() {
                 <CardHeader>
                   <CardTitle>Smart Candidate Ranking</CardTitle>
                   <CardDescription>
-                    Percentile-based scoring (0-100). Tune metric weights and presets to shortlist
-                    top candidates.
+                    Proportional percentile-based scoring (0-100). Adjust metric weights,
+                    directions, and presets to shortlist top candidates.
                     {peptidesTyped.length <= 1 && (
                       <span className="block mt-1 text-amber-600">
                         Cohort ranking requires 2+ peptides.
@@ -483,10 +492,10 @@ export default function Results() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
-                  {/* Preset buttons */}
-                  <div className="flex items-center gap-2">
+                  {/* Row 1: Preset buttons */}
+                  <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium mr-1">Presets:</span>
-                    {(["equal", "physicochemical", "aggregation"] as RankingPreset[]).map((p) => (
+                    {(["equal", "amyloid", "switch"] as RankingPreset[]).map((p) => (
                       <Button
                         key={p}
                         variant={preset === p ? "default" : "outline"}
@@ -495,9 +504,9 @@ export default function Results() {
                       >
                         {p === "equal"
                           ? "Equal"
-                          : p === "physicochemical"
-                            ? "Physicochemical"
-                            : "Aggregation"}
+                          : p === "amyloid"
+                            ? "Amyloid Focus"
+                            : "Switch Focus"}
                       </Button>
                     ))}
                     {preset === "custom" && (
@@ -507,59 +516,89 @@ export default function Results() {
                     )}
                   </div>
 
-                  {/* Grouped sliders by category */}
-                  <div className="space-y-5">
-                    {(["physicochemical", "structural", "aggregation"] as RankingCategory[]).map(
-                      (cat) => {
-                        const metricsInCat = (
-                          Object.entries(METRIC_CATEGORIES) as [RankingMetric, RankingCategory][]
-                        )
-                          .filter(([, c]) => c === cat)
-                          .map(([m]) => m);
-                        const isTangoCategory = cat === "aggregation";
-
-                        return (
-                          <div key={cat}>
-                            <h4 className="text-sm font-medium text-muted-foreground mb-2">
-                              {CATEGORY_LABELS[cat]}
-                            </h4>
-                            <div
-                              className={`grid gap-4 ${metricsInCat.length === 1 ? "grid-cols-1 max-w-xs" : "md:grid-cols-2 lg:grid-cols-3"}`}
-                            >
-                              {metricsInCat.map((metric) => {
-                                const disabled = isTangoCategory && !tangoAvailable;
-                                return (
-                                  <div key={metric} className={disabled ? "opacity-40" : ""}>
-                                    <div className="flex justify-between text-sm mb-1">
-                                      <span>{METRIC_LABELS[metric]}</span>
-                                      <span className="text-muted-foreground font-mono text-xs">
-                                        {weights[metric].toFixed(1)}
-                                      </span>
-                                    </div>
-                                    <Slider
-                                      min={0}
-                                      max={1}
-                                      step={0.05}
-                                      value={[weights[metric]]}
-                                      onValueChange={([v]) => setWeight(metric, v)}
-                                      disabled={disabled}
-                                    />
-                                    {disabled && (
-                                      <span className="text-xs text-muted-foreground">
-                                        TANGO OFF
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      }
-                    )}
+                  {/* Row 2: Direction toggles */}
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <span className="text-sm font-medium text-muted-foreground">Direction:</span>
+                    {/* S4PRED direction (prominent) */}
+                    <div className="flex items-center gap-1 border rounded-md p-1">
+                      <span className="text-xs font-medium px-1">S4PRED Helix</span>
+                      <Button
+                        variant={directions.s4predHelixPercent === "high" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setDirection("s4predHelixPercent", "high")}
+                      >
+                        <ArrowUp className="w-3 h-3 mr-1" />
+                        Helix-Rich
+                      </Button>
+                      <Button
+                        variant={directions.s4predHelixPercent === "low" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setDirection("s4predHelixPercent", "low")}
+                      >
+                        <ArrowDown className="w-3 h-3 mr-1" />
+                        Disordered
+                      </Button>
+                    </div>
+                    {/* TANGO direction (smaller) */}
+                    <div className="flex items-center gap-1 border rounded-md p-1">
+                      <span className="text-xs font-medium px-1">TANGO</span>
+                      <Button
+                        variant={directions.tangoAggMax === "high" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setDirection("tangoAggMax", "high")}
+                        disabled={!tangoAvailable}
+                      >
+                        <ArrowUp className="w-3 h-3 mr-1" />
+                        High
+                      </Button>
+                      <Button
+                        variant={directions.tangoAggMax === "low" ? "default" : "ghost"}
+                        size="sm"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setDirection("tangoAggMax", "low")}
+                        disabled={!tangoAvailable}
+                      >
+                        <ArrowDown className="w-3 h-3 mr-1" />
+                        Low
+                      </Button>
+                    </div>
                   </div>
 
-                  {/* Top N + Export */}
+                  {/* Row 3: Optional metric toggles */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-sm font-medium text-muted-foreground">Add metrics:</span>
+                    {OPTIONAL_METRICS.map((m) => {
+                      const isActive = activeMetrics.includes(m);
+                      return (
+                        <Button
+                          key={m}
+                          variant={isActive ? "secondary" : "outline"}
+                          size="sm"
+                          onClick={() => toggleOptionalMetric(m)}
+                        >
+                          {isActive ? "−" : "+"} {METRIC_LABELS[m]}
+                        </Button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Row 4: Proportional Weight Bar */}
+                  <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-2">
+                      Metric Weights (drag handles to adjust)
+                    </h4>
+                    <WeightBar
+                      weights={weights}
+                      activeMetrics={activeMetrics}
+                      onChange={setWeights}
+                      disabled={peptidesTyped.length <= 1}
+                    />
+                  </div>
+
+                  {/* Row 5: Top N + Export */}
                   <div className="flex items-center gap-3 pt-2 border-t">
                     <div className="flex items-center gap-2">
                       <span className="text-sm">Top N</span>
@@ -582,7 +621,12 @@ export default function Results() {
                     <h3 className="text-base font-semibold mb-3">
                       Top {Math.min(topN, peptidesTyped.length)} Candidates
                     </h3>
-                    <RankedTable peptides={peptidesTyped} rankings={rankings} topN={topN} />
+                    <RankedTable
+                      peptides={peptidesTyped}
+                      rankings={rankings}
+                      topN={topN}
+                      activeMetrics={activeMetrics}
+                    />
                   </div>
                 </CardContent>
               </Card>

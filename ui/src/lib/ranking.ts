@@ -1,98 +1,148 @@
 /**
- * Percentile-based peptide ranking engine.
+ * Percentile-based peptide ranking engine v2.
  *
- * Replaces the z-score approach with a 0-100 percentile scale that is
- * easier for researchers to interpret ("this peptide ranks in the 85th
- * percentile for hydrophobicity").
+ * 5 default metrics + 2 optional add-ons. Proportional weights sum to 100%.
+ * Direction toggles allow inverting "high is good" vs "low is good".
  *
- * 6 continuous metrics (no binary FF flags):
- *   Physicochemical: hydrophobicity, |charge|, μH
- *   Structural:      FF-Helix %
- *   Aggregation:     SSW score, TANGO Agg Max
+ * Default metrics:  tangoAggMax, s4predHelixPercent, ffHelixPercent, muH, sswScore
+ * Optional add-ons: hydrophobicity, absCharge
  */
 import type { Peptide } from "@/types/peptide";
 
 // ---- Types ----
 
 export type RankingMetric =
-  | "hydrophobicity"
-  | "absCharge"
-  | "muH"
+  | "tangoAggMax"
+  | "s4predHelixPercent"
   | "ffHelixPercent"
+  | "muH"
   | "sswScore"
-  | "tangoAggMax";
+  | "hydrophobicity"
+  | "absCharge";
 
-export type RankingCategory = "physicochemical" | "structural" | "aggregation";
+export type MetricDirection = "high" | "low";
 
-export type RankingWeights = Record<RankingMetric, number>;
+export type MetricDirections = Partial<Record<RankingMetric, MetricDirection>>;
+
+export type ProportionalWeights = Partial<Record<RankingMetric, number>>;
 
 export type PeptideRanking = {
   peptideId: string;
   compositeScore: number; // 0-100
-  categoryScores: Record<RankingCategory, number | null>;
   metricPercentiles: Record<RankingMetric, number | null>;
 };
 
 export interface RankingOptions {
   tangoAvailable?: boolean;
+  directions?: MetricDirections;
 }
+
+export type RankingPreset = "equal" | "amyloid" | "switch";
 
 // ---- Constants ----
 
-export const METRIC_CATEGORIES: Record<RankingMetric, RankingCategory> = {
-  hydrophobicity: "physicochemical",
-  absCharge: "physicochemical",
-  muH: "physicochemical",
-  ffHelixPercent: "structural",
-  sswScore: "aggregation",
-  tangoAggMax: "aggregation",
-};
+export const DEFAULT_METRICS: RankingMetric[] = [
+  "tangoAggMax",
+  "s4predHelixPercent",
+  "ffHelixPercent",
+  "muH",
+  "sswScore",
+];
+
+export const OPTIONAL_METRICS: RankingMetric[] = ["hydrophobicity", "absCharge"];
+
+export const ALL_METRICS: RankingMetric[] = [...DEFAULT_METRICS, ...OPTIONAL_METRICS];
 
 export const METRIC_LABELS: Record<RankingMetric, string> = {
+  tangoAggMax: "TANGO Agg Max",
+  s4predHelixPercent: "S4PRED Helix %",
+  ffHelixPercent: "FF-Helix %",
+  muH: "μH",
+  sswScore: "SSW Score",
   hydrophobicity: "Hydrophobicity",
   absCharge: "|Charge|",
-  muH: "μH",
-  ffHelixPercent: "FF-Helix %",
-  sswScore: "SSW Score",
-  tangoAggMax: "TANGO Agg Max",
 };
 
-export const CATEGORY_LABELS: Record<RankingCategory, string> = {
-  physicochemical: "Physicochemical",
-  structural: "Structural",
-  aggregation: "Agg & Switch",
+export const METRIC_COLORS: Record<RankingMetric, string> = {
+  tangoAggMax: "bg-red-500",
+  s4predHelixPercent: "bg-violet-500",
+  ffHelixPercent: "bg-purple-500",
+  muH: "bg-blue-500",
+  sswScore: "bg-amber-500",
+  hydrophobicity: "bg-cyan-500",
+  absCharge: "bg-emerald-500",
 };
 
-export const DEFAULT_WEIGHTS: RankingWeights = {
-  hydrophobicity: 1,
-  absCharge: 1,
-  muH: 1,
-  ffHelixPercent: 1,
-  sswScore: 1,
-  tangoAggMax: 1,
+export const METRIC_COLORS_HEX: Record<RankingMetric, string> = {
+  tangoAggMax: "#ef4444",
+  s4predHelixPercent: "#8b5cf6",
+  ffHelixPercent: "#a855f7",
+  muH: "#3b82f6",
+  sswScore: "#f59e0b",
+  hydrophobicity: "#06b6d4",
+  absCharge: "#10b981",
 };
 
-export const PRESETS = {
-  equal: { ...DEFAULT_WEIGHTS } as RankingWeights,
-  physicochemical: {
-    hydrophobicity: 1,
-    absCharge: 1,
-    muH: 1,
-    ffHelixPercent: 0.25,
-    sswScore: 0.25,
-    tangoAggMax: 0.25,
-  } as RankingWeights,
-  aggregation: {
-    hydrophobicity: 0.25,
-    absCharge: 0.25,
-    muH: 0.25,
-    ffHelixPercent: 0.25,
-    sswScore: 1,
-    tangoAggMax: 1,
-  } as RankingWeights,
+/** Default directions: high = good for all metrics. */
+export const DEFAULT_DIRECTIONS: MetricDirections = {
+  tangoAggMax: "high",
+  s4predHelixPercent: "high",
+  ffHelixPercent: "high",
+  muH: "high",
+  sswScore: "high",
+  hydrophobicity: "high",
+  absCharge: "high",
 };
 
-export type RankingPreset = keyof typeof PRESETS;
+/** Equal weights across 5 default metrics (20% each). */
+function equalWeights(): ProportionalWeights {
+  return {
+    tangoAggMax: 20,
+    s4predHelixPercent: 20,
+    ffHelixPercent: 20,
+    muH: 20,
+    sswScore: 20,
+  };
+}
+
+export const PRESETS: Record<
+  RankingPreset,
+  { weights: ProportionalWeights; directions: MetricDirections }
+> = {
+  equal: {
+    weights: equalWeights(),
+    directions: { ...DEFAULT_DIRECTIONS },
+  },
+  amyloid: {
+    weights: {
+      tangoAggMax: 35,
+      sswScore: 25,
+      ffHelixPercent: 15,
+      muH: 15,
+      s4predHelixPercent: 10,
+    },
+    directions: {
+      ...DEFAULT_DIRECTIONS,
+      s4predHelixPercent: "low", // low helix = more disordered = more amyloid-prone
+    },
+  },
+  switch: {
+    weights: {
+      s4predHelixPercent: 30,
+      tangoAggMax: 25,
+      sswScore: 20,
+      ffHelixPercent: 15,
+      muH: 10,
+    },
+    directions: {
+      ...DEFAULT_DIRECTIONS,
+      s4predHelixPercent: "high", // high helix content → helix-to-beta switch
+    },
+  },
+};
+
+// Metrics that require TANGO
+const TANGO_GATED: RankingMetric[] = ["sswScore", "tangoAggMax"];
 
 // ---- Core Functions ----
 
@@ -111,6 +161,8 @@ function extractMetric(p: Peptide, metric: RankingMetric): number | null {
       return p.sswScore ?? null;
     case "tangoAggMax":
       return p.tangoAggMax ?? null;
+    case "s4predHelixPercent":
+      return p.s4predHelixPercent ?? null;
   }
 }
 
@@ -132,33 +184,58 @@ export function computePercentileRank(value: number, allValues: number[]): numbe
 }
 
 /**
- * Rank all peptides using percentile normalization and weighted composite scoring.
+ * Redistribute weights proportionally when some metrics are removed.
+ * Returns a new weights record that sums to 100.
+ */
+export function redistributeWeights(
+  weights: ProportionalWeights,
+  activeMetrics: RankingMetric[]
+): ProportionalWeights {
+  const activeWeights: ProportionalWeights = {};
+  let sum = 0;
+  for (const m of activeMetrics) {
+    const w = weights[m] ?? 0;
+    activeWeights[m] = w;
+    sum += w;
+  }
+  if (sum === 0) {
+    // Fallback: equal distribution
+    const each = 100 / activeMetrics.length;
+    for (const m of activeMetrics) activeWeights[m] = each;
+    return activeWeights;
+  }
+  // Scale to sum to 100
+  const scale = 100 / sum;
+  for (const m of activeMetrics) {
+    activeWeights[m] = (activeWeights[m] ?? 0) * scale;
+  }
+  return activeWeights;
+}
+
+/**
+ * Rank all peptides using percentile normalization and proportional weighted scoring.
  *
  * @param peptides - Array of peptides to rank
- * @param weights - Per-metric weights (0-1 range, default 1)
- * @param options - tangoAvailable gates SSW/TANGO metrics
+ * @param weights - Per-metric weights (values sum to 100)
+ * @param options - tangoAvailable gates SSW/TANGO metrics, directions invert percentiles
  */
 export function rankPeptides(
   peptides: Peptide[],
-  weights: RankingWeights,
+  weights: ProportionalWeights,
   options?: RankingOptions
 ): PeptideRanking[] {
   const tangoAvailable = options?.tangoAvailable ?? true;
-  const allMetrics: RankingMetric[] = [
-    "hydrophobicity",
-    "absCharge",
-    "muH",
-    "ffHelixPercent",
-    "sswScore",
-    "tangoAggMax",
-  ];
+  const directions = options?.directions ?? DEFAULT_DIRECTIONS;
 
-  // Determine which metrics are active (TANGO gating)
-  const tangoGated: RankingMetric[] = ["sswScore", "tangoAggMax"];
-  const activeMetrics = allMetrics.filter((m) => tangoAvailable || !tangoGated.includes(m));
+  // Determine which metrics are active (from weights keys, minus TANGO-gated when unavailable)
+  const requestedMetrics = ALL_METRICS.filter((m) => (weights[m] ?? 0) > 0);
+  const activeMetrics = requestedMetrics.filter((m) => tangoAvailable || !TANGO_GATED.includes(m));
+
+  // Redistribute weights excluding gated metrics
+  const effectiveWeights = redistributeWeights(weights, activeMetrics);
 
   // Collect all valid values per metric (for percentile computation)
-  const metricValues: Record<RankingMetric, number[]> = {} as any;
+  const metricValues: Partial<Record<RankingMetric, number[]>> = {};
   for (const m of activeMetrics) {
     metricValues[m] = peptides
       .map((p) => extractMetric(p, m))
@@ -169,7 +246,7 @@ export function rankPeptides(
   return peptides.map((p) => {
     const metricPercentiles: Record<RankingMetric, number | null> = {} as any;
 
-    for (const m of allMetrics) {
+    for (const m of ALL_METRICS) {
       if (!activeMetrics.includes(m)) {
         metricPercentiles[m] = null;
         continue;
@@ -178,34 +255,24 @@ export function rankPeptides(
       if (value == null || !Number.isFinite(value)) {
         metricPercentiles[m] = null;
       } else {
-        metricPercentiles[m] = computePercentileRank(value, metricValues[m]);
+        let pct = computePercentileRank(value, metricValues[m]!);
+        // Invert percentile when direction is "low" (lower raw value = higher score)
+        if (directions[m] === "low") {
+          pct = 100 - pct;
+        }
+        metricPercentiles[m] = pct;
       }
     }
 
-    // Category scores: average of constituent metric percentiles
-    const categoryScores: Record<RankingCategory, number | null> = {
-      physicochemical: null,
-      structural: null,
-      aggregation: null,
-    };
-    for (const cat of ["physicochemical", "structural", "aggregation"] as RankingCategory[]) {
-      const catMetrics = activeMetrics.filter((m) => METRIC_CATEGORIES[m] === cat);
-      const catPercentiles = catMetrics
-        .map((m) => metricPercentiles[m])
-        .filter((v): v is number => v != null);
-      if (catPercentiles.length > 0) {
-        categoryScores[cat] = catPercentiles.reduce((a, b) => a + b, 0) / catPercentiles.length;
-      }
-    }
-
-    // Composite score: weighted average of percentile ranks
+    // Composite score: weighted average of adjusted percentiles / 100
     let weightedSum = 0;
     let weightSum = 0;
     for (const m of activeMetrics) {
       const pct = metricPercentiles[m];
+      const w = effectiveWeights[m] ?? 0;
       if (pct != null) {
-        weightedSum += weights[m] * pct;
-        weightSum += weights[m];
+        weightedSum += w * pct;
+        weightSum += w;
       }
     }
     const compositeScore = weightSum > 0 ? weightedSum / weightSum : 50;
@@ -213,7 +280,6 @@ export function rankPeptides(
     return {
       peptideId: p.id,
       compositeScore,
-      categoryScores,
       metricPercentiles,
     };
   });
