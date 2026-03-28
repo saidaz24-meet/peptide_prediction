@@ -1,9 +1,8 @@
 # Known Issues — Prioritized Backlog
 
-**Last Updated**: 2026-03-05
+**Last Updated**: 2026-03-28
 
-> **Status**: All 17 issues from the original backlog are FIXED. No open P0/P1/P2 issues.
-> This file is kept for historical reference and as a template for future issues.
+> **Status**: 17 original issues FIXED. 5 new issues open (ISSUE-018 to ISSUE-022) from Alex's testing.
 
 ## Priority Definitions
 
@@ -448,6 +447,70 @@ User enters `XXXX11111` in Quick Analyze → gets analyzed as `AAAA11111`. Numbe
 - [ ] `XXXX11111` → rejected with clear error (or stripped to `AAAA` with warning)
 - [ ] `FOFJJJFFOOO` → accepted with substitution notice: "Non-standard amino acids corrected: O→K, J→L"
 - [ ] Pure letter sequences continue to work normally
+
+---
+
+## ISSUE-021: Large file upload fails with "413 Request Entity Too Large"
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P0 |
+| **Status** | Open |
+| **Blast Radius** | HIGH — blocks any dataset > 1MB |
+| **Root Module** | `docker/nginx.conf` |
+| **Reported by** | Alex (2026-03-28) |
+
+### Symptom
+Uploading a UniProt TSV with ~6,000 entries (5MB file) returns:
+```
+413 Request Entity Too Large — nginx/1.29.7
+```
+The error is an HTML page from nginx, not a JSON error from the backend. The "Analyze Dataset" button shows a raw HTML error toast.
+
+Also reported: a 3,000-entry dataset (376KB) — this may pass the nginx limit but could fail due to backend timeout or memory when running TANGO/S4PRED on 3K sequences.
+
+### Root Cause
+`docker/nginx.conf` has **no `client_max_body_size` directive**. Nginx defaults to **1MB**. Any file larger than 1MB is rejected before reaching the FastAPI backend.
+
+### Fix
+Add to `docker/nginx.conf` inside the `server` block:
+```nginx
+# Allow uploads up to 100MB (our stated limit is 50MB, add headroom)
+client_max_body_size 100M;
+```
+
+### Additional Considerations
+- The 50MB limit advertised in the UI should match the nginx config
+- Large datasets (3K+ entries) will also need backend timeout adjustments — TANGO runs ~2-5 seconds per peptide, so 3K entries = ~2-4 hours. This is a separate issue addressed by B1 (async job queue).
+- Frontend should show a clear progress indicator for large uploads and warn about expected processing time
+- Consider: reject datasets > 500 entries when TANGO is enabled, or auto-disable TANGO for large batches
+
+### Success Criteria
+- [ ] 5MB file uploads without 413 error
+- [ ] 50MB file uploads without 413 error
+- [ ] Files > 100MB rejected with clear error message from backend (not nginx HTML)
+
+---
+
+## ISSUE-022: No example dataset on Quick Analyze page
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P2 |
+| **Status** | Open |
+| **Blast Radius** | LOW |
+| **Root Module** | `ui/src/pages/QuickAnalyze.tsx` |
+| **Reported by** | Alex (2026-03-28) |
+
+### Symptom
+Quick Analyze page has no "Try example" button. The Upload page has example datasets (Venom Peptides, Antimicrobial Peptides, etc.), but Quick Analyze requires the user to know a peptide sequence to type in.
+
+### Proposed Fix
+Add a "Try example" button below the sequence input that pre-fills with a well-known peptide sequence (e.g., Amyloid-beta 1-42: `DAEFRHDSGYEVHHQKLVFFAEDVGSNKGAIIGLMVGGVVIA`) and auto-triggers analysis.
+
+### Success Criteria
+- [ ] Quick Analyze has at least one example peptide button
+- [ ] Clicking it fills the sequence field and optionally auto-runs analysis
 
 ---
 

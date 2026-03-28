@@ -114,7 +114,36 @@ Improve the upload experience with better information:
 - Show required columns: "Your file must include a 'Sequence' column. Optional: 'Entry', 'Organism', 'Length'."
 - Currently only shows "50MB max" with no guidance on entry counts or required format.
 
-**Phase B summary**: 6/11 done. B1 (async), B6 (cache), B10 (modifications), B11 (FASTA), B12 (upload guidance) are planned.
+### B13. Cohort Comparison: Dual Upload
+**Status**: NOT STARTED | **Effort**: 6-8h | **Requested by**: Alex (2026-03-28)
+Currently Cohort Comparison requires a dataset already loaded (Cohort A) and then uploading Cohort B. Alex requests:
+- **Option 1** (current): Upload B, compare with already-loaded A
+- **Option 2** (new): Upload both A and B fresh from the Compare page — no need to go through Upload first
+- **Option 3** (new): Save previous analysis results and load them later for comparison without recalculation
+**Scope**: Add dual dropzone to Compare page, add result persistence (localStorage or DuckDB), add "Load saved analysis" picker.
+
+### B14. Tools Tab — PDB Visualization & More
+**Status**: NOT STARTED | **Effort**: 12-16h | **Requested by**: Alex (2026-03-28)
+New sidebar tab "Tools" with standalone utilities for amyloid researchers:
+- **PDB Structure Renderer**: Drag-and-drop a PDB file → generate publication-ready PNG image showing peptide chain with colored residues (like Alex's example: N-term markers, charged residues in red/green/blue). Uses a Python script Alex has.
+- **Future tools**: Sequence format converter, FASTA↔CSV, batch accession lookup, etc.
+**Key decision**: Should this be part of PVL or a separate micro-app? Recommendation: Start as a PVL tab, extract later if it grows.
+
+### B15. Large Dataset Support (>500 entries)
+**Status**: NOT STARTED | **Effort**: 8-12h | **Requested by**: Alex (2026-03-28)
+Current blockers for large datasets:
+1. **Nginx 413 error** (ISSUE-021): `client_max_body_size` defaults to 1MB — fixed with one line
+2. **Backend timeout**: TANGO runs 2-5s/peptide → 3K entries = hours. Need async queue (B1) or auto-disable TANGO for large batches
+3. **No progress feedback**: User sees nothing while 3K entries process
+**Immediate fix**: Increase nginx body size limit, show entry count warning ("3,088 entries detected — analysis without TANGO will take ~5 minutes, with TANGO ~2-4 hours")
+**Long-term fix**: B1 (async job queue) + chunked processing + progress WebSocket
+
+### B16. Load Testing / Smoke Testing Infrastructure
+**Status**: NOT STARTED | **Effort**: 4-6h | **Requested by**: Alex (2026-03-28)
+Simulate concurrent load: 50, 100, 1000 simultaneous analyses. Tools: `locust` or `k6` for HTTP load testing against the Hetzner VPS. Helps determine when to scale workers or add async queue.
+**Deliverables**: Load test script, baseline numbers (requests/sec, p95 latency), breaking point identification.
+
+**Phase B summary**: 6/15 done. B1 (async), B6 (cache), B10-B16 planned.
 
 ---
 

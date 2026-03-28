@@ -9,6 +9,11 @@
 # For local dev without HTTPS, set DOMAIN=localhost
 
 {$DOMAIN:localhost} {
+    # Upload size limit (datasets can be 5-50MB)
+    request_body {
+        max_size 100MB
+    }
+
     # API proxy - forward to backend service
     handle /api/* {
         reverse_proxy backend:8000 {
