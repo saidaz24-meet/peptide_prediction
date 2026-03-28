@@ -1,5 +1,6 @@
 import math
 import os
+import re
 from statistics import mean, median
 from typing import Optional
 
@@ -17,10 +18,28 @@ MIN_TANGO_SCORE = 0
 
 # Simple helix propensity (normalized ~0..1) — tweak if you like
 _HELIX_PROP = {
-    "A": 1.42, "E": 1.51, "L": 1.21, "M": 1.45, "Q": 1.11, "K": 1.14, "R": 0.98,
-    "I": 1.08, "V": 1.06, "W": 1.08, "F": 1.13, "T": 0.83, "S": 0.77, "Y": 0.69,
-    "H": 1.00, "C": 0.70, "N": 0.67, "D": 1.01, "G": 0.57, "P": 0.57,
+    "A": 1.42,
+    "E": 1.51,
+    "L": 1.21,
+    "M": 1.45,
+    "Q": 1.11,
+    "K": 1.14,
+    "R": 0.98,
+    "I": 1.08,
+    "V": 1.06,
+    "W": 1.08,
+    "F": 1.13,
+    "T": 0.83,
+    "S": 0.77,
+    "Y": 0.69,
+    "H": 1.00,
+    "C": 0.70,
+    "N": 0.67,
+    "D": 1.01,
+    "G": 0.57,
+    "P": 0.57,
 }
+
 
 def _safe_seq_str(seq) -> str:
     """Convert sequence to string, handling NaN/None/float values safely."""
@@ -30,10 +49,12 @@ def _safe_seq_str(seq) -> str:
         return str(seq)
     return seq
 
+
 def _hprop(seq):
     """Get helix propensity for each residue in sequence."""
     s = _safe_seq_str(seq).upper()
     return [_HELIX_PROP.get(aa, 1.0) for aa in s]
+
 
 def ff_helix_percent(seq, core_len: Optional[int] = None, thr: Optional[float] = None) -> float:
     """
@@ -51,12 +72,14 @@ def ff_helix_percent(seq, core_len: Optional[int] = None, thr: Optional[float] =
     if core_len is None:
         try:
             from config import settings
+
             core_len = settings.FF_HELIX_CORE_LEN
         except ImportError:
             core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
     if thr is None:
         try:
             from config import settings
+
             thr = settings.FF_HELIX_THRESHOLD
         except ImportError:
             thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
@@ -69,7 +92,7 @@ def ff_helix_percent(seq, core_len: Optional[int] = None, thr: Optional[float] =
 
     # Check each possible window
     for i in range(len(s) - core_len + 1):
-        window_props = hp[i:i + core_len]
+        window_props = hp[i : i + core_len]
         window_mean = sum(window_props) / core_len
 
         if window_mean >= thr:
@@ -83,6 +106,7 @@ def ff_helix_percent(seq, core_len: Optional[int] = None, thr: Optional[float] =
     percent = round(100.0 * sum(in_core) / len(s), 1)
     # Ensure result is in valid range [0.0, 100.0]
     return max(0.0, min(100.0, percent))
+
 
 def ff_helix_cores(seq, core_len: Optional[int] = None, thr: Optional[float] = None):
     """
@@ -98,12 +122,14 @@ def ff_helix_cores(seq, core_len: Optional[int] = None, thr: Optional[float] = N
     if core_len is None:
         try:
             from config import settings
+
             core_len = settings.FF_HELIX_CORE_LEN
         except ImportError:
             core_len = int(os.getenv("FF_HELIX_CORE_LEN", "6"))
     if thr is None:
         try:
             from config import settings
+
             thr = settings.FF_HELIX_THRESHOLD
         except ImportError:
             thr = float(os.getenv("FF_HELIX_THRESHOLD", "1.0"))
@@ -116,7 +142,7 @@ def ff_helix_cores(seq, core_len: Optional[int] = None, thr: Optional[float] = N
 
     # Mark residues that are part of qualifying windows
     for i in range(len(s) - core_len + 1):
-        window_props = hp[i:i + core_len]
+        window_props = hp[i : i + core_len]
         window_mean = sum(window_props) / core_len
 
         if window_mean >= thr:
@@ -148,8 +174,8 @@ def __check_subsegment(prediction: list, start: int, end: int) -> tuple:
     max_score = -1
     for cur_length in all_possible_length:
         for i in range(start, end - cur_length + 2):  # +2: inclusive end
-            cur_mean = mean(prediction[i:(i + cur_length)])
-            cur_median = median(prediction[i:(i + cur_length)])
+            cur_mean = mean(prediction[i : (i + cur_length)])
+            cur_median = median(prediction[i : (i + cur_length)])
             if cur_mean > max_score or cur_median > max_score:
                 max_score = max(cur_median, cur_mean)
                 max_start = i
@@ -166,7 +192,7 @@ def get_secondary_structure_segments(prediction: list, prediction_method: str) -
     :param prediction: list of float numbers indicating the prediction score for each residue
     :return: list of tuples with start and end indexes of segments predicted to have secondary structure
     """
-    min_score = - np.inf
+    min_score = -np.inf
     if prediction_method == "Tango":
         min_score = MIN_TANGO_SCORE
 
@@ -186,14 +212,21 @@ def get_secondary_structure_segments(prediction: list, prediction_method: str) -
 
             end = i - 1 - gap
             segment_length = end - start + 1
-            good_segment = segment_length >= MIN_LENGTH and (mean(prediction[start:end + 1]) >= min_score or
-                                                             median(prediction[start:end + 1]) >= min_score)
+            good_segment = segment_length >= MIN_LENGTH and (
+                mean(prediction[start : end + 1]) >= min_score
+                or median(prediction[start : end + 1]) >= min_score
+            )
             if good_segment:
                 segments.append((start, end))
             elif segment_length >= MIN_LENGTH:
-                shorter_segment_start, shorter_segment_end, shorter_segment_score = __check_subsegment(prediction,
-                                                                                                       start, end)
-                if shorter_segment_end is not None and shorter_segment_start is not None and shorter_segment_score >= min_score:
+                shorter_segment_start, shorter_segment_end, shorter_segment_score = (
+                    __check_subsegment(prediction, start, end)
+                )
+                if (
+                    shorter_segment_end is not None
+                    and shorter_segment_start is not None
+                    and shorter_segment_score >= min_score
+                ):
                     segments.append((shorter_segment_start, shorter_segment_end))
 
         i += 1
@@ -214,12 +247,13 @@ def __calc_average_score(prediction: list, structure_prediction_indexes: list) -
         return None  # No segments to calculate
     segments_scores = []
     for start, end in structure_prediction_indexes:
-        segments_scores.append(mean(prediction[start: end + 1]))
+        segments_scores.append(mean(prediction[start : end + 1]))
     return mean(segments_scores)
 
 
-def calc_secondary_structure_switch_difference_and_score(beta_prediction: list, helix_prediction: list,
-                                                         structure_prediction_indexes: list) -> tuple:
+def calc_secondary_structure_switch_difference_and_score(
+    beta_prediction: list, helix_prediction: list, structure_prediction_indexes: list
+) -> tuple:
     """
     Calculate the score of secondary structure switch segments by summing the average score of the helical prediction
     and beta prediction. In addition, it calculates the difference between these averaged scores.
@@ -262,12 +296,12 @@ def find_secondary_structure_switch_segments(beta_segments: list, helix_segments
         b_end = beta_segments[beta_ind][1]
         # print("h_start={}, h_end={}\nb_start={}, b_end={}".format(h_start, h_end, b_start, b_end))
 
-        ''' [] {} '''
+        """ [] {} """
         if h_end <= b_start:
             helix_ind += 1
             continue
 
-        ''' {} [] '''
+        """ {} [] """
         if b_end <= h_start:
             beta_ind += 1
             continue
@@ -300,7 +334,6 @@ def find_secondary_structure_switch_segments(beta_segments: list, helix_segments
     return merged_segments
 
 
-
 def get_avg_uH_by_segments(sequence: str, segments: list) -> Optional[float]:
     """
     Calculate average hydrophobic moment for given segments.
@@ -327,10 +360,14 @@ def get_avg_uH_by_segments(sequence: str, segments: list) -> Optional[float]:
 
     except Exception as e:
         from services.logger import log_debug
+
         log_debug("uH_segment_error", f"Error in get_avg_uH_by_segments: {e}")
         return None  # Return None on error
 
-def check_secondary_structure_prediction_content(secondary_structure_prediction_conf: list) -> float:
+
+def check_secondary_structure_prediction_content(
+    secondary_structure_prediction_conf: list,
+) -> float:
     """
     This function calculates the percentage of secondary structure prediction of the sequence.
 
@@ -338,8 +375,11 @@ def check_secondary_structure_prediction_content(secondary_structure_prediction_
     :return: percentage of secondary structure prediction
     """
     # Filter out NaN/None values — they shouldn't inflate the denominator
-    valid_values = [v for v in secondary_structure_prediction_conf
-                    if v is not None and not (isinstance(v, float) and math.isnan(v))]
+    valid_values = [
+        v
+        for v in secondary_structure_prediction_conf
+        if v is not None and not (isinstance(v, float) and math.isnan(v))
+    ]
     if not valid_values:
         return 0
     residues_with_secondary_structure_prediction = sum(1 for v in valid_values if v > 0)
@@ -367,12 +407,17 @@ def get_corrected_sequence(sequence) -> str:
     if not isinstance(sequence, str):
         sequence = str(sequence)
 
-    s1 = sequence.replace('X', 'A')
-    s2 = s1.replace('Z', 'E')
-    s3 = s2.replace('U', 'C')
-    s4 = s3.replace('B', 'D')
-    s4 = s4.replace('O', 'K')
-    s4 = s4.replace('J', 'L')
-    if '-' in s4:
-        return s4.split('-')[0].upper()
+    # Strip non-letter characters (keep dashes for terminal modification handling)
+    sequence = re.sub(r"[^A-Za-z-]", "", sequence)
+    if not sequence or sequence == "-":
+        return ""
+
+    s1 = sequence.replace("X", "A")
+    s2 = s1.replace("Z", "E")
+    s3 = s2.replace("U", "C")
+    s4 = s3.replace("B", "D")
+    s4 = s4.replace("O", "K")
+    s4 = s4.replace("J", "L")
+    if "-" in s4:
+        return s4.split("-")[0].upper()
     return s4.upper()

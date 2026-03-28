@@ -17,6 +17,7 @@ from auxiliary import get_corrected_sequence
 
 # --- get_corrected_sequence ---
 
+
 class TestCorrectedSequence:
     """All non-standard AAs must be substituted before calculations."""
 
@@ -56,8 +57,28 @@ class TestCorrectedSequence:
     def test_lowercase_uppercased(self):
         assert get_corrected_sequence("akla") == "AKLA"
 
+    def test_digits_stripped(self):
+        assert get_corrected_sequence("ABC123DEF") == "ADCDEF"  # B→D, digits stripped
+
+    def test_all_digits_returns_empty(self):
+        assert get_corrected_sequence("12345") == ""
+
+    def test_spaces_stripped(self):
+        assert get_corrected_sequence("AC GT") == "ACGT"
+
+    def test_symbols_stripped(self):
+        assert get_corrected_sequence("AC!@#GT") == "ACGT"
+
+    def test_standard_unchanged(self):
+        assert get_corrected_sequence("ACDEFGHIKLMNPQRSTVWY") == "ACDEFGHIKLMNPQRSTVWY"
+
+    def test_mixed_invalid_with_substitutions(self):
+        # strip non-letters first → "FOFJJJ", then O→K, J→L → "FKFLLL"
+        assert get_corrected_sequence("FOF123JJJ") == "FKFLLL"
+
 
 # --- hydrophobicity: must not crash on unknown AA ---
+
 
 class TestHydrophobicityRobust:
     """hydrophobicity() must handle unknown AAs gracefully."""
@@ -88,6 +109,7 @@ class TestHydrophobicityRobust:
 
 # --- hydrophobic_moment (muH): must not crash on unknown AA ---
 
+
 class TestHydrophobicMomentRobust:
     """hydrophobic_moment() must handle unknown AAs gracefully."""
 
@@ -113,6 +135,7 @@ class TestHydrophobicMomentRobust:
 
 
 # --- total_charge: already uses .get() so should be safe, but verify ---
+
 
 class TestTotalChargeRobust:
     """Verify total_charge handles unknown AAs (should already work via .get(aa, 0))."""

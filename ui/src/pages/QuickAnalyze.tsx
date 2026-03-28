@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, AlertCircle } from "lucide-react";
 import { predictOne as apiPredictOne } from "@/lib/api";
 import { mapApiRowToPeptide } from "@/lib/peptideMapper";
 import { Peptide, ThresholdConfig } from "@/types/peptide";
@@ -103,8 +103,15 @@ export default function QuickAnalyze() {
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!sequence.trim()) {
+    const trimmed = sequence.trim();
+    if (!trimmed) {
       toast.error("Please paste an amino-acid sequence");
+      return;
+    }
+    if (!/^[A-Za-z]+$/.test(trimmed)) {
+      toast.error(
+        "Sequence must contain only amino acid letters (A-Z). Remove numbers, spaces, or symbols."
+      );
       return;
     }
     setLoading(true);
@@ -218,6 +225,34 @@ export default function QuickAnalyze() {
                 variant="details"
               />
 
+              {/* Example peptides */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs text-muted-foreground">Try an example:</span>
+                {[
+                  { label: "Amyloid-β(25-35)", seq: "GSNKGAIIGLM", entry: "Amyloid-beta(25-35)" },
+                  {
+                    label: "LL-37",
+                    seq: "LLGDFFRKSKEKIGKEFKRIVQRIKDFLRNLVPRTES",
+                    entry: "LL-37",
+                  },
+                  { label: "KLVFF", seq: "KLVFF", entry: "KLVFF-core" },
+                ].map((ex) => (
+                  <Button
+                    key={ex.seq}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs h-7"
+                    type="button"
+                    onClick={() => {
+                      setSequence(ex.seq);
+                      setEntry(ex.entry);
+                    }}
+                  >
+                    {ex.label}
+                  </Button>
+                ))}
+              </div>
+
               {/* Sequence length warnings */}
               {sequence.trim().length > 0 && sequence.trim().length < 5 && (
                 <Alert variant="destructive">
@@ -242,6 +277,15 @@ export default function QuickAnalyze() {
                   <AlertDescription>
                     {sequence.trim().length} aa — reduced TANGO accuracy above 100 aa. S4PRED
                     remains reliable.
+                  </AlertDescription>
+                </Alert>
+              )}
+              {sequence && !/^[A-Za-z]*$/.test(sequence) && (
+                <Alert variant="destructive">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Non-amino-acid characters detected (digits, spaces, symbols). These will be
+                    rejected before analysis.
                   </AlertDescription>
                 </Alert>
               )}

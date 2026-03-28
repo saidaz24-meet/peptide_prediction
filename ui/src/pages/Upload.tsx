@@ -18,7 +18,7 @@ import { UniProtQueryInput } from "@/components/UniProtQueryInput";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Info } from "lucide-react";
 import { Search } from "lucide-react";
 import { ThresholdConfigPanel } from "@/components/ThresholdConfigPanel";
 import type { ThresholdConfig } from "@/types/peptide";
@@ -314,7 +314,15 @@ export default function Upload() {
                             onClick={async () => {
                               try {
                                 const resp = await fetch(ex.file);
+                                if (!resp.ok) {
+                                  toast.error("Failed to load example dataset");
+                                  return;
+                                }
                                 const text = await resp.text();
+                                if (!text.trim()) {
+                                  toast.error("Failed to load example dataset");
+                                  return;
+                                }
                                 const blob = new Blob([text], { type: "text/csv" });
                                 const file = new File(
                                   [blob],
@@ -336,10 +344,31 @@ export default function Upload() {
 
                   {/* File Upload */}
                   {uploadMode === "file" && (
-                    <UploadDropzone
-                      onFileSelected={(f: File) => handleLocalPreview(f)}
-                      onFileProcessed={() => setCurrentStep(1)}
-                    />
+                    <>
+                      <UploadDropzone
+                        onFileSelected={(f: File) => handleLocalPreview(f)}
+                        onFileProcessed={() => setCurrentStep(1)}
+                      />
+
+                      {/* Upload guidance */}
+                      <Alert className="bg-muted/50 border-muted">
+                        <Info className="h-4 w-4" />
+                        <AlertDescription className="text-xs space-y-1">
+                          <p>
+                            <strong>Required:</strong> Your file must include a{" "}
+                            <code>Sequence</code> column.
+                          </p>
+                          <p>
+                            <strong>Recommended:</strong> Up to ~500 sequences. Larger batches take
+                            longer with TANGO enabled.
+                          </p>
+                          <p>
+                            <strong>From UniProt:</strong> Search → Download → TSV → include Entry
+                            and Sequence columns.
+                          </p>
+                        </AlertDescription>
+                      </Alert>
+                    </>
                   )}
 
                   {/* UniProt Query */}
