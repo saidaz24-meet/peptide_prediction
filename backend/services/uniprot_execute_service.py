@@ -11,6 +11,7 @@ Handles the full lifecycle of a UniProt query:
 
 Extracted from server.py to break the circular import chain.
 """
+
 import hashlib
 import json
 import re
@@ -57,6 +58,7 @@ from services.upload_service import (
 # Query parsing + validation helpers
 # ---------------------------------------------------------------------------
 
+
 def _parse_query(request: UniProtQueryExecuteRequest) -> Tuple[str, str]:
     """
     Parse the query and detect mode.
@@ -72,24 +74,33 @@ def _parse_query(request: UniProtQueryExecuteRequest) -> Tuple[str, str]:
         api_query = parsed.api_query_string
         detected_mode = parsed.mode.value
 
-        log_info("uniprot_parse", f"Parsed query: mode={detected_mode}",
-                 **{"input": request.query, "mode": detected_mode, "api_query": api_query})
+        log_info(
+            "uniprot_parse",
+            f"Parsed query: mode={detected_mode}",
+            **{"input": request.query, "mode": detected_mode, "api_query": api_query},
+        )
 
         if parsed.error:
             raise HTTPException(status_code=400, detail=f"Query parsing error: {parsed.error}")
     else:
         api_query = request.query
         detected_mode = request.mode
-        log_info("uniprot_parse", f"Using provided mode: {detected_mode}",
-                 **{"mode": detected_mode, "api_query": api_query})
+        log_info(
+            "uniprot_parse",
+            f"Using provided mode: {detected_mode}",
+            **{"mode": detected_mode, "api_query": api_query},
+        )
 
     return api_query, detected_mode
 
 
 _ALLOWED_SORTS = {
-    "length asc", "length desc",
-    "protein_name asc", "protein_name desc",
-    "organism_name asc", "organism_name desc",
+    "length asc",
+    "length desc",
+    "protein_name asc",
+    "protein_name desc",
+    "organism_name asc",
+    "organism_name desc",
 }
 
 
@@ -103,8 +114,11 @@ def _validate_sort(sort: Optional[str]) -> Optional[str]:
     Raises:
         HTTPException 400 on invalid sort value.
     """
-    log_info("uniprot_sort_received", f"Received sort: {sort}",
-             **{"received_sort": sort, "sort_type": type(sort).__name__})
+    log_info(
+        "uniprot_sort_received",
+        f"Received sort: {sort}",
+        **{"received_sort": sort, "sort_type": type(sort).__name__},
+    )
 
     if not sort:
         log_info("uniprot_sort_omitted", "No sort provided, using default (best match)")
@@ -114,27 +128,35 @@ def _validate_sort(sort: Optional[str]) -> Optional[str]:
 
     # Reject legacy "score" silently
     if sort_str == "score":
-        log_warning("uniprot_invalid_sort", "Received legacy 'score' sort, omitting",
-                     **{"received_sort": sort})
+        log_warning(
+            "uniprot_invalid_sort",
+            "Received legacy 'score' sort, omitting",
+            **{"received_sort": sort},
+        )
         return None
 
     # Normalize underscore to space (length_asc -> length asc)
-    normalized = re.sub(r'_asc$', ' asc', sort)
-    normalized = re.sub(r'_desc$', ' desc', normalized)
+    normalized = re.sub(r"_asc$", " asc", sort)
+    normalized = re.sub(r"_desc$", " desc", normalized)
 
     if normalized not in _ALLOWED_SORTS:
-        log_warning("uniprot_invalid_sort", f"Invalid sort: '{sort}'",
-                     **{"received_sort": sort, "allowed": sorted(_ALLOWED_SORTS)})
+        log_warning(
+            "uniprot_invalid_sort",
+            f"Invalid sort: '{sort}'",
+            **{"received_sort": sort, "allowed": sorted(_ALLOWED_SORTS)},
+        )
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid sort value: '{sort}'. Allowed: {sorted(_ALLOWED_SORTS)} or omit for best match"
+            detail=f"Invalid sort value: '{sort}'. Allowed: {sorted(_ALLOWED_SORTS)} or omit for best match",
         )
 
     log_info("uniprot_sort_valid", f"Using sort: {normalized}", **{"sort": normalized})
     return normalized
 
 
-def _build_url(api_query: str, request: UniProtQueryExecuteRequest, sort_value: Optional[str]) -> str:
+def _build_url(
+    api_query: str, request: UniProtQueryExecuteRequest, sort_value: Optional[str]
+) -> str:
     """Build the UniProt REST API export URL."""
     return build_uniprot_export_url(
         api_query,
@@ -155,9 +177,13 @@ def _build_url(api_query: str, request: UniProtQueryExecuteRequest, sort_value: 
 _USER_AGENT = "PeptideVisualLab/1.0 (https://github.com/your-org/peptide-prediction)"
 
 
-async def _fetch_uniprot_tsv(url: str) -> pd.DataFrame:
+async def _fetch_uniprot_tsv(url: str) -> Tuple[pd.DataFrame, int]:
     """
     Fetch TSV data from UniProt and parse into a DataFrame.
+
+    Returns:
+        Tuple of (DataFrame, total_available) where total_available is from
+        the X-Total-Results header (-1 if missing).
 
     Raises:
         httpx.HTTPStatusError, httpx.TimeoutException on network errors.
@@ -166,12 +192,15 @@ async def _fetch_uniprot_tsv(url: str) -> pd.DataFrame:
         headers = {"User-Agent": _USER_AGENT}
         response = await client.get(url, headers=headers)
         response.raise_for_status()
-        return read_any_table(response.content, "uniprot_export.tsv")
+        total_available = int(response.headers.get("X-Total-Results", -1))
+        df = read_any_table(response.content, "uniprot_export.tsv")
+        return df, total_available
 
 
 # ---------------------------------------------------------------------------
 # Analysis pipeline (reuses upload_service functions)
 # ---------------------------------------------------------------------------
+
 
 def _run_analysis_pipeline(
     df: pd.DataFrame,
@@ -189,8 +218,7 @@ def _run_analysis_pipeline(
     try:
         df_normalized = normalize_cols(df)
     except Exception as e:
-        log_warning("uniprot_normalize_warning", f"Normalization warning: {e}",
-                     **{"error": str(e)})
+        log_warning("uniprot_normalize_warning", f"Normalization warning: {e}", **{"error": str(e)})
         df_normalized = df
 
     require_cols(df_normalized, ["Entry", "Sequence"])
@@ -203,13 +231,17 @@ def _run_analysis_pipeline(
 
     # TANGO (reuse upload_service's function, with opt-in gate)
     tango_stats, tango_status, tango_reason, tango_ran, run_dir = run_tango_processing(
-        df_normalized, trace_entry=None, sentry_initialized=sentry_initialized,
+        df_normalized,
+        trace_entry=None,
+        sentry_initialized=sentry_initialized,
         tango_requested=run_tango,
     )
 
     # S4PRED (reuse upload_service's function)
     s4pred_stats, s4pred_status, s4pred_reason, s4pred_ran = run_s4pred_processing(
-        df_normalized, trace_entry=None, sentry_initialized=sentry_initialized,
+        df_normalized,
+        trace_entry=None,
+        sentry_initialized=sentry_initialized,
     )
 
     # Biochem + finalize (UniProt queries use default thresholds)
@@ -227,7 +259,11 @@ def _run_analysis_pipeline(
     )
 
     # SSW stats
-    ssw_hits = int(df_normalized["SSW prediction"].notna().sum()) if "SSW prediction" in df_normalized.columns else 0
+    ssw_hits = (
+        int(df_normalized["SSW prediction"].notna().sum())
+        if "SSW prediction" in df_normalized.columns
+        else 0
+    )
 
     return {
         "df": df_normalized,
@@ -249,12 +285,14 @@ def _run_analysis_pipeline(
 # Response construction
 # ---------------------------------------------------------------------------
 
+
 def _build_response(
     result: Dict[str, Any],
     request: UniProtQueryExecuteRequest,
     api_query: str,
     detected_mode: str,
     uniprot_url: str,
+    total_available: int = -1,
 ) -> Dict[str, Any]:
     """Build the final RowsResponse dict."""
     df = result["df"]
@@ -287,11 +325,11 @@ def _build_response(
     trace_id = get_trace_id_for_response()
 
     inputs_str = f"{request.query}:{request.size or 500}"
-    inputs_hash = hashlib.sha256(inputs_str.encode('utf-8')).hexdigest()[:16]
+    inputs_hash = hashlib.sha256(inputs_str.encode("utf-8")).hexdigest()[:16]
 
     config_dict = {"USE_TANGO": settings.USE_TANGO, "USE_S4PRED": settings.USE_S4PRED}
-    config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
-    config_hash = hashlib.sha256(config_str.encode('utf-8')).hexdigest()[:16]
+    config_str = json.dumps(config_dict, sort_keys=True, separators=(",", ":"))
+    config_hash = hashlib.sha256(config_str.encode("utf-8")).hexdigest()[:16]
 
     provider_status_summary = {
         "tango": {
@@ -299,42 +337,49 @@ def _build_response(
             "requested": result["tango_stats"].get("requested", 0),
             "parsed_ok": result["tango_stats"].get("parsed_ok", 0),
             "parsed_bad": result["tango_stats"].get("parsed_bad", 0),
-        } if settings.USE_TANGO else None,
+        }
+        if settings.USE_TANGO
+        else None,
         "s4pred": {
             "status": result["s4pred_status"],
             "requested": result["s4pred_stats"].get("requested", 0),
             "parsed_ok": result["s4pred_stats"].get("parsed_ok", 0),
             "parsed_bad": result["s4pred_stats"].get("parsed_bad", 0),
-        } if settings.USE_S4PRED else None,
+        }
+        if settings.USE_S4PRED
+        else None,
     }
 
     # Thresholds (UniProt uses defaults)
     resolved_thresholds = resolve_thresholds(None, df)
 
-    meta = ensure_trace_id_in_meta({
-        "source": "uniprot_api",
-        "query": request.query,
-        "api_query_string": api_query,
-        "mode": detected_mode,
-        "url": uniprot_url,
-        "row_count": len(df),
-        "size_requested": request.size or 500,
-        "size_returned": len(df),
-        "use_s4pred": settings.USE_S4PRED,
-        "use_tango": settings.USE_TANGO,
-        "run_tango": request.run_tango,
-        "ssw_rows": result["ssw_hits"],
-        "valid_seq_rows": len(df),
-        "provider_status": provider_status_meta,
-        "runId": repro_run_id,
-        "traceId": trace_id,
-        "inputsHash": inputs_hash,
-        "configHash": config_hash,
-        "providerStatusSummary": provider_status_summary,
-        "thresholdConfigRequested": None,
-        "thresholdConfigResolved": {"mode": "default", "version": "1.0.0"},
-        "thresholds": resolved_thresholds,
-    })
+    meta = ensure_trace_id_in_meta(
+        {
+            "source": "uniprot_api",
+            "query": request.query,
+            "api_query_string": api_query,
+            "mode": detected_mode,
+            "url": uniprot_url,
+            "row_count": len(df),
+            "size_requested": request.size or 500,
+            "size_returned": len(df),
+            "total_available": total_available,
+            "use_s4pred": settings.USE_S4PRED,
+            "use_tango": settings.USE_TANGO,
+            "run_tango": request.run_tango,
+            "ssw_rows": result["ssw_hits"],
+            "valid_seq_rows": len(df),
+            "provider_status": provider_status_meta,
+            "runId": repro_run_id,
+            "traceId": trace_id,
+            "inputsHash": inputs_hash,
+            "configHash": config_hash,
+            "providerStatusSummary": provider_status_summary,
+            "thresholdConfigRequested": None,
+            "thresholdConfigResolved": {"mode": "default", "version": "1.0.0"},
+            "thresholds": resolved_thresholds,
+        }
+    )
 
     return {"rows": rows_out, "meta": meta}
 
@@ -342,6 +387,7 @@ def _build_response(
 # ---------------------------------------------------------------------------
 # 400 fallback: retry with minimal JSON query
 # ---------------------------------------------------------------------------
+
 
 async def _handle_400_fallback(
     api_query: str,
@@ -386,8 +432,11 @@ async def _handle_400_fallback(
             fallback_data = fallback_response.json()
             results = fallback_data.get("results", [])
 
-            log_info("uniprot_fallback_success", f"Fallback got {len(results)} results",
-                     **{"result_count": len(results)})
+            log_info(
+                "uniprot_fallback_success",
+                f"Fallback got {len(results)} results",
+                **{"result_count": len(results)},
+            )
 
             if not results:
                 return {
@@ -456,13 +505,19 @@ async def _handle_400_fallback(
                     },
                 }
             except Exception as analysis_error:
-                log_warning("uniprot_fallback_analysis_error",
-                            f"Error analyzing fallback: {analysis_error}",
-                            **{"error": str(analysis_error)})
+                log_warning(
+                    "uniprot_fallback_analysis_error",
+                    f"Error analyzing fallback: {analysis_error}",
+                    **{"error": str(analysis_error)},
+                )
                 # Return raw results
                 return {
                     "rows": [
-                        {"Entry": r.get("accession", ""), "Entry Name": r.get("id", ""), "Length": r.get("length", 0)}
+                        {
+                            "Entry": r.get("accession", ""),
+                            "Entry Name": r.get("id", ""),
+                            "Length": r.get("length", 0),
+                        }
                         for r in results
                     ],
                     "meta": {
@@ -478,12 +533,14 @@ async def _handle_400_fallback(
                 }
 
     except Exception as fallback_error:
-        log_error("uniprot_fallback_failed", f"Fallback also failed: {fallback_error}",
-                  **{"fallback_error": str(fallback_error)})
+        log_error(
+            "uniprot_fallback_failed",
+            f"Fallback also failed: {fallback_error}",
+            **{"fallback_error": str(fallback_error)},
+        )
         # Re-raise the original 400 error
         raise HTTPException(
-            status_code=400,
-            detail=json.dumps({"source": "uniprot", "error": error_text})
+            status_code=400, detail=json.dumps({"source": "uniprot", "error": error_text})
         ) from fallback_error
 
 
@@ -491,18 +548,19 @@ async def _handle_400_fallback(
 # HTTP error handling
 # ---------------------------------------------------------------------------
 
+
 def _extract_error_text(response_text: str, status_code: int) -> str:
     """Extract a clean error message from UniProt HTML/text error response."""
     # Remove all HTML tags
-    error_text = re.sub(r'<[^>]+>', '', response_text)
-    error_text = re.sub(r'\s+', ' ', error_text).strip()
+    error_text = re.sub(r"<[^>]+>", "", response_text)
+    error_text = re.sub(r"\s+", " ", error_text).strip()
 
     # Try to extract meaningful message
     error_patterns = [
-        r'Bad Request[:\s]+(.+?)(?:\.|$)',
-        r'Invalid query[:\s]+(.+?)(?:\.|$)',
-        r'Error[:\s]+(.+?)(?:\.|$)',
-        r'HTTP Status \d+[:\s]+(.+?)(?:\.|$)',
+        r"Bad Request[:\s]+(.+?)(?:\.|$)",
+        r"Invalid query[:\s]+(.+?)(?:\.|$)",
+        r"Error[:\s]+(.+?)(?:\.|$)",
+        r"HTTP Status \d+[:\s]+(.+?)(?:\.|$)",
     ]
 
     for pattern in error_patterns:
@@ -521,6 +579,7 @@ def _extract_error_text(response_text: str, status_code: int) -> str:
 # ---------------------------------------------------------------------------
 # Main entry point
 # ---------------------------------------------------------------------------
+
 
 async def execute_uniprot_query(
     request: UniProtQueryExecuteRequest,
@@ -543,25 +602,39 @@ async def execute_uniprot_query(
     # 3. Build URL
     uniprot_url = _build_url(api_query, request, sort_value)
 
-    log_info("uniprot_execute_start", "Executing UniProt query", **{
-        "query": api_query,
-        "reviewed": request.reviewed,
-        "length_min": request.length_min,
-        "length_max": request.length_max,
-        "sort": sort_value,
-        "size": request.size or 500,
-    })
+    log_info(
+        "uniprot_execute_start",
+        "Executing UniProt query",
+        **{
+            "query": api_query,
+            "reviewed": request.reviewed,
+            "length_min": request.length_min,
+            "length_max": request.length_max,
+            "sort": sort_value,
+            "size": request.size or 500,
+        },
+    )
     log_info("uniprot_url", f"UniProt URL: {uniprot_url}", **{"url": uniprot_url})
 
     try:
         # 4. Fetch from UniProt
-        df = await _fetch_uniprot_tsv(uniprot_url)
-        log_info("uniprot_fetch_success", f"Retrieved {len(df)} rows",
-                 **{"row_count": len(df), "columns": list(df.columns)})
+        df, total_available = await _fetch_uniprot_tsv(uniprot_url)
+        log_info(
+            "uniprot_fetch_success",
+            f"Retrieved {len(df)} rows (total available: {total_available})",
+            **{
+                "row_count": len(df),
+                "columns": list(df.columns),
+                "total_available": total_available,
+            },
+        )
 
         if len(df) == 0:
-            log_warning("uniprot_no_results", "Query returned 0 rows",
-                        **{"query": api_query, "url": uniprot_url})
+            log_warning(
+                "uniprot_no_results",
+                "Query returned 0 rows",
+                **{"query": api_query, "url": uniprot_url},
+            )
             return {
                 "rows": [],
                 "meta": {
@@ -578,22 +651,32 @@ async def execute_uniprot_query(
         log_info("uniprot_analysis_start", "Running analysis pipeline")
 
         result = _run_analysis_pipeline(
-            df, run_tango=request.run_tango, sentry_initialized=sentry_initialized,
+            df,
+            run_tango=request.run_tango,
+            sentry_initialized=sentry_initialized,
         )
 
-        log_info("uniprot_analysis_complete", "Analysis complete", **{
-            "total_rows": len(result["df"]),
-            "ssw_hits": result["ssw_hits"],
-            "tango_ran": result["tango_ran"],
-            "s4pred_ran": result["s4pred_ran"],
-        })
+        log_info(
+            "uniprot_analysis_complete",
+            "Analysis complete",
+            **{
+                "total_rows": len(result["df"]),
+                "ssw_hits": result["ssw_hits"],
+                "tango_ran": result["tango_ran"],
+                "s4pred_ran": result["s4pred_ran"],
+            },
+        )
 
         # 6. Build response
-        return _build_response(result, request, api_query, detected_mode, uniprot_url)
+        return _build_response(
+            result, request, api_query, detected_mode, uniprot_url, total_available
+        )
 
     except UploadProcessingError as e:
         # Convert service errors to HTTP errors (e.g., TANGO zero outputs)
-        raise HTTPException(status_code=e.status_code, detail=json.dumps(e.detail) if e.detail else e.message) from e
+        raise HTTPException(
+            status_code=e.status_code, detail=json.dumps(e.detail) if e.detail else e.message
+        ) from e
 
     except httpx.HTTPStatusError as e:
         status_code = e.response.status_code
@@ -603,8 +686,11 @@ async def execute_uniprot_query(
             error_text = f"Bad Request (HTTP {status_code})"
 
         if status_code == 400:
-            log_warning("uniprot_400_error", f"UniProt 400: {error_text}",
-                        **{"status_code": 400, "original_url": uniprot_url})
+            log_warning(
+                "uniprot_400_error",
+                f"UniProt 400: {error_text}",
+                **{"status_code": 400, "original_url": uniprot_url},
+            )
             return await _handle_400_fallback(api_query, request, detected_mode, error_text)
 
         elif status_code >= 500:
@@ -614,14 +700,16 @@ async def execute_uniprot_query(
         else:
             error_msg = f"UniProt API error ({status_code}): {error_text}"
             log_warning("uniprot_client_error", error_msg, **{"status_code": status_code})
-            raise HTTPException(status_code=400,
-                                detail=json.dumps({"source": "uniprot", "error": error_msg})) from e
+            raise HTTPException(
+                status_code=400, detail=json.dumps({"source": "uniprot", "error": error_msg})
+            ) from e
 
     except httpx.TimeoutException as e:
         error_msg = "UniProt API request timed out. Try reducing the result size or removing length/sort filters."
         log_error("uniprot_timeout", error_msg)
-        raise HTTPException(status_code=504,
-                            detail=json.dumps({"source": "uniprot", "error": error_msg})) from e
+        raise HTTPException(
+            status_code=504, detail=json.dumps({"source": "uniprot", "error": error_msg})
+        ) from e
 
     except HTTPException:
         raise  # Re-raise FastAPI HTTP exceptions as-is

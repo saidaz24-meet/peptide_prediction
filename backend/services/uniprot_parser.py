@@ -4,6 +4,7 @@ UniProt query parser and API integration.
 Parses user input to classify query type (accession, keyword, organism, combinations)
 and builds valid UniProt API search strings.
 """
+
 import re
 from dataclasses import dataclass
 from enum import Enum
@@ -15,20 +16,21 @@ from typing import List, Optional
 # Extended (10 chars): [A-NR-Z][0-9][A-Z][A-Z0-9]{2}[0-9][A-Z][A-Z0-9]{2}[0-9] e.g., A0A024R1E1
 # Isoform suffix: -[0-9]+ e.g., P12345-1
 ACCESSION_PATTERN = re.compile(
-    r'^('
-    r'[OPQ][0-9][A-Z0-9]{3}[0-9]'  # Classic format (P12345, Q9UNL2)
-    r'|'
-    r'[A-NR-Z][0-9][A-Z][A-Z0-9]{2}[0-9]([A-Z][A-Z0-9]{2}[0-9])?'  # Primary/Extended format
-    r')(-[0-9]+)?$',  # Optional isoform suffix
-    re.IGNORECASE
+    r"^("
+    r"[OPQ][0-9][A-Z0-9]{3}[0-9]"  # Classic format (P12345, Q9UNL2)
+    r"|"
+    r"[A-NR-Z][0-9][A-Z][A-Z0-9]{2}[0-9]([A-Z][A-Z0-9]{2}[0-9])?"  # Primary/Extended format
+    r")(-[0-9]+)?$",  # Optional isoform suffix
+    re.IGNORECASE,
 )
 
 # Organism ID pattern (taxonomy ID, e.g., 9606 for human)
-ORGANISM_ID_PATTERN = re.compile(r'^\d+$')
+ORGANISM_ID_PATTERN = re.compile(r"^\d+$")
 
 
 class QueryMode(str, Enum):
     """UniProt query modes"""
+
     ACCESSION = "accession"
     KEYWORD = "keyword"
     ORGANISM = "organism"
@@ -39,6 +41,7 @@ class QueryMode(str, Enum):
 @dataclass
 class ParsedUniProtQuery:
     """Result of parsing a UniProt query"""
+
     mode: QueryMode
     raw_query: str
     normalized_query: str  # Normalized version for display
@@ -70,7 +73,7 @@ def normalize_query(text: str) -> str:
     # Strip leading/trailing whitespace
     normalized = text.strip()
     # Collapse multiple spaces
-    normalized = re.sub(r'\s+', ' ', normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
     return normalized
 
 
@@ -89,7 +92,7 @@ def detect_accession(text: str) -> Optional[str]:
         return None
 
     # Split by spaces/commas and check each part
-    parts = re.split(r'[,\s]+', normalized)
+    parts = re.split(r"[,\s]+", normalized)
     for part in parts:
         part = part.strip()
         if ACCESSION_PATTERN.match(part):
@@ -122,7 +125,7 @@ def detect_organism_id(text: str) -> Optional[str]:
         return normalized
 
     # Check for "organism_id:123" pattern
-    organism_match = re.search(r'organism[_\s]*id[:\s]+(\d+)', normalized, re.IGNORECASE)
+    organism_match = re.search(r"organism[_\s]*id[:\s]+(\d+)", normalized, re.IGNORECASE)
     if organism_match:
         return organism_match.group(1)
 
@@ -161,7 +164,7 @@ def extract_keyword(text: str, exclude_patterns: Optional[List[str]] = None) -> 
         return None
 
     # Remove organism_id patterns (explicit)
-    normalized = re.sub(r'organism[_\s]*id[:\s]+\d+', '', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r"organism[_\s]*id[:\s]+\d+", "", normalized, flags=re.IGNORECASE)
     normalized = normalized.strip()
 
     # Remove trailing numeric that looks like organism ID (e.g., "amyloid 9606" -> "amyloid")
@@ -170,7 +173,7 @@ def extract_keyword(text: str, exclude_patterns: Optional[List[str]] = None) -> 
         last_part = parts[-1]
         if ORGANISM_ID_PATTERN.match(last_part) and 3 <= len(last_part) <= 7:
             # Strip trailing organism ID
-            normalized = ' '.join(parts[:-1]).strip()
+            normalized = " ".join(parts[:-1]).strip()
 
     # Remove accession if present (would be detected separately)
     # For now, if it looks like a single accession, return None for keyword
@@ -242,7 +245,7 @@ def parse_uniprot_query(text: str) -> ParsedUniProtQuery:
         result.keyword = keyword
         result.organism_id = organism_id
         # UniProt API: keyword search + organism filter
-        result.api_query_string = f"keyword:{keyword} AND organism_id:{organism_id}"
+        result.api_query_string = f"{keyword} AND organism_id:{organism_id}"
     elif organism_id:
         result.mode = QueryMode.ORGANISM
         result.organism_id = organism_id
@@ -250,7 +253,7 @@ def parse_uniprot_query(text: str) -> ParsedUniProtQuery:
     elif keyword:
         result.mode = QueryMode.KEYWORD
         result.keyword = keyword
-        result.api_query_string = f"keyword:{keyword}"
+        result.api_query_string = f"{keyword}"
     else:
         result.mode = QueryMode.UNKNOWN
         result.error = "Could not parse query. Expected: accession (e.g., P12345), keyword, or organism_id (e.g., 9606)"
@@ -263,7 +266,9 @@ def build_uniprot_export_url(
     query_string: str,
     format: str = "tsv",
     columns: Optional[List[str]] = None,
-    reviewed: Optional[bool] = True,  # True = reviewed (Swiss-Prot), False = unreviewed (TrEMBL), None = both
+    reviewed: Optional[
+        bool
+    ] = True,  # True = reviewed (Swiss-Prot), False = unreviewed (TrEMBL), None = both
     length_min: Optional[int] = None,
     length_max: Optional[int] = None,
     sort: Optional[str] = None,  # None or "score" = omit (best match), or allowed sort value
@@ -331,6 +336,9 @@ def build_uniprot_export_url(
         "organism_id",
         "sequence",
         "length",
+        "gene_names",
+        "cc_function",
+        "annotation_score",
     ]
 
     columns_to_use = columns if columns else default_columns
@@ -354,16 +362,19 @@ def build_uniprot_export_url(
     # Note: "reviewed" is NOT a valid sort field (it's a filter, not sortable)
     # Note: "score" (best match) should be omitted - UniProt defaults to score when sort is not provided
     ALLOWED_SORT_VALUES = {
-        "length asc", "length desc",
-        "protein_name asc", "protein_name desc",
-        "organism_name asc", "organism_name desc",
+        "length asc",
+        "length desc",
+        "protein_name asc",
+        "protein_name desc",
+        "organism_name asc",
+        "organism_name desc",
     }
 
     # Normalize underscore to space (length_asc -> length asc)
     def normalize_sort(s: str) -> str:
         # Replace trailing _asc/_desc with space format
-        s = re.sub(r'_asc$', ' asc', s)
-        s = re.sub(r'_desc$', ' desc', s)
+        s = re.sub(r"_asc$", " asc", s)
+        s = re.sub(r"_desc$", " desc", s)
         return s
 
     # Only add sort parameter if it's not "score"/None and is in allowlist
@@ -387,7 +398,7 @@ def build_uniprot_export_url(
 
     # Build URL with proper encoding using httpx.URL
     import httpx
+
     url = httpx.URL(base_url, params=params)
 
     return str(url)
-
