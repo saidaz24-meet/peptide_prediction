@@ -72,6 +72,7 @@ RUN mkdir -p \
     /data/uploads \
     /opt/tools \
     /app/.run_cache \
+    /app/Tango/bin /app/Tango/out /app/Tango/work \
     && chown -R ${APP_USER}:${APP_USER} /data /opt/tools /app
 
 # Set PATH for user-installed packages
