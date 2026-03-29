@@ -79,6 +79,7 @@ services:
     container_name: pvl-frontend
     ports:
       - "80:80"
+      - "3000:80"
     depends_on:
       backend:
         condition: service_healthy
