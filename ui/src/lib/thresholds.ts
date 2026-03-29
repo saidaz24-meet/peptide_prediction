@@ -16,6 +16,7 @@ export type ResolvedThresholds = {
   sswMaxDifference: number;
   minPredictionPercent: number;
   minS4predHelixScore: number;
+  maxTangoDifference: number;
 };
 
 /**
@@ -30,6 +31,7 @@ export const DEFAULT_THRESHOLDS: ResolvedThresholds = {
   sswMaxDifference: 0.0,
   minPredictionPercent: 50.0,
   minS4predHelixScore: 0.0,
+  maxTangoDifference: 0.0,
 };
 
 /** Extract AggFlagConfig from ResolvedThresholds */

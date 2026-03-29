@@ -5,7 +5,7 @@
  * as color-coded bars. Scientists use this to identify aggregation-prone regions
  * in the sequence.
  *
- * Color scale: white (0) → orange → red (high risk)
+ * Color scale: teal (0-10%) → amber (10-30%) → red (30%+)
  */
 import { useMemo, useState } from 'react';
 import {
@@ -20,7 +20,15 @@ import {
   Tooltip,
   Legend,
   ReferenceLine,
+  Cell,
 } from 'recharts';
+
+/** Map a TANGO aggregation score to a proportional color. */
+function aggBarColor(score: number): string {
+  if (score < 10) return '#14b8a6';   // teal-500 — low
+  if (score < 30) return '#f59e0b';   // amber-500 — moderate
+  return '#ef4444';                    // red-500 — high
+}
 import { ChartExportButtons } from '@/components/ChartExportButtons';
 
 interface AggregationHeatmapProps {
@@ -108,7 +116,11 @@ export function AggregationHeatmap({
                   );
                 }}
               />
-              <Bar dataKey="Aggregation" fill="#ef4444" opacity={0.85} />
+              <Bar dataKey="Aggregation" opacity={0.85}>
+                {data.map((entry, idx) => (
+                  <Cell key={idx} fill={aggBarColor(entry.Aggregation)} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -180,7 +192,7 @@ export function AggregationHeatmap({
         <div className="space-y-2" data-chart-export>
           <h3 className="text-sm font-semibold">Aggregation–Structure Overlay</h3>
           <p className="text-xs text-muted-foreground">
-            Regions where aggregation (red) and beta propensity (blue/cyan) overlap suggest amyloid-forming stretches.
+            Regions where aggregation (amber) and beta propensity (blue/cyan) overlap suggest amyloid-forming stretches.
           </p>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
@@ -222,7 +234,7 @@ export function AggregationHeatmap({
                   }}
                 />
                 <Legend />
-                <Line type="monotone" dataKey="Aggregation" stroke="#ef4444" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="Aggregation" stroke="#f59e0b" strokeWidth={2} dot={false} />
                 {betaCurve?.length && <Line type="monotone" dataKey="TANGO Beta" stroke="#3b82f6" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />}
                 {s4predBetaCurve?.length && <Line type="monotone" dataKey="S4PRED P(β)" stroke="#06b6d4" strokeWidth={1.5} strokeDasharray="4 2" dot={false} />}
               </LineChart>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ExternalLink, Loader2 } from 'lucide-react';
+import { ExternalLink, Info, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -133,6 +133,14 @@ export function AlphaFoldViewer({ peptideId }: AlphaFoldViewerProps) {
             reliable structure prediction.
           </div>
         )}
+
+        {/* Signal peptide caveat */}
+        <div className="flex items-start gap-2 p-2.5 rounded bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800">
+          <Info className="h-4 w-4 text-blue-600 mt-0.5 shrink-0" />
+          <span className="text-xs text-blue-800 dark:text-blue-300">
+            AlphaFold structure may include the signal peptide, making it longer than the mature sequence analyzed by PVL.
+          </span>
+        </div>
 
         {/* Embedded 3D viewer (lazy-loaded on click) */}
         {showViewer ? (

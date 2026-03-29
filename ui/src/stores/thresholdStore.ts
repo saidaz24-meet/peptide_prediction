@@ -21,6 +21,7 @@ const PRESETS: Record<Exclude<ThresholdPreset, "original" | "custom">, ResolvedT
     sswMaxDifference: 0.0,
     minPredictionPercent: 60.0,
     minS4predHelixScore: 0.0,
+    maxTangoDifference: 0.0,
   },
   exploratory: {
     muHCutoff: 0.0,
@@ -31,6 +32,7 @@ const PRESETS: Record<Exclude<ThresholdPreset, "original" | "custom">, ResolvedT
     sswMaxDifference: 0.0,
     minPredictionPercent: 40.0,
     minS4predHelixScore: 0.0,
+    maxTangoDifference: 0.0,
   },
 };
 

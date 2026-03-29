@@ -40,6 +40,7 @@ export interface CustomThresholds {
   sswMaxDifference: number;
   minPredictionPercent: number;
   minS4predHelixScore: number;
+  maxTangoDifference: number;
 }
 
 interface ThresholdConfigPanelProps {
@@ -60,6 +61,7 @@ const RECOMMENDED_DEFAULTS: Required<CustomThresholds> = {
   sswMaxDifference: 0.0,
   minPredictionPercent: 50.0,
   minS4predHelixScore: 0.0,
+  maxTangoDifference: 0.0,
 };
 
 /* ── Info tooltip for each threshold ── */
@@ -327,6 +329,17 @@ function ThresholdFields({
           impact="Higher values require stronger helix confidence from S4PRED neural network."
           readOnly={isReadOnly}
           onChange={(v) => update("minS4predHelixScore", v)}
+        />
+        <ThresholdInput
+          id="max-tango-diff"
+          label="Max TANGO Difference"
+          value={t.maxTangoDifference ?? d.maxTangoDifference}
+          defaultValue={d.maxTangoDifference}
+          step="0.1"
+          description="Maximum allowed TANGO score difference between avg beta and avg helicity. TANGO is secondary to S4PRED."
+          impact="Lower values require more balanced TANGO helix/beta scores."
+          readOnly={isReadOnly}
+          onChange={(v) => update("maxTangoDifference", v)}
         />
       </ThresholdSection>
     </div>

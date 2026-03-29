@@ -67,6 +67,7 @@ export default function Upload() {
     sswMaxDifference: 0.0,
     minPredictionPercent: 50.0,
     minS4predHelixScore: 0.0,
+    maxTangoDifference: 0.0,
   });
 
   // preview QC banner
