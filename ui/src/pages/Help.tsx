@@ -249,9 +249,9 @@ export default function Help() {
                       "A peptide is classified as FF-SSW when TANGO predicts a Secondary Structure Switch (SSW) AND the mean hydrophobicity is above the cohort average. This identifies peptides with structural switching potential and a hydrophobic core — key features of amyloid fibril formation.",
                   },
                   {
-                    name: "Aggregation Risk Interpretation",
+                    name: "Aggregation Propensity Interpretation",
                     description:
-                      "The lollipop chart shows peak TANGO aggregation per peptide. Green (<5%) = low risk, Yellow (5-20%) = moderate — potential aggregation hotspot, Red (>20%) = high — strong amyloid-forming propensity. Hotspot regions are where per-residue aggregation exceeds the threshold.",
+                      "The lollipop chart shows peak TANGO aggregation per peptide. Green (<5%) = low propensity, Yellow (5-20%) = moderate — potential aggregation hotspot, Red (>20%) = high — strong amyloid-forming propensity. Hotspot regions are where per-residue aggregation exceeds the threshold.",
                   },
                   {
                     name: "Correlation Matrix Guide",

@@ -71,7 +71,7 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
     {
       title: (
         <>
-          % <Abbr title="Fibril-Forming Helix">FF Helix</Abbr>
+          <Abbr title="Fibril-Forming Helix">FF-Helix</Abbr> %
         </>
       ),
       titleKey: "ff-helix",
@@ -87,8 +87,7 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
       clickable: true,
       subtitle: (
         <>
-          <Abbr title="Secondary Structure Prediction">S4PRED</Abbr> helix +{" "}
-          <Abbr title="Hydrophobic moment">uH</Abbr> {">"} avg
+          Helix + <Abbr title="Hydrophobic moment">uH</Abbr> {">"} avg
         </>
       ),
       tooltip:
@@ -98,7 +97,7 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
       title: (
         <>
           {" "}
-          % <Abbr title="Fibril-Forming Structural Switching">FF SSW</Abbr>
+          <Abbr title="Fibril-Forming Structural Switching">FF-SSW</Abbr> %
         </>
       ),
       titleKey: "ff-ssw",

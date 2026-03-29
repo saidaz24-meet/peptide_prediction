@@ -1,20 +1,21 @@
 /**
  * Threshold application helpers
- * 
+ *
  * Centralizes logic for applying thresholds to peptides for consistent
  * filtering and ranking across Results and QuickAnalyze.
  */
-import type { Peptide } from '@/types/peptide';
-import { computeAggFlag, type AggFlagConfig, DEFAULT_AGG_CONFIG } from '@/lib/aggregationFlags';
+import type { Peptide } from "@/types/peptide";
+import { computeAggFlag, type AggFlagConfig, DEFAULT_AGG_CONFIG } from "@/lib/aggregationFlags";
 
 export type ResolvedThresholds = {
   muHCutoff: number;
   hydroCutoff: number;
   aggThreshold: number;
-  // Smart aggregation flagging config
-  dangerousThreshold: number;
   percentOfLengthCutoff: number;
   minSswResidues: number;
+  sswMaxDifference: number;
+  minPredictionPercent: number;
+  minS4predHelixScore: number;
 };
 
 /**
@@ -24,16 +25,17 @@ export const DEFAULT_THRESHOLDS: ResolvedThresholds = {
   muHCutoff: 0.0,
   hydroCutoff: 0.0,
   aggThreshold: 5.0,
-  dangerousThreshold: 25.0,
   percentOfLengthCutoff: 20.0,
   minSswResidues: 3,
+  sswMaxDifference: 0.0,
+  minPredictionPercent: 50.0,
+  minS4predHelixScore: 0.0,
 };
 
 /** Extract AggFlagConfig from ResolvedThresholds */
 export function toAggConfig(t: ResolvedThresholds): AggFlagConfig {
   return {
     aggThreshold: t.aggThreshold,
-    dangerousThreshold: t.dangerousThreshold,
     percentOfLengthCutoff: t.percentOfLengthCutoff,
     minSswResidues: t.minSswResidues,
   };
@@ -41,7 +43,7 @@ export function toAggConfig(t: ResolvedThresholds): AggFlagConfig {
 
 /**
  * Apply thresholds to a peptide and return view flags
- * 
+ *
  * @param peptide - Peptide to evaluate
  * @param thresholds - Resolved thresholds from meta.thresholds
  * @returns Object with ffHelixView and sswView flags (1, 0, or -1)
@@ -50,8 +52,8 @@ export function applyThresholds(
   peptide: Peptide,
   thresholds: ResolvedThresholds
 ): { ffHelixView: number; sswView: number } {
-  const muH = typeof peptide.muH === 'number' ? peptide.muH : 0;
-  const H = typeof peptide.hydrophobicity === 'number' ? peptide.hydrophobicity : 0;
+  const muH = typeof peptide.muH === "number" ? peptide.muH : 0;
+  const H = typeof peptide.hydrophobicity === "number" ? peptide.hydrophobicity : 0;
   const ssw = peptide.sswPrediction ?? -1;
 
   // FF-Helix flag: 1 if muH >= muHCutoff, else 0
@@ -97,4 +99,3 @@ export function classificationSummary(
     total: peptides.length,
   };
 }
-

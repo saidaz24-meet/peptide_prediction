@@ -195,7 +195,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
     };
   }).filter((bin) => bin.count > 0 || bin.binStart <= maxLen);
 
-  // ── Aggregation Risk Distribution ──
+  // ── Aggregation Propensity Distribution ──
   const AGG_BINS = [
     { label: "0–5%", min: 0, max: 5, color: "#22c55e" },
     { label: "5–10%", min: 5, max: 10, color: "#84cc16" },
@@ -582,7 +582,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
           transition={{ delay: 0.5 }}
         >
           <ExpandableChart
-            title="Aggregation Risk Distribution"
+            title="Aggregation Propensity Distribution"
             description="How peptides distribute across aggregation score ranges"
             peptides={peptides}
             headerRight={
@@ -635,7 +635,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
                         selectBin({
                           ids: bin.ids,
                           binLabel: `Agg Max ${bin.label}`,
-                          source: "Aggregation Risk Distribution",
+                          source: "Aggregation Propensity Distribution",
                         });
                     }}
                   >
@@ -652,7 +652,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
                         selectBin({
                           ids: bin.ids,
                           binLabel: `Agg Max ${bin.label}`,
-                          source: "Aggregation Risk Distribution",
+                          source: "Aggregation Propensity Distribution",
                         });
                     }}
                   >

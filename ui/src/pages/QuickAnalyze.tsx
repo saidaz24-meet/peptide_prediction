@@ -96,6 +96,11 @@ export default function QuickAnalyze() {
     muHCutoff: 0.0,
     hydroCutoff: 0.0,
     aggThreshold: 5.0,
+    percentOfLengthCutoff: 20,
+    minSswResidues: 3,
+    sswMaxDifference: 0.0,
+    minPredictionPercent: 50.0,
+    minS4predHelixScore: 0.0,
   });
 
   const [phase, setPhase] = useState<Phase>("idle");

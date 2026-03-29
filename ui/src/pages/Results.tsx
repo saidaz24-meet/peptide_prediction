@@ -238,7 +238,7 @@ export default function Results() {
       "SSW score",
       "TANGO Agg Max",
       "FF-Helix %",
-      "S4PRED Helix %",
+      "Helix %",
       "Species",
       "Protein names",
     ];
@@ -549,7 +549,7 @@ export default function Results() {
                     <span className="text-sm font-medium text-muted-foreground">Direction:</span>
                     {/* S4PRED direction (prominent) */}
                     <div className="flex items-center gap-1 border rounded-md p-1">
-                      <span className="text-xs font-medium px-1">S4PRED Helix</span>
+                      <span className="text-xs font-medium px-1">Helix</span>
                       <Button
                         variant={directions.s4predHelixPercent === "high" ? "default" : "ghost"}
                         size="sm"

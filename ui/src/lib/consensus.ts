@@ -27,8 +27,8 @@ const TIER_META: Record<
 > = {
   1: { label: "High-Confidence Switch Zone", color: "border-red-500", baseCertainty: 0.9 },
   2: { label: "Disordered Aggregation-Prone", color: "border-amber-500", baseCertainty: 0.7 },
-  3: { label: "Native Beta / Low Switch Risk", color: "border-blue-500", baseCertainty: 0.5 },
-  4: { label: "No Aggregation Concern", color: "border-green-500", baseCertainty: 0.8 },
+  3: { label: "Native Beta / Low Switch Propensity", color: "border-blue-500", baseCertainty: 0.5 },
+  4: { label: "Low Aggregation Propensity", color: "border-green-500", baseCertainty: 0.8 },
   5: { label: "Insufficient Data", color: "border-muted", baseCertainty: 0.0 },
 };
 

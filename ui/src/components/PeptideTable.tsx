@@ -57,7 +57,6 @@ import { Peptide } from "@/types/peptide";
 import { toast } from "sonner";
 import { TangoBadge } from "@/components/TangoBadge";
 import { S4PredBadge } from "@/components/S4PredBadge";
-import { Abbr } from "@/components/Abbr";
 import { useChartSelection } from "@/stores/chartSelectionStore";
 
 /** Compute S4PRED composition summary for hover preview. Returns null if no data. */
@@ -239,6 +238,9 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
 
   const columns = useMemo(
     () => [
+      /* ── Left side: identity & decision columns ── */
+
+      // 1. ID (Entry)
       columnHelper.accessor("id", {
         header: ({ column }) => (
           <Button
@@ -252,7 +254,6 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         ),
         cell: (info) => {
           const id = String(info.getValue());
-          // UniProt accession pattern: [OPQ][0-9][A-Z0-9]{3}[0-9] or [A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}
           const isUniprot = /^[A-Z][0-9][A-Z0-9]{3}[0-9](-\d+)?$/i.test(id);
           const uni = `https://www.uniprot.org/uniprotkb/${id}/entry`;
           return (
@@ -275,6 +276,261 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           );
         },
       }),
+
+      // 2. Length
+      columnHelper.accessor("length", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            Length
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => <span className="font-mono">{info.getValue()}</span>,
+      }),
+
+      // 3. Helix (yes/no binary from S4PRED)
+      columnHelper.accessor("s4predHelixPrediction", {
+        id: "helixBinary",
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            Helix
+            <HeaderTip tip="S4PRED helix detection. 'Yes' = helix segments found with ≥5 consecutive residues at P(Helix) ≥ 0.5." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const value = info.getValue();
+          if (value == null)
+            return (
+              <Badge variant="outline" className="text-muted-foreground/50 text-xs">
+                N/A
+              </Badge>
+            );
+          return value === 1 ? (
+            <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100 text-xs">
+              Yes
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-muted-foreground text-xs">
+              No
+            </Badge>
+          );
+        },
+      }),
+
+      // 4. SSW (badge)
+      columnHelper.accessor("sswPrediction", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            SSW
+            <HeaderTip tip="Secondary Structure Switch — overlapping helix/beta regions detected via TANGO aggregation analysis, suggesting conformational switching potential." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const peptide = info.row.original;
+          const prediction = info.getValue();
+          const hasTangoData =
+            peptide.tangoHasData ??
+            Boolean(
+              peptide.tango?.beta?.length ||
+                peptide.tango?.helix?.length ||
+                peptide.extra?.["Tango Beta curve"]?.length ||
+                peptide.extra?.["Tango Helix curve"]?.length
+            );
+          return (
+            <TangoBadge
+              providerStatus={peptide.providerStatus?.tango}
+              sswPrediction={prediction}
+              hasTangoData={hasTangoData}
+              showIcon={false}
+              sswContext={{ sswHelixPercentage: peptide.sswHelixPct, sswDiff: peptide.sswDiff }}
+            />
+          );
+        },
+      }),
+
+      // 5. FF-Helix (badge)
+      columnHelper.accessor("ffHelixFlag", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            FF-Helix
+            <HeaderTip tip="Fibril-forming helix candidate. Based on S4PRED helix μH ≥ cohort average — helix detected with amphipathic character above threshold." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const value = info.getValue();
+          if (value == null)
+            return (
+              <Badge variant="outline" className="text-muted-foreground/50 text-xs">
+                N/A
+              </Badge>
+            );
+          return value === 1 ? (
+            <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100 text-xs">
+              Yes
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-muted-foreground text-xs">
+              No
+            </Badge>
+          );
+        },
+      }),
+
+      // 6. FF-SSW (badge)
+      columnHelper.accessor("ffSswFlag", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            FF-SSW
+            <HeaderTip tip="Fibril-forming SSW candidate. Requires SSW prediction AND hydrophobicity ≥ cohort average — structural switch with hydrophobic core." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const value = info.getValue();
+          if (value == null)
+            return (
+              <Badge variant="outline" className="text-muted-foreground/50 text-xs">
+                N/A
+              </Badge>
+            );
+          return value === 1 ? (
+            <Badge className="bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-100 text-xs">
+              Yes
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-muted-foreground text-xs">
+              No
+            </Badge>
+          );
+        },
+      }),
+
+      /* ── Right side: bio calculations ── */
+
+      // 7. Helix %
+      columnHelper.accessor("s4predHelixPercent", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            Helix %
+            <HeaderTip tip="S4PRED neural network helix content (context-dependent). Percentage of residues predicted as helical." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const value = info.getValue();
+          return <span className="font-mono">{value != null ? `${value.toFixed(1)}%` : "-"}</span>;
+        },
+      }),
+
+      // 8. Charge
+      columnHelper.accessor("charge", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            Charge
+            <HeaderTip tip="Net charge at pH 7.0. Positive charge enhances electrostatic interaction with negatively charged membranes." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const charge = info.getValue();
+          if (charge == null) return <span className="font-mono">-</span>;
+          return (
+            <span className="font-mono">
+              {charge > 0 ? "+" : ""}
+              {charge.toFixed(1)}
+            </span>
+          );
+        },
+      }),
+
+      // 9. Hydrophobicity (H)
+      columnHelper.accessor("hydrophobicity", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            H
+            <HeaderTip tip="Hydrophobicity (Fauchere-Pliska scale). Higher values = greater preference for non-polar environments, correlating with membrane affinity." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const value = info.getValue();
+          return <span className="font-mono">{value != null ? value.toFixed(2) : "-"}</span>;
+        },
+      }),
+
+      // 10. μH
+      columnHelper.accessor("muH", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            μH
+            <HeaderTip tip="Hydrophobic moment — measures amphipathic character. Values > 0.5 suggest strong hydrophobic/hydrophilic face separation." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => <span className="font-mono">{info.getValue()?.toFixed(2) || "-"}</span>,
+      }),
+
+      // 11. FF-Helix %
+      columnHelper.accessor("ffHelixPercent", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            FF-Helix %
+            <HeaderTip tip="Chou-Fasman (1978) helix propensity — context-free amino acid tendency to form helices. Not comparable to S4PRED or experimental CD." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const value = info.getValue();
+          return <span className="font-mono">{value != null ? `${value.toFixed(1)}%` : "-"}</span>;
+        },
+      }),
+
+      /* ── Far right: optional metadata (via column toggle) ── */
+
+      // 12. Organism
       columnHelper.accessor("species", {
         header: ({ column }) => (
           <Button
@@ -288,6 +544,8 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         ),
         cell: (info) => info.getValue() || "-",
       }),
+
+      // 13. Gene Name
       columnHelper.accessor("geneName", {
         header: ({ column }) => (
           <Button
@@ -296,13 +554,21 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             Gene
+            <HeaderTip tip="Gene name from UniProt, when available." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
         cell: (info) => info.getValue() || "-",
       }),
+
+      // 14. Function
       columnHelper.accessor("proteinFunction", {
-        header: () => <span className="font-medium">Function</span>,
+        header: () => (
+          <span className="font-medium">
+            Function
+            <HeaderTip tip="Protein function annotation from UniProt." />
+          </span>
+        ),
         cell: (info) => {
           const val = info.getValue();
           if (!val) return "-";
@@ -321,111 +587,10 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           );
         },
       }),
-      columnHelper.accessor("length", {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 p-0 font-medium"
-          >
-            Length
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: (info) => <span className="font-mono">{info.getValue()}</span>,
-      }),
-      columnHelper.accessor("hydrophobicity", {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 p-0 font-medium"
-          >
-            Hydrophobicity
-            <HeaderTip tip="Kyte-Doolittle scale. Higher values = greater preference for non-polar environments, often correlating with membrane affinity." />
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: (info) => {
-          const value = info.getValue();
-          return <span className="font-mono">{value != null ? value.toFixed(2) : "-"}</span>;
-        },
-      }),
-      columnHelper.accessor("muH", {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 p-0 font-medium"
-          >
-            <Abbr title="Hydrophobic moment (amphipathic character)">μH</Abbr>
-            <HeaderTip tip="Hydrophobic moment — measures amphipathic character. Values >0.5 suggest strong hydrophobic/hydrophilic face separation, relevant for membrane-active peptides." />
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: (info) => <span className="font-mono">{info.getValue()?.toFixed(2) || "-"}</span>,
-      }),
-      columnHelper.accessor("charge", {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 p-0 font-medium"
-          >
-            Charge
-            <HeaderTip tip="Net charge at pH 7.0. Positive charge can enhance electrostatic interaction with negatively charged membranes." />
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: (info) => {
-          const charge = info.getValue();
-          if (charge == null) return <span className="font-mono">-</span>;
-          return (
-            <span className="font-mono">
-              {charge > 0 ? "+" : ""}
-              {charge.toFixed(1)}
-            </span>
-          );
-        },
-      }),
-      columnHelper.accessor("sswPrediction", {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 p-0 font-medium"
-          >
-            <Abbr title="Thermodynamic prediction of aggregation">TANGO</Abbr>{" "}
-            <Abbr title="Structural Switching">SSW</Abbr>
-            <HeaderTip tip="Secondary Structure Switch from TANGO aggregation analysis. 'Positive' = overlapping helix/beta regions detected, suggesting conformational switching potential." />
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: (info) => {
-          const peptide = info.row.original;
-          const prediction = info.getValue();
-          // Use canonical tangoHasData field from backend (preferred)
-          // Fallback to checking curves if tangoHasData not available
-          const hasTangoData =
-            peptide.tangoHasData ??
-            Boolean(
-              peptide.tango?.beta?.length ||
-              peptide.tango?.helix?.length ||
-              peptide.extra?.["Tango Beta curve"]?.length ||
-              peptide.extra?.["Tango Helix curve"]?.length
-            );
-          // Use centralized TangoBadge for consistent display semantics
-          return (
-            <TangoBadge
-              providerStatus={peptide.providerStatus?.tango}
-              sswPrediction={prediction}
-              hasTangoData={hasTangoData}
-              showIcon={false}
-              sswContext={{ sswHelixPercentage: peptide.sswHelixPct, sswDiff: peptide.sswDiff }}
-            />
-          );
-        },
-      }),
+
+      /* ── Hidden by default: advanced columns ── */
+
+      // SSW Residues
       columnHelper.accessor(
         (row) => {
           const helix = row.tango?.helix;
@@ -446,8 +611,8 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
               onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
               className="h-8 p-0 font-medium"
             >
-              <Abbr title="Structural Switching">SSW</Abbr> Residues
-              <HeaderTip tip="Count of residues where both TANGO helix and beta curves are > 0, indicating potential secondary structure switch regions." />
+              SSW Residues
+              <HeaderTip tip="Count of residues where both helix and beta curves are > 0, indicating potential secondary structure switch regions." />
               <ArrowUpDown className="ml-2 h-4 w-4" />
             </Button>
           ),
@@ -468,6 +633,8 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           },
         }
       ),
+
+      // S4PRED SSW (hidden by default)
       columnHelper.accessor("s4predSswPrediction", {
         header: ({ column }) => (
           <Button
@@ -475,8 +642,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="h-8 p-0 font-medium"
           >
-            <Abbr title="Secondary Structure Prediction (neural network)">S4PRED</Abbr>{" "}
-            <Abbr title="Structural Switching">SSW</Abbr>
+            S4PRED SSW
             <HeaderTip tip="Secondary Structure Switch from S4PRED neural network. Compares helix/beta probabilities to detect structure-switching regions." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
@@ -484,7 +650,6 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         cell: (info) => {
           const peptide = info.row.original;
           const prediction = info.getValue();
-          // Use canonical s4predHasData field from backend (preferred)
           const hasS4PredData =
             peptide.s4predHasData ??
             Boolean(peptide.s4pred?.pH?.length || peptide.s4pred?.pE?.length);
@@ -496,92 +661,6 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
               showIcon={false}
             />
           );
-        },
-      }),
-      columnHelper.accessor("ffHelixFlag", {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 p-0 font-medium"
-          >
-            <Abbr title="Fibril-Forming">FF</Abbr> Helix
-            <HeaderTip tip="Fibril-forming helix candidate flag. Based on S4PRED helix uH >= cohort average. 'Candidate' = helix detected with amphipathic character above threshold." />
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: (info) => {
-          const value = info.getValue();
-          if (value == null) return <span className="text-muted-foreground">-</span>;
-          return value === 1 ? (
-            <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100">
-              Candidate
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-muted-foreground">
-              Not Candidate
-            </Badge>
-          );
-        },
-      }),
-      columnHelper.accessor("ffSswFlag", {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 p-0 font-medium"
-          >
-            <Abbr title="Fibril-Forming">FF</Abbr> <Abbr title="Structural Switching">SSW</Abbr>
-            <HeaderTip tip="Fibril-forming SSW candidate flag. Requires TANGO SSW AND hydrophobicity >= cohort average. 'Candidate' = structural switch with hydrophobic core." />
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: (info) => {
-          const value = info.getValue();
-          if (value == null) return <span className="text-muted-foreground">-</span>;
-          return value === 1 ? (
-            <Badge className="bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-100">
-              Candidate
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-muted-foreground">
-              Not Candidate
-            </Badge>
-          );
-        },
-      }),
-      columnHelper.accessor("s4predHelixPercent", {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 p-0 font-medium"
-          >
-            <Abbr title="Secondary Structure Prediction (neural network)">S4PRED</Abbr> Helix %
-            <HeaderTip tip="Neural network helix prediction (context-dependent). Requires ≥5 consecutive residues with P(Helix)≥0.5." />
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: (info) => {
-          const value = info.getValue();
-          return <span className="font-mono">{value != null ? `${value.toFixed(1)}%` : "-"}</span>;
-        },
-      }),
-      columnHelper.accessor("ffHelixPercent", {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 p-0 font-medium"
-          >
-            <Abbr title="Chou-Fasman helix propensity">CF</Abbr> Propensity %
-            <HeaderTip tip="Chou-Fasman (1978) helix propensity — context-free amino acid tendency to form helices. Not comparable to S4PRED or experimental CD measurements." />
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        cell: (info) => {
-          const value = info.getValue();
-          return <span className="font-mono">{value != null ? `${value.toFixed(1)}%` : "-"}</span>;
         },
       }),
     ],
@@ -771,18 +850,21 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
                 .map((col) => {
                   const labels: Record<string, string> = {
                     id: "ID",
-                    species: "Organism",
                     length: "Length",
+                    helixBinary: "Helix",
+                    sswPrediction: "SSW",
+                    ffHelixFlag: "FF-Helix",
+                    ffSswFlag: "FF-SSW",
+                    s4predHelixPercent: "Helix %",
+                    charge: "Charge",
                     hydrophobicity: "Hydrophobicity",
                     muH: "μH",
-                    charge: "Charge",
-                    sswPrediction: "TANGO SSW",
-                    s4predSswPrediction: "S4PRED SSW",
-                    ffHelixFlag: "FF Helix Flag",
-                    ffSswFlag: "FF SSW Flag",
-                    s4predHelixPercent: "S4PRED Helix %",
-                    ffHelixPercent: "CF Propensity %",
+                    ffHelixPercent: "FF-Helix %",
+                    species: "Organism",
+                    geneName: "Gene",
+                    proteinFunction: "Function",
                     tangoSswResidues: "SSW Residues",
+                    s4predSswPrediction: "S4PRED SSW",
                   };
                   return (
                     <DropdownMenuCheckboxItem

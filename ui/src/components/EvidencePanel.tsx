@@ -130,7 +130,7 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
   }
 
   // SSW (Secondary Structure Switch) prediction evidence
-  // Show BOTH TANGO and S4PRED SSW, flag disagreements
+  // Show BOTH TANGO and S4PRED SSW
   const tangoSSW = peptide.sswPrediction;
   const s4predSSW = peptide.s4predSswPrediction;
   const tangoAvailable = peptide.providerStatus?.tango?.status === "AVAILABLE";
@@ -140,10 +140,6 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
 
   const tangoLabel = !hasTangoSSW ? 'N/A' : tangoSSW === 1 ? 'Positive' : tangoSSW === -1 ? 'Negative' : 'N/A';
   const s4predLabel = !hasS4predSSW ? 'N/A' : s4predSSW === 1 ? 'Positive' : s4predSSW === -1 ? 'Negative' : 'N/A';
-
-  // Determine if predictors disagree
-  const bothAvailable = hasTangoSSW && hasS4predSSW;
-  const predictorsDisagree = bothAvailable && tangoSSW !== s4predSSW;
 
   // Pick the "headline" SSW — prefer TANGO since it's the aggregation-specific predictor
   const headlineSSW = hasTangoSSW ? tangoSSW : hasS4predSSW ? s4predSSW : null;
@@ -167,7 +163,7 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
         <motion.div
           initial={{ opacity: 0, x: -20 }}
           animate={{ opacity: 1, x: 0 }}
-          className={`p-4 rounded-lg border-l-4 ${predictorsDisagree ? 'border-l-amber-500 bg-gradient-to-r from-amber-500/5 to-transparent' : 'border-l-chameleon-positive bg-gradient-to-r from-chameleon-positive/5 to-transparent'}`}
+          className="p-4 rounded-lg border-l-4 border-l-chameleon-positive bg-gradient-to-r from-chameleon-positive/5 to-transparent"
         >
           <div className="flex items-center space-x-3">
             <sswEvidence.icon className={`w-5 h-5 ${sswEvidence.color}`} />
@@ -179,11 +175,6 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
                 <span>TANGO: <strong className={hasTangoSSW && tangoSSW === 1 ? 'text-chameleon-positive' : ''}>{tangoLabel}</strong></span>
                 <span>S4PRED: <strong className={hasS4predSSW && s4predSSW === 1 ? 'text-chameleon-positive' : ''}>{s4predLabel}</strong></span>
               </div>
-              {predictorsDisagree && (
-                <p className="text-xs text-amber-600 mt-1">
-                  Predictors disagree — TANGO (aggregation-based) and S4PRED (structure-based) use different algorithms.
-                </p>
-              )}
             </div>
           </div>
         </motion.div>

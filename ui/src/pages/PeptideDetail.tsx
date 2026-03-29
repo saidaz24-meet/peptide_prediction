@@ -368,7 +368,7 @@ export default function PeptideDetail() {
               <CardHeader>
                 <CardTitle>Sliding-Window Profiles</CardTitle>
                 <CardDescription>
-                  Hydrophobicity (Kyte–Doolittle) and hydrophobic moment (μH), computed on the fly
+                  Hydrophobicity (Fauchere-Pliska) and hydrophobic moment (μH), computed on the fly
                   from the sequence.
                 </CardDescription>
               </CardHeader>
@@ -393,7 +393,7 @@ export default function PeptideDetail() {
                 {/* Hydrophobicity (KD) + optional TANGO Agg overlay */}
                 <div className="space-y-2" data-chart-export>
                   <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold">Hydrophobicity (Kyte–Doolittle)</h3>
+                    <h3 className="text-sm font-semibold">Hydrophobicity (Fauchere-Pliska)</h3>
                     {hydroZoom.ZoomControls}
                   </div>
                   <div className="h-64">

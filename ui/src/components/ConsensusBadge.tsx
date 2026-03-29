@@ -27,7 +27,7 @@ const TIER_DISPLAY: Record<ConsensusTier, { short: string; bg: string; text: str
     text: "text-blue-700 dark:text-blue-400",
   },
   4: {
-    short: "No Concern",
+    short: "Low Propensity",
     bg: "bg-green-100 dark:bg-green-950",
     text: "text-green-700 dark:text-green-400",
   },

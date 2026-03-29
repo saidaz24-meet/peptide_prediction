@@ -5,15 +5,33 @@
  * ThresholdTuner component. When thresholds change, all dependent
  * computations (KPIs, shortlist, charts) auto-update via React reactivity.
  */
-import { create } from 'zustand';
-import type { ResolvedThresholds } from '@/lib/thresholds';
-import { DEFAULT_THRESHOLDS } from '@/lib/thresholds';
+import { create } from "zustand";
+import type { ResolvedThresholds } from "@/lib/thresholds";
+import { DEFAULT_THRESHOLDS } from "@/lib/thresholds";
 
-export type ThresholdPreset = 'original' | 'strict' | 'exploratory' | 'custom';
+export type ThresholdPreset = "original" | "strict" | "exploratory" | "custom";
 
-const PRESETS: Record<Exclude<ThresholdPreset, 'original' | 'custom'>, ResolvedThresholds> = {
-  strict: { muHCutoff: 0.35, hydroCutoff: 0.40, aggThreshold: 10.0, dangerousThreshold: 20.0, percentOfLengthCutoff: 15.0, minSswResidues: 5 },
-  exploratory: { muHCutoff: 0.0, hydroCutoff: 0.0, aggThreshold: 2.0, dangerousThreshold: 30.0, percentOfLengthCutoff: 30.0, minSswResidues: 2 },
+const PRESETS: Record<Exclude<ThresholdPreset, "original" | "custom">, ResolvedThresholds> = {
+  strict: {
+    muHCutoff: 0.35,
+    hydroCutoff: 0.4,
+    aggThreshold: 10.0,
+    percentOfLengthCutoff: 15.0,
+    minSswResidues: 5,
+    sswMaxDifference: 0.0,
+    minPredictionPercent: 60.0,
+    minS4predHelixScore: 0.0,
+  },
+  exploratory: {
+    muHCutoff: 0.0,
+    hydroCutoff: 0.0,
+    aggThreshold: 2.0,
+    percentOfLengthCutoff: 30.0,
+    minSswResidues: 2,
+    sswMaxDifference: 0.0,
+    minPredictionPercent: 40.0,
+    minS4predHelixScore: 0.0,
+  },
 };
 
 interface ThresholdState {
@@ -37,7 +55,7 @@ interface ThresholdState {
 }
 
 export const useThresholdStore = create<ThresholdState>((set, get) => ({
-  preset: 'original',
+  preset: "original",
   active: { ...DEFAULT_THRESHOLDS },
   original: { ...DEFAULT_THRESHOLDS },
   isModified: false,
@@ -49,18 +67,18 @@ export const useThresholdStore = create<ThresholdState>((set, get) => ({
     set({
       original: { ...merged },
       active: { ...merged },
-      preset: 'original',
+      preset: "original",
       isModified: false,
     });
   },
 
   setPreset: (p) => {
     const state = get();
-    if (p === 'original') {
-      set({ preset: 'original', active: { ...state.original }, isModified: false });
-    } else if (p === 'custom') {
+    if (p === "original") {
+      set({ preset: "original", active: { ...state.original }, isModified: false });
+    } else if (p === "custom") {
       // Keep current active values, just switch label
-      set({ preset: 'custom', isModified: true });
+      set({ preset: "custom", isModified: true });
     } else {
       set({ preset: p, active: { ...PRESETS[p] }, isModified: true });
     }
@@ -69,7 +87,7 @@ export const useThresholdStore = create<ThresholdState>((set, get) => ({
   setThreshold: (key, value) => {
     const state = get();
     set({
-      preset: 'custom',
+      preset: "custom",
       active: { ...state.active, [key]: value },
       isModified: true,
     });
@@ -78,7 +96,7 @@ export const useThresholdStore = create<ThresholdState>((set, get) => ({
   resetToOriginal: () => {
     const state = get();
     set({
-      preset: 'original',
+      preset: "original",
       active: { ...state.original },
       isModified: false,
     });

@@ -306,7 +306,7 @@ export function exportShortlistPDF(
     "SSW Score: Secondary Structure Switch score from TANGO aggregation analysis.",
     "TANGO Agg Max: Maximum aggregation propensity from TANGO per-residue analysis.",
     "Consensus Tier: Multi-evidence classification (T1=Switch Zone, T2=Disordered,",
-    "  T3=Native Beta, T4=No Concern, T5=No Data).",
+    "  T3=Native Beta, T4=Low Propensity, T5=No Data).",
     "Ranking: Percentile-based (0-100), proportional weights summing to 100%.",
     "  Direction toggles invert percentiles (low=100-pct) for relevant metrics.",
     "",
