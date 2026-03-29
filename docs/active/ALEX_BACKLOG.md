@@ -12,12 +12,12 @@
 |----|------|-------|--------|
 | T1 | Delete "Dangerous Max" threshold — misleading name | D | DONE |
 | T2 | If advanced thresholds are from TANGO, reconsider — goal is to not rely on TANGO | D | DONE (removed Rule 1) |
-| T3 | Add "Minimal Score of Helicity" threshold | D | TODO |
+| T3 | Add "Minimal Score of Helicity" threshold | D | DONE |
 | T4 | Group thresholds with titles: SSW section, FF section, General section | D | DONE |
-| T5 | General threshold: "Minimal prediction percentage of amino acids" (if <50% predicted, flag it) | D | TODO |
-| T6 | Min S4PRED helix threshold | D | TODO |
-| T7 | Max TANGO difference threshold (keep but deprioritize — don't rely on TANGO) | D | TODO |
-| T8 | SSW max difference threshold | D | TODO |
+| T5 | General threshold: "Minimal prediction percentage of amino acids" (if <50% predicted, flag it) | D | DONE |
+| T6 | Min S4PRED helix threshold | D | DONE |
+| T7 | Max TANGO difference threshold (keep but deprioritize) | D | DONE |
+| T8 | SSW max difference threshold | D | DONE |
 | T9 | FF threshold section: hydrophobicity and muH cutoffs | D | DONE (grouped) |
 | T10 | Add eye/info icons next to each threshold showing description + effect | D | DONE |
 | T11 | Reference: look up Peleg and Bader papers for threshold values | D | TODO |
@@ -41,7 +41,7 @@
 | P3 | Clickable/expandable titles for faster scrolling | D | TODO |
 | P4 | Show three aggregation graphs for S4PRED helix results (same as SSW graphs) | D | TODO |
 | P5 | Remove "concerns and flagging risks" — aggregation is not a risk to biologists | D | DONE |
-| P6 | Aggregation graph: currently red/scary even at 2% score. Make calmer, proportional to TANGO score | D | TODO |
+| P6 | Aggregation graph: calmer colors proportional to score | D | DONE |
 | P7 | "High confidence switch zone" warning — research Hamodrakas 2007 for amyloid-forming hallmark | D | TODO |
 | P8 | Another helix diagram (same layout as SSW up/down diagram) | D | TODO |
 
@@ -62,7 +62,7 @@
 | ID | Item | Phase | Status |
 |----|------|-------|--------|
 | AF1 | Research: why does AlphaFold DB have longer sequence than what we send from UniProt? | B | TODO |
-| AF2 | Add warning: "AlphaFold structure includes signal peptide — PVL sequence may be shorter" | B | TODO |
+| AF2 | Add warning: "AlphaFold structure includes signal peptide — PVL sequence may be shorter" | B | DONE |
 
 ## Cohort Comparison (B13 — already in roadmap)
 
