@@ -289,7 +289,7 @@ export function ThresholdTuner({ peptides }: ThresholdTunerProps) {
           <div className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2.5">
             <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
             <span>
-              You have changed from the original thresholds. These are derived from Peleg's
+              You have changed from the original thresholds. These are derived from the recommended
               rigorously tested reference dataset. Changing may affect scientific accuracy. Server
               values: μH={original.muHCutoff.toFixed(2)}, H={original.hydroCutoff.toFixed(2)}, Agg=
               {original.aggThreshold.toFixed(1)}%
@@ -299,7 +299,7 @@ export function ThresholdTuner({ peptides }: ThresholdTunerProps) {
           <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-md p-2.5">
             <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <span>
-              Using Peleg's original thresholds (dataset-average). These are rigorously validated
+              Using recommended thresholds (dataset-average). These are rigorously validated
               values.
             </span>
           </div>

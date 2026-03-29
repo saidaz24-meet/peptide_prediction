@@ -266,7 +266,7 @@ export default function Help() {
                   {
                     name: "Threshold Presets",
                     description:
-                      "Recommended (default): thresholds computed from your data using cohort median. Custom: manually set μH cutoff, hydrophobicity cutoff, and aggregation thresholds. Custom values override Peleg's validated reference values — use with care for publication-quality analysis.",
+                      "Recommended (default): thresholds computed from your data using cohort median. Custom: manually set μH cutoff, hydrophobicity cutoff, and aggregation thresholds. Custom values override the recommended reference values — use with care for publication-quality analysis.",
                   },
                 ].map((topic, index) => (
                   <motion.div

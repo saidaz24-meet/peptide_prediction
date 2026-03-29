@@ -216,7 +216,7 @@ function ThresholdFields({
         <div className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2.5">
           <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
           <span>
-            Custom thresholds override Peleg's rigorously validated reference values. Changes may
+            Custom thresholds override the recommended reference values. Changes may
             affect scientific accuracy of FF classification.
           </span>
         </div>
