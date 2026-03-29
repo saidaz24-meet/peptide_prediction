@@ -8,9 +8,9 @@
  * - AVAILABLE/available → "Name: OK (N/N)" (default)
  */
 
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { normalizeProviderStatus } from '@/lib/tangoDisplaySemantics';
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { normalizeProviderStatus } from "@/lib/tangoDisplaySemantics";
 
 interface ProviderStats {
   requested: number;
@@ -19,7 +19,7 @@ interface ProviderStats {
 }
 
 interface ProviderStatus {
-  status: string;  // Accept any string, we'll normalize it
+  status: string; // Accept any string, we'll normalize it
   reason?: string | null;
   stats?: ProviderStats;
 }
@@ -27,42 +27,42 @@ interface ProviderStatus {
 interface ProviderBadgeProps {
   name: string;
   status: ProviderStatus;
-  variant?: 'default' | 'outline' | 'secondary' | 'destructive';
+  variant?: "default" | "outline" | "secondary" | "destructive";
 }
 
-export function ProviderBadge({ name, status, variant = 'default' }: ProviderBadgeProps) {
+export function ProviderBadge({ name, status, variant = "default" }: ProviderBadgeProps) {
   const { status: rawStatus, reason, stats } = status;
   const normalizedStatus = normalizeProviderStatus(rawStatus);
 
   let label: string;
-  let badgeVariant: 'default' | 'outline' | 'secondary' | 'destructive' = variant;
+  let badgeVariant: "default" | "outline" | "secondary" | "destructive" = variant;
   let tooltipText: string;
 
-  if (normalizedStatus === 'OFF') {
+  if (normalizedStatus === "OFF") {
     label = `${name}: OFF`;
-    badgeVariant = 'outline';
+    badgeVariant = "outline";
     tooltipText = reason || `${name} is disabled in settings`;
-  } else if (normalizedStatus === 'UNAVAILABLE') {
+  } else if (normalizedStatus === "UNAVAILABLE") {
     const requested = stats?.requested || 0;
-    label = requested > 0 ? `${name}: FAILED (0/${requested})` : `${name}: FAILED`;
-    badgeVariant = 'destructive';
-    tooltipText = reason || `${name} execution failed - check run_meta.json`;
-  } else if (normalizedStatus === 'PARTIAL') {
+    label = requested > 0 ? `${name}: Unavailable (0/${requested})` : `${name}: Unavailable`;
+    badgeVariant = "secondary";
+    tooltipText = reason || `${name} could not run — check tool configuration`;
+  } else if (normalizedStatus === "PARTIAL") {
     const parsed_ok = stats?.parsed_ok || 0;
     const requested = stats?.requested || 0;
     label = requested > 0 ? `${name}: PARTIAL (${parsed_ok}/${requested})` : `${name}: PARTIAL`;
-    badgeVariant = 'secondary';
+    badgeVariant = "secondary";
     tooltipText = reason || `Only ${parsed_ok} of ${requested} peptides processed`;
-  } else if (normalizedStatus === 'AVAILABLE') {
+  } else if (normalizedStatus === "AVAILABLE") {
     const parsed_ok = stats?.parsed_ok || stats?.requested || 0;
     const requested = stats?.requested || 0;
     label = requested > 0 ? `${name}: OK (${parsed_ok}/${requested})` : `${name}: OK`;
-    badgeVariant = 'default';
+    badgeVariant = "default";
     tooltipText = `${name} processing completed successfully`;
   } else {
     // Unknown status - show raw value for debugging
     label = `${name}: UNKNOWN`;
-    badgeVariant = 'outline';
+    badgeVariant = "outline";
     tooltipText = `${name} status unknown (raw: "${rawStatus}") - check backend logs`;
   }
 
@@ -81,4 +81,3 @@ export function ProviderBadge({ name, status, variant = 'default' }: ProviderBad
     </TooltipProvider>
   );
 }
-

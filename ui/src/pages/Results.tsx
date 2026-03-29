@@ -421,10 +421,10 @@ export default function Results() {
             if (s4predStatus === "UNAVAILABLE" && !dismissedBanners.has("s4pred")) {
               banners.push({
                 key: "s4pred",
-                icon: <XCircle className="h-4 w-4 text-red-600" />,
-                borderClass: "border-l-4 border-l-red-400",
+                icon: <Info className="h-4 w-4 text-blue-600" />,
+                borderClass: "border-l-4 border-l-blue-400",
                 message:
-                  "S4PRED unavailable — secondary structure predictions not available for this run.",
+                  "S4PRED not enabled — helix and SSW predictions require S4PRED to be configured.",
               });
             }
 

@@ -434,6 +434,32 @@ export default function Upload() {
 
                       <DataPreview data={rawData} />
 
+                      {/* Entry count and time estimate */}
+                      {(() => {
+                        const count = rawData.rowCount ?? rawData.rows?.length ?? 0;
+                        if (count > 500) {
+                          const timeNoTango = Math.ceil(count / 100);
+                          const timeWithTango = Math.ceil((count * 3) / 60);
+                          return (
+                            <Alert
+                              className={
+                                count > 3000
+                                  ? "border-amber-300 bg-amber-50"
+                                  : "bg-muted/50 border-muted"
+                              }
+                            >
+                              <AlertTriangle className="h-4 w-4" />
+                              <AlertDescription className="text-xs">
+                                <strong>{count} sequences detected.</strong> Estimated time: ~
+                                {timeNoTango} min without TANGO, ~{timeWithTango} min with TANGO.
+                                {count > 3000 && " Consider disabling TANGO for faster results."}
+                              </AlertDescription>
+                            </Alert>
+                          );
+                        }
+                        return null;
+                      })()}
+
                       {/* Sequence length summary */}
                       {rawData.rows &&
                         rawData.rows.length > 0 &&
