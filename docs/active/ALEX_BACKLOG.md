@@ -90,7 +90,7 @@
 |----|------|-------|--------|
 | LD1 | Fix nginx 413 error for >1MB files | ISSUE-021 | FIXED |
 | LD2 | Handle 3K+ entry datasets (timeout, progress, auto-disable TANGO) | B15 | TODO |
-| LD3 | Show entry count warning during upload with time estimate | B15 | TODO |
+| LD3 | Show entry count warning during upload with time estimate | B15 | DONE |
 
 ## Load Testing (B16 — already in roadmap)
 
