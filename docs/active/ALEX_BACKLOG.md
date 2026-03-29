@@ -10,16 +10,16 @@
 
 | ID | Item | Phase | Status |
 |----|------|-------|--------|
-| T1 | Delete "Dangerous Max" threshold — misleading name | D | TODO |
-| T2 | If advanced thresholds are from TANGO, reconsider — goal is to not rely on TANGO | D | TODO |
+| T1 | Delete "Dangerous Max" threshold — misleading name | D | DONE |
+| T2 | If advanced thresholds are from TANGO, reconsider — goal is to not rely on TANGO | D | DONE (removed Rule 1) |
 | T3 | Add "Minimal Score of Helicity" threshold | D | TODO |
-| T4 | Group thresholds with titles: SSW section, FF section, General section | D | TODO |
+| T4 | Group thresholds with titles: SSW section, FF section, General section | D | DONE |
 | T5 | General threshold: "Minimal prediction percentage of amino acids" (if <50% predicted, flag it) | D | TODO |
 | T6 | Min S4PRED helix threshold | D | TODO |
 | T7 | Max TANGO difference threshold (keep but deprioritize — don't rely on TANGO) | D | TODO |
 | T8 | SSW max difference threshold | D | TODO |
-| T9 | FF threshold section: hydrophobicity and muH cutoffs | D | TODO |
-| T10 | Add eye/info icons next to each threshold showing description + effect | D | TODO |
+| T9 | FF threshold section: hydrophobicity and muH cutoffs | D | DONE (grouped) |
+| T10 | Add eye/info icons next to each threshold showing description + effect | D | DONE |
 | T11 | Reference: look up Peleg and Bader papers for threshold values | D | TODO |
 
 ## Table & Columns (Phase D)
@@ -27,10 +27,10 @@
 | ID | Item | Phase | Status |
 |----|------|-------|--------|
 | C1 | Put S4PRED secondary structure (helicity) in a table column | D | TODO |
-| C2 | Remove TANGO/S4PRED labels everywhere — researchers already know | D | TODO |
+| C2 | Remove TANGO/S4PRED labels everywhere — researchers already know | D | DONE |
 | C3 | S4PRED helix as yes/no (search Peleg's 4 important columns for auto-show criteria) | D | TODO |
 | C4 | Important columns on left side, bio calcs on right side | D | TODO |
-| C5 | Remove T1 warning ("S4PRED and TANGO disagree") — not serious, expected | D | TODO |
+| C5 | Remove T1 warning ("S4PRED and TANGO disagree") — not serious, expected | D | DONE |
 
 ## PeptideDetail Page (Phase D)
 
@@ -40,7 +40,7 @@
 | P2 | Have sequence shown again under SSW track with SSW-specific calcs | D | TODO |
 | P3 | Clickable/expandable titles for faster scrolling | D | TODO |
 | P4 | Show three aggregation graphs for S4PRED helix results (same as SSW graphs) | D | TODO |
-| P5 | Remove "concerns and flagging risks" — aggregation is not a risk to biologists | D | TODO |
+| P5 | Remove "concerns and flagging risks" — aggregation is not a risk to biologists | D | DONE |
 | P6 | Aggregation graph: currently red/scary even at 2% score. Make calmer, proportional to TANGO score | D | TODO |
 | P7 | "High confidence switch zone" warning — research Hamodrakas 2007 for amyloid-forming hallmark | D | TODO |
 | P8 | Another helix diagram (same layout as SSW up/down diagram) | D | TODO |
@@ -54,7 +54,7 @@
 | CH3 | Clickable diagram sections: click "helix & SSW but not FF-Helix" to filter table | D | TODO |
 | CH4 | Top 2 charts: more rows, more colors, more distribution, user-customizable (show what they want in one diagram instead of 10 separate ones) | D | TODO |
 | CH5 | Peptide markers in table below charts for quick visual relationships | D | TODO |
-| CH6 | Rename "Doolittle" to "Fauchere-Pliska" in sliding window charts | D | TODO |
+| CH6 | Rename "Doolittle" to "Fauchere-Pliska" in sliding window charts | D | DONE (labels + scale values) |
 | CH7 | Rename to "Helic West" (verify exact name from Peleg) | D | TODO |
 
 ## AlphaFold (Phase B/D)
@@ -75,7 +75,7 @@
 
 | ID | Item | Phase | Status |
 |----|------|-------|--------|
-| QA1 | Add example peptide buttons (like Upload page has Venom, Antimicrobial, etc.) | ISSUE-022 | TODO |
+| QA1 | Add example peptide buttons (like Upload page has Venom, Antimicrobial, etc.) | ISSUE-022 | DONE |
 
 ## Tools Tab (B14 — already in roadmap)
 
