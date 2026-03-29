@@ -26,10 +26,10 @@
 
 | ID | Item | Phase | Status |
 |----|------|-------|--------|
-| C1 | Put S4PRED secondary structure (helicity) in a table column | D | TODO |
+| C1 | Put S4PRED secondary structure (helicity) in a table column | D | DONE |
 | C2 | Remove TANGO/S4PRED labels everywhere — researchers already know | D | DONE |
-| C3 | S4PRED helix as yes/no (search Peleg's 4 important columns for auto-show criteria) | D | TODO |
-| C4 | Important columns on left side, bio calcs on right side | D | TODO |
+| C3 | S4PRED helix as yes/no (auto-show) | D | DONE |
+| C4 | Important columns on left side, bio calcs on right side | D | DONE |
 | C5 | Remove T1 warning ("S4PRED and TANGO disagree") — not serious, expected | D | DONE |
 
 ## PeptideDetail Page (Phase D)
