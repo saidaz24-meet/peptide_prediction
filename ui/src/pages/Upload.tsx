@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { DataPreview } from "@/components/DataPreview";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { uploadCSV } from "@/lib/api";
-import { useNavigate, useBlocker } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import AppFooter from "@/components/AppFooter";
@@ -17,14 +17,6 @@ import { UploadDropzone } from "@/components/UploadDropzone";
 import { UniProtQueryInput } from "@/components/UniProtQueryInput";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { toast } from "sonner";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Info } from "lucide-react";
 import { Search } from "lucide-react";
@@ -94,9 +86,6 @@ export default function Upload() {
   const navigate = useNavigate();
   const abortRef = useRef<AbortController | null>(null);
   const progressPercent = ((currentStep + 1) / steps.length) * 100;
-
-  // Prevent navigation while analysis is running
-  const blocker = useBlocker(isAnalyzing);
 
   // Prevent tab close/reload while analyzing
   useEffect(() => {
@@ -625,34 +614,6 @@ export default function Upload() {
           <AppFooter />
         </motion.div>
       </div>
-
-      {/* Navigation guard dialog */}
-      {blocker.state === "blocked" && (
-        <Dialog open onOpenChange={() => blocker.reset()}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Analysis in progress</DialogTitle>
-              <DialogDescription>
-                Navigating away will cancel the current analysis. Are you sure you want to leave?
-              </DialogDescription>
-            </DialogHeader>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => blocker.reset()}>
-                Stay
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={() => {
-                  abortRef.current?.abort();
-                  blocker.proceed();
-                }}
-              >
-                Leave
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }
