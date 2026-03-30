@@ -1,6 +1,8 @@
 """
 Single sequence prediction endpoint.
 """
+
+import asyncio
 from typing import Optional
 
 from fastapi import APIRouter, Form, HTTPException
@@ -17,7 +19,7 @@ router = APIRouter()
 async def predict(
     sequence: str = Form(...),
     entry: Optional[str] = Form(None),
-    thresholdConfig: Optional[str] = Form(None, description="Threshold configuration JSON")
+    thresholdConfig: Optional[str] = Form(None, description="Threshold configuration JSON"),
 ):
     """Predict properties for a single peptide sequence."""
     # Parse threshold config (shared helper)
@@ -32,8 +34,9 @@ async def predict(
         raise HTTPException(status_code=400, detail="Sequence is empty after validation")
 
     # Process the single sequence through the prediction pipeline
-    return process_single_sequence(
+    return await asyncio.to_thread(
+        process_single_sequence,
         df=df,
         threshold_config_requested=threshold_config_requested,
-        threshold_config_resolved=threshold_config_resolved
+        threshold_config_resolved=threshold_config_resolved,
     )

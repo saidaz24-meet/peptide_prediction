@@ -1,7 +1,7 @@
 /**
  * Smart aggregation flagging module.
  *
- * Implements 4 rules from Peleg's review for intelligent
+ * Implements 4 rules from the holistic review for intelligent
  * aggregation-prone peptide flagging — replaces simple
  * "aggMax > threshold" with multi-rule assessment.
  *

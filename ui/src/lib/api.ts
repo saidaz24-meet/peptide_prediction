@@ -67,21 +67,28 @@ async function handleResponse(res: Response) {
 
 export async function uploadCSV(
   file: File,
-  thresholdConfig?: ThresholdConfig
+  thresholdConfig?: ThresholdConfig,
+  signal?: AbortSignal
 ): Promise<RowsResponse> {
   const fd = new FormData();
   fd.append("file", file);
   if (thresholdConfig) {
     fd.append("thresholdConfig", JSON.stringify(thresholdConfig));
   }
-  const res = await fetch(`${API_BASE}/api/upload-csv`, { method: "POST", body: fd, mode: "cors" });
+  const res = await fetch(`${API_BASE}/api/upload-csv`, {
+    method: "POST",
+    body: fd,
+    mode: "cors",
+    signal,
+  });
   return (await handleResponse(res)) as RowsResponse;
 }
 
 export async function predictOne(
   sequence: string,
   entry?: string,
-  thresholdConfig?: ThresholdConfig
+  thresholdConfig?: ThresholdConfig,
+  signal?: AbortSignal
 ): Promise<PredictResponse> {
   const fd = new FormData();
   fd.append("sequence", sequence);
@@ -89,7 +96,12 @@ export async function predictOne(
   if (thresholdConfig) {
     fd.append("thresholdConfig", JSON.stringify(thresholdConfig));
   }
-  const res = await fetch(`${API_BASE}/api/predict`, { method: "POST", body: fd, mode: "cors" });
+  const res = await fetch(`${API_BASE}/api/predict`, {
+    method: "POST",
+    body: fd,
+    mode: "cors",
+    signal,
+  });
   return (await handleResponse(res)) as PredictResponse;
 }
 

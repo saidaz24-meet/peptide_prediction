@@ -35,7 +35,7 @@ export type SingleProviderStatus = {
   enabled?: boolean;
   requested?: boolean;
   ran?: boolean;
-  status: 'OFF' | 'UNAVAILABLE' | 'PARTIAL' | 'AVAILABLE';
+  status: "OFF" | "UNAVAILABLE" | "PARTIAL" | "AVAILABLE";
   reason?: string | null;
   stats?: {
     requested: number;
@@ -67,76 +67,76 @@ export type Peptide = {
 
   // sequence (required)
   sequence: string;
-  length: number | null;  // null if not computed
+  length: number | null; // null if not computed
 
   // basic biophysics (can be null if not computed)
   hydrophobicity: number | null;
-  muH?: number | null;  // hydrophobic moment if present
+  muH?: number | null; // hydrophobic moment if present
   charge: number | null;
 
   // Tango / SSW (Secondary Structure Switch)
   // sswPrediction can be -1/0/1 (valid predictions) or null (no prediction available)
-  sswPrediction: SSWPrediction;  // from "SSW prediction"
-  sswScore?: number | null;      // "SSW score" - null if TANGO unavailable
-  sswDiff?: number | null;       // "SSW diff" - null if TANGO unavailable
-  sswHelixPct?: number | null;   // "SSW helix percentage" - null if TANGO unavailable
-  sswBetaPct?: number | null;    // "SSW beta percentage" - null if TANGO unavailable
+  sswPrediction: SSWPrediction; // from "SSW prediction"
+  sswScore?: number | null; // "SSW score" - null if TANGO unavailable
+  sswDiff?: number | null; // "SSW diff" - null if TANGO unavailable
+  sswHelixPct?: number | null; // "SSW helix percentage" - null if TANGO unavailable
+  sswBetaPct?: number | null; // "SSW beta percentage" - null if TANGO unavailable
 
   // FF-Helix (from auxiliary - always computed locally)
-  ffHelixPercent?: number | null;                            // "FF-Helix %"
-  ffHelixFragments?: Array<SegmentTuple> | Segment[];        // "FF Helix fragments"
+  ffHelixPercent?: number | null; // "FF-Helix %"
+  ffHelixFragments?: Array<SegmentTuple> | Segment[]; // "FF Helix fragments"
 
   // FF flags (database-level binary classification from reference implementation)
-  // Thresholds verified against Peleg's reference dataset (2026-02-26). Fallback: H=0.417, uH=0.388.
-  ffHelixFlag?: number | null;    // 1 (candidate), -1 (not candidate), null (no data). S4PRED-based.
-  ffHelixScore?: number | null;   // helix_uH + helix_score
-  ffSswFlag?: number | null;      // 1 (candidate), -1 (not candidate), null (no data)
-  ffSswScore?: number | null;     // Hydrophobicity + Beta_uH + Full_length_uH + SSW_prediction
+  // Thresholds verified against reference dataset (2026-02-26). Fallback: H=0.417, uH=0.388.
+  ffHelixFlag?: number | null; // 1 (candidate), -1 (not candidate), null (no data). S4PRED-based.
+  ffHelixScore?: number | null; // helix_uH + helix_score
+  ffSswFlag?: number | null; // 1 (candidate), -1 (not candidate), null (no data)
+  ffSswScore?: number | null; // Hydrophobicity + Beta_uH + Full_length_uH + SSW_prediction
 
   // ----- Unified secondary-structure percentages used by Results table -----
   // These are filled by the mapper from S4PRED if present, otherwise Tango fallback.
-  helixPercent?: number | null;   // preferred: S4PRED helix %; fallback: "SSW helix percentage"
-  betaPercent?: number | null;    // preferred: S4PRED beta %;  fallback: "SSW beta percentage"
+  helixPercent?: number | null; // preferred: S4PRED helix %; fallback: "SSW helix percentage"
+  betaPercent?: number | null; // preferred: S4PRED beta %;  fallback: "SSW beta percentage"
 
   // --- Optional Tango per-residue curves
   tango?: {
-    agg?: number[];   // Aggregation curve
-    beta?: number[];  // Beta curve
+    agg?: number[]; // Aggregation curve
+    beta?: number[]; // Beta curve
     helix?: number[]; // Helix curve
-    turn?: number[];  // Turn curve
+    turn?: number[]; // Turn curve
   };
 
   // Canonical Tango summary fields (from backend, preferred over computing from extras)
   // These provide a single source of truth for UI display
-  tangoHasData?: boolean;        // True if any Tango curves are available
-  tangoAggMax?: number | null;   // Max value of Aggregation curve (risk indicator)
-  tangoBetaMax?: number | null;  // Max value of Beta curve
+  tangoHasData?: boolean; // True if any Tango curves are available
+  tangoAggMax?: number | null; // Max value of Aggregation curve (risk indicator)
+  tangoBetaMax?: number | null; // Max value of Beta curve
   tangoHelixMax?: number | null; // Max value of Helix curve
 
   // ----- S4PRED secondary structure predictions -----
   // From backend/s4pred.py - matches reference 260120_Alpha_and_SSW_FF_Predictor/s4pred.py
   // Helix predictions
-  s4predHelixPrediction?: number | null;              // -1 no helix, 1 helix found (alias: 'Helix prediction (S4PRED)')
-  s4predHelixFragments?: Array<SegmentTuple> | null;  // segment tuples (alias: 'Helix fragments (S4PRED)')
-  s4predHelixScore?: number | null;                   // avg helix score (alias: 'Helix score (S4PRED)')
-  s4predHelixPercent?: number | null;                 // helix percentage 0-100 (alias: 'Helix percentage (S4PRED)')
+  s4predHelixPrediction?: number | null; // -1 no helix, 1 helix found (alias: 'Helix prediction (S4PRED)')
+  s4predHelixFragments?: Array<SegmentTuple> | null; // segment tuples (alias: 'Helix fragments (S4PRED)')
+  s4predHelixScore?: number | null; // avg helix score (alias: 'Helix score (S4PRED)')
+  s4predHelixPercent?: number | null; // helix percentage 0-100 (alias: 'Helix percentage (S4PRED)')
   // SSW (Secondary Structure Switch) predictions
-  s4predSswPrediction?: number | null;                // -1/1 (alias: 'SSW prediction (S4PRED)')
-  s4predSswFragments?: Array<SegmentTuple> | null;    // SSW segment tuples (alias: 'SSW fragments (S4PRED)')
-  s4predSswScore?: number | null;                     // SSW score (alias: 'SSW score (S4PRED)')
-  s4predSswDiff?: number | null;                      // SSW diff (alias: 'SSW diff (S4PRED)')
-  s4predSswHelixPercent?: number | null;              // SSW helix % (alias: 'SSW helix percentage (S4PRED)')
-  s4predSswBetaPercent?: number | null;               // SSW beta % (alias: 'SSW beta percentage (S4PRED)')
-  s4predSswPercent?: number | null;                   // SSW overlap % (alias: 'SSW percentage (S4PRED)')
-  s4predHasData?: boolean;                            // True if S4PRED ran and produced results
+  s4predSswPrediction?: number | null; // -1/1 (alias: 'SSW prediction (S4PRED)')
+  s4predSswFragments?: Array<SegmentTuple> | null; // SSW segment tuples (alias: 'SSW fragments (S4PRED)')
+  s4predSswScore?: number | null; // SSW score (alias: 'SSW score (S4PRED)')
+  s4predSswDiff?: number | null; // SSW diff (alias: 'SSW diff (S4PRED)')
+  s4predSswHelixPercent?: number | null; // SSW helix % (alias: 'SSW helix percentage (S4PRED)')
+  s4predSswBetaPercent?: number | null; // SSW beta % (alias: 'SSW beta percentage (S4PRED)')
+  s4predSswPercent?: number | null; // SSW overlap % (alias: 'SSW percentage (S4PRED)')
+  s4predHasData?: boolean; // True if S4PRED ran and produced results
   // S4PRED per-residue curves (for PeptideDetail view)
   s4pred?: {
-    pH?: number[];    // per-residue P(helix)
-    pE?: number[];    // per-residue P(beta)
-    pC?: number[];    // per-residue P(coil)
-    ssPrediction?: string[];  // per-residue SS prediction ('C', 'H', 'E')
-    helixSegments?: Array<[number, number]>;  // Helix segment tuples
-    betaSegments?: Array<[number, number]>;   // Beta segment tuples (from ssw fragments)
+    pH?: number[]; // per-residue P(helix)
+    pE?: number[]; // per-residue P(beta)
+    pC?: number[]; // per-residue P(coil)
+    ssPrediction?: string[]; // per-residue SS prediction ('C', 'H', 'E')
+    helixSegments?: Array<[number, number]>; // Helix segment tuples
+    betaSegments?: Array<[number, number]>; // Beta segment tuples (from ssw fragments)
   };
 
   // Provider status (Principle B: mandatory provider status)
@@ -159,19 +159,19 @@ export type ColumnMapping = {
   charge?: string;
 
   // SSW (Secondary Structure Switch)
-  ssw_prediction?: string;   // maps to Peptide.sswPrediction
+  ssw_prediction?: string; // maps to Peptide.sswPrediction
   ssw_score?: string;
   ssw_diff?: string;
   ssw_helix_percentage?: string;
   ssw_beta_percentage?: string;
 
   // FF-Helix
-  ff_helix_percent?: string;       // maps to Peptide.ffHelixPercent
+  ff_helix_percent?: string; // maps to Peptide.ffHelixPercent
   ff_helix_fragments?: string;
 
   // ----- Optional direct mapping for unified columns -----
-  helix_percent?: string;          // maps to Peptide.helixPercent
-  beta_percent?: string;           // maps to Peptide.betaPercent
+  helix_percent?: string; // maps to Peptide.helixPercent
+  beta_percent?: string; // maps to Peptide.betaPercent
 
   // metadata
   species?: string;
@@ -193,7 +193,7 @@ export type DatasetStats = {
 
   // FF candidate percentages
   ffHelixCandidatePercent?: number | null; // % of peptides with ffHelixFlag === 1
-  ffSswCandidatePercent?: number | null;   // % of peptides with ffSswFlag === 1 (gated on TANGO)
+  ffSswCandidatePercent?: number | null; // % of peptides with ffSswFlag === 1 (gated on TANGO)
 
   // availability counts for better UI display
   s4predAvailable?: number;
@@ -221,15 +221,15 @@ export type PeptideRow = {
   "Full length uH": number;
 
   // FF flags (legacy names kept)
-  "FF-Helix (Jpred)": number;                 // 1 or -1
-  "FF-Secondary structure switch": number;    // 1 or -1
+  "FF-Helix (Jpred)": number; // 1 or -1
+  "FF-Secondary structure switch": number; // 1 or -1
 
   // Optional richer outputs (all optional to avoid breaking old sheets)
-  "FF-Helix %"? : number;                     // from auxiliary calc
+  "FF-Helix %"?: number; // from auxiliary calc
   "FF Helix fragments"?: Array<SegmentTuple> | any[];
 
   // Tango / SSW
-  "SSW prediction"?: number;                  // -1/0/1
+  "SSW prediction"?: number; // -1/0/1
   "SSW score"?: number;
   "SSW diff"?: number;
   "SSW helix percentage"?: number;
@@ -241,14 +241,14 @@ export type PeptideRow = {
 
   // Metadata
   "Protein name"?: string;
-  "Organism"?: string;
+  Organism?: string;
 };
 
 // ----- Threshold Configuration -----
 export type ThresholdConfig = {
   mode: "default" | "recommended" | "custom";
-  custom?: Record<string, any>;  // Custom threshold values when mode is "custom"
-  version: string;  // Config schema version
+  custom?: Record<string, any>; // Custom threshold values when mode is "custom"
+  version: string; // Config schema version
 };
 
 // ----- Backend-provided metadata for pills at top-right -----
@@ -267,7 +267,7 @@ export type DatasetMetadata = {
   };
   thresholdConfigRequested?: ThresholdConfig | null;
   thresholdConfigResolved?: ThresholdConfig | null;
-  providerStatusSummary?: any;  // Provider status summary from backend
+  providerStatusSummary?: any; // Provider status summary from backend
   provider_status?: {
     tango?: SingleProviderStatus;
     s4pred?: SingleProviderStatus;

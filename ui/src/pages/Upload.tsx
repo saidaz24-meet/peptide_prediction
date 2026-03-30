@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { Upload as UploadIcon, FileText, CheckCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { DataPreview } from "@/components/DataPreview";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { uploadCSV } from "@/lib/api";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useBlocker } from "react-router-dom";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import AppFooter from "@/components/AppFooter";
@@ -17,6 +17,14 @@ import { UploadDropzone } from "@/components/UploadDropzone";
 import { UniProtQueryInput } from "@/components/UniProtQueryInput";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, Info } from "lucide-react";
 import { Search } from "lucide-react";
@@ -84,7 +92,21 @@ export default function Upload() {
     setSourceFile,
   } = useDatasetStore();
   const navigate = useNavigate();
+  const abortRef = useRef<AbortController | null>(null);
   const progressPercent = ((currentStep + 1) / steps.length) * 100;
+
+  // Prevent navigation while analysis is running
+  const blocker = useBlocker(isAnalyzing);
+
+  // Prevent tab close/reload while analyzing
+  useEffect(() => {
+    if (!isAnalyzing) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [isAnalyzing]);
 
   // ---- CSV/TSV preview (XLSX skips preview) ----
   const handleLocalPreview = (file: File) => {
@@ -92,8 +114,52 @@ export default function Upload() {
     setQc(null);
 
     const name = file.name.toLowerCase();
+    const isFASTA = name.endsWith(".fasta") || name.endsWith(".fa");
     const isTSV = name.endsWith(".tsv");
     const isXLSX = name.endsWith(".xlsx") || name.endsWith(".xls");
+
+    if (isFASTA) {
+      const reader = new FileReader();
+      reader.onload = (evt) => {
+        const text = evt.target?.result as string;
+        if (!text?.trim()) {
+          toast.error("FASTA file is empty");
+          return;
+        }
+        const lines = text.split("\n");
+        const entries: { Entry: string; Sequence: string }[] = [];
+        let currentEntry = "";
+        let currentSeq = "";
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith(">")) {
+            if (currentEntry && currentSeq) {
+              entries.push({ Entry: currentEntry, Sequence: currentSeq });
+            }
+            currentEntry = trimmed.slice(1).split(/\s/)[0] || `seq_${entries.length + 1}`;
+            currentSeq = "";
+          } else if (trimmed) {
+            currentSeq += trimmed.replace(/\s/g, "");
+          }
+        }
+        if (currentEntry && currentSeq) {
+          entries.push({ Entry: currentEntry, Sequence: currentSeq });
+        }
+        if (entries.length === 0) {
+          toast.error("No sequences found in FASTA file");
+          return;
+        }
+        setRawPreview({
+          fileName: file.name,
+          headers: ["Entry", "Sequence"],
+          rows: entries.slice(0, 200),
+          rowCount: entries.length,
+        } as any);
+        setCurrentStep(1);
+      };
+      reader.readAsText(file);
+      return;
+    }
 
     if (isXLSX) {
       const reader = new FileReader();
@@ -203,6 +269,8 @@ export default function Upload() {
 
   const handleAnalyze = async () => {
     if (!localFile) return;
+    const controller = new AbortController();
+    abortRef.current = controller;
     try {
       setIsAnalyzing(true);
 
@@ -217,12 +285,21 @@ export default function Upload() {
       setLastRun("upload", localFile, thresholdConfig);
       setSourceFile(localFile);
 
-      const { rows, meta } = (await uploadCSV(localFile, thresholdConfig)) as any; // POST /api/upload-csv
+      const { rows, meta } = (await uploadCSV(
+        localFile,
+        thresholdConfig,
+        controller.signal
+      )) as any;
       ingestBackendRows(rows, meta);
       navigate("/results");
     } catch (e: any) {
-      toast.error(`Analyze failed: ${e.message || e}`);
+      if (e.name === "AbortError") {
+        toast.info("Analysis cancelled");
+      } else {
+        toast.error(`Analyze failed: ${e.message || e}`);
+      }
     } finally {
+      abortRef.current = null;
       setIsAnalyzing(false);
     }
   };
@@ -548,6 +625,34 @@ export default function Upload() {
           <AppFooter />
         </motion.div>
       </div>
+
+      {/* Navigation guard dialog */}
+      {blocker.state === "blocked" && (
+        <Dialog open onOpenChange={() => blocker.reset()}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Analysis in progress</DialogTitle>
+              <DialogDescription>
+                Navigating away will cancel the current analysis. Are you sure you want to leave?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => blocker.reset()}>
+                Stay
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={() => {
+                  abortRef.current?.abort();
+                  blocker.proceed();
+                }}
+              >
+                Leave
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

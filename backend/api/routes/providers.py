@@ -1,6 +1,8 @@
 """
 Provider status and diagnostic endpoints.
 """
+
+import asyncio
 import os
 import subprocess
 
@@ -25,13 +27,9 @@ async def debug_providers():
             "tango": {
                 "status": "OFF | UNAVAILABLE | PARTIAL | AVAILABLE",
                 "reason": "string | null",
-                "stats": {
-                    "requested": 0,
-                    "parsed_ok": 0,
-                    "parsed_bad": 0
-                }
+                "stats": {"requested": 0, "parsed_ok": 0, "parsed_bad": 0},
             }
-        }
+        },
     }
 
 
@@ -50,7 +48,7 @@ async def providers_last_run():
             "s4pred": None,
             "run_dirs": {
                 "tango": None,
-            }
+            },
         }
 
     latest_tango_dir = get_last_run_dir() or tango._latest_run_dir()
@@ -64,16 +62,12 @@ async def providers_last_run():
         "sample_counts": {
             "total_rows": last_status.get("total_rows", 0),
             "ssw_rows_with_data": last_status.get("ssw_rows_with_data", 0),
-        }
+        },
     }
 
 
-@router.get("/api/providers/diagnose/tango")
-async def diagnose_tango():
-    """
-    Diagnose TANGO binary/container availability.
-    Returns actionable status for debugging TANGO execution failures.
-    """
+def _diagnose_tango_sync():
+    """Synchronous TANGO diagnostic — runs in thread pool to avoid blocking event loop."""
     use_docker = settings.TANGO_MODE != "simple"
     docker_image = os.getenv("TANGO_DOCKER_IMAGE", "desy-tango")
 
@@ -126,7 +120,9 @@ async def diagnose_tango():
 
     if not bin_path_abs:
         result["status"] = "missing"
-        result["reason"] = "TANGO binary not found (checked TANGO_BINARY_PATH, tools/tango/bin/, backend/Tango/bin/, and PATH)"
+        result["reason"] = (
+            "TANGO binary not found (checked TANGO_BINARY_PATH, tools/tango/bin/, backend/Tango/bin/, and PATH)"
+        )
         return result
 
     result["path"] = bin_path_abs
@@ -165,3 +161,11 @@ async def diagnose_tango():
     result["status"] = "found"
     return result
 
+
+@router.get("/api/providers/diagnose/tango")
+async def diagnose_tango():
+    """
+    Diagnose TANGO binary/container availability.
+    Returns actionable status for debugging TANGO execution failures.
+    """
+    return await asyncio.to_thread(_diagnose_tango_sync)

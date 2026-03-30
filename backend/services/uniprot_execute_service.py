@@ -12,6 +12,7 @@ Handles the full lifecycle of a UniProt query:
 Extracted from server.py to break the circular import chain.
 """
 
+import asyncio
 import hashlib
 import json
 import re
@@ -650,7 +651,8 @@ async def execute_uniprot_query(
         # 5. Run analysis pipeline
         log_info("uniprot_analysis_start", "Running analysis pipeline")
 
-        result = _run_analysis_pipeline(
+        result = await asyncio.to_thread(
+            _run_analysis_pipeline,
             df,
             run_tango=request.run_tango,
             sentry_initialized=sentry_initialized,

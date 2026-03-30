@@ -2,6 +2,7 @@
 File upload endpoint.
 """
 
+import asyncio
 import json
 import time
 from typing import Optional
@@ -131,7 +132,8 @@ async def upload_csv(
     from api.main import SENTRY_INITIALIZED
 
     try:
-        return process_upload_dataframe(
+        return await asyncio.to_thread(
+            process_upload_dataframe,
             df=df,
             threshold_config_requested=threshold_config_requested,
             threshold_config_resolved=threshold_config_resolved,

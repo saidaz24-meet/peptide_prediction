@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, cubicBezier } from "framer-motion";
 import { FlaskConical, ChevronRight, Copy, Download, ArrowLeft } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -107,6 +107,16 @@ export default function QuickAnalyze() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [clickPos, setClickPos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
+  // Prevent tab close/reload while analyzing
+  useEffect(() => {
+    if (!loading) return;
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [loading]);
+
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = sequence.trim();
@@ -213,12 +223,12 @@ export default function QuickAnalyze() {
                   />
                 </div>
                 <div className="md:col-span-1">
-                  <Label htmlFor="entry">Label (optional)</Label>
+                  <Label htmlFor="entry">Name (optional)</Label>
                   <Input
                     id="entry"
                     value={entry}
                     onChange={(e) => setEntry(e.target.value)}
-                    placeholder="e.g. custom-1"
+                    placeholder="e.g. Amyloid-beta"
                   />
                 </div>
               </div>

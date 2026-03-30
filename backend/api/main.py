@@ -1,6 +1,9 @@
 """
 Main FastAPI application setup and router registration.
 """
+
+import asyncio
+import concurrent.futures
 import logging
 import os
 import uuid
@@ -44,7 +47,10 @@ if settings.SENTRY_DSN and not _running_under_pytest:
             debug=settings.SENTRY_DEBUG,
         )
         SENTRY_INITIALIZED = True
-        log_info("sentry_init", f"Initialized successfully (environment={settings.ENVIRONMENT}, release={release or 'not set'})")
+        log_info(
+            "sentry_init",
+            f"Initialized successfully (environment={settings.ENVIRONMENT}, release={release or 'not set'})",
+        )
     except Exception as e:
         log_error("sentry_init", f"Failed to initialize: {e}")
         SENTRY_INITIALIZED = False
@@ -53,6 +59,7 @@ else:
 
 # Create FastAPI app
 app = FastAPI(title="Peptide Prediction Service")
+
 
 # Add exception handler to capture HTTPExceptions to Sentry
 @app.exception_handler(HTTPException)
@@ -67,13 +74,12 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     elif exc.status_code in [400, 401, 403, 404, 422]:
         sentry_sdk.capture_exception(exc, level="warning")
 
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"detail": exc.detail}
-    )
+    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
+
 
 # Structured logging setup
 logger = get_logger()
+
 
 # Middleware to attach traceId to each request
 class TraceIdMiddleware(BaseHTTPMiddleware):
@@ -84,37 +90,51 @@ class TraceIdMiddleware(BaseHTTPMiddleware):
     - Adds traceId to response headers (X-Trace-Id)
     - Ensures traceId is available in logger context for all log events
     """
+
     async def dispatch(self, request: Request, call_next):
         trace_id = request.headers.get("X-Trace-Id") or str(uuid.uuid4())
         set_trace_id(trace_id)
         request.state.trace_id = trace_id
 
-        log_info("request_start", f"{request.method} {request.url.path}", **{
-            "method": request.method,
-            "path": request.url.path,
-            "stage": "request",
-        })
+        log_info(
+            "request_start",
+            f"{request.method} {request.url.path}",
+            **{
+                "method": request.method,
+                "path": request.url.path,
+                "stage": "request",
+            },
+        )
 
         try:
             response = await call_next(request)
             response.headers["X-Trace-Id"] = trace_id
 
-            log_info("request_end", f"{request.method} {request.url.path} {response.status_code}", **{
-                "method": request.method,
-                "path": request.url.path,
-                "status_code": response.status_code,
-                "stage": "request",
-            })
+            log_info(
+                "request_end",
+                f"{request.method} {request.url.path} {response.status_code}",
+                **{
+                    "method": request.method,
+                    "path": request.url.path,
+                    "status_code": response.status_code,
+                    "stage": "request",
+                },
+            )
             return response
         except Exception as e:
-            log_error("request_error", f"{request.method} {request.url.path} failed: {e}", **{
-                "method": request.method,
-                "path": request.url.path,
-                "error": str(e),
-                "stage": "request",
-            })
+            log_error(
+                "request_error",
+                f"{request.method} {request.url.path} failed: {e}",
+                **{
+                    "method": request.method,
+                    "path": request.url.path,
+                    "error": str(e),
+                    "stage": "request",
+                },
+            )
             sentry_sdk.capture_exception(e, level="error")
             raise
+
 
 # CORS configuration from settings
 app.add_middleware(
@@ -137,9 +157,19 @@ app.include_router(providers.router)
 app.include_router(uniprot.router)
 app.include_router(feedback.router)
 
+
+# Configure thread pool for asyncio.to_thread() — allows concurrent analysis requests.
+# 4 threads = 2 concurrent full pipelines on 4 vCPU VPS.
+@app.on_event("startup")
+def _configure_thread_pool():
+    loop = asyncio.get_running_loop()
+    loop.set_default_executor(
+        concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="pvl")
+    )
+
+
 # Log boot message
 log_info("boot", f"USE_TANGO={settings.USE_TANGO} • USE_S4PRED={settings.USE_S4PRED}")
 
 # Export app and SENTRY_INITIALIZED for use in server.py
 __all__ = ["app", "SENTRY_INITIALIZED"]
-

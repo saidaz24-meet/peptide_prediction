@@ -147,7 +147,7 @@ def apply_ff_flags(
         else:
             data_avg_H = float("nan")
 
-        # Choose threshold: custom overrides data-average, Peleg fallback for NaN
+        # Choose threshold: custom overrides data-average, reference fallback for NaN
         if use_custom and "hydroCutoff" in resolved_thresholds:
             ssw_hydro_threshold = float(resolved_thresholds["hydroCutoff"])
         elif pd.notna(data_avg_H):
@@ -227,7 +227,7 @@ def apply_ff_flags(
         else:
             data_avg_uH = float("nan")
 
-        # Choose threshold: custom overrides data-average, Peleg fallback for NaN
+        # Choose threshold: custom overrides data-average, reference fallback for NaN
         if use_custom and "muHCutoff" in resolved_thresholds:
             helix_uH_threshold = float(resolved_thresholds["muHCutoff"])
         elif pd.notna(data_avg_uH):

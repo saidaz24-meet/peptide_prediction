@@ -125,6 +125,34 @@
 | AI2 | Scientific RAG with PubMed citations | G2 | TODO |
 | AI3 | Research Tamarind Bio for inspiration/connection | G1 | TODO |
 
+## Concurrency & Background Processing (CRITICAL — 2026-03-30)
+
+| ID | Item | Phase | Status |
+|----|------|-------|--------|
+| CQ1 | Large analysis (6000 entries) blocks ALL other requests — Quick Analyze, Upload, everything | B15 | DONE |
+| CQ2 | Wrap `subprocess.run()` in `asyncio.to_thread()` to unblock event loop | B15 | DONE |
+| CQ3 | Bump `--workers 1` to `--workers 2` in Dockerfile.backend + CPU limit to 3 | B15 | DONE |
+| CQ4 | Ghost processes: navigating away leaves TANGO running in background, no way to reconnect | B15 | PARTIAL (abort on nav, but no reconnect yet) |
+| CQ5 | Add navigation guard: "Do you really want to leave? Analysis in progress." | B15 | DONE |
+| CQ6 | Job persistence: sidebar tab showing running/completed jobs (Alex's idea) | B15 | TODO |
+| CQ7 | Server at 150% CPU (1.5/4 cores) but other requests still blocked — queue architecture issue | B15 | TODO |
+| CQ8 | 6000 entries estimated 360 min — communicate timing better and/or optimize batch processing | B15 | TODO |
+| CQ9 | Future: Celery + Redis for proper job queue (defer until 10+ concurrent users) | B15 | TODO |
+
+## Upload UX Confusion (2026-03-30)
+
+| ID | Item | Phase | Status |
+|----|------|-------|--------|
+| UU1 | Alex keeps clicking violet "Upload Data" button instead of dropzone — rename/tone down or make dropzone more prominent | D | TODO |
+| UU2 | Alex also clicks "Upload File" near progress bar — confusing with actual upload area | D | TODO |
+| UU3 | Make real upload dropzone the main focus: more contrast, color, "click here" indicator | D | TODO |
+
+## Quick Analyze UX (2026-03-30)
+
+| ID | Item | Phase | Status |
+|----|------|-------|--------|
+| QU1 | Rename "Label (optional)" to "Name (optional)" or "Peptide Name" — Alex didn't understand it was a name field | D | DONE |
+
 ## Operational
 
 | ID | Item | Owner | Status |

@@ -1,6 +1,6 @@
 # Peptide Visual Lab (PVL) — Development Roadmap
 
-**Last Updated**: 2026-03-05
+**Last Updated**: 2026-03-30
 **Status**: Active Development (pre-paper, deployment-ready)
 **Branch**: `main` (merged from `ref-impl-replacement`)
 
@@ -27,7 +27,7 @@ PVL occupies a unique niche: the **only web tool** combining aggregation propens
 - Smart ranking, per-residue profiles, CSV/PDF/FASTA export
 - Helical wheel projection, collapsible sidebar, progressive disclosure (3-tab)
 - Sentry error tracking, CITATION.cff, pinned dependencies
-- 323 backend tests + 77 frontend tests = 400 total (all deterministic, no network)
+- 341 backend tests + 77 frontend tests = 418 total (all deterministic, no network)
 - Peleg holistic review: Chunks 1-7 DONE, Chunk 8 PARKED, Chunk 9 ONGOING
 
 ### Waiting for DESY
@@ -444,7 +444,24 @@ Alex's vision: a scientific version of OpenClaw where researchers can connect th
 
 ---
 
+## Phase H: Marketing, Content & Branding
 
+**Goal**: Professional public presence. PVL should look like a real product, not a student project.
+**When**: Parallel to Phase D redesign. Visual identity first, then content.
+
+| ID | Task | Effort | Status | Notes |
+|----|------|--------|--------|-------|
+| H1 | Visual identity: logo, color palettes, brand kit | 4-6h | TODO | Export from design system (Phase D) |
+| H2 | Demo video series: Quick Analyze, batch upload, UniProt search, threshold tuning | 8-12h | TODO | Screen recording + voiceover |
+| H3 | LinkedIn content calendar: 2-3 posts/week, templates, content library | 4h + ongoing | TODO | Announce features, show visualizations |
+| H4 | Presentation deck: JOSS paper pitch, conference talks, team internal | 6-8h | TODO | Reusable slide templates |
+| H5 | Website content: landing page copy, use case pages, FAQ | 4-6h | TODO | Part of Phase D redesign |
+| H6 | Wallpapers, social media assets, shareable cards | 2-4h | TODO | From brand kit |
+| H7 | Tamarind Bio research: MCP positioning, partnership potential | 2h | TODO | Informs G1 MCP server story |
+
+**Key principle**: Every LinkedIn post should showcase a real feature with a screenshot or screen recording. No fluff.
+
+---
 
 | ID | Issue | Priority | When to Fix |
 |----|-------|----------|-------------|
@@ -522,6 +539,28 @@ Alex's vision: a scientific version of OpenClaw where researchers can connect th
 - Ranking: multi-metric scoring, weight sliders, consensus pipeline
 - Polish: edge cases, threshold tuner, aggregation flagging
 - Tests: 235 → 323 backend, 0 → 77 frontend (vitest)
+
+</details>
+
+<details>
+<summary>Mar 25-30: Alex VPS Testing + Concurrency Fix + Wave 1 Features</summary>
+
+- Deployed to Hetzner VPS (CX33, 4 vCPU, 8GB, Nuremberg) — Alex testing live
+- Fixed nginx 413 for large uploads (ISSUE-021)
+- FASTA upload support (B11) — backend parser + frontend dropzone
+- Example peptide buttons on Quick Analyze (ISSUE-022)
+- Sequence validation with non-letter character stripping (ISSUE-020)
+- Upload guidance info panel (B12)
+- Entry count warnings with time estimates for large datasets
+- UniProt metadata enrichment (gene_names, cc_function, annotation_score)
+- UniProt X-Total-Results header parsing
+- Concurrency fix: asyncio.to_thread() for TANGO/S4PRED, 2 workers, thread pool
+- Navigation guard: useBlocker + beforeunload + AbortController
+- "Label" renamed to "Name" in Quick Analyze
+- Ranking system: multi-metric scoring, consensus pipeline, weight sliders
+- ConsensusBadge + WeightBar components
+- All Alex/Peleg feedback documented in ALEX_BACKLOG.md (70+ items tracked)
+- Tests: 323 → 341 backend
 
 </details>
 

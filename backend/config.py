@@ -162,17 +162,17 @@ class Settings:
     SSW_DIFF_THRESHOLD_FALLBACK: float = float(os.getenv("SSW_DIFF_THRESHOLD_FALLBACK", "0.0"))
     """Fallback SSW diff threshold when no valid diffs (default: 0.0)"""
 
-    # Peleg dataset-average fallbacks for single-sequence mode
-    # When there is no cohort to compute data-average, use Peleg's reference values.
+    # Reference dataset-average fallbacks for single-sequence mode
+    # When there is no cohort to compute data-average, use reference values.
     PELEG_DEFAULT_HYDRO_THRESHOLD: float = float(
         os.getenv("PELEG_DEFAULT_HYDRO_THRESHOLD", "0.417")
     )
-    """Peleg dataset-average hydrophobicity (fallback for single-sequence FF-SSW)"""
+    """Reference dataset-average hydrophobicity (fallback for single-sequence FF-SSW)"""
 
     PELEG_DEFAULT_HELIX_UH_THRESHOLD: float = float(
         os.getenv("PELEG_DEFAULT_HELIX_UH_THRESHOLD", "0.388")
     )
-    """Peleg dataset-average helix uH (fallback for single-sequence FF-Helix)"""
+    """Reference dataset-average helix uH (fallback for single-sequence FF-Helix)"""
 
     # S4PRED thresholds (from reference config.py)
     MIN_S4PRED_SCORE: float = float(os.getenv("MIN_S4PRED_SCORE", "0.5"))
