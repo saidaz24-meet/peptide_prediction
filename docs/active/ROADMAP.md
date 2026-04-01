@@ -147,7 +147,7 @@ Current blockers for large datasets:
 Simulate concurrent load: 50, 100, 1000 simultaneous analyses. Tools: `locust` or `k6` for HTTP load testing against the Hetzner VPS. Helps determine when to scale workers or add async queue.
 **Deliverables**: Load test script, baseline numbers (requests/sec, p95 latency), breaking point identification.
 
-**Phase B summary**: 6/15 done. B1 (async), B6 (cache), B10-B16 planned.
+**Phase B summary**: 9/16 done. B11 (FASTA), B13 (atom2svg), B14 (dual compare) completed. B6 (cache), B15-B16 planned.
 
 ---
 
@@ -265,7 +265,7 @@ Each graph goes through the cycle above. Charts to redesign:
 | F1 | Search query fix | 3-4h | DONE | Full-text default already correct (no `keyword:` prefix), X-Total-Results parsed |
 | F2 | Search summary banner | 2h | DONE | Enhanced banner with query mode detection, filter details, cap warning, "View on UniProt" link |
 | F3 | Metadata enrichment | 5-6h | DONE | gene_names, cc_function, annotation_score already fetched; now displayed on PeptideDetail (gene in header, function card, annotation stars) |
-| F4 | Dedicated `/search` page | 8-10h | TODO | Own sidebar tab, browse table with checkboxes, "Analyze Selected" (ties into D7) |
+| F4 | Dedicated `/search` page | 8-10h | DONE | Own sidebar tab "Database Search", tip cards, clean card layout, direct to results |
 | F5 | Browse-then-analyze | 6-8h | TODO | Lightweight browse first (metadata only), user-triggered analysis on selection |
 | F6 | Advanced search | 6-8h | TODO | "Search in" selector, raised caps, smart suggestions, pagination |
 
