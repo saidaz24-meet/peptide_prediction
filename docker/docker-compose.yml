@@ -33,6 +33,55 @@ services:
     command: ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   # ---------------------------------------------------------------------------
+  # Celery Workers (dev overrides)
+  # ---------------------------------------------------------------------------
+  celery-batch:
+    container_name: pvl-celery-batch-dev
+    volumes:
+      - ../backend:/app:cached
+    environment:
+      - LOG_LEVEL=DEBUG
+    restart: unless-stopped
+
+  celery-quick:
+    container_name: pvl-celery-quick-dev
+    volumes:
+      - ../backend:/app:cached
+    environment:
+      - LOG_LEVEL=DEBUG
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Redis (dev overrides)
+  # ---------------------------------------------------------------------------
+  redis:
+    container_name: pvl-redis-dev
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Flower Monitoring (optional — run with: docker compose --profile monitoring up)
+  # ---------------------------------------------------------------------------
+  flower:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+    container_name: pvl-flower-dev
+    command: celery -A celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles:
+      - monitoring
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
   # Frontend Service (dev overrides)
   # ---------------------------------------------------------------------------
   frontend:

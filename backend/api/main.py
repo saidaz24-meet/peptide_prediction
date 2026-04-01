@@ -18,7 +18,7 @@ from sentry_sdk.integrations.logging import LoggingIntegration
 from starlette.middleware.base import BaseHTTPMiddleware
 
 # Import routers
-from api.routes import example, feedback, health, predict, providers, uniprot, upload
+from api.routes import example, feedback, health, jobs, predict, providers, uniprot, upload
 from config import settings
 from services.logger import get_logger, log_error, log_info, set_trace_id
 
@@ -33,12 +33,17 @@ if settings.SENTRY_DSN and not _running_under_pytest:
         release = settings.SENTRY_RELEASE
         if not release:
             import subprocess
+
             try:
-                release = subprocess.check_output(
-                    ["git", "rev-parse", "--short", "HEAD"],
-                    stderr=subprocess.DEVNULL,
-                    timeout=5,
-                ).decode().strip()
+                release = (
+                    subprocess.check_output(
+                        ["git", "rev-parse", "--short", "HEAD"],
+                        stderr=subprocess.DEVNULL,
+                        timeout=5,
+                    )
+                    .decode()
+                    .strip()
+                )
             except Exception:
                 release = None
 
@@ -173,6 +178,7 @@ app.include_router(predict.router)
 app.include_router(providers.router)
 app.include_router(uniprot.router)
 app.include_router(feedback.router)
+app.include_router(jobs.router)
 
 
 # Configure thread pool for asyncio.to_thread() — allows concurrent analysis requests.
@@ -185,6 +191,23 @@ def _configure_thread_pool():
     )
 
 
+@app.on_event("startup")
+def _check_redis():
+    """Check Redis connectivity on startup. Disable Celery if Redis is unreachable."""
+    if not settings.CELERY_ENABLED:
+        log_info("redis_skip", "CELERY_ENABLED=0, skipping Redis check")
+        return
+    try:
+        import redis
+
+        r = redis.from_url(settings.REDIS_URL, socket_connect_timeout=3)
+        r.ping()
+        log_info("redis_ok", f"Redis connected at {settings.REDIS_URL}")
+    except Exception as e:
+        log_info("redis_fail", f"Redis unavailable: {e} — falling back to sync mode")
+        settings.CELERY_ENABLED = False
+
+
 @app.on_event("shutdown")
 async def _graceful_shutdown():
     """Handle SIGTERM for graceful K8s pod shutdown."""
@@ -192,7 +215,10 @@ async def _graceful_shutdown():
 
 
 # Log boot message
-log_info("boot", f"USE_TANGO={settings.USE_TANGO} • USE_S4PRED={settings.USE_S4PRED}")
+log_info(
+    "boot",
+    f"USE_TANGO={settings.USE_TANGO} • USE_S4PRED={settings.USE_S4PRED} • CELERY={settings.CELERY_ENABLED}",
+)
 
 # Export app and SENTRY_INITIALIZED for use in server.py
 __all__ = ["app", "SENTRY_INITIALIZED"]

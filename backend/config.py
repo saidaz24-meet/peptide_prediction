@@ -202,6 +202,22 @@ class Settings:
     """TANGO absolute minimum sequence length"""
 
     # ============================================================================
+    # Celery / Redis Configuration
+    # ============================================================================
+
+    CELERY_BROKER_URL: str = os.getenv("CELERY_BROKER_URL", "redis://localhost:6379/0")
+    """Redis URL for Celery message broker (default: redis://localhost:6379/0)"""
+
+    CELERY_RESULT_BACKEND: str = os.getenv("CELERY_RESULT_BACKEND", "redis://localhost:6379/1")
+    """Redis URL for Celery result backend (default: redis://localhost:6379/1)"""
+
+    REDIS_URL: str = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    """Redis URL for general use (job tracking, etc.)"""
+
+    CELERY_ENABLED: bool = _env_bool("CELERY_ENABLED", False)
+    """Enable Celery async job processing (default: False — sync fallback)"""
+
+    # ============================================================================
     # Debug Configuration
     # ============================================================================
 

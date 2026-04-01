@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { DataPreview } from "@/components/DataPreview";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { uploadCSV } from "@/lib/api";
+import { submitUploadJob } from "@/lib/jobApi";
+import { useJobStore } from "@/stores/jobStore";
 import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
@@ -275,6 +277,31 @@ export default function Upload() {
       setLastRun("upload", localFile, thresholdConfig);
       setSourceFile(localFile);
 
+      // Try async job submission first, fall back to sync
+      try {
+        const jobResponse = await submitUploadJob(localFile, thresholdConfig);
+
+        if (jobResponse.mode === "async" && jobResponse.jobId) {
+          // Async path: job dispatched to Celery worker
+          const peptideCount = jobResponse.peptideCount ?? rawData?.rowCount ?? 0;
+          useJobStore.getState().addJob(jobResponse.jobId, localFile.name, peptideCount);
+          toast.success("Analysis started — you can navigate away safely.", {
+            description: `Processing ${peptideCount} peptides in the background`,
+          });
+          // Don't navigate yet — jobStore will navigate on completion
+          return;
+        } else if (jobResponse.mode === "sync" && jobResponse.result) {
+          // Sync fallback: result returned directly
+          const { rows, meta } = jobResponse.result;
+          ingestBackendRows(rows, meta);
+          navigate("/results");
+          return;
+        }
+      } catch {
+        // Job endpoint unavailable — fall back to legacy sync upload
+      }
+
+      // Legacy sync fallback (direct upload-csv endpoint)
       const { rows, meta } = (await uploadCSV(
         localFile,
         thresholdConfig,
@@ -327,11 +354,7 @@ export default function Upload() {
                             : "border-2 border-[hsl(var(--border))] text-[hsl(var(--faint))]"
                       }`}
                     >
-                      {isCompleted ? (
-                        <CheckCircle className="w-4 h-4" />
-                      ) : (
-                        <span>{index + 1}</span>
-                      )}
+                      {isCompleted ? <CheckCircle className="w-4 h-4" /> : <span>{index + 1}</span>}
                     </div>
                     <span
                       className={`text-small font-medium hidden sm:inline ${isActive || isCompleted ? "text-foreground" : "text-[hsl(var(--faint))]"}`}
@@ -339,7 +362,9 @@ export default function Upload() {
                       {step.title}
                     </span>
                     {index < steps.length - 1 && (
-                      <div className={`w-8 sm:w-12 h-[2px] rounded-full mx-1 ${isCompleted ? "bg-primary" : "bg-[hsl(var(--border))]"}`} />
+                      <div
+                        className={`w-8 sm:w-12 h-[2px] rounded-full mx-1 ${isCompleted ? "bg-primary" : "bg-[hsl(var(--border))]"}`}
+                      />
                     )}
                   </div>
                 );
@@ -602,10 +627,19 @@ export default function Upload() {
                   )}
 
                   <div className="flex justify-between items-center pt-2">
-                    <Button variant="outline" onClick={() => setCurrentStep(0)} className="btn-press">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentStep(0)}
+                      className="btn-press"
+                    >
                       Back
                     </Button>
-                    <Button onClick={handleAnalyze} disabled={!localFile || isAnalyzing} size="lg" className="px-8 btn-press">
+                    <Button
+                      onClick={handleAnalyze}
+                      disabled={!localFile || isAnalyzing}
+                      size="lg"
+                      className="px-8 btn-press"
+                    >
                       {isAnalyzing ? "Analyzing…" : "Analyze Dataset"}
                     </Button>
                   </div>

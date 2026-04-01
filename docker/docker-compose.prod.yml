@@ -41,6 +41,74 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
+  # Redis (prod overrides)
+  # ---------------------------------------------------------------------------
+  redis:
+    container_name: pvl-redis
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 192M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Celery Batch Worker (prod overrides)
+  # ---------------------------------------------------------------------------
+  celery-batch:
+    image: pvl-backend:latest
+    container_name: pvl-celery-batch
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Celery Quick Worker (prod overrides)
+  # ---------------------------------------------------------------------------
+  celery-quick:
+    image: pvl-backend:latest
+    container_name: pvl-celery-quick
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
   # Frontend Service (prod overrides)
   # ---------------------------------------------------------------------------
   frontend:

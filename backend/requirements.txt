@@ -18,6 +18,13 @@ sentry-sdk[fastapi]>=2.49,<3.0
 # Result caching
 duckdb>=1.1,<2.0
 
+# Task queue & caching
+celery[redis]>=5.4,<6.0
+redis>=5.0,<6.0
+
+# Monitoring (optional — used by Flower dashboard)
+flower>=2.0,<3.0
+
 # S4PRED neural network inference
 # Note: In Docker, use CPU-only torch via --extra-index-url
 # (see Dockerfile.backend for details)

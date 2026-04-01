@@ -1,9 +1,9 @@
 // src/App.tsx
-import React, { Suspense } from "react";
+import React, { Suspense, useEffect } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation, useNavigate } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import Index from "./pages/Index";
 import ScrollToTop from "@/components/ScrollToTop";
@@ -11,6 +11,7 @@ import { ValidationBanner } from "@/components/ValidationBanner";
 import { AppSidebar } from "@/components/AppSidebar";
 import { TopNav } from "@/components/TopNav";
 import { PageTransition } from "@/components/PageTransition";
+import { useJobStore } from "@/stores/jobStore";
 
 // Lazy-loaded pages (Index kept direct for instant first load)
 const Upload = React.lazy(() => import("./pages/Upload"));
@@ -28,7 +29,21 @@ const queryClient = new QueryClient();
 /** Inner layout that switches between TopNav (landing) and Sidebar (app pages) */
 function AppLayout() {
   const location = useLocation();
+  const navigate = useNavigate();
   const isLanding = location.pathname === "/";
+
+  // Set global navigate for job store polling callbacks
+  useEffect(() => {
+    window.__pvlNavigate = navigate;
+    return () => {
+      window.__pvlNavigate = undefined;
+    };
+  }, [navigate]);
+
+  // Resume polling for any persisted active jobs on mount
+  useEffect(() => {
+    useJobStore.getState().resumePolling();
+  }, []);
 
   return (
     <>
@@ -64,15 +79,78 @@ function AppLayout() {
               }
             >
               <Routes>
-                <Route path="/upload" element={<PageTransition><Upload /></PageTransition>} />
-                <Route path="/results" element={<PageTransition><Results /></PageTransition>} />
-                <Route path="/peptides/:id" element={<PageTransition><PeptideDetail /></PageTransition>} />
-                <Route path="/metrics/:metricId" element={<PageTransition><MetricDetail /></PageTransition>} />
-                <Route path="/help" element={<PageTransition><Help /></PageTransition>} />
-                <Route path="/about" element={<PageTransition><About /></PageTransition>} />
-                <Route path="/quick" element={<PageTransition><QuickAnalyze /></PageTransition>} />
-                <Route path="/compare" element={<PageTransition><Compare /></PageTransition>} />
-                <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
+                <Route
+                  path="/upload"
+                  element={
+                    <PageTransition>
+                      <Upload />
+                    </PageTransition>
+                  }
+                />
+                <Route
+                  path="/results"
+                  element={
+                    <PageTransition>
+                      <Results />
+                    </PageTransition>
+                  }
+                />
+                <Route
+                  path="/peptides/:id"
+                  element={
+                    <PageTransition>
+                      <PeptideDetail />
+                    </PageTransition>
+                  }
+                />
+                <Route
+                  path="/metrics/:metricId"
+                  element={
+                    <PageTransition>
+                      <MetricDetail />
+                    </PageTransition>
+                  }
+                />
+                <Route
+                  path="/help"
+                  element={
+                    <PageTransition>
+                      <Help />
+                    </PageTransition>
+                  }
+                />
+                <Route
+                  path="/about"
+                  element={
+                    <PageTransition>
+                      <About />
+                    </PageTransition>
+                  }
+                />
+                <Route
+                  path="/quick"
+                  element={
+                    <PageTransition>
+                      <QuickAnalyze />
+                    </PageTransition>
+                  }
+                />
+                <Route
+                  path="/compare"
+                  element={
+                    <PageTransition>
+                      <Compare />
+                    </PageTransition>
+                  }
+                />
+                <Route
+                  path="*"
+                  element={
+                    <PageTransition>
+                      <NotFound />
+                    </PageTransition>
+                  }
+                />
               </Routes>
             </Suspense>
           </main>

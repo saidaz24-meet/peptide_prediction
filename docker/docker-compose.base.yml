@@ -36,12 +36,112 @@ services:
       - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
       # Optional: Sentry DSN
       - SENTRY_DSN=${SENTRY_DSN:-}
+      # Celery / Redis (enabled when redis service is present)
+      - CELERY_ENABLED=${CELERY_ENABLED:-1}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Redis (Message Broker + Result Backend)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - pvl-redis:/data
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save 60 1000
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # ---------------------------------------------------------------------------
+  # Celery Worker — Batch Queue (heavy analysis jobs)
+  # ---------------------------------------------------------------------------
+  celery-batch:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      args:
+        PYTHON_VERSION: "3.11"
+    command: >
+      celery -A celery_app worker
+      --queues=batch
+      --concurrency=2
+      --pool=prefork
+      --loglevel=info
+      --hostname=batch@%h
+    volumes:
+      - pvl-runs:/data/runs
+      - pvl-uploads:/data/uploads
+      - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
+      - pvl-cache:/app/.run_cache
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - USE_TANGO=${USE_TANGO:-1}
+      - USE_S4PRED=${USE_S4PRED:-1}
+      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
+      - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "celery_app", "inspect", "ping", "--destination", "celery@batch@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ---------------------------------------------------------------------------
+  # Celery Worker — Quick Queue (single-sequence predictions)
+  # ---------------------------------------------------------------------------
+  celery-quick:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      args:
+        PYTHON_VERSION: "3.11"
+    command: >
+      celery -A celery_app worker
+      --queues=quick
+      --concurrency=2
+      --pool=prefork
+      --loglevel=info
+      --hostname=quick@%h
+    volumes:
+      - pvl-runs:/data/runs
+      - pvl-cache:/app/.run_cache
+      - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - USE_TANGO=${USE_TANGO:-1}
+      - USE_S4PRED=${USE_S4PRED:-1}
+      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
+      - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "celery_app", "inspect", "ping", "--destination", "celery@quick@$$HOSTNAME"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
 
   # ---------------------------------------------------------------------------
   # Frontend Service (base definition)
@@ -66,4 +166,6 @@ volumes:
   pvl-uploads:
     driver: local
   pvl-cache:
+    driver: local
+  pvl-redis:
     driver: local

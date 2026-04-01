@@ -4,12 +4,13 @@ Upload processing service.
 Core DataFrame processing logic for file uploads.
 HTTP-specific concerns (file validation, UploadFile handling) remain in server.py.
 """
+
 import hashlib
 import json
 import os
 import time
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import pandas as pd
 import sentry_sdk
@@ -50,7 +51,10 @@ from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_res
 
 class UploadProcessingError(Exception):
     """Custom exception for upload processing errors."""
-    def __init__(self, message: str, detail: Optional[Dict[str, Any]] = None, status_code: int = 500):
+
+    def __init__(
+        self, message: str, detail: Optional[Dict[str, Any]] = None, status_code: int = 500
+    ):
         super().__init__(message)
         self.message = message
         self.detail = detail or {}
@@ -110,14 +114,23 @@ def run_tango_processing(
             if records:
                 # Performance timing: TANGO execution
                 tango_run_start_time = time.time()
-                log_info("tango_run_start", f"Running TANGO for {len(records)} sequences",
-                        stage="tango_run", **{"sequence_count": len(records)})
+                log_info(
+                    "tango_run_start",
+                    f"Running TANGO for {len(records)} sequences",
+                    stage="tango_run",
+                    **{"sequence_count": len(records)},
+                )
                 run_dir = tango.run_tango_simple(records)
                 tango_ran = True
                 run_id = os.path.basename(run_dir) if run_dir else None
                 tango_run_elapsed = (time.time() - tango_run_start_time) * 1000
-                log_info("tango_run_complete", f"TANGO run completed, outputs in {run_dir}",
-                        stage="tango_run", run_id=run_id, **{"run_dir": run_dir, "tango_run_time_ms": round(tango_run_elapsed, 2)})
+                log_info(
+                    "tango_run_complete",
+                    f"TANGO run completed, outputs in {run_dir}",
+                    stage="tango_run",
+                    run_id=run_id,
+                    **{"run_dir": run_dir, "tango_run_time_ms": round(tango_run_elapsed, 2)},
+                )
             else:
                 log_info("tango_skip", "No records to run (possibly all already processed).")
                 tango_provider_status = "UNAVAILABLE"
@@ -130,19 +143,32 @@ def run_tango_processing(
             try:
                 # Performance timing: TANGO parsing
                 tango_parse_start_time = time.time()
-                log_info("tango_parse_start", "Parsing TANGO output files",
-                        stage="tango_parse", run_id=run_id)
+                log_info(
+                    "tango_parse_start",
+                    "Parsing TANGO output files",
+                    stage="tango_parse",
+                    run_id=run_id,
+                )
                 parse_stats = tango.process_tango_output(df, run_dir=run_dir)
                 if parse_stats:
                     tango_stats["parsed_ok"] = parse_stats.get("parsed_ok", 0)
                     tango_stats["parsed_bad"] = parse_stats.get("parsed_bad", 0)
                     tango_stats["requested"] = parse_stats.get("requested", requested)
                 tango_parse_elapsed = (time.time() - tango_parse_start_time) * 1000
-                log_info("tango_parse_complete", f"Parsed TANGO outputs: {tango_stats['parsed_ok']} OK, {tango_stats['parsed_bad']} failed",
-                        stage="tango_parse", run_id=run_id, **{**tango_stats, "tango_parse_time_ms": round(tango_parse_elapsed, 2)})
+                log_info(
+                    "tango_parse_complete",
+                    f"Parsed TANGO outputs: {tango_stats['parsed_ok']} OK, {tango_stats['parsed_bad']} failed",
+                    stage="tango_parse",
+                    run_id=run_id,
+                    **{**tango_stats, "tango_parse_time_ms": round(tango_parse_elapsed, 2)},
+                )
 
                 # If parse_ok == 0 and requested > 0, runner likely failed
-                if parse_stats and parse_stats.get("parsed_ok", 0) == 0 and parse_stats.get("requested", 0) > 0:
+                if (
+                    parse_stats
+                    and parse_stats.get("parsed_ok", 0) == 0
+                    and parse_stats.get("requested", 0) > 0
+                ):
                     tango_provider_status = "UNAVAILABLE"
                     meta_reason = parse_stats.get("reason")
                     if meta_reason:
@@ -158,16 +184,25 @@ def run_tango_processing(
                     if "SSW diff" in df.columns:
                         df["SSW diff"] = pd.Series([None] * n, index=df.index, dtype=object)
                     if "SSW helix percentage" in df.columns:
-                        df["SSW helix percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
+                        df["SSW helix percentage"] = pd.Series(
+                            [None] * n, index=df.index, dtype=object
+                        )
                     if "SSW beta percentage" in df.columns:
-                        df["SSW beta percentage"] = pd.Series([None] * n, index=df.index, dtype=object)
+                        df["SSW beta percentage"] = pd.Series(
+                            [None] * n, index=df.index, dtype=object
+                        )
 
             except ValueError as e:
                 # Check if this is a fatal "0 outputs" error
                 if "TANGO produced 0 outputs" in str(e):
                     trace_id = get_trace_id()
-                    log_error("tango_zero_outputs_ui", f"TANGO zero outputs error: {e}", entry=trace_entry,
-                            stage="tango_parse", **{"error": str(e), "run_dir": run_dir})
+                    log_error(
+                        "tango_zero_outputs_ui",
+                        f"TANGO zero outputs error: {e}",
+                        entry=trace_entry,
+                        stage="tango_parse",
+                        **{"error": str(e), "run_dir": run_dir},
+                    )
 
                     # Read run_meta.json for full diagnostic context
                     run_meta = {}
@@ -185,53 +220,66 @@ def run_tango_processing(
                             scope.set_tag("provider", "tango")
                             scope.set_tag("stage", "parse")
                             scope.set_tag("error_type", "zero_outputs")
-                            scope.set_tag("execution_mode", run_meta.get("execution_mode", "unknown"))
-                            scope.set_context("tango_execution", {
-                                "run_dir": run_dir if run_dir else None,
-                                "trace_id": trace_id,
-                                "entry": trace_entry,
-                                "execution_mode": run_meta.get("execution_mode"),
-                                "bin_path": run_meta.get("bin_path"),
-                                "cmd": run_meta.get("cmd"),
-                                "cwd": run_meta.get("cwd"),
-                                "exit_code": run_meta.get("exit_code"),
-                                "inputs_requested": run_meta.get("inputs_requested"),
-                                "outputs_found": run_meta.get("outputs_found"),
-                                "output_files": run_meta.get("output_files", [])[:10],
-                                "stderr_tail": run_meta.get("stderr_tail", "")[:500],
-                                "reason": run_meta.get("reason"),
-                            })
+                            scope.set_tag(
+                                "execution_mode", run_meta.get("execution_mode", "unknown")
+                            )
+                            scope.set_context(
+                                "tango_execution",
+                                {
+                                    "run_dir": run_dir if run_dir else None,
+                                    "trace_id": trace_id,
+                                    "entry": trace_entry,
+                                    "execution_mode": run_meta.get("execution_mode"),
+                                    "bin_path": run_meta.get("bin_path"),
+                                    "cmd": run_meta.get("cmd"),
+                                    "cwd": run_meta.get("cwd"),
+                                    "exit_code": run_meta.get("exit_code"),
+                                    "inputs_requested": run_meta.get("inputs_requested"),
+                                    "outputs_found": run_meta.get("outputs_found"),
+                                    "output_files": run_meta.get("output_files", [])[:10],
+                                    "stderr_tail": run_meta.get("stderr_tail", "")[:500],
+                                    "reason": run_meta.get("reason"),
+                                },
+                            )
                             sentry_sdk.capture_exception(e, level="error")
 
                     error_detail = {
                         "source": "tango",
                         "error": str(e),
                         "run_dir": run_dir if run_dir else None,
-                        "suspected_cause": parse_stats.get("reason", "Unknown") if parse_stats else "Unknown",
+                        "suspected_cause": parse_stats.get("reason", "Unknown")
+                        if parse_stats
+                        else "Unknown",
                         "execution_mode": run_meta.get("execution_mode"),
                         "outputs_found": run_meta.get("outputs_found"),
                         "output_files": run_meta.get("output_files", [])[:10],
                     }
                     raise UploadProcessingError(
-                        message="TANGO produced 0 outputs",
-                        detail=error_detail,
-                        status_code=500
+                        message="TANGO produced 0 outputs", detail=error_detail, status_code=500
                     ) from e
 
                 # Catch alignment errors and report clearly
                 trace_id = get_trace_id()
-                log_error("tango_parse_failed", f"TANGO parse error: {e}", entry=trace_entry,
-                        stage="tango_parse", **{"error": str(e), "run_dir": run_dir})
+                log_error(
+                    "tango_parse_failed",
+                    f"TANGO parse error: {e}",
+                    entry=trace_entry,
+                    stage="tango_parse",
+                    **{"error": str(e), "run_dir": run_dir},
+                )
 
                 if sentry_initialized:
                     with sentry_sdk.push_scope() as scope:
                         scope.set_tag("provider", "tango")
                         scope.set_tag("stage", "parse")
-                        scope.set_context("tango_parse", {
-                            "run_dir": run_dir if run_dir else None,
-                            "trace_id": trace_id,
-                            "entry": trace_entry,
-                        })
+                        scope.set_context(
+                            "tango_parse",
+                            {
+                                "run_dir": run_dir if run_dir else None,
+                                "trace_id": trace_id,
+                                "entry": trace_entry,
+                            },
+                        )
                         sentry_sdk.capture_exception(e, level="error")
 
                 tango_provider_status = "UNAVAILABLE"
@@ -240,18 +288,26 @@ def run_tango_processing(
 
             except Exception as e:
                 trace_id = get_trace_id()
-                log_error("tango_parse_error", f"Unexpected error during output processing: {e}",
-                        entry=trace_entry, stage="tango_parse", **{"error": str(e), "run_dir": run_dir})
+                log_error(
+                    "tango_parse_error",
+                    f"Unexpected error during output processing: {e}",
+                    entry=trace_entry,
+                    stage="tango_parse",
+                    **{"error": str(e), "run_dir": run_dir},
+                )
 
                 if sentry_initialized:
                     with sentry_sdk.push_scope() as scope:
                         scope.set_tag("provider", "tango")
                         scope.set_tag("stage", "parse")
-                        scope.set_context("tango_parse", {
-                            "run_dir": run_dir if run_dir else None,
-                            "trace_id": trace_id,
-                            "entry": trace_entry,
-                        })
+                        scope.set_context(
+                            "tango_parse",
+                            {
+                                "run_dir": run_dir if run_dir else None,
+                                "trace_id": trace_id,
+                                "entry": trace_entry,
+                            },
+                        )
                         sentry_sdk.capture_exception(e, level="error")
 
                 tango_provider_status = "UNAVAILABLE"
@@ -269,17 +325,25 @@ def run_tango_processing(
                 log_info("tango_filter_complete", "SSW predictions computed")
             except ValueError as e:
                 trace_id = get_trace_id()
-                log_error("tango_filter_failed", f"SSW prediction computation failed: {e}",
-                        entry=trace_entry, stage="tango_filter", **{"error": str(e)})
+                log_error(
+                    "tango_filter_failed",
+                    f"SSW prediction computation failed: {e}",
+                    entry=trace_entry,
+                    stage="tango_filter",
+                    **{"error": str(e)},
+                )
 
                 if sentry_initialized:
                     with sentry_sdk.push_scope() as scope:
                         scope.set_tag("provider", "tango")
                         scope.set_tag("stage", "filter")
-                        scope.set_context("tango_filter", {
-                            "trace_id": trace_id,
-                            "entry": trace_entry,
-                        })
+                        scope.set_context(
+                            "tango_filter",
+                            {
+                                "trace_id": trace_id,
+                                "entry": trace_entry,
+                            },
+                        )
                         sentry_sdk.capture_exception(e, level="error")
 
                 tango_provider_status = "UNAVAILABLE"
@@ -288,17 +352,25 @@ def run_tango_processing(
                 df["SSW prediction"] = pd.Series([None] * n, index=df.index, dtype=object)
             except Exception as e:
                 trace_id = get_trace_id()
-                log_error("tango_filter_error", f"Could not compute SSW prediction: {e}",
-                        entry=trace_entry, stage="tango_filter", **{"error": str(e)})
+                log_error(
+                    "tango_filter_error",
+                    f"Could not compute SSW prediction: {e}",
+                    entry=trace_entry,
+                    stage="tango_filter",
+                    **{"error": str(e)},
+                )
 
                 if sentry_initialized:
                     with sentry_sdk.push_scope() as scope:
                         scope.set_tag("provider", "tango")
                         scope.set_tag("stage", "filter")
-                        scope.set_context("tango_filter", {
-                            "trace_id": trace_id,
-                            "entry": trace_entry,
-                        })
+                        scope.set_context(
+                            "tango_filter",
+                            {
+                                "trace_id": trace_id,
+                                "entry": trace_entry,
+                            },
+                        )
                         sentry_sdk.capture_exception(e, level="error")
 
                 tango_provider_status = "UNAVAILABLE"
@@ -317,7 +389,9 @@ def run_tango_processing(
                 _set_ssw_fields_to_none(df)
             elif 0 < parsed_ok < requested:
                 tango_provider_status = "PARTIAL"
-                tango_provider_reason = f"Only {parsed_ok}/{requested} sequences processed successfully"
+                tango_provider_reason = (
+                    f"Only {parsed_ok}/{requested} sequences processed successfully"
+                )
                 # Only nullify SSW fields for entries where TANGO genuinely
                 # did NOT produce data. Do NOT use "SSW diff".isna() — entries
                 # can have valid TANGO output (Tango has data = True) but still
@@ -327,10 +401,17 @@ def run_tango_processing(
                     mask_no_tango = ~df["Tango has data"].fillna(False).astype(bool)
                     # Also exclude entries that were at least attempted
                     if "Tango attempted" in df.columns:
-                        mask_no_tango = mask_no_tango & ~df["Tango attempted"].fillna(False).astype(bool)
+                        mask_no_tango = mask_no_tango & ~df["Tango attempted"].fillna(False).astype(
+                            bool
+                        )
                     if mask_no_tango.any():
-                        for col in ["SSW prediction", "SSW score", "SSW diff",
-                                    "SSW helix percentage", "SSW beta percentage"]:
+                        for col in [
+                            "SSW prediction",
+                            "SSW score",
+                            "SSW diff",
+                            "SSW helix percentage",
+                            "SSW beta percentage",
+                        ]:
                             if col in df.columns:
                                 df.loc[mask_no_tango, col] = None
             elif parsed_ok == requested and requested > 0:
@@ -340,16 +421,23 @@ def run_tango_processing(
                 tango_provider_status = "OFF"
                 tango_provider_reason = "No TANGO run attempted"
 
-            log_info("tango_stats", f"TANGO provider status: {tango_provider_status}", **{
-                "status": tango_provider_status,
-                "reason": tango_provider_reason,
-                **tango_stats,
-            })
+            log_info(
+                "tango_stats",
+                f"TANGO provider status: {tango_provider_status}",
+                **{
+                    "status": tango_provider_status,
+                    "reason": tango_provider_reason,
+                    **tango_stats,
+                },
+            )
 
         else:
             # ENV USE_TANGO=false: Always skip (primary gate)
-            log_info("tango_disabled", "TANGO disabled by USE_TANGO env (USE_TANGO=0)",
-                    **{"run_tango": False, "reason": "TANGO disabled in environment (USE_TANGO=0)"})
+            log_info(
+                "tango_disabled",
+                "TANGO disabled by USE_TANGO env (USE_TANGO=0)",
+                **{"run_tango": False, "reason": "TANGO disabled in environment (USE_TANGO=0)"},
+            )
             tango_provider_status = "OFF"
             tango_provider_reason = "TANGO disabled in environment (USE_TANGO=0)"
 
@@ -358,17 +446,25 @@ def run_tango_processing(
         raise
     except Exception as e:
         trace_id = get_trace_id()
-        log_error("tango_error", f"TANGO error: {e} (continuing without Tango)",
-                entry=trace_entry, stage="tango", **{"error": str(e)})
+        log_error(
+            "tango_error",
+            f"TANGO error: {e} (continuing without Tango)",
+            entry=trace_entry,
+            stage="tango",
+            **{"error": str(e)},
+        )
 
         if sentry_initialized:
             with sentry_sdk.push_scope() as scope:
                 scope.set_tag("provider", "tango")
                 scope.set_tag("stage", "general")
-                scope.set_context("tango_error", {
-                    "trace_id": trace_id,
-                    "entry": trace_entry,
-                })
+                scope.set_context(
+                    "tango_error",
+                    {
+                        "trace_id": trace_id,
+                        "entry": trace_entry,
+                    },
+                )
                 sentry_sdk.capture_exception(e, level="error")
 
         tango_provider_status = "UNAVAILABLE"
@@ -378,9 +474,7 @@ def run_tango_processing(
 
 
 def run_s4pred_processing(
-    df: pd.DataFrame,
-    trace_entry: Optional[str],
-    sentry_initialized: bool
+    df: pd.DataFrame, trace_entry: Optional[str], sentry_initialized: bool
 ) -> Tuple[Dict[str, Any], str, Optional[str], bool]:
     """
     Run S4PRED processing pipeline.
@@ -396,8 +490,11 @@ def run_s4pred_processing(
 
     try:
         if not s4pred_enabled_flag:
-            log_info("s4pred_disabled", "S4PRED disabled by USE_S4PRED env (USE_S4PRED=0)",
-                    **{"run_s4pred": False, "reason": "S4PRED disabled in environment"})
+            log_info(
+                "s4pred_disabled",
+                "S4PRED disabled by USE_S4PRED env (USE_S4PRED=0)",
+                **{"run_s4pred": False, "reason": "S4PRED disabled in environment"},
+            )
             s4pred_provider_status = "OFF"
             s4pred_provider_reason = "S4PRED disabled in environment (USE_S4PRED=0)"
             return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
@@ -405,8 +502,7 @@ def run_s4pred_processing(
         # Check if S4PRED is available
         available, reason = s4pred.is_s4pred_available()
         if not available:
-            log_info("s4pred_unavailable", f"S4PRED not available: {reason}",
-                    **{"reason": reason})
+            log_info("s4pred_unavailable", f"S4PRED not available: {reason}", **{"reason": reason})
             s4pred_provider_status = "UNAVAILABLE"
             s4pred_provider_reason = reason
             return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
@@ -414,8 +510,8 @@ def run_s4pred_processing(
         # Build sequence list from DataFrame
         sequences = []
         for _, row in df.iterrows():
-            entry_id = str(row.get('Entry', ''))
-            sequence = str(row.get('Sequence', ''))
+            entry_id = str(row.get("Entry", ""))
+            sequence = str(row.get("Sequence", ""))
             if entry_id and sequence:
                 sequences.append((entry_id, sequence))
 
@@ -429,16 +525,24 @@ def run_s4pred_processing(
 
         # Run S4PRED
         s4pred_start_time = time.time()
-        log_info("s4pred_run_start", f"Running S4PRED for {len(sequences)} sequences",
-                stage="s4pred_run", **{"sequence_count": len(sequences)})
+        log_info(
+            "s4pred_run_start",
+            f"Running S4PRED for {len(sequences)} sequences",
+            stage="s4pred_run",
+            **{"sequence_count": len(sequences)},
+        )
 
         success, stats = s4pred.run_s4pred_database(df, "upload", trace_id=get_trace_id())
         s4pred_ran = True
         s4pred_stats.update(stats)
 
         s4pred_elapsed = (time.time() - s4pred_start_time) * 1000
-        log_info("s4pred_run_complete", f"S4PRED completed: {s4pred_stats['parsed_ok']}/{s4pred_stats['requested']} parsed",
-                stage="s4pred_run", **{**s4pred_stats, "s4pred_time_ms": round(s4pred_elapsed, 2)})
+        log_info(
+            "s4pred_run_complete",
+            f"S4PRED completed: {s4pred_stats['parsed_ok']}/{s4pred_stats['requested']} parsed",
+            stage="s4pred_run",
+            **{**s4pred_stats, "s4pred_time_ms": round(s4pred_elapsed, 2)},
+        )
 
         # Generate S4PRED SSW predictions
         try:
@@ -458,7 +562,9 @@ def run_s4pred_processing(
             s4pred_provider_reason = f"S4PRED failed; {parsed_ok}/{requested} parsed"
         elif 0 < parsed_ok < requested:
             s4pred_provider_status = "PARTIAL"
-            s4pred_provider_reason = f"Only {parsed_ok}/{requested} sequences processed successfully"
+            s4pred_provider_reason = (
+                f"Only {parsed_ok}/{requested} sequences processed successfully"
+            )
         elif parsed_ok == requested and requested > 0:
             s4pred_provider_status = "AVAILABLE"
             s4pred_provider_reason = None
@@ -466,25 +572,37 @@ def run_s4pred_processing(
             s4pred_provider_status = "OFF"
             s4pred_provider_reason = "No S4PRED run attempted"
 
-        log_info("s4pred_stats", f"S4PRED provider status: {s4pred_provider_status}", **{
-            "status": s4pred_provider_status,
-            "reason": s4pred_provider_reason,
-            **s4pred_stats,
-        })
+        log_info(
+            "s4pred_stats",
+            f"S4PRED provider status: {s4pred_provider_status}",
+            **{
+                "status": s4pred_provider_status,
+                "reason": s4pred_provider_reason,
+                **s4pred_stats,
+            },
+        )
 
     except Exception as e:
         trace_id = get_trace_id()
-        log_error("s4pred_error", f"S4PRED error: {e} (continuing without S4PRED)",
-                entry=trace_entry, stage="s4pred", **{"error": str(e)})
+        log_error(
+            "s4pred_error",
+            f"S4PRED error: {e} (continuing without S4PRED)",
+            entry=trace_entry,
+            stage="s4pred",
+            **{"error": str(e)},
+        )
 
         if sentry_initialized:
             with sentry_sdk.push_scope() as scope:
                 scope.set_tag("provider", "s4pred")
                 scope.set_tag("stage", "general")
-                scope.set_context("s4pred_error", {
-                    "trace_id": trace_id,
-                    "entry": trace_entry,
-                })
+                scope.set_context(
+                    "s4pred_error",
+                    {
+                        "trace_id": trace_id,
+                        "entry": trace_entry,
+                    },
+                )
                 sentry_sdk.capture_exception(e, level="error")
 
         s4pred_provider_status = "UNAVAILABLE"
@@ -493,7 +611,9 @@ def run_s4pred_processing(
     return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
 
 
-def compute_ssw_stats(rows_out: List[Dict[str, Any]], trace_entry: Optional[str]) -> Tuple[int, int, float]:
+def compute_ssw_stats(
+    rows_out: List[Dict[str, Any]], trace_entry: Optional[str]
+) -> Tuple[int, int, float]:
     """
     Compute SSW positive statistics from final normalized rows.
 
@@ -516,16 +636,30 @@ def compute_ssw_stats(rows_out: List[Dict[str, Any]], trace_entry: Optional[str]
 
     # Debug: Show which entries are counted as positive
     if trace_entry:
-        log_debug("ssw_count", f"Total positives: {ssw_positives}/{len(rows_out)} ({ssw_percent}%)", entry=trace_entry)
-        log_debug("ssw_count", f"Positive entries: {ssw_positive_entries[:10]}{'...' if len(ssw_positive_entries) > 10 else ''}", entry=trace_entry)
+        log_debug(
+            "ssw_count",
+            f"Total positives: {ssw_positives}/{len(rows_out)} ({ssw_percent}%)",
+            entry=trace_entry,
+        )
+        log_debug(
+            "ssw_count",
+            f"Positive entries: {ssw_positive_entries[:10]}{'...' if len(ssw_positive_entries) > 10 else ''}",
+            entry=trace_entry,
+        )
         if trace_entry in ssw_positive_entries:
             log_debug("ssw_count", f"Entry {trace_entry} IS counted as positive", entry=trace_entry)
         else:
-            trace_row_out = [r for r in rows_out if str(r.get("id", "")).strip() == str(trace_entry).strip()]
+            trace_row_out = [
+                r for r in rows_out if str(r.get("id", "")).strip() == str(trace_entry).strip()
+            ]
             if trace_row_out:
                 trace_row = trace_row_out[0]
                 ssw_val = trace_row.get("sswPrediction")
-                log_debug("ssw_count", f"Entry {trace_entry} NOT counted as positive (value: {ssw_val}, type: {type(ssw_val).__name__})", entry=trace_entry)
+                log_debug(
+                    "ssw_count",
+                    f"Entry {trace_entry} NOT counted as positive (value: {ssw_val}, type: {type(ssw_val).__name__})",
+                    entry=trace_entry,
+                )
 
     return ssw_positives, ssw_valid_count, ssw_percent
 
@@ -538,7 +672,7 @@ def compute_reproducibility_primitives(
     tango_provider_status: str,
     s4pred_stats: Optional[Dict[str, Any]] = None,
     s4pred_enabled_flag: bool = False,
-    s4pred_provider_status: str = "OFF"
+    s4pred_provider_status: str = "OFF",
 ) -> Tuple[str, str, str, str, Dict[str, Any], Dict[str, float]]:
     """
     Compute reproducibility primitives for the response.
@@ -563,15 +697,15 @@ def compute_reproducibility_primitives(
 
     inputs_data.sort()
     inputs_str = "\n".join(inputs_data)
-    inputs_hash = hashlib.sha256(inputs_str.encode('utf-8')).hexdigest()[:16]
+    inputs_hash = hashlib.sha256(inputs_str.encode("utf-8")).hexdigest()[:16]
 
     # 4. Compute config_hash from configuration flags/options
     config_dict = {
         "USE_TANGO": settings.USE_TANGO,
         "USE_S4PRED": settings.USE_S4PRED,
     }
-    config_str = json.dumps(config_dict, sort_keys=True, separators=(',', ':'))
-    config_hash = hashlib.sha256(config_str.encode('utf-8')).hexdigest()[:16]
+    config_str = json.dumps(config_dict, sort_keys=True, separators=(",", ":"))
+    config_hash = hashlib.sha256(config_str.encode("utf-8")).hexdigest()[:16]
 
     # 5. Compute provider status summary counts
     s4pred_stats = s4pred_stats or {}
@@ -581,19 +715,30 @@ def compute_reproducibility_primitives(
             "requested": tango_stats.get("requested", 0),
             "parsed_ok": tango_stats.get("parsed_ok", 0),
             "parsed_bad": tango_stats.get("parsed_bad", 0),
-        } if tango_enabled_flag else None,
+        }
+        if tango_enabled_flag
+        else None,
         "s4pred": {
             "status": s4pred_provider_status,
             "requested": s4pred_stats.get("requested", 0),
             "parsed_ok": s4pred_stats.get("parsed_ok", 0),
             "parsed_bad": s4pred_stats.get("parsed_bad", 0),
-        } if s4pred_enabled_flag else None,
+        }
+        if s4pred_enabled_flag
+        else None,
     }
 
     # 6. Resolve thresholds (deterministic computation based on mode)
     resolved_thresholds = resolve_thresholds(threshold_config_requested, df)
 
-    return repro_run_id, trace_id, inputs_hash, config_hash, provider_status_summary, resolved_thresholds
+    return (
+        repro_run_id,
+        trace_id,
+        inputs_hash,
+        config_hash,
+        provider_status_summary,
+        resolved_thresholds,
+    )
 
 
 def process_upload_dataframe(
@@ -601,7 +746,8 @@ def process_upload_dataframe(
     threshold_config_requested: Optional[Dict[str, Any]],
     threshold_config_resolved: Dict[str, Any],
     trace_entry: Optional[str] = None,
-    sentry_initialized: bool = False
+    sentry_initialized: bool = False,
+    progress_callback: Optional[Callable[[str, int], None]] = None,
 ) -> Dict[str, Any]:
     """
     Process an uploaded DataFrame through the full pipeline.
@@ -615,6 +761,7 @@ def process_upload_dataframe(
         threshold_config_resolved: Resolved config dict with mode/version/custom
         trace_entry: Optional entry ID for detailed tracing
         sentry_initialized: Whether Sentry is initialized for error reporting
+        progress_callback: Optional callback(stage, percent) for Celery progress reporting
 
     Returns:
         Dict with 'rows' (list of peptide dicts) and 'meta' (metadata dict)
@@ -638,21 +785,30 @@ def process_upload_dataframe(
     ensure_ff_cols(df)
     ensure_computed_cols(df)
     ff_helix_elapsed = (time.time() - ff_helix_start_time) * 1000
-    log_info("ff_helix_complete", f"Computed FF-Helix for {len(df)} peptides",
-            **{"ff_helix_time_ms": round(ff_helix_elapsed, 2)})
+    log_info(
+        "ff_helix_complete",
+        f"Computed FF-Helix for {len(df)} peptides",
+        **{"ff_helix_time_ms": round(ff_helix_elapsed, 2)},
+    )
+    if progress_callback:
+        progress_callback("ff_helix", 15)
 
     # --- TANGO processing ---
-    tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = run_tango_processing(
-        df, trace_entry, sentry_initialized
+    tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = (
+        run_tango_processing(df, trace_entry, sentry_initialized)
     )
     tango_enabled_flag = settings.USE_TANGO
     tango_requested_flag = True
+    if progress_callback:
+        progress_callback("tango", 60)
 
     # --- S4PRED processing ---
-    s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = run_s4pred_processing(
-        df, trace_entry, sentry_initialized
+    s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = (
+        run_s4pred_processing(df, trace_entry, sentry_initialized)
     )
     s4pred_enabled_flag = settings.USE_S4PRED
+    if progress_callback:
+        progress_callback("s4pred", 80)
 
     # Count SSW hits (rows with valid TANGO predictions)
     if "SSW prediction" in df.columns:
@@ -665,17 +821,38 @@ def process_upload_dataframe(
         trace_row = df[df["Entry"].astype(str).str.strip() == str(trace_entry).strip()]
         if not trace_row.empty:
             idx = trace_row.index[0]
-            log_info("trace_dataframe_merge", f"DataFrame merge for entry {trace_entry}", entry=trace_entry, **{
-                "index": int(idx),
-                "sequence_length": len(str(trace_row.iloc[0].get('Sequence', ''))),
-            })
-            for col in ["SSW prediction", "SSW score", "SSW diff", "SSW helix percentage", "SSW beta percentage",
-                       "FF-Helix %", "FF Helix %"]:
+            log_info(
+                "trace_dataframe_merge",
+                f"DataFrame merge for entry {trace_entry}",
+                entry=trace_entry,
+                **{
+                    "index": int(idx),
+                    "sequence_length": len(str(trace_row.iloc[0].get("Sequence", ""))),
+                },
+            )
+            for col in [
+                "SSW prediction",
+                "SSW score",
+                "SSW diff",
+                "SSW helix percentage",
+                "SSW beta percentage",
+                "FF-Helix %",
+                "FF Helix %",
+            ]:
                 if col in df.columns:
                     val = trace_row.iloc[0][col]
-                    log_info("trace_field", f"{col}: {val}", entry=trace_entry, **{"field": col, "value": str(val), "type": type(val).__name__})
+                    log_info(
+                        "trace_field",
+                        f"{col}: {val}",
+                        entry=trace_entry,
+                        **{"field": col, "value": str(val), "type": type(val).__name__},
+                    )
         else:
-            log_warning("trace_entry_not_found", f"Entry {trace_entry} not found in DataFrame", entry=trace_entry)
+            log_warning(
+                "trace_entry_not_found",
+                f"Entry {trace_entry} not found in DataFrame",
+                entry=trace_entry,
+            )
 
     # Compute biochemical features and flags
     biochem_start_time = time.time()
@@ -685,46 +862,81 @@ def process_upload_dataframe(
     # Resolve thresholds BEFORE apply_ff_flags so user thresholds are wired in
     threshold_mode = (threshold_config_requested or {}).get("mode", "default")
     pre_resolved = resolve_thresholds(threshold_config_requested, df)
-    ff_thresholds_used = apply_ff_flags(df, resolved_thresholds=pre_resolved, threshold_mode=threshold_mode)
+    ff_thresholds_used = apply_ff_flags(
+        df, resolved_thresholds=pre_resolved, threshold_mode=threshold_mode
+    )
 
     _finalize_ui_aliases(df)
     finalize_ff_fields(df)
     biochem_elapsed = (time.time() - biochem_start_time) * 1000
-    log_info("biochem_complete", f"Computed biochemical features for {len(df)} peptides",
-            **{"biochem_time_ms": round(biochem_elapsed, 2)})
+    log_info(
+        "biochem_complete",
+        f"Computed biochemical features for {len(df)} peptides",
+        **{"biochem_time_ms": round(biochem_elapsed, 2)},
+    )
+    if progress_callback:
+        progress_callback("biochem", 90)
 
     # Debug: Log after finalize_ui_aliases
     if trace_entry:
         trace_row = df[df["Entry"].astype(str).str.strip() == str(trace_entry).strip()]
         if not trace_row.empty:
-            log_info("trace_after_finalize", f"After finalize for entry {trace_entry}", entry=trace_entry)
+            log_info(
+                "trace_after_finalize", f"After finalize for entry {trace_entry}", entry=trace_entry
+            )
             for col in ["SSW prediction", "FF-Helix %"]:
                 if col in df.columns:
                     val = trace_row.iloc[0][col]
-                    log_info("trace_field", f"{col}: {val}", entry=trace_entry, **{"field": col, "value": str(val), "type": type(val).__name__})
+                    log_info(
+                        "trace_field",
+                        f"{col}: {val}",
+                        entry=trace_entry,
+                        **{"field": col, "value": str(val), "type": type(val).__name__},
+                    )
 
     # Normalize rows for UI
     normalize_ui_start_time = time.time()
     run_id_for_log = os.path.basename(run_dir) if run_dir else None
-    log_info("normalize_ui_start", "Normalizing rows for UI output",
-            stage="normalize_rows_for_ui", run_id=run_id_for_log)
+    log_info(
+        "normalize_ui_start",
+        "Normalizing rows for UI output",
+        stage="normalize_rows_for_ui",
+        run_id=run_id_for_log,
+    )
     rows_out = normalize_rows_for_ui(
         df,
         is_single_row=False,
         tango_enabled=settings.USE_TANGO,
-        s4pred_enabled=settings.USE_S4PRED
+        s4pred_enabled=settings.USE_S4PRED,
     )
     normalize_ui_elapsed = (time.time() - normalize_ui_start_time) * 1000
-    log_info("normalize_ui_complete", f"Normalized {len(rows_out)} rows for UI",
-            stage="normalize_rows_for_ui", run_id=run_id_for_log, **{"row_count": len(rows_out), "normalize_ui_time_ms": round(normalize_ui_elapsed, 2)})
+    log_info(
+        "normalize_ui_complete",
+        f"Normalized {len(rows_out)} rows for UI",
+        stage="normalize_rows_for_ui",
+        run_id=run_id_for_log,
+        **{"row_count": len(rows_out), "normalize_ui_time_ms": round(normalize_ui_elapsed, 2)},
+    )
+    if progress_callback:
+        progress_callback("normalize", 95)
 
     # Schema assert: When provider status is not AVAILABLE, ensure all dependent row fields are null
     if os.getenv("ENABLE_PROVIDER_STATUS_ASSERT", "0") == "1":
         for row_dict in rows_out:
             provider_status = row_dict.get("providerStatus", {})
-            tango_status = provider_status.get("tango", {}).get("status") if isinstance(provider_status, dict) else None
+            tango_status = (
+                provider_status.get("tango", {}).get("status")
+                if isinstance(provider_status, dict)
+                else None
+            )
             if tango_status and tango_status != "AVAILABLE":
-                tango_fields = ["sswPrediction", "sswScore", "sswDiff", "sswHelixPercentage", "sswBetaPercentage"]
+                tango_fields = [
+                    "sswPrediction",
+                    "sswScore",
+                    "sswDiff",
+                    "sswHelixPercentage",
+                    "sswBetaPercentage",
+                ]
                 for field in tango_fields:
                     if field in row_dict and row_dict[field] is not None:
                         raise ValueError(
@@ -734,34 +946,71 @@ def process_upload_dataframe(
 
     # Debug: Log final serialized JSON for traced entry
     if trace_entry:
-        trace_row_out = [r for r in rows_out if str(r.get("id", "")).strip() == str(trace_entry).strip()]
+        trace_row_out = [
+            r for r in rows_out if str(r.get("id", "")).strip() == str(trace_entry).strip()
+        ]
         if trace_row_out:
             row_json = trace_row_out[0]
-            log_info("trace_api_response", f"API response for entry {trace_entry}", entry=trace_entry, **{
-                "ssw_keys": [k for k in row_json.keys() if 'ssw' in k.lower() or 'helix' in k.lower() or 'beta' in k.lower()]
-            })
-            for key in ["id", "sswPrediction", "sswHelixPercentage", "sswBetaPercentage",
-                       "ffHelixPercent", "sswScore", "sswDiff"]:
+            log_info(
+                "trace_api_response",
+                f"API response for entry {trace_entry}",
+                entry=trace_entry,
+                **{
+                    "ssw_keys": [
+                        k
+                        for k in row_json.keys()
+                        if "ssw" in k.lower() or "helix" in k.lower() or "beta" in k.lower()
+                    ]
+                },
+            )
+            for key in [
+                "id",
+                "sswPrediction",
+                "sswHelixPercentage",
+                "sswBetaPercentage",
+                "ffHelixPercent",
+                "sswScore",
+                "sswDiff",
+            ]:
                 if key in row_json:
                     val = row_json[key]
-                    log_info("trace_field", f"{key}: {val}", entry=trace_entry, **{"field": key, "value": str(val), "type": type(val).__name__})
+                    log_info(
+                        "trace_field",
+                        f"{key}: {val}",
+                        entry=trace_entry,
+                        **{"field": key, "value": str(val), "type": type(val).__name__},
+                    )
         else:
-            log_warning("trace_entry_not_found", f"Entry {trace_entry} not found in normalized rows", entry=trace_entry)
+            log_warning(
+                "trace_entry_not_found",
+                f"Entry {trace_entry} not found in normalized rows",
+                entry=trace_entry,
+            )
 
     # Compute SSW positive stats
     ssw_positives, ssw_valid_count, ssw_percent = compute_ssw_stats(rows_out, trace_entry)
 
-    ff_avail = int((pd.to_numeric(df.get("FF-Helix %", pd.Series([-1]*len(df))), errors="coerce") != -1).sum())
+    ff_avail = int(
+        (
+            pd.to_numeric(df.get("FF-Helix %", pd.Series([-1] * len(df))), errors="coerce") != -1
+        ).sum()
+    )
 
     tango_run_dir_basename = os.path.basename(run_dir) if run_dir else None
 
-    log_info("upload_complete", "Upload processing complete", stage="response", run_id=tango_run_dir_basename, **{
-        "total_rows": len(df),
-        "ssw_hits": ssw_hits,
-        "ssw_positive_percent": ssw_percent,
-        "ssw_positives": ssw_positives,
-        "ff_helix_available": ff_avail,
-    })
+    log_info(
+        "upload_complete",
+        "Upload processing complete",
+        stage="response",
+        run_id=tango_run_dir_basename,
+        **{
+            "total_rows": len(df),
+            "ssw_hits": ssw_hits,
+            "ssw_positive_percent": ssw_percent,
+            "ssw_positives": ssw_positives,
+            "ff_helix_available": ff_avail,
+        },
+    )
 
     # Build provider status metadata
     provider_status_meta = build_provider_meta(
@@ -786,29 +1035,44 @@ def process_upload_dataframe(
     set_last_run_dir(tango._latest_run_dir())
 
     # Compute reproducibility primitives
-    repro_run_id, trace_id, inputs_hash, config_hash, provider_status_summary, resolved_thresholds = compute_reproducibility_primitives(
-        df, threshold_config_requested, tango_stats, tango_enabled_flag, tango_provider_status,
-        s4pred_stats=s4pred_stats, s4pred_enabled_flag=s4pred_enabled_flag, s4pred_provider_status=s4pred_provider_status
+    (
+        repro_run_id,
+        trace_id,
+        inputs_hash,
+        config_hash,
+        provider_status_summary,
+        resolved_thresholds,
+    ) = compute_reproducibility_primitives(
+        df,
+        threshold_config_requested,
+        tango_stats,
+        tango_enabled_flag,
+        tango_provider_status,
+        s4pred_stats=s4pred_stats,
+        s4pred_enabled_flag=s4pred_enabled_flag,
+        s4pred_provider_status=s4pred_provider_status,
     )
 
     # Build meta dict (ISSUE-018: schema enforcement)
-    meta_dict = ensure_trace_id_in_meta({
-        "use_tango": settings.USE_TANGO,
-        "use_s4pred": settings.USE_S4PRED,
-        "ssw_rows": ssw_hits,
-        "valid_seq_rows": int(df["Sequence"].notna().sum()),
-        "provider_status": provider_status_meta,
-        # Reproducibility primitives
-        "runId": repro_run_id,
-        "traceId": trace_id,
-        "inputsHash": inputs_hash,
-        "configHash": config_hash,
-        "providerStatusSummary": provider_status_summary,
-        # Threshold configuration
-        "thresholdConfigRequested": threshold_config_requested,
-        "thresholdConfigResolved": threshold_config_resolved,
-        "thresholds": {**resolved_thresholds, **ff_thresholds_used},
-    })
+    meta_dict = ensure_trace_id_in_meta(
+        {
+            "use_tango": settings.USE_TANGO,
+            "use_s4pred": settings.USE_S4PRED,
+            "ssw_rows": ssw_hits,
+            "valid_seq_rows": int(df["Sequence"].notna().sum()),
+            "provider_status": provider_status_meta,
+            # Reproducibility primitives
+            "runId": repro_run_id,
+            "traceId": trace_id,
+            "inputsHash": inputs_hash,
+            "configHash": config_hash,
+            "providerStatusSummary": provider_status_summary,
+            # Threshold configuration
+            "thresholdConfigRequested": threshold_config_requested,
+            "thresholdConfigResolved": threshold_config_resolved,
+            "thresholds": {**resolved_thresholds, **ff_thresholds_used},
+        }
+    )
 
     # ISSUE-018: Validate response through Pydantic model
     # This ensures the response matches the RowsResponse schema
@@ -819,8 +1083,7 @@ def process_upload_dataframe(
 
         # Construct and validate full response
         response = RowsResponse(
-            rows=[PeptideRow.model_validate(row) for row in rows_out],
-            meta=validated_meta
+            rows=[PeptideRow.model_validate(row) for row in rows_out], meta=validated_meta
         )
         return response.model_dump(exclude_none=True)
     except Exception as e:
