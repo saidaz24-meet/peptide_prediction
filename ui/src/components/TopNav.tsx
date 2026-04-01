@@ -23,11 +23,13 @@ function toggleTheme(): boolean {
 const NAV_LINKS = [
   { label: "Quick Analyze", href: "/quick", isRoute: true },
   { label: "Upload", href: "/upload", isRoute: true },
+  { label: "Database Search", href: "/search", isRoute: true },
   { label: "Help", href: "/help", isRoute: true },
-  { label: "About", href: "/about", isRoute: true },
 ] as const;
 
-interface TopNavProps { className?: string }
+interface TopNavProps {
+  className?: string;
+}
 
 export function TopNav({ className }: TopNavProps) {
   const [scrolled, setScrolled] = useState(false);
@@ -41,7 +43,9 @@ export function TopNav({ className }: TopNavProps) {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => { setDark(isDarkMode()); }, []);
+  useEffect(() => {
+    setDark(isDarkMode());
+  }, []);
 
   const handleToggle = () => setDark(toggleTheme());
   const closeMobile = () => setMobileOpen(false);
@@ -50,15 +54,15 @@ export function TopNav({ className }: TopNavProps) {
 
   const ctaClass = cn(
     "inline-flex items-center gap-1.5 rounded-lg text-sm font-medium transition-colors",
-    "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary-hover))]",
+    "bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] hover:bg-[hsl(var(--primary-hover))]"
   );
   const linkClass = cn(
     "text-sm font-medium transition-colors",
-    "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]",
+    "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
   );
   const iconBtnClass = cn(
     "flex items-center justify-center h-8 w-8 rounded-lg transition-colors",
-    "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]",
+    "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]"
   );
 
   return (
@@ -69,7 +73,7 @@ export function TopNav({ className }: TopNavProps) {
           scrolled
             ? "border-b shadow-sm bg-[hsl(var(--background)/0.8)] backdrop-blur-xl border-[hsl(var(--border)/0.5)]"
             : "bg-transparent border-b border-transparent",
-          className,
+          className
         )}
       >
         <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-6">
@@ -84,7 +88,9 @@ export function TopNav({ className }: TopNavProps) {
           {/* Center links (desktop) */}
           <div className="hidden md:flex items-center gap-8">
             {NAV_LINKS.map((l) => (
-              <Link key={l.href} to={l.href} className={linkClass}>{l.label}</Link>
+              <Link key={l.href} to={l.href} className={linkClass}>
+                {l.label}
+              </Link>
             ))}
           </div>
 
@@ -101,7 +107,10 @@ export function TopNav({ className }: TopNavProps) {
           {/* Animated hamburger / X (mobile) */}
           <button
             onClick={() => setMobileOpen((o) => !o)}
-            className={cn("relative w-10 h-10 flex items-center justify-center rounded-lg md:hidden", "hover:bg-[hsl(var(--accent))]")}
+            className={cn(
+              "relative w-10 h-10 flex items-center justify-center rounded-lg md:hidden",
+              "hover:bg-[hsl(var(--accent))]"
+            )}
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
           >
             <TopNavHamburger open={mobileOpen} />
@@ -119,23 +128,44 @@ export function TopNav({ className }: TopNavProps) {
           >
             <div className="flex items-center gap-2.5 px-5 py-4 border-b border-[hsl(var(--border))]">
               <span className="text-lg font-bold text-[hsl(var(--primary))]">PVL</span>
-              <span className="text-[10px] text-[hsl(var(--muted-foreground))]">Peptide Visual Lab</span>
+              <span className="text-[10px] text-[hsl(var(--muted-foreground))]">
+                Peptide Visual Lab
+              </span>
             </div>
             <div className="flex flex-col py-2">
               {NAV_LINKS.map((l) => (
-                <Link key={l.href} to={l.href} onClick={closeMobile}
-                  className={cn("px-5 py-3 text-sm font-medium transition-colors", "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]")}>
+                <Link
+                  key={l.href}
+                  to={l.href}
+                  onClick={closeMobile}
+                  className={cn(
+                    "px-5 py-3 text-sm font-medium transition-colors",
+                    "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]"
+                  )}
+                >
                   {l.label}
                 </Link>
               ))}
               <div className="mx-5 my-2 h-px bg-[hsl(var(--border))]" />
-              <button onClick={() => { handleToggle(); closeMobile(); }}
-                className={cn("flex items-center gap-3 px-5 py-3 w-full text-left text-sm font-medium", "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]")}>
+              <button
+                onClick={() => {
+                  handleToggle();
+                  closeMobile();
+                }}
+                className={cn(
+                  "flex items-center gap-3 px-5 py-3 w-full text-left text-sm font-medium",
+                  "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]"
+                )}
+              >
                 <ThemeIcon className="h-4 w-4" />
                 {dark ? "Light mode" : "Dark mode"}
               </button>
               <div className="px-5 pt-3">
-                <Link to="/upload" onClick={closeMobile} className={cn(ctaClass, "justify-center w-full px-5 py-2.5")}>
+                <Link
+                  to="/upload"
+                  onClick={closeMobile}
+                  className={cn(ctaClass, "justify-center w-full px-5 py-2.5")}
+                >
                   Start Analysis <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </div>

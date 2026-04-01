@@ -10,6 +10,7 @@ import {
   FlaskConical,
   Home,
   GitCompareArrows,
+  Database,
   FilePlus2,
   Moon,
   Sun,
@@ -29,6 +30,7 @@ import { STAGE_LABELS } from "@/lib/jobApi";
 const NAV_ITEMS = [
   { path: "/", label: "Home", icon: Home },
   { path: "/upload", label: "Upload", icon: Upload },
+  { path: "/search", label: "Database Search", icon: Database },
   { path: "/quick", label: "Quick Analyze", icon: Zap },
   { path: "/results", label: "Results", icon: BarChart3 },
   { path: "/compare", label: "Compare", icon: GitCompareArrows },
@@ -259,15 +261,33 @@ function HamburgerIcon({ open }: { open: boolean }) {
     <div className="w-5 h-4 flex flex-col justify-between text-foreground">
       <span
         className={cn(barClass, "w-5", open && "translate-y-[7px] rotate-45")}
-        style={{ background: "currentColor", backgroundImage: open ? "none" : "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: open ? "auto" : "4px 2px" }}
+        style={{
+          background: "currentColor",
+          backgroundImage: open
+            ? "none"
+            : "radial-gradient(circle, currentColor 1px, transparent 1px)",
+          backgroundSize: open ? "auto" : "4px 2px",
+        }}
       />
       <span
         className={cn(barClass, "w-4", open && "opacity-0 scale-x-0")}
-        style={{ background: "currentColor", backgroundImage: open ? "none" : "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: open ? "auto" : "4px 2px" }}
+        style={{
+          background: "currentColor",
+          backgroundImage: open
+            ? "none"
+            : "radial-gradient(circle, currentColor 1px, transparent 1px)",
+          backgroundSize: open ? "auto" : "4px 2px",
+        }}
       />
       <span
         className={cn(barClass, "w-5", open && "-translate-y-[7px] -rotate-45")}
-        style={{ background: "currentColor", backgroundImage: open ? "none" : "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: open ? "auto" : "4px 2px" }}
+        style={{
+          background: "currentColor",
+          backgroundImage: open
+            ? "none"
+            : "radial-gradient(circle, currentColor 1px, transparent 1px)",
+          backgroundSize: open ? "auto" : "4px 2px",
+        }}
       />
     </div>
   );
@@ -297,7 +317,7 @@ function MobilePageTitle() {
   }
 
   const match = NAV_ITEMS.find((item) =>
-    item.path === "/" ? location.pathname === "/" : location.pathname.startsWith(item.path),
+    item.path === "/" ? location.pathname === "/" : location.pathname.startsWith(item.path)
   );
   const title = match?.label ?? "PVL";
   const Icon = match?.icon ?? FlaskConical;
@@ -361,10 +381,7 @@ export function AppSidebar() {
 
         {/* Full-screen nav overlay */}
         {mobileOpen && (
-          <div
-            className="fixed inset-0 z-30 md:hidden"
-            onClick={() => setMobileOpen(false)}
-          >
+          <div className="fixed inset-0 z-30 md:hidden" onClick={() => setMobileOpen(false)}>
             {/* Backdrop */}
             <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
             {/* Nav panel — slides from left */}

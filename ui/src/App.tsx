@@ -23,6 +23,7 @@ const NotFound = React.lazy(() => import("./pages/NotFound"));
 const About = React.lazy(() => import("@/pages/About"));
 const QuickAnalyze = React.lazy(() => import("@/pages/QuickAnalyze"));
 const Compare = React.lazy(() => import("@/pages/Compare"));
+const DatabaseSearch = React.lazy(() => import("@/pages/DatabaseSearch"));
 
 const queryClient = new QueryClient();
 
@@ -140,6 +141,14 @@ function AppLayout() {
                   element={
                     <PageTransition>
                       <Compare />
+                    </PageTransition>
+                  }
+                />
+                <Route
+                  path="/search"
+                  element={
+                    <PageTransition>
+                      <DatabaseSearch />
                     </PageTransition>
                   }
                 />
