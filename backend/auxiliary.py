@@ -1,8 +1,9 @@
 import math
 import os
 import re
+from collections import defaultdict
 from statistics import mean, median
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 import numpy as np
 import pandas as pd
@@ -421,3 +422,99 @@ def get_corrected_sequence(sequence) -> str:
     if "-" in s4:
         return s4.split("-")[0].upper()
     return s4.upper()
+
+
+# Substitution reason map for user-facing notes (ISSUE-024)
+_SUBSTITUTION_REASONS: Dict[str, Tuple[str, str]] = {
+    "X": ("A", "Unknown residue → Alanine"),
+    "Z": ("E", "Glu/Gln ambiguity → Glutamate"),
+    "B": ("D", "Asp/Asn ambiguity → Aspartate"),
+    "U": ("C", "Selenocysteine → Cysteine"),
+    "O": ("K", "Pyrrolysine → Lysine"),
+    "J": ("L", "Leu/Ile ambiguity → Leucine"),
+}
+
+
+def get_corrected_sequence_with_notes(
+    sequence,
+) -> Tuple[str, List[Dict], str]:
+    """
+    Like get_corrected_sequence(), but also returns substitution details.
+
+    Returns:
+        Tuple of:
+        - corrected_sequence (str): The cleaned sequence
+        - substitutions (list[dict]): Each substitution made, e.g.:
+            [{"position": 3, "original": "X", "replacement": "A", "reason": "Unknown residue → Alanine"}]
+        - notes (str): Human-readable summary, or empty string if no changes
+    """
+    if sequence is None or (isinstance(sequence, float) and pd.isna(sequence)):
+        return "", [], ""
+    if not isinstance(sequence, str):
+        sequence = str(sequence)
+
+    note_parts: List[str] = []
+
+    # Track non-letter characters stripped
+    non_letters = re.findall(r"[^A-Za-z-]", sequence)
+    if non_letters:
+        note_parts.append("Non-amino acid characters removed")
+
+    # Strip non-letter characters (keep dashes for terminal modification handling)
+    stripped = re.sub(r"[^A-Za-z-]", "", sequence)
+    if not stripped or stripped == "-":
+        return "", [], ""
+
+    # Track terminal modification removal
+    terminal_mod = None
+    if "-" in stripped:
+        parts = stripped.split("-", 1)
+        if len(parts) > 1 and parts[1]:
+            terminal_mod = parts[1]
+            note_parts.append(f"Terminal modification '-{terminal_mod}' removed")
+        stripped = parts[0]
+
+    # Uppercase for substitution tracking
+    upper = stripped.upper()
+
+    # Track substitutions character by character
+    substitutions: List[Dict] = []
+    result_chars: List[str] = []
+    for i, ch in enumerate(upper):
+        if ch in _SUBSTITUTION_REASONS:
+            replacement, reason = _SUBSTITUTION_REASONS[ch]
+            substitutions.append(
+                {
+                    "position": i + 1,  # 1-based
+                    "original": ch,
+                    "replacement": replacement,
+                    "reason": reason,
+                }
+            )
+            result_chars.append(replacement)
+        else:
+            result_chars.append(ch)
+
+    corrected = "".join(result_chars)
+
+    # Build human-readable substitution summary
+    if substitutions:
+        # Group by original → positions
+        grouped: Dict[str, List[int]] = defaultdict(list)
+        for sub in substitutions:
+            grouped[sub["original"]].append(sub["position"])
+        parts = []
+        for orig, positions in grouped.items():
+            replacement = _SUBSTITUTION_REASONS[orig][0]
+            pos_str = ", ".join(str(p) for p in positions)
+            if len(positions) == 1:
+                parts.append(f"{orig}→{replacement} (position {pos_str})")
+            else:
+                parts.append(f"{orig}→{replacement} (positions {pos_str})")
+        note_parts.insert(0, "Non-standard residues substituted: " + ", ".join(parts))
+
+    notes = ". ".join(note_parts) + ("." if note_parts else "")
+    if notes == ".":
+        notes = ""
+
+    return corrected, substitutions, notes

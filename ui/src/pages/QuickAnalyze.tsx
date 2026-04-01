@@ -1,27 +1,32 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { motion, cubicBezier } from "framer-motion";
-import { FlaskConical, ChevronRight, Copy, Download, ArrowLeft } from "lucide-react";
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
+import { FlaskConical, ChevronRight, ArrowLeft, AlertTriangle as AlertTriangleIcon } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle, AlertCircle } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { predictOne as apiPredictOne } from "@/lib/api";
 import { mapApiRowToPeptide } from "@/lib/peptideMapper";
 import { Peptide, ThresholdConfig } from "@/types/peptide";
 import { ThresholdConfigPanel } from "@/components/ThresholdConfigPanel";
-import { TangoBadge } from "@/components/TangoBadge";
-import { SequenceTrack } from "@/components/SequenceTrack";
-import { HelicalWheel } from "@/components/HelicalWheel";
-import { AggregationHeatmap } from "@/components/AggregationHeatmap";
-import { AlphaFoldViewer } from "@/components/AlphaFoldViewer";
-import { S4PredChart } from "@/components/S4PredChart";
-import { ConsensusCard } from "@/components/ConsensusCard";
+import { PeptideViewer } from "@/components/PeptideViewer";
 import { useDatasetStore } from "@/stores/datasetStore";
+import { BgDotGrid } from "@/components/BgDotGrid";
+import { setNavGuard } from "@/hooks/use-nav-guard";
 
 async function predictSequence(
   sequence: string,
@@ -107,15 +112,52 @@ export default function QuickAnalyze() {
   const [phase, setPhase] = useState<Phase>("idle");
   const [clickPos, setClickPos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
 
-  // Prevent tab close/reload while analyzing
+  // Navigation guard state
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
+
+  const hasUnsavedResults = peptide !== null;
+
+  // Prevent tab close/reload while analyzing OR when results exist
   useEffect(() => {
-    if (!loading) return;
+    if (!loading && !hasUnsavedResults) return;
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [loading]);
+  }, [loading, hasUnsavedResults]);
+
+  // Register global nav guard so sidebar intercepts navigation
+  useEffect(() => {
+    if (hasUnsavedResults) {
+      setNavGuard(true, () => {
+        setShowLeaveDialog(true);
+      });
+    } else {
+      setNavGuard(false);
+    }
+    return () => setNavGuard(false);
+  }, [hasUnsavedResults]);
+
+  // Guarded navigation — shows dialog if results exist
+  const guardedNavigate = useCallback((path: string) => {
+    if (hasUnsavedResults) {
+      setPendingNavPath(path);
+      setShowLeaveDialog(true);
+    } else {
+      navigate(path);
+    }
+  }, [hasUnsavedResults, navigate]);
+
+  const confirmLeave = useCallback(() => {
+    setShowLeaveDialog(false);
+    setPeptide(null); // Clear results so guard is deactivated
+    if (pendingNavPath) {
+      navigate(pendingNavPath);
+      setPendingNavPath(null);
+    }
+  }, [pendingNavPath, navigate]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -150,31 +192,36 @@ export default function QuickAnalyze() {
     }
   };
 
-  const handleCopySequence = () => {
-    if (!peptide) return;
-    navigator.clipboard.writeText(peptide.sequence);
-    toast.success("Sequence copied to clipboard");
-  };
-
-  const handleDownloadFASTA = () => {
-    if (!peptide) return;
-    const header = `>${peptide.id}`;
-    const wrapped = peptide.sequence.match(/.{1,80}/g)?.join("\n") ?? peptide.sequence;
-    const fasta = `${header}\n${wrapped}\n`;
-    const blob = new Blob([fasta], { type: "text/plain;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${peptide.id}.fasta`;
-    link.click();
-    URL.revokeObjectURL(url);
-    toast.success("FASTA downloaded");
-  };
-
   const p = peptide; // alias for brevity in JSX
 
   return (
     <>
+      {/* Navigation guard dialog */}
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent className="rounded-xl border-[hsl(var(--border))] shadow-strong max-w-md">
+          <AlertDialogHeader>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <AlertTriangleIcon className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <AlertDialogTitle className="text-h3">Leave Quick Analyze?</AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-small text-muted-foreground">
+              Your prediction results will be lost. This analysis hasn't been saved to a dataset.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="btn-press">Stay</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmLeave}
+              className="bg-amber-600 hover:bg-amber-700 text-white btn-press"
+            >
+              Leave anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <ScreenTransition
         phase={phase}
         clickPosition={clickPos}
@@ -188,27 +235,30 @@ export default function QuickAnalyze() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: cubicBezier(0.22, 1, 0.36, 1) }}
-        className="max-w-5xl mx-auto p-6 space-y-8"
+        transition={{ duration: 0.5, ease: cubicBezier(0.22, 1, 0.36, 1) }}
+        className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-8 relative"
       >
+        <BgDotGrid opacity={0.02} />
         {useDatasetStore.getState().peptides.length > 0 && (
-          <Link
-            to="/results"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+          <button
+            onClick={() => guardedNavigate("/results")}
+            className="inline-flex items-center text-small text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back to Batch Results
-          </Link>
+          </button>
         )}
 
-        <div className="flex items-center gap-3">
-          <FlaskConical className="h-6 w-6 text-primary" />
-          <h1 className="text-2xl font-semibold">Quick Analyze (single peptide)</h1>
+        <div>
+          <h1 className="text-h1 text-foreground">Quick Analyze</h1>
+          <p className="text-body text-muted-foreground mt-1">
+            Paste a single peptide sequence for instant prediction.
+          </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Paste a sequence (A-Z amino-acid letters)</CardTitle>
+        <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl overflow-hidden">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-h3">Sequence Input</CardTitle>
           </CardHeader>
           <CardContent>
             <form onSubmit={onSubmit} className="space-y-4">
@@ -306,18 +356,24 @@ export default function QuickAnalyze() {
                 </Alert>
               )}
 
-              <div className="flex gap-3">
-                <Button type="submit" disabled={loading}>
+              <div className="flex flex-col sm:flex-row gap-3 pt-2">
+                <Button type="submit" disabled={loading} className="px-6 btn-press">
                   {loading ? "Analyzing..." : "Analyze"}
                   <ChevronRight className="ml-2 h-4 w-4" />
                 </Button>
 
                 <Button
-                  variant="ghost"
+                  variant="outline"
+                  className="btn-press"
                   onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    setClickPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-                    setPhase("enter");
+                    if (hasUnsavedResults) {
+                      setPendingNavPath("/upload");
+                      setShowLeaveDialog(true);
+                    } else {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setClickPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+                      setPhase("enter");
+                    }
                   }}
                 >
                   Batch mode
@@ -329,173 +385,8 @@ export default function QuickAnalyze() {
 
         {/* ==================== RESULTS ==================== */}
         {p && (
-          <motion.div
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
-          >
-            {/* ── Header: Entry + Length + Badges + Actions ── */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between flex-wrap gap-4">
-                  <div>
-                    <CardTitle className="text-xl">
-                      {/^[A-Z][0-9][A-Z0-9]{3}[0-9](-\d+)?$/i.test(p.id) ? (
-                        <a
-                          href={`https://www.uniprot.org/uniprotkb/${p.id}/entry`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {p.id}
-                        </a>
-                      ) : (
-                        p.id
-                      )}
-                    </CardTitle>
-                    <CardDescription>{p.length ?? "?"} amino acids</CardDescription>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <TangoBadge
-                      providerStatus={p.providerStatus?.tango}
-                      sswPrediction={p.sswPrediction}
-                      hasTangoData={p.tangoHasData ?? false}
-                      showIcon
-                      sswContext={{ sswHelixPercentage: p.sswHelixPct, sswDiff: p.sswDiff }}
-                    />
-                    {typeof p.s4predHelixPercent === "number" && (
-                      <Badge variant="outline" className="text-helix border-helix">
-                        S4PRED Helix: {p.s4predHelixPercent.toFixed(1)}%
-                      </Badge>
-                    )}
-                    <Button variant="outline" size="sm" onClick={handleCopySequence}>
-                      <Copy className="w-4 h-4 mr-1" />
-                      Copy
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleDownloadFASTA}>
-                      <Download className="w-4 h-4 mr-1" />
-                      FASTA
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <SequenceTrack peptide={p} />
-              </CardContent>
-            </Card>
-
-            {/* ── KPI tiles ── */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-2xl font-bold text-primary">
-                    {p.charge !== null ? `${p.charge > 0 ? "+" : ""}${p.charge.toFixed(1)}` : "N/A"}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Charge</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-2xl font-bold text-primary">
-                    {p.hydrophobicity !== null ? p.hydrophobicity.toFixed(2) : "N/A"}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Hydrophobicity</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-2xl font-bold text-primary">
-                    {p.muH != null ? p.muH.toFixed(2) : "N/A"}
-                  </div>
-                  <div className="text-sm text-muted-foreground">Hydrophobic moment</div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-4">
-                  <div className="text-2xl font-bold text-helix">
-                    {typeof p.s4predHelixPercent === "number"
-                      ? `${p.s4predHelixPercent.toFixed(0)}%`
-                      : "N/A"}
-                  </div>
-                  <div className="text-sm text-muted-foreground">S4PRED Helix</div>
-                  <div className="text-[10px] text-muted-foreground/60">
-                    neural network prediction
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* ── Consensus Analysis ── */}
-            <ConsensusCard peptide={p} />
-
-            {/* ── Helical Wheel + Biochem side by side ── */}
-            {p.length != null && p.length <= 40 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Helical Wheel Projection</CardTitle>
-                  <CardDescription>
-                    Schiffer-Edmundson axial view. The red arrow shows the hydrophobic moment
-                    direction.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="flex justify-center">
-                  <HelicalWheel sequence={p.sequence} />
-                </CardContent>
-              </Card>
-            )}
-
-            {/* ── S4PRED Per-Residue Probabilities ── */}
-            <S4PredChart peptide={p} />
-
-            {/* ── TANGO Aggregation Heatmap ── */}
-            {p.tango?.agg && p.tango.agg.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>TANGO Aggregation Profile</CardTitle>
-                  <CardDescription>
-                    Per-residue aggregation propensity. High scores indicate amyloid-forming
-                    regions.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <AggregationHeatmap
-                    sequence={p.sequence}
-                    aggCurve={p.tango.agg}
-                    betaCurve={p.tango.beta}
-                    helixCurve={p.tango.helix}
-                    peptideId={p.id}
-                  />
-                </CardContent>
-              </Card>
-            )}
-
-            {/* ── AlphaFold Viewer ── */}
-            <AlphaFoldViewer peptideId={p.id} />
-
-            {/* ── Interpretation guidance ── */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Interpretation Notes</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  <strong className="text-foreground">Charge</strong> and{" "}
-                  <strong className="text-foreground">hydrophobicity</strong> help screen
-                  antimicrobial and amyloid-prone candidates. Higher hydrophobicity with positive
-                  charge can suggest membrane activity.
-                </p>
-                <p>
-                  <strong className="text-foreground">Hydrophobic moment</strong> measures
-                  amphipathicity — the asymmetry of hydrophobic residue distribution around a helix
-                  axis.
-                </p>
-                <p>
-                  TANGO and S4PRED predictions show "N/A" if those tools are not installed on the
-                  server. Biochemical properties (charge, hydrophobicity, hydrophobic moment) are
-                  always computed.
-                </p>
-              </CardContent>
-            </Card>
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+            <PeptideViewer peptide={p} />
           </motion.div>
         )}
       </motion.div>

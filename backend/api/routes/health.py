@@ -1,6 +1,7 @@
 """
 Health check and dependency status endpoints.
 """
+
 import os
 import time
 from typing import Any, Dict
@@ -32,7 +33,9 @@ def _check_tango_availability() -> Dict[str, Any]:
     bin_path = tango_module._resolve_tango_bin()
 
     if not bin_path:
-        result["reason"] = "TANGO binary not found (checked TANGO_BINARY_PATH, tools/tango/bin/, backend/Tango/bin/, and PATH)"
+        result["reason"] = (
+            "TANGO binary not found (checked TANGO_BINARY_PATH, tools/tango/bin/, backend/Tango/bin/, and PATH)"
+        )
         return result
 
     result["path"] = os.path.abspath(bin_path)
@@ -73,7 +76,13 @@ def _check_s4pred_availability() -> Dict[str, Any]:
         result["reason"] = f"S4PRED weights directory not found: {weights_path}"
         return result
 
-    required_files = ['weights_1.pt', 'weights_2.pt', 'weights_3.pt', 'weights_4.pt', 'weights_5.pt']
+    required_files = [
+        "weights_1.pt",
+        "weights_2.pt",
+        "weights_3.pt",
+        "weights_4.pt",
+        "weights_5.pt",
+    ]
     for f in required_files:
         if os.path.exists(os.path.join(weights_path, f)):
             result["weights_found"].append(f)
@@ -110,7 +119,7 @@ def _check_uniprot_connectivity() -> Dict[str, Any]:
         start = time.time()
         req = urllib.request.Request(
             "https://rest.uniprot.org/uniprotkb/search?query=P53_HUMAN&size=1",
-            headers={"Accept": "application/json"}
+            headers={"Accept": "application/json"},
         )
         with urllib.request.urlopen(req, timeout=5) as response:
             if response.status == 200:
@@ -125,10 +134,95 @@ def _check_uniprot_connectivity() -> Dict[str, Any]:
 
     return result
 
+
 @router.get("/api/health")
 def health():
     """Health check endpoint."""
     return {"ok": True}
+
+
+@router.get("/api/live")
+def live():
+    """Liveness probe — always 200 if process is running."""
+    return {"status": "alive"}
+
+
+@router.get("/api/ready")
+def ready():
+    """
+    Readiness probe — returns 200 if at least one prediction provider is available.
+    Returns 503 if no providers are ready.
+    """
+    from fastapi.responses import JSONResponse
+
+    checks = {}
+
+    # TANGO check
+    if settings.USE_TANGO:
+        tango_info = _check_tango_availability()
+        checks["tango"] = tango_info["available"]
+    else:
+        checks["tango"] = False
+
+    # S4PRED check
+    if settings.USE_S4PRED:
+        s4pred_info = _check_s4pred_availability()
+        checks["s4pred"] = s4pred_info["available"]
+    else:
+        checks["s4pred"] = False
+
+    # FF-Helix is always available (pure Python)
+    checks["ff_helix"] = True
+
+    is_ready = any(checks.values())
+    payload = {"ready": is_ready, "checks": checks}
+
+    if not is_ready:
+        return JSONResponse(status_code=503, content=payload)
+    return payload
+
+
+@router.get("/api/live")
+def liveness():
+    """
+    Kubernetes liveness probe.
+    Always returns 200 — if this fails, the pod is restarted.
+    """
+    return {"status": "alive"}
+
+
+@router.get("/api/ready")
+def readiness():
+    """
+    Kubernetes readiness probe.
+    Returns 200 when at least one prediction provider is available.
+    Returns 503 if no providers are ready (pod removed from Service endpoints).
+    """
+    from fastapi.responses import JSONResponse
+
+    tango_status = _check_tango_availability()
+    s4pred_status = _check_s4pred_availability()
+
+    providers_available = sum(
+        [
+            tango_status["available"],
+            s4pred_status["available"],
+            True,  # FF-Helix is always available
+        ]
+    )
+
+    ready = providers_available >= 1
+    body = {
+        "ready": ready,
+        "providers_available": providers_available,
+        "tango": tango_status["available"],
+        "s4pred": s4pred_status["available"],
+        "ff_helix": True,
+    }
+
+    if not ready:
+        return JSONResponse(status_code=503, content=body)
+    return body
 
 
 @router.get("/api/health/dependencies")
@@ -167,11 +261,13 @@ async def health_dependencies(check_uniprot: bool = False):
     # "ready" = at least one prediction provider available
     # "degraded" = some providers missing but can still function
     # "unavailable" = no providers available
-    providers_available = sum([
-        tango_status["available"],
-        s4pred_status["available"],
-        ff_helix_status["available"],
-    ])
+    providers_available = sum(
+        [
+            tango_status["available"],
+            s4pred_status["available"],
+            ff_helix_status["available"],
+        ]
+    )
 
     if providers_available >= 2:
         overall_status = "ready"
@@ -194,15 +290,19 @@ async def health_dependencies(check_uniprot: bool = False):
     # Add helpful messages for common issues
     issues = []
     if not tango_status["available"] and settings.USE_TANGO:
-        issues.append({
-            "provider": "tango",
-            "fix": "Place platform binary in tools/tango/bin/ or set TANGO_BINARY_PATH env var"
-        })
+        issues.append(
+            {
+                "provider": "tango",
+                "fix": "Place platform binary in tools/tango/bin/ or set TANGO_BINARY_PATH env var",
+            }
+        )
     if not s4pred_status["available"] and settings.USE_S4PRED:
-        issues.append({
-            "provider": "s4pred",
-            "fix": "Set S4PRED_MODEL_PATH to directory containing weights_1.pt through weights_5.pt"
-        })
+        issues.append(
+            {
+                "provider": "s4pred",
+                "fix": "Set S4PRED_MODEL_PATH to directory containing weights_1.pt through weights_5.pt",
+            }
+        )
 
     if issues:
         result["issues"] = issues

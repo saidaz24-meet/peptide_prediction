@@ -13,7 +13,7 @@ These MUST NOT crash any biochem function.
 """
 
 import biochem_calculation
-from auxiliary import get_corrected_sequence
+from auxiliary import get_corrected_sequence, get_corrected_sequence_with_notes
 
 # --- get_corrected_sequence ---
 
@@ -148,3 +148,93 @@ class TestTotalChargeRobust:
     def test_mixed_known_unknown(self):
         # K(+1) + X(0) + D(-1) = 0
         assert biochem_calculation.total_charge("KXD") == 0
+
+
+# --- get_corrected_sequence_with_notes (ISSUE-024) ---
+
+
+class TestCorrectedSequenceWithNotes:
+    """Tests for the substitution-tracking variant."""
+
+    def test_no_substitutions(self):
+        """Clean sequence should return empty notes."""
+        seq, subs, notes = get_corrected_sequence_with_notes("ACDEFGHIK")
+        assert seq == "ACDEFGHIK"
+        assert subs == []
+        assert notes == ""
+
+    def test_single_substitution(self):
+        """Single X should be tracked."""
+        seq, subs, notes = get_corrected_sequence_with_notes("AXCD")
+        assert seq == "AACD"
+        assert len(subs) == 1
+        assert subs[0]["position"] == 2
+        assert subs[0]["original"] == "X"
+        assert subs[0]["replacement"] == "A"
+        assert "X→A" in notes
+
+    def test_multiple_substitutions(self):
+        """Multiple different non-standard AAs."""
+        seq, subs, notes = get_corrected_sequence_with_notes("XBZUOJ")
+        # Matches existing test: XBZUOJ → ADECKL
+        assert seq == "ADECKL"
+        assert len(subs) == 6
+        assert "X→A" in notes
+        assert "O→K" in notes
+
+    def test_terminal_modification(self):
+        """Terminal modification should be noted (digits stripped first)."""
+        seq, subs, notes = get_corrected_sequence_with_notes("PEPTIDE-NH2")
+        assert seq == "PEPTIDE"
+        assert "Terminal modification" in notes
+        # Note: digit "2" is stripped before dash handling, so mod is "-NH"
+        assert "NH" in notes
+
+    def test_stripped_characters(self):
+        """Digits and symbols should be noted."""
+        seq, subs, notes = get_corrected_sequence_with_notes("PEP123TIDE")
+        assert seq == "PEPTIDE"
+        assert "characters removed" in notes.lower()
+
+    def test_no_notes_for_clean(self):
+        """Standard 20 AAs with no modifications → no notes."""
+        seq, subs, notes = get_corrected_sequence_with_notes("ACDEFGHIKLMNPQRSTVWY")
+        assert notes == ""
+
+    def test_none_input(self):
+        """None should return empty."""
+        seq, subs, notes = get_corrected_sequence_with_notes(None)
+        assert seq == ""
+        assert subs == []
+        assert notes == ""
+
+    def test_positions_are_one_based(self):
+        """Positions should be 1-based for user display."""
+        seq, subs, notes = get_corrected_sequence_with_notes("AXA")
+        assert subs[0]["position"] == 2  # 1-based
+
+    def test_matches_original_function(self):
+        """New function must produce same corrected sequence as original."""
+        test_cases = [
+            "AXXA", "ABBA", "AZZA", "AUUA", "AOOA", "AJJA",
+            "XBZUOJ", "AAAA-BBB", "akla", "ABC123DEF",
+            "ACDEFGHIKLMNPQRSTVWY", "FOF123JJJ",
+        ]
+        for case in test_cases:
+            old = get_corrected_sequence(case)
+            new, _, _ = get_corrected_sequence_with_notes(case)
+            assert old == new, f"Mismatch for {case!r}: old={old!r}, new={new!r}"
+
+    def test_substitution_with_stripped_chars(self):
+        """Both substitutions and stripped chars should be noted."""
+        seq, subs, notes = get_corrected_sequence_with_notes("A1X2B")
+        assert seq == "AAD"
+        assert len(subs) == 2  # X and B
+        assert "X→A" in notes
+        assert "B→D" in notes
+        assert "characters removed" in notes.lower()
+
+    def test_reason_included(self):
+        """Each substitution should include a human-readable reason."""
+        _, subs, _ = get_corrected_sequence_with_notes("U")
+        assert subs[0]["reason"] == "Selenocysteine → Cysteine"

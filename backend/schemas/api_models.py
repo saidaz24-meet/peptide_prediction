@@ -201,6 +201,14 @@ class PeptideRow(BaseModel):
         None, description="S4PRED per-residue SS prediction ('C', 'H', 'E')"
     )
 
+    # Added for ISSUE-024: non-standard AA substitution transparency
+    sequenceNotes: Optional[str] = Field(
+        None, description="Human-readable note about sequence modifications (non-standard AA substitutions, character stripping)"
+    )
+    originalSequence: Optional[str] = Field(
+        None, description="Original input sequence before correction, only present if different from 'sequence'"
+    )
+
     # Provider status (Principle B: mandatory provider status)
     # Produced by: backend/services/provider_tracking.py:create_provider_status_for_row()
     # Added during normalization: backend/services/normalize.py:normalize_rows_for_ui()
@@ -274,6 +282,8 @@ class PeptideRow(BaseModel):
             "s4predPECurve",
             "s4predPCCurve",
             "s4predSsPrediction",
+            "sequenceNotes",
+            "originalSequence",
             "providerStatus",
             "extras",
         }

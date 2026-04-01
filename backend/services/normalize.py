@@ -152,8 +152,9 @@ def create_single_sequence_df(sequence: str, entry: Optional[str] = None) -> pd.
     if not sequence or not sequence.strip():
         raise HTTPException(status_code=400, detail="Sequence is required and cannot be empty")
 
-    # Get corrected sequence (handles non-standard AAs)
-    seq = auxiliary.get_corrected_sequence(sequence.strip())
+    # Get corrected sequence with substitution tracking (ISSUE-024)
+    raw_sequence = sequence.strip()
+    seq, substitutions, sequence_notes = auxiliary.get_corrected_sequence_with_notes(raw_sequence)
 
     # Validate sequence is not empty after correction
     if not seq or len(seq) == 0:
@@ -163,7 +164,13 @@ def create_single_sequence_df(sequence: str, entry: Optional[str] = None) -> pd.
         )
 
     # Create DataFrame with canonical column names (same as CSV path)
-    df = pd.DataFrame([{"Entry": (entry or "adhoc").strip(), "Sequence": seq, "Length": len(seq)}])
+    row_data = {"Entry": (entry or "adhoc").strip(), "Sequence": seq, "Length": len(seq)}
+    # Add substitution notes if sequence was modified (ISSUE-024)
+    if sequence_notes:
+        row_data["sequenceNotes"] = sequence_notes
+    if raw_sequence.upper() != seq:
+        row_data["originalSequence"] = raw_sequence
+    df = pd.DataFrame([row_data])
 
     return df
 

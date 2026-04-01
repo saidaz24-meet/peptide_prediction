@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { motion, cubicBezier } from "framer-motion";
 import * as Sentry from "@sentry/react";
+import { BgNotebook } from "@/components/BgNotebook";
 
 /** ---------- ScreenTransition (local, no extra files) ---------- */
 type Phase = "idle" | "enter" | "exit";
@@ -35,7 +36,9 @@ function ScreenTransition({
   return (
     <motion.div
       initial={{ clipPath: `circle(${from}px at ${clickPosition.x}px ${clickPosition.y}px)` }}
-      animate={{ clipPath: `circle(${isEntering ? to : from}px at ${clickPosition.x}px ${clickPosition.y}px)` }}
+      animate={{
+        clipPath: `circle(${isEntering ? to : from}px at ${clickPosition.x}px ${clickPosition.y}px)`,
+      }}
       transition={{ duration: 0.6, ease: cubicBezier(0.22, 1, 0.36, 1) }}
       onUpdate={(latest) => {
         const m = /circle\((\d+\.?\d*)px/.exec(String((latest as any).clipPath));
@@ -80,61 +83,70 @@ export default function About() {
       <motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.35, ease: cubicBezier(0.22, 1, 0.36, 1) }}
-        className="max-w-4xl mx-auto p-6"
+        transition={{ duration: 0.5, ease: cubicBezier(0.22, 1, 0.36, 1) }}
+        className="max-w-4xl mx-auto px-4 sm:px-6 relative"
       >
-        <div className="container mx-auto max-w-4xl py-8 space-y-6">
-          {/* Back button with animated transition */}
-          <div className="mb-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setClickPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-                setPhase("enter");
-              }}
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
-          </div>
+        <BgNotebook />
+        <div className="max-w-4xl mx-auto py-10 space-y-8 relative z-10">
+          {/* Back button */}
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9 btn-press"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              setClickPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+              setPhase("enter");
+            }}
+          >
+            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+            Back
+          </Button>
 
           {/* Title */}
-          <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-bold text-foreground">Peptide Visual Lab</h1>
-            <Badge variant="secondary">DESY • Landau Group</Badge>
+          <div>
+            <h1 className="text-h1 text-foreground">Peptide Visual Lab</h1>
+            <p className="text-body text-muted-foreground mt-1">DESY &middot; Landau Group</p>
           </div>
 
           {/* Purpose */}
-          <Card className="shadow-medium">
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
             <CardHeader>
               <CardTitle>Purpose</CardTitle>
               <CardDescription>Internal, non-public application</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm text-muted-foreground">
               <p>
-                Explore peptide properties and fibril-forming predictions. Upload UniProt exports (TSV/CSV/XLSX), compute
-                hydrophobicity, charge, μH, and visualize TANGO/S4PRED outputs when available.
+                Explore peptide properties and fibril-forming predictions. Upload UniProt exports
+                (TSV/CSV/XLSX), compute hydrophobicity, charge, μH, and visualize TANGO/S4PRED
+                outputs when available.
               </p>
             </CardContent>
           </Card>
 
           {/* Acknowledgements */}
-          <Card className="shadow-medium">
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
             <CardHeader>
               <CardTitle>Acknowledgements</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 text-sm">
-              <p><b>Frontend design & implementation:</b> Said Azaizah</p>
-              <p><b>Algorithmic approach & backend code:</b> provided by <b>Dr. Aleksandr Golubev</b></p>
-              <p><b>TANGO / S4PRED predictions:</b> courtesy of the lab's existing pipelines</p>
+              <p>
+                <b>Frontend design & implementation:</b> Said Azaizah
+              </p>
+              <p>
+                <b>Algorithmic approach & backend code:</b> provided by <b>Dr. Aleksandr Golubev</b>
+              </p>
+              <p>
+                <b>TANGO / S4PRED predictions:</b> courtesy of the lab's existing pipelines
+              </p>
             </CardContent>
           </Card>
 
           {/* Key Features */}
-          <Card className="shadow-medium">
-            <CardHeader><CardTitle>Key Features</CardTitle></CardHeader>
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
+            <CardHeader>
+              <CardTitle>Key Features</CardTitle>
+            </CardHeader>
             <CardContent className="grid md:grid-cols-2 gap-3 text-sm">
               <ul className="list-disc pl-5 space-y-1">
                 <li>Flexible upload with QC (+ rejected rows export)</li>
@@ -154,13 +166,15 @@ export default function About() {
           </Card>
 
           {/* TANGO / S4PRED Providers */}
-          <Card className="shadow-medium">
-            <CardHeader><CardTitle>TANGO / S4PRED Providers</CardTitle></CardHeader>
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
+            <CardHeader>
+              <CardTitle>TANGO / S4PRED Providers</CardTitle>
+            </CardHeader>
             <CardContent className="text-sm text-muted-foreground">
               <p>
-                Prediction providers are controlled via environment variables in <code>backend/.env</code>:{" "}
-                <code>USE_TANGO=1</code> enables TANGO aggregation prediction,{" "}
-                <code>USE_S4PRED=1</code> enables S4PRED secondary structure prediction.
+                Prediction providers are controlled via environment variables in{" "}
+                <code>backend/.env</code>: <code>USE_TANGO=1</code> enables TANGO aggregation
+                prediction, <code>USE_S4PRED=1</code> enables S4PRED secondary structure prediction.
                 Without these providers enabled, related metrics display <em>Not available</em>.
               </p>
             </CardContent>
@@ -168,7 +182,7 @@ export default function About() {
 
           {/* Sentry Test (Development Only) */}
           {import.meta.env.MODE === "development" && (
-            <Card className="shadow-medium border-orange-200">
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl border-orange-200">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Bug className="w-5 h-5" />

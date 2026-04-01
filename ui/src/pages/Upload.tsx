@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import AppFooter from "@/components/AppFooter";
+import { BgDashLines } from "@/components/BgDashLines";
 import { UploadDropzone } from "@/components/UploadDropzone";
 import { UniProtQueryInput } from "@/components/UniProtQueryInput";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
@@ -294,55 +295,61 @@ export default function Upload() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-surface">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-background relative">
+      <BgDashLines />
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-10 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
           className="max-w-4xl mx-auto"
         >
           {/* Header & progress */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-foreground mb-2">Upload & Process Dataset</h1>
-            <p className="text-muted-foreground mb-6">
+          <div className="mb-10">
+            <h1 className="text-h1 text-foreground mb-2">Upload & Process Dataset</h1>
+            <p className="text-body text-muted-foreground mb-8">
               Upload your peptide CSV/TSV/XLSX — columns are auto-detected.
             </p>
 
-            <div className="space-y-4">
-              <Progress value={progressPercent} className="h-2" />
-              <div className="flex justify-between">
-                {steps.map((step, index) => {
-                  const Icon = step.icon;
-                  const isActive = index === currentStep;
-                  const isCompleted = index < currentStep;
-                  return (
-                    <div key={step.id} className="flex items-center space-x-2">
-                      <div
-                        className={`flex items-center justify-center w-8 h-8 rounded-full border-2 transition-colors ${
-                          isCompleted
-                            ? "bg-primary border-primary text-primary-foreground"
-                            : isActive
-                              ? "border-primary text-primary"
-                              : "border-muted text-muted-foreground"
-                        }`}
-                      >
-                        <Icon className="w-4 h-4" />
-                      </div>
-                      <span
-                        className={`text-sm font-medium ${isActive ? "text-foreground" : "text-muted-foreground"}`}
-                      >
-                        {step.title}
-                      </span>
+            {/* Step indicator — clean pill style */}
+            <div className="flex items-center gap-3">
+              {steps.map((step, index) => {
+                const isActive = index === currentStep;
+                const isCompleted = index < currentStep;
+                return (
+                  <div key={step.id} className="flex items-center gap-2">
+                    <div
+                      className={`flex items-center justify-center w-8 h-8 rounded-full text-small font-semibold transition-all duration-300 ${
+                        isCompleted
+                          ? "bg-primary text-primary-foreground shadow-sm"
+                          : isActive
+                            ? "border-2 border-primary text-primary bg-primary/10"
+                            : "border-2 border-[hsl(var(--border))] text-[hsl(var(--faint))]"
+                      }`}
+                    >
+                      {isCompleted ? (
+                        <CheckCircle className="w-4 h-4" />
+                      ) : (
+                        <span>{index + 1}</span>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
+                    <span
+                      className={`text-small font-medium hidden sm:inline ${isActive || isCompleted ? "text-foreground" : "text-[hsl(var(--faint))]"}`}
+                    >
+                      {step.title}
+                    </span>
+                    {index < steps.length - 1 && (
+                      <div className={`w-8 sm:w-12 h-[2px] rounded-full mx-1 ${isCompleted ? "bg-primary" : "bg-[hsl(var(--border))]"}`} />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
 
           {/* Step content */}
-          <Card className="shadow-medium">
-            <CardContent className="p-6">
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl overflow-hidden">
+            <CardContent className="p-4 sm:p-8">
               {currentStep === 0 && (
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                   {/* Upload Mode Selector */}
@@ -423,9 +430,9 @@ export default function Upload() {
                       />
 
                       {/* Upload guidance */}
-                      <Alert className="bg-muted/50 border-muted">
+                      <Alert className="bg-[hsl(var(--surface-1))] border-[hsl(var(--border))] rounded-xl">
                         <Info className="h-4 w-4" />
-                        <AlertDescription className="text-xs space-y-1">
+                        <AlertDescription className="text-caption space-y-1">
                           <p>
                             <strong>Required:</strong> Your file must include a{" "}
                             <code>Sequence</code> column.
@@ -566,8 +573,8 @@ export default function Upload() {
 
                       {/* Auto-detected columns info */}
                       {rawData.headers && rawData.headers.length > 0 && (
-                        <div className="bg-muted/50 rounded-lg p-4">
-                          <p className="text-sm font-medium mb-2">Detected columns:</p>
+                        <div className="bg-[hsl(var(--surface-1))] rounded-xl p-4 border border-[hsl(var(--border))]">
+                          <p className="text-small font-medium mb-2">Detected columns:</p>
                           <div className="flex flex-wrap gap-2">
                             {rawData.headers.slice(0, 8).map((h: string) => (
                               <Badge key={h} variant="outline" className="text-xs">
@@ -594,11 +601,11 @@ export default function Upload() {
                     </>
                   )}
 
-                  <div className="flex justify-between items-center">
-                    <Button variant="outline" onClick={() => setCurrentStep(0)}>
+                  <div className="flex justify-between items-center pt-2">
+                    <Button variant="outline" onClick={() => setCurrentStep(0)} className="btn-press">
                       Back
                     </Button>
-                    <Button onClick={handleAnalyze} disabled={!localFile || isAnalyzing} size="lg">
+                    <Button onClick={handleAnalyze} disabled={!localFile || isAnalyzing} size="lg" className="px-8 btn-press">
                       {isAnalyzing ? "Analyzing…" : "Analyze Dataset"}
                     </Button>
                   </div>

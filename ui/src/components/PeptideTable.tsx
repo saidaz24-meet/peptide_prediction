@@ -12,6 +12,7 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table";
 import {
+  AlertTriangle,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
@@ -55,6 +56,7 @@ import {
 } from "@/components/ui/tooltip";
 import { Peptide } from "@/types/peptide";
 import { toast } from "sonner";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { TangoBadge } from "@/components/TangoBadge";
 import { S4PredBadge } from "@/components/S4PredBadge";
 import { useChartSelection } from "@/stores/chartSelectionStore";
@@ -166,6 +168,7 @@ interface PeptideTableProps {
 const columnHelper = createColumnHelper<Peptide>();
 
 export function PeptideTable({ peptides }: PeptideTableProps) {
+  const isMobile = useIsMobile();
   const [globalFilter, setGlobalFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>(EMPTY_FILTERS);
@@ -192,6 +195,25 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
       proteinFunction: hasUniProtMeta,
     }));
   }, [hasUniProtMeta]);
+
+  // Hide dense columns on mobile — user can re-enable via Columns dropdown
+  useEffect(() => {
+    if (isMobile) {
+      setColumnVisibility((prev) => ({
+        ...prev,
+        sequence: false,
+        charge: false,
+        hydrophobicity: false,
+        muH: false,
+        ffSswFlag: false,
+        helixBinary: false,
+        s4predHelixPercent: false,
+        species: false,
+        geneName: false,
+        proteinFunction: false,
+      }));
+    }
+  }, [isMobile]);
 
   const activeFilterCount = useMemo(() => countActiveFilters(columnFilters), [columnFilters]);
 
@@ -254,6 +276,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         ),
         cell: (info) => {
           const id = String(info.getValue());
+          const row = info.row.original;
           const isUniprot = /^[A-Z][0-9][A-Z0-9]{3}[0-9](-\d+)?$/i.test(id);
           const uni = `https://www.uniprot.org/uniprotkb/${id}/entry`;
           return (
@@ -271,6 +294,18 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
                 </a>
               ) : (
                 <span className="font-mono text-sm">{id}</span>
+              )}
+              {row.sequenceNotes && (
+                <TooltipProvider delayDuration={200}>
+                  <UITooltip>
+                    <TooltipTrigger>
+                      <AlertTriangle className="w-3 h-3 text-[hsl(var(--warning))] inline" />
+                    </TooltipTrigger>
+                    <TooltipContent side="right" className="max-w-xs text-xs">
+                      {row.sequenceNotes}
+                    </TooltipContent>
+                  </UITooltip>
+                </TooltipProvider>
               )}
             </div>
           );
@@ -793,13 +828,13 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
       {/* Controls */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center sm:justify-between gap-3">
+        <div className="flex items-center gap-2">
           <Input
             placeholder="Search peptides..."
             value={globalFilter ?? ""}
             onChange={(e) => setGlobalFilter(e.target.value)}
-            className="max-w-sm"
+            className="max-w-sm min-w-0"
           />
           <Select
             value={`${table.getState().pagination.pageSize}`}
@@ -807,7 +842,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
               table.setPageSize(Number(value));
             }}
           >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-[130px] sm:w-[180px]">
               <SelectValue placeholder="Rows per page" />
             </SelectTrigger>
             <SelectContent>
@@ -820,14 +855,14 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           </Select>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <Button
             variant={showFilters ? "default" : "outline"}
             size="sm"
             onClick={() => setShowFilters(!showFilters)}
           >
-            <Filter className="w-4 h-4 mr-2" />
-            Filters
+            <Filter className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Filters</span>
             {activeFilterCount > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
                 {activeFilterCount}
@@ -837,8 +872,8 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="outline" size="sm">
-                <Columns3 className="w-4 h-4 mr-2" />
-                Columns
+                <Columns3 className="w-4 h-4 sm:mr-2" />
+                <span className="hidden sm:inline">Columns</span>
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
@@ -879,12 +914,12 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button onClick={exportToCSV} size="sm" variant="outline">
-            <Download className="w-4 h-4 mr-2" />
-            Export Filtered
+            <Download className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Export Filtered</span>
           </Button>
           <Button onClick={exportFullCSV} size="sm">
-            <Download className="w-4 h-4 mr-2" />
-            Export All CSV
+            <Download className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Export All</span>
           </Button>
         </div>
       </div>

@@ -122,6 +122,15 @@ jobs:
           npm run build
           echo "Finished build at $(date)"
 
+      - name: Check bundle size
+        run: |
+          TOTAL=$(du -sk dist/ | cut -f1)
+          echo "### Bundle size: ${TOTAL}KB" >> "$GITHUB_STEP_SUMMARY"
+          ls -lhS dist/assets/*.js 2>/dev/null | head -10 >> "$GITHUB_STEP_SUMMARY" || true
+          if [ "$TOTAL" -gt 2048 ]; then
+            echo "::warning::Bundle size exceeds 2MB (${TOTAL}KB)"
+          fi
+
   # Docker build verification (on all PRs and main)
   docker:
     name: Docker Build

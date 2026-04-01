@@ -622,6 +622,16 @@ def process_upload_dataframe(
     Raises:
         UploadProcessingError: For processing errors that should be returned as HTTP errors
     """
+    # ISSUE-024: Track non-standard AA substitutions for user transparency
+    for idx, row in df.iterrows():
+        raw_seq = str(row.get("Sequence", ""))
+        if raw_seq:
+            corrected, _subs, notes = auxiliary.get_corrected_sequence_with_notes(raw_seq)
+            if notes:
+                df.at[idx, "sequenceNotes"] = notes
+            if raw_seq.upper() != corrected:
+                df.at[idx, "originalSequence"] = raw_seq
+
     # Performance timing: FF-Helix computation
     ff_helix_start_time = time.time()
     log_info("ff_helix_compute_start", "Computing FF-Helix % for all sequences")

@@ -23,6 +23,7 @@ import { useDatasetStore } from "@/stores/datasetStore";
 import { uploadCSV } from "@/lib/api";
 import { mapApiRowToPeptide } from "@/lib/peptideMapper";
 import type { Peptide, DatasetStats } from "@/types/peptide";
+import { BgDotGrid } from "@/components/BgDotGrid";
 
 // Colors for the two cohorts
 const COHORT_A_COLOR = "hsl(210, 80%, 55%)"; // blue
@@ -280,11 +281,12 @@ export default function Compare() {
   ];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="px-4 sm:px-6 py-8 sm:py-10 max-w-[1400px] mx-auto space-y-8 relative">
+      <BgDotGrid />
       {/* Header */}
-      <div className="space-y-2">
-        <h1 className="text-2xl font-bold tracking-tight">Cohort Comparison</h1>
-        <p className="text-muted-foreground text-sm">
+      <div>
+        <h1 className="text-h1 text-foreground">Cohort Comparison</h1>
+        <p className="text-body text-muted-foreground mt-1">
           Compare your current dataset (Cohort A) against a second dataset (Cohort B).
         </p>
       </div>
@@ -323,7 +325,7 @@ export default function Compare() {
 
       {/* Cohort labels */}
       {cohortB && (
-        <div className="flex items-center gap-4 text-sm">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COHORT_A_COLOR }} />
             <span className="font-medium">Cohort A</span>

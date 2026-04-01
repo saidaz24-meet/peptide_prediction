@@ -5,20 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <title>Peptide Visual Lab - Advanced Peptide Analysis</title>
-    <meta name="description" content="Professional peptide analysis tool with advanced visualizations for CSV data" />
+    <meta name="description" content="Multi-algorithm prediction and visualization for peptide aggregation, structural switching, and fibril formation." />
     <meta name="author" content="Peptide Visual Lab" />
 
     <meta property="og:title" content="Peptide Visual Lab - Advanced Peptide Analysis" />
-    <meta property="og:description" content="Professional peptide analysis tool with advanced visualizations for CSV data" />
+    <meta property="og:description" content="Multi-algorithm prediction and visualization for peptide aggregation, structural switching, and fibril formation." />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/favicon.png" />
 
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:image" content="/favicon.png" />
+
+    <!-- Fonts: Inter (UI) + JetBrains Mono (data/sequences) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
   </head>
 
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Apply saved theme — default is light (no class = light)
+      (function() {
+        var saved = localStorage.getItem('pvl-theme');
+        if (saved === 'dark') {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </body>
 </html>

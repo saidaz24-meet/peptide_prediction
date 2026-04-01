@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { HelpCircle, BarChart3, Zap, Waves, Target, Layers, BookOpen, Info } from "lucide-react";
+import { BgNotebook } from "@/components/BgNotebook";
 
 const metrics = [
   {
@@ -72,26 +73,28 @@ const chartTypes = [
 
 export default function Help() {
   return (
-    <div className="min-h-screen bg-gradient-surface">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-background relative">
+      <BgNotebook />
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-10 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
           className="max-w-4xl mx-auto space-y-8"
         >
           {/* Header */}
           <div className="text-center space-y-4">
-            <div className="flex items-center justify-center w-16 h-16 mx-auto bg-primary/10 rounded-2xl">
-              <BookOpen className="w-8 h-8 text-primary" />
+            <div className="flex items-center justify-center w-14 h-14 mx-auto bg-primary/10 rounded-2xl">
+              <BookOpen className="w-7 h-7 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold text-foreground">Help & Documentation</h1>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Learn how to interpret peptide metrics and make the most of your analysis results
+            <h1 className="text-h1 text-foreground">Help & Documentation</h1>
+            <p className="text-body text-muted-foreground max-w-2xl mx-auto">
+              Learn how to interpret peptide metrics and make the most of your analysis results.
             </p>
           </div>
 
           {/* Metrics Explanation */}
-          <Card className="shadow-medium">
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Info className="w-5 h-5 mr-2 text-primary" />
@@ -135,7 +138,7 @@ export default function Help() {
           </Card>
 
           {/* Chart Types */}
-          <Card className="shadow-medium">
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <BarChart3 className="w-5 h-5 mr-2 text-primary" />
@@ -166,7 +169,7 @@ export default function Help() {
           </Card>
 
           {/* Color Legend */}
-          <Card className="shadow-medium">
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
             <CardHeader>
               <CardTitle>Color Conventions</CardTitle>
               <CardDescription>
@@ -192,7 +195,7 @@ export default function Help() {
           </Card>
 
           {/* Tips Section */}
-          <Card className="shadow-medium border-primary/20 bg-primary/5">
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl border-primary/20 bg-primary/5">
             <CardHeader>
               <CardTitle className="flex items-center text-primary">
                 <HelpCircle className="w-5 h-5 mr-2" />
@@ -225,7 +228,7 @@ export default function Help() {
           </Card>
 
           {/* Advanced Topics */}
-          <Card className="shadow-medium">
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <Info className="w-5 h-5 mr-2 text-primary" />
@@ -285,7 +288,7 @@ export default function Help() {
           </Card>
 
           {/* Scientific Notes */}
-          <Card className="shadow-medium">
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
             <CardHeader>
               <CardTitle className="flex items-center">
                 <BookOpen className="w-5 h-5 mr-2 text-primary" />

@@ -1,6 +1,6 @@
 // src/pages/Results.tsx
 import { motion } from "framer-motion";
-import { Download, ArrowUp, ArrowDown } from "lucide-react";
+import { Download, ArrowUp, ArrowDown, ChevronDown, FileText, FileDown } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -10,6 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ProviderBadge } from "@/components/ProviderBadge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 
 import { ResultsKpis } from "@/components/ResultsKpis";
 import { ResultsCharts } from "@/components/ResultsCharts";
@@ -28,11 +35,14 @@ import {
   type RankingPreset,
 } from "@/lib/ranking";
 import { useThresholdStore } from "@/stores/thresholdStore";
+import { BgDotGrid } from "@/components/BgDotGrid";
 import { exportShortlistPDF } from "@/lib/report";
 import { DEFAULT_THRESHOLDS, type ResolvedThresholds } from "@/lib/thresholds";
 import { uploadCSV, predictOne } from "@/lib/api";
 import { RotateCcw, FlaskConical, Info, AlertTriangle, XCircle, X } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AnimateIn, AnimateInChild } from "@/components/AnimateIn";
+import { smoothEase } from "@/lib/animations";
 
 import type { Peptide } from "@/types/peptide";
 
@@ -290,94 +300,99 @@ export default function Results() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-surface">
-      <div className="container mx-auto px-4 py-8" id="results-root">
+    <div className="min-h-screen bg-background relative">
+      <BgDotGrid />
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-10 relative z-10" id="results-root">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: smoothEase }}
           className="space-y-8"
         >
-          {/* Header */}
-          <div className="flex items-center justify-between">
+          {/* ── Header ── */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-foreground">Analysis Results</h1>
-              <p className="text-muted-foreground mt-1">
-                Comprehensive peptide analysis and visualizations
+              <h1 className="text-h1 text-foreground">Analysis Results</h1>
+              <p className="text-body text-muted-foreground mt-1">
+                {peptidesTyped.length} peptide{peptidesTyped.length !== 1 ? "s" : ""} analyzed
+                {meta?.source === "uniprot_api" && meta?.query && (
+                  <> &middot; UniProt: &ldquo;<em>{meta.query}</em>&rdquo;</>
+                )}
               </p>
             </div>
 
-            <div className="flex items-center space-x-3">
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Provider status — compact pills */}
               {meta && (
-                <div className="flex gap-2">
+                <div className="flex items-center gap-1.5 mr-2">
                   {meta.provider_status?.tango ? (
                     <ProviderBadge name="TANGO" status={meta.provider_status.tango as any} />
                   ) : (
-                    <Badge variant="outline">TANGO: {meta.use_tango ? "ENABLED" : "OFF"}</Badge>
+                    <Badge variant="outline" className="text-xs font-normal">TANGO: {meta.use_tango ? "ON" : "OFF"}</Badge>
                   )}
                   {meta.provider_status?.s4pred ? (
                     <ProviderBadge name="S4PRED" status={meta.provider_status.s4pred as any} />
                   ) : (
-                    <Badge variant="outline">S4PRED: OFF</Badge>
-                  )}
-                  <Badge variant="secondary">n = {peptidesTyped.length}</Badge>
-                  {meta?.thresholds && (
-                    <Badge variant="outline" className="text-xs">
-                      Using{" "}
-                      {thresholdMode === "default"
-                        ? "default"
-                        : thresholdMode === "recommended"
-                          ? "recommended"
-                          : "custom"}{" "}
-                      thresholds
-                    </Badge>
+                    <Badge variant="outline" className="text-xs font-normal">S4PRED: OFF</Badge>
                   )}
                   {thresholdsModified && (
-                    <Badge
-                      variant="secondary"
-                      className="text-xs bg-amber-100 text-amber-800 border-amber-300"
-                    >
-                      Custom Thresholds Active
+                    <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                      Custom Thresholds
                     </Badge>
                   )}
                 </div>
               )}
 
               <Legend defaultOpen={legendDefaultOpen} />
+
               <Link to="/quick">
-                <Button variant="outline" size="sm">
-                  <FlaskConical className="w-4 h-4 mr-2" />
+                <Button variant="outline" size="sm" className="h-9 text-small btn-press">
+                  <FlaskConical className="w-3.5 h-3.5 mr-1.5" />
                   Single Sequence
                 </Button>
               </Link>
+
               <ReproduceButton
                 getLastRun={getLastRun}
                 ingestBackendRows={ingestBackendRows}
                 setLoading={setLoading}
                 setError={setError}
               />
-              <Button variant="outline" size="sm" onClick={exportAllFASTA}>
-                <Download className="w-4 h-4 mr-2" />
-                FASTA
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  exportShortlistPDF(
-                    peptidesTyped,
-                    stats!,
-                    meta,
-                    weights,
-                    topN,
-                    resolvedThresholds,
-                    activeMetrics,
-                    directions
-                  )
-                }
-              >
-                <Download className="w-4 h-4 mr-2" />
-                PDF Report
-              </Button>
+
+              {/* Export dropdown — groups FASTA + PDF */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="h-9 text-small btn-press">
+                    <Download className="w-3.5 h-3.5 mr-1.5" />
+                    Export
+                    <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={exportAllFASTA}>
+                    <FileText className="w-4 h-4 mr-2" />
+                    Export FASTA
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() =>
+                      exportShortlistPDF(
+                        peptidesTyped,
+                        stats!,
+                        meta,
+                        weights,
+                        topN,
+                        resolvedThresholds,
+                        activeMetrics,
+                        directions
+                      )
+                    }
+                  >
+                    <FileDown className="w-4 h-4 mr-2" />
+                    PDF Report
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
 
@@ -452,16 +467,16 @@ export default function Results() {
 
           {/* UniProt source banner */}
           {meta?.source === "uniprot_api" && (
-            <div className="flex items-center justify-between bg-muted/50 rounded-lg px-4 py-2 text-sm">
-              <span>
-                Showing <strong>{meta.size_returned}</strong>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-[hsl(var(--surface-1))] rounded-xl px-4 sm:px-5 py-3 text-small border border-[hsl(var(--border))]">
+              <span className="text-muted-foreground">
+                Showing <strong className="text-foreground">{meta.size_returned}</strong>
                 {meta.total_available != null &&
                   meta.total_available > 0 &&
                   ` of ${meta.total_available.toLocaleString()}`}
                 {meta.query && (
                   <>
                     {" "}
-                    entries matching &ldquo;<em>{meta.query}</em>&rdquo;
+                    entries matching &ldquo;<em className="text-foreground">{meta.query}</em>&rdquo;
                   </>
                 )}
               </span>
@@ -470,7 +485,7 @@ export default function Results() {
                   href={meta.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-primary hover:underline text-xs"
+                  className="text-primary hover:underline text-small font-medium"
                 >
                   View on UniProt &rarr;
                 </a>
@@ -483,18 +498,18 @@ export default function Results() {
 
           {/* Main Content Tabs — Data Table first (researcher workflow) */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="data">Data Table</TabsTrigger>
-              <TabsTrigger value="ranking">Candidate Ranking</TabsTrigger>
-              <TabsTrigger value="charts">Charts & Analysis</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 h-11 bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] rounded-xl p-1">
+              <TabsTrigger value="data" className="rounded-lg text-small font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">Data Table</TabsTrigger>
+              <TabsTrigger value="ranking" className="rounded-lg text-small font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"><span className="hidden sm:inline">Candidate </span>Ranking</TabsTrigger>
+              <TabsTrigger value="charts" className="rounded-lg text-small font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"><span className="hidden sm:inline">Charts & </span>Analysis</TabsTrigger>
             </TabsList>
 
             {/* Data Table — default view */}
             <TabsContent value="data" className="space-y-6">
-              <Card className="shadow-medium">
-                <CardHeader>
-                  <CardTitle>Peptide Dataset</CardTitle>
-                  <CardDescription>
+              <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-h3">Peptide Dataset</CardTitle>
+                  <CardDescription className="text-small">
                     Interactive table with search, column filters, sorting, and export
                   </CardDescription>
                 </CardHeader>
@@ -506,10 +521,10 @@ export default function Results() {
 
             {/* Candidate Ranking */}
             <TabsContent value="ranking" className="space-y-6">
-              <Card className="shadow-medium">
-                <CardHeader>
-                  <CardTitle>Smart Candidate Ranking</CardTitle>
-                  <CardDescription>
+              <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl overflow-hidden">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-h3">Smart Candidate Ranking</CardTitle>
+                  <CardDescription className="text-small">
                     Proportional percentile-based scoring (0-100). Adjust metric weights,
                     directions, and presets to shortlist top candidates.
                     {peptidesTyped.length <= 1 && (
@@ -665,10 +680,10 @@ export default function Results() {
               {/* FF-Helix explanation */}
               <Alert
                 variant="default"
-                className="border-purple-200 bg-purple-50/50 dark:border-purple-800 dark:bg-purple-950/20"
+                className="border-primary/20 bg-primary/5 rounded-xl"
               >
-                <Info className="h-4 w-4 text-purple-600" />
-                <AlertDescription className="text-sm text-muted-foreground">
+                <Info className="h-4 w-4 text-primary" />
+                <AlertDescription className="text-small text-muted-foreground">
                   <strong className="text-foreground">FF-Helix %</strong> measures intrinsic amino
                   acid helix propensity using a sliding window (Fauchere-Pliska scale). It is{" "}
                   <strong className="text-foreground">not</strong> a prediction of actual helical

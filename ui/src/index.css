@@ -2,145 +2,172 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Peptide Visual Lab Design System - Professional Scientific Aesthetic */
+/* PVL Design System v2.0 — Dark-First, Precognition × Stripe */
 
 @layer base {
+  /* ═══════════════════════════════════════════════
+     LIGHT MODE (secondary — acceptable, not primary)
+     ═══════════════════════════════════════════════ */
   :root {
-    /* Base colors - Clean lab aesthetic */
+    /* ── Surfaces ── */
     --background: 0 0% 99%;
     --foreground: 220 13% 18%;
-    
-    /* Cards and surfaces */
+
     --card: 0 0% 100%;
     --card-foreground: 220 13% 18%;
-    
-    /* Interactive elements */
+
     --popover: 0 0% 100%;
     --popover-foreground: 220 13% 18%;
-    
-    /* Brand colors - Scientific purple */
+
+    /* ── Elevated Surfaces (new) ── */
+    --surface-1: 220 14% 97%;
+    --surface-2: 220 14% 94%;
+    --surface-3: 220 14% 91%;
+
+    /* ── Brand ── */
     --primary: 258 90% 66%;
     --primary-foreground: 0 0% 100%;
-    
-    /* Secondary - Neutral gray */
+    --primary-hover: 258 90% 56%;
+    --primary-muted: 258 90% 66%;      /* use with /0.15 opacity */
+
+    /* ── Neutrals ── */
     --secondary: 220 14% 96%;
     --secondary-foreground: 220 13% 18%;
-    
-    /* Muted elements */
+
     --muted: 220 14% 96%;
-    --muted-foreground: 220 8.9% 46.1%;
-    
-    /* Accent - Scientific blue for helix */
-    --accent: 211 96% 68%;
-    --accent-foreground: 0 0% 100%;
-    
-    /* Status colors */
-    --destructive: 0 84.2% 60.2%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 220 14% 94%;
+    --accent-foreground: 220 13% 18%;
+
+    --faint: 220 9% 70%;              /* tertiary/disabled text */
+
+    /* ── Semantic Status ── */
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    
-    /* Scientific theme colors */
-    --chameleon-positive: 258 90% 66%;
-    --chameleon-negative: 220 8.9% 46.1%;
+
+    /* ── Scientific Palette (DATA ONLY) ── */
     --helix: 211 96% 68%;
     --helix-foreground: 0 0% 100%;
     --beta: 25 95% 53%;
     --beta-foreground: 0 0% 100%;
-    --coil: 220 8.9% 66%;
+    --coil: 220 9% 46%;
 
-    /* Borders and inputs */
+    --chameleon-positive: 258 90% 66%;
+    --chameleon-negative: 220 9% 46%;
+
+    /* ── Borders ── */
     --border: 220 13% 91%;
+    --border-hover: 220 13% 82%;
     --input: 220 13% 91%;
     --ring: 258 90% 66%;
-    
-    /* Spacing and shape */
-    --radius: 0.75rem;
-    
-    /* Gradients */
+
+    /* ── Shape ── */
+    --radius: 0.5rem;
+
+    /* ── Gradients ── */
     --gradient-primary: linear-gradient(135deg, hsl(258 90% 66%), hsl(258 90% 76%));
     --gradient-surface: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 14% 98%));
-    
-    /* Shadows */
-    --shadow-soft: 0 2px 8px -2px hsl(220 13% 18% / 0.08);
-    --shadow-medium: 0 4px 16px -4px hsl(220 13% 18% / 0.12);
-    --shadow-strong: 0 8px 32px -8px hsl(220 13% 18% / 0.16);
 
+    /* ── Shadows ── */
+    --shadow-soft: 0 1px 3px 0 rgba(0,0,0,0.04), 0 1px 2px -1px rgba(0,0,0,0.03);
+    --shadow-medium: 0 4px 6px -1px rgba(0,0,0,0.06), 0 2px 4px -2px rgba(0,0,0,0.03);
+    --shadow-strong: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.04);
+
+    /* ── Sidebar (light mode — clean white/gray) ── */
     --sidebar-background: 0 0% 98%;
-
-    --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
-    --sidebar-primary-foreground: 0 0% 98%;
-
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
+    --sidebar-foreground: 220 13% 26%;
+    --sidebar-primary: 258 90% 66%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 95%;
+    --sidebar-accent-foreground: 220 13% 18%;
     --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-ring: 258 90% 66%;
   }
 
+  /* ═══════════════════════════════════════════════
+     DARK MODE (primary — this is PVL's native look)
+     ═══════════════════════════════════════════════ */
   .dark {
-    /* Dark mode - Professional lab in low light */
-    --background: 220 27% 8%;
-    --foreground: 220 14% 96%;
-    
-    --card: 220 27% 10%;
-    --card-foreground: 220 14% 96%;
-    
-    --popover: 220 27% 10%;
-    --popover-foreground: 220 14% 96%;
-    
-    --primary: 258 90% 66%;
+    /* ── Surfaces ── */
+    --background: 220 27% 6%;
+    --foreground: 0 0% 96%;
+
+    --card: 220 27% 9%;
+    --card-foreground: 0 0% 96%;
+
+    --popover: 220 27% 9%;
+    --popover-foreground: 0 0% 96%;
+
+    /* ── Elevated Surfaces ── */
+    --surface-1: 220 27% 9%;
+    --surface-2: 220 27% 12%;
+    --surface-3: 220 27% 16%;
+
+    /* ── Brand ── */
+    --primary: 258 90% 72%;
     --primary-foreground: 0 0% 100%;
-    
-    --secondary: 220 27% 16%;
-    --secondary-foreground: 220 14% 96%;
-    
-    --muted: 220 27% 16%;
-    --muted-foreground: 220 8.9% 46.1%;
-    
-    --accent: 211 96% 68%;
-    --accent-foreground: 0 0% 100%;
-    
-    --destructive: 0 84.2% 60.2%;
+    --primary-hover: 258 90% 56%;
+    --primary-muted: 258 90% 72%;
+
+    /* ── Neutrals ── */
+    --secondary: 220 27% 12%;
+    --secondary-foreground: 0 0% 96%;
+
+    --muted: 220 27% 12%;
+    --muted-foreground: 220 9% 55%;
+
+    --accent: 220 20% 14%;
+    --accent-foreground: 0 0% 96%;
+
+    --faint: 220 9% 35%;
+
+    /* ── Semantic Status ── */
+    --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
     --success: 142 71% 45%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
-    
-    --chameleon-positive: 258 90% 66%;
-    --chameleon-negative: 220 8.9% 46.1%;
+
+    /* ── Scientific Palette ── */
     --helix: 211 96% 68%;
     --helix-foreground: 0 0% 100%;
     --beta: 25 95% 53%;
     --beta-foreground: 0 0% 100%;
-    --coil: 220 8.9% 66%;
+    --coil: 220 9% 46%;
 
-    --border: 220 27% 16%;
-    --input: 220 27% 16%;
-    --ring: 258 90% 66%;
-    
-    --gradient-primary: linear-gradient(135deg, hsl(258 90% 66%), hsl(258 90% 76%));
-    --gradient-surface: linear-gradient(180deg, hsl(220 27% 10%), hsl(220 27% 12%));
-    
-    --shadow-soft: 0 2px 8px -2px hsl(0 0% 0% / 0.3);
-    --shadow-medium: 0 4px 16px -4px hsl(0 0% 0% / 0.4);
-    --shadow-strong: 0 8px 32px -8px hsl(0 0% 0% / 0.5);
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --chameleon-positive: 258 90% 72%;
+    --chameleon-negative: 220 9% 55%;
+
+    /* ── Borders ── */
+    --border: 220 20% 14%;
+    --border-hover: 220 20% 22%;
+    --input: 220 20% 14%;
+    --ring: 258 90% 72%;
+
+    /* ── Gradients ── */
+    --gradient-primary: linear-gradient(135deg, hsl(258 90% 72%), hsl(258 90% 82%));
+    --gradient-surface: linear-gradient(180deg, hsl(220 27% 6%), hsl(220 27% 9%));
+
+    /* ── Shadows ── */
+    --shadow-soft: 0 1px 3px 0 rgba(0,0,0,0.2), 0 1px 2px -1px rgba(0,0,0,0.15);
+    --shadow-medium: 0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -2px rgba(0,0,0,0.2);
+    --shadow-strong: 0 10px 15px -3px rgba(0,0,0,0.35), 0 4px 6px -4px rgba(0,0,0,0.25);
+
+    /* ── Sidebar ── */
+    --sidebar-background: 220 27% 5%;
+    --sidebar-foreground: 220 9% 75%;
+    --sidebar-primary: 258 90% 72%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 220 27% 12%;
+    --sidebar-accent-foreground: 0 0% 96%;
+    --sidebar-border: 220 20% 12%;
+    --sidebar-ring: 258 90% 72%;
   }
 }
 
@@ -151,16 +178,135 @@
 
   body {
     @apply bg-background text-foreground;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11"; /* Inter OpenType features */
+    transition: background-color 200ms ease, color 200ms ease;
   }
 }
 
-/* ExpandableChart: force chart descendants to fill dialog height.
-   .chart-expanded is absolutely positioned inside a sized parent
-   so percentage-based children resolve correctly. */
+/* ═══════════════════════════════════════════════
+   ANIMATION TIMING TOKENS
+   ═══════════════════════════════════════════════ */
+:root {
+  --duration-fast: 150ms;
+  --duration-normal: 200ms;
+  --duration-slow: 350ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* ═══════════════════════════════════════════════
+   TYPOGRAPHY CLASSES
+   ═══════════════════════════════════════════════ */
+@layer components {
+  .text-display { font-size: 3.5rem; line-height: 1.1; font-weight: 800; letter-spacing: -0.03em; }
+  .text-h1      { font-size: 2.25rem; line-height: 1.2; font-weight: 700; letter-spacing: -0.02em; }
+  .text-h2      { font-size: 1.5rem; line-height: 1.3; font-weight: 600; letter-spacing: -0.01em; }
+  .text-h3      { font-size: 1.125rem; line-height: 1.4; font-weight: 600; }
+  .text-body    { font-size: 0.9375rem; line-height: 1.6; font-weight: 400; }
+  .text-small   { font-size: 0.8125rem; line-height: 1.5; font-weight: 400; }
+  .text-caption  {
+    font-size: 0.6875rem;
+    line-height: 1.4;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+}
+
+/* Mobile typography scaling */
+@media (max-width: 640px) {
+  .text-display { font-size: 2.25rem; letter-spacing: -0.02em; }
+  .text-h1      { font-size: 1.75rem; }
+  .text-h2      { font-size: 1.25rem; }
+  .text-h3      { font-size: 1rem; }
+}
+
+/* ═══════════════════════════════════════════════
+   MICRO-INTERACTION CLASSES
+   ═══════════════════════════════════════════════ */
+@layer components {
+  /* Card lift + glow on hover */
+  .card-hover {
+    transition: border-color 0.35s ease,
+                transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.35s ease,
+                filter 0.35s ease;
+    cursor: pointer;
+  }
+  .card-hover:hover {
+    border-color: hsl(var(--border-hover));
+    transform: translateY(-6px) scale(1.01);
+    box-shadow:
+      0 20px 40px rgba(0, 0, 0, 0.10),
+      0 0 30px hsl(var(--primary) / 0.06);
+  }
+
+  /* Card glow — stronger purple glow variant */
+  .card-glow {
+    transition: border-color 0.35s ease,
+                transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+                box-shadow 0.35s ease;
+    cursor: pointer;
+  }
+  .card-glow:hover {
+    border-color: hsl(var(--primary) / 0.3);
+    transform: translateY(-6px) scale(1.02);
+    box-shadow:
+      0 20px 50px rgba(0, 0, 0, 0.12),
+      0 0 40px hsl(var(--primary) / 0.10),
+      0 0 80px hsl(var(--primary) / 0.05);
+  }
+
+  /* Link/text glow on hover */
+  .text-glow:hover {
+    text-shadow: 0 0 20px hsl(var(--primary) / 0.3);
+  }
+
+  /* Button press feel with glow */
+  .btn-press {
+    transition: transform 0.2s ease, box-shadow 0.3s ease;
+  }
+  .btn-press:hover {
+    transform: scale(1.03);
+    box-shadow: 0 8px 25px hsl(var(--primary) / 0.25);
+  }
+  .btn-press:active {
+    transform: scale(0.98);
+  }
+
+  /* Table row hover */
+  .table-row-hover {
+    transition: background-color var(--duration-fast) ease;
+  }
+  .table-row-hover:hover {
+    background-color: hsl(var(--surface-2));
+  }
+
+  /* Shimmer loading skeleton */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--surface-2)) 50%,
+      hsl(var(--muted)) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: calc(var(--radius) - 2px);
+  }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+/* ═══════════════════════════════════════════════
+   CHART EXPANDED (preserved from v1)
+   ═══════════════════════════════════════════════ */
 .chart-expanded {
   display: flex;
   flex-direction: column;
-  /* Expanded margins: generous room for axis labels in full-screen dialog */
   padding: 12px 24px 20px 28px;
 }
 .chart-expanded > * {
@@ -170,18 +316,22 @@
   flex: 1 1 0%;
   min-height: 0;
 }
-/* Override ChartContainer's fixed h-[300px] and aspect-video */
 .chart-expanded [data-chart] {
   height: 100% !important;
   aspect-ratio: unset !important;
 }
-/* Fallback: ensure Recharts responsive containers fill expanded dialog */
 .chart-expanded .recharts-responsive-container {
   height: 100% !important;
 }
-/* Smooth zoom transitions for chart SVG redraws */
 .chart-expanded svg .recharts-cartesian-grid,
 .chart-expanded svg .recharts-xAxis,
 .chart-expanded svg .recharts-yAxis {
   transition: transform 0.15s ease-out;
+}
+
+/* ═══════════════════════════════════════════════
+   UTILITY: GRADIENT SURFACE (updated for dark-first)
+   ═══════════════════════════════════════════════ */
+.bg-gradient-surface {
+  background: var(--gradient-surface);
 }

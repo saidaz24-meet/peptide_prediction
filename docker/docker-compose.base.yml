@@ -1,0 +1,69 @@
+# =============================================================================
+# Peptide Visual Lab - Docker Compose (Base)
+# Shared service definitions extended by dev and prod overrides.
+# =============================================================================
+# Do NOT run this file directly. Use:
+#   docker compose -f docker/docker-compose.yml up        (dev)
+#   docker compose -f docker/docker-compose.prod.yml up   (prod)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Backend API Service (base definition)
+  # ---------------------------------------------------------------------------
+  backend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.backend
+      args:
+        PYTHON_VERSION: "3.11"
+    volumes:
+      # Persistent data volumes
+      - pvl-runs:/data/runs
+      - pvl-uploads:/data/uploads
+      # Tool assets (bind-mount from project root tools/ directory)
+      - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
+      # Runtime cache
+      - pvl-cache:/app/.run_cache
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      # Provider flags (both ON — requires tools volume mounted)
+      - USE_TANGO=${USE_TANGO:-1}
+      - USE_S4PRED=${USE_S4PRED:-1}
+      # Tool paths (in mounted volumes)
+      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
+      - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
+      # Optional: Sentry DSN
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  # ---------------------------------------------------------------------------
+  # Frontend Service (base definition)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+      args:
+        VITE_API_BASE_URL: ""
+        VITE_SENTRY_DSN: ${SENTRY_DSN:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+
+# =============================================================================
+# Named Volumes
+# =============================================================================
+volumes:
+  pvl-runs:
+    driver: local
+  pvl-uploads:
+    driver: local
+  pvl-cache:
+    driver: local

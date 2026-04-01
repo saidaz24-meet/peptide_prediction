@@ -1,49 +1,94 @@
 // src/App.tsx
+import React, { Suspense } from "react";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
+import { Loader2 } from "lucide-react";
 import Index from "./pages/Index";
-import Upload from "./pages/Upload";
-import Results from "./pages/Results";
-import PeptideDetail from "./pages/PeptideDetail";
-import MetricDetail from "./pages/MetricDetail";
-import Help from "./pages/Help";
-import NotFound from "./pages/NotFound";
-import About from "@/pages/About";
 import ScrollToTop from "@/components/ScrollToTop";
-import QuickAnalyze from "@/pages/QuickAnalyze";
-import Compare from "@/pages/Compare";
 import { ValidationBanner } from "@/components/ValidationBanner";
 import { AppSidebar } from "@/components/AppSidebar";
+import { TopNav } from "@/components/TopNav";
+import { PageTransition } from "@/components/PageTransition";
+
+// Lazy-loaded pages (Index kept direct for instant first load)
+const Upload = React.lazy(() => import("./pages/Upload"));
+const Results = React.lazy(() => import("./pages/Results"));
+const PeptideDetail = React.lazy(() => import("./pages/PeptideDetail"));
+const MetricDetail = React.lazy(() => import("./pages/MetricDetail"));
+const Help = React.lazy(() => import("./pages/Help"));
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+const About = React.lazy(() => import("@/pages/About"));
+const QuickAnalyze = React.lazy(() => import("@/pages/QuickAnalyze"));
+const Compare = React.lazy(() => import("@/pages/Compare"));
 
 const queryClient = new QueryClient();
+
+/** Inner layout that switches between TopNav (landing) and Sidebar (app pages) */
+function AppLayout() {
+  const location = useLocation();
+  const isLanding = location.pathname === "/";
+
+  return (
+    <>
+      <ScrollToTop />
+      {isLanding ? (
+        /* Landing page: TopNav + full-width content, no sidebar */
+        <>
+          <TopNav />
+          <main className="min-h-screen">
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center min-h-screen">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              }
+            >
+              <Routes>
+                <Route path="/" element={<Index />} />
+              </Routes>
+            </Suspense>
+          </main>
+        </>
+      ) : (
+        /* App pages: Sidebar + constrained content */
+        <div className="flex min-h-screen">
+          <AppSidebar />
+          <main className="flex-1 min-w-0">
+            <Suspense
+              fallback={
+                <div className="flex items-center justify-center min-h-screen">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              }
+            >
+              <Routes>
+                <Route path="/upload" element={<PageTransition><Upload /></PageTransition>} />
+                <Route path="/results" element={<PageTransition><Results /></PageTransition>} />
+                <Route path="/peptides/:id" element={<PageTransition><PeptideDetail /></PageTransition>} />
+                <Route path="/metrics/:metricId" element={<PageTransition><MetricDetail /></PageTransition>} />
+                <Route path="/help" element={<PageTransition><Help /></PageTransition>} />
+                <Route path="/about" element={<PageTransition><About /></PageTransition>} />
+                <Route path="/quick" element={<PageTransition><QuickAnalyze /></PageTransition>} />
+                <Route path="/compare" element={<PageTransition><Compare /></PageTransition>} />
+                <Route path="*" element={<PageTransition><NotFound /></PageTransition>} />
+              </Routes>
+            </Suspense>
+          </main>
+        </div>
+      )}
+    </>
+  );
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Sonner />
-      {/* Development-only validation banner */}
       <ValidationBanner />
       <BrowserRouter>
-        <ScrollToTop />
-        <div className="flex min-h-screen">
-          <AppSidebar />
-          <main className="flex-1 min-w-0">
-            <Routes>
-              <Route path="/" element={<Index />} />
-              <Route path="/upload" element={<Upload />} />
-              <Route path="/results" element={<Results />} />
-              <Route path="/peptides/:id" element={<PeptideDetail />} />
-              <Route path="/metrics/:metricId" element={<MetricDetail />} />
-              <Route path="/help" element={<Help />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/quick" element={<QuickAnalyze />} />
-              <Route path="/compare" element={<Compare />} />
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </main>
-        </div>
+        <AppLayout />
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

@@ -163,19 +163,46 @@ Simulate concurrent load: 50, 100, 1000 simultaneous analyses. Tools: `locust` o
 
 ---
 
-## Phase D: UI/UX Redesign (Next)
+## Phase D1: Visual Redesign — Stripe-Level (COMPLETE)
 
 **Prerequisites**: Chunks 1-7 complete, 400 tests safety net, clean main branch.
+**Started**: 2026-03-31. **Completed**: 2026-04-01. Light-first, top nav on landing, sidebar on data pages.
 
 | ID | Task | Effort | Status | Details |
 |----|------|--------|--------|---------|
-| D1 | Extract PeptideViewer component | 4h | TODO | ~200 LOC duplicated between QuickAnalyze and PeptideDetail |
-| D2 | Card-based progressive disclosure | 16h | TODO | Summary cards on dashboard, click-to-expand |
-| D3 | Per-residue profile viewer | 12h | TODO | Unified multi-track viewer (P_H, P_E, TANGO curves) |
-| D4 | Code-splitting / lazy routes | 4h | TODO | Main bundle is 2.4MB (warning threshold 500KB) |
-| D5 | Sidebar polish (icons-only, hover labels) | 4h | TODO | Already exists, needs refinement |
-| D6 | Theme finalization | 4h | TODO | Lock dark/light theme with consistent shadcn/ui tokens |
-| D7 | UniProt Database Search page | 10h | TODO | Dedicated `/search` route + sidebar entry. See Phase F. |
+| D1.1 | Theme foundation (tokens, Inter/JetBrains Mono fonts) | 4h | DONE | index.css + tailwind.config + index.html |
+| D1.2 | Landing page hero + COBE globe | 8h | DONE | Split layout, globe with colored arcs/markers |
+| D1.3 | TopNav (horizontal, glassmorphism) | 4h | DONE | Replaces sidebar on landing page |
+| D1.4 | Page transitions + scroll reveal animations | 2h | DONE | AnimateIn, smoothEase, card-glow, btn-press |
+| D1.5 | Background patterns (dots, constellation, notebook) | 4h | DONE | Light: BgDotGrid, Dark: ConstellationBackground |
+| D1.6 | Feature Showcase Cards (3-up with live previews) | 8h | DONE | FeatureShowcase.tsx via Cowork |
+| D1.7 | Use-Case Sections (text + floating mockups) | 8h | DONE | UseCaseSection.tsx via Cowork |
+| D1.8 | Algorithm Showcase Tabs | 6h | DONE | AlgorithmShowcase.tsx via Cowork |
+| D1.9 | Trust Section + Pipeline Diagram | 6h | DONE | TrustSection.tsx + PipelineDiagram.tsx via Cowork |
+| D1.10 | Full landing page assembly | 4h | DONE | All sections wired into Index.tsx |
+| D1.11 | Inner pages redesign (Results, Upload, etc.) | 8h | DONE | All 9 data pages + sidebar redesigned |
+| D1.12 | Navigation guard (QuickAnalyze) | 2h | DONE | AlertDialog + global nav guard hook |
+
+## Phase D2: Mobile Responsive + Polish (IN PROGRESS)
+
+| ID | Task | Effort | Status | Details |
+|----|------|--------|--------|---------|
+| D2.6 | Mobile responsive polish | 8h | IN PROGRESS | Typography scaling, grid stacking, table column visibility |
+| D2.7 | Code-splitting / lazy routes | 4h | DONE | React.lazy + manualChunks in vite.config |
+
+## Phase D3: Advanced Visualizations (PARKED — Post-Launch)
+
+**Prerequisites**: Live deployment, updated screenshots, stable base.
+**Why parked**: Each item is 8-20h of specialized design work requiring custom SVG/Three.js. Must be top-tier quality. Will execute after the base product is live and getting real user feedback.
+
+| ID | Task | Effort | Status | Details |
+|----|------|--------|--------|---------|
+| D3.1 | "Everything Runs Locally" visualization | 12h | PARKED | SVG laptop mockup + animated dashed lines showing data flow. "Your data never leaves your machine." Stripe Terminal reference. |
+| D3.2 | "Spreadsheet → Insights" transformation | 12h | PARKED | Split-screen scroll animation: messy CSV → animated dash paths → beautiful dashboard. Before/after pattern. |
+| D3.3 | Connected dashed line narrative | 8h | PARKED | SVG paths between landing page sections with stroke-dashoffset animation on scroll. Visual narrative thread. |
+| D3.4 | Per-residue unified profile viewer | 12h | PARKED | Multi-track synchronized viewer: sequence + S4PRED probabilities + TANGO curve + hydrophobicity + FF-Helix windows on same X axis. |
+| D3.5 | Three.js globe upgrade | 16-20h | PARKED | Replace COBE with custom Three.js globe: colorful continent dots, glowing arcs, atmospheric haze, particle effects. Exact Stripe aesthetics. ~600KB bundle cost, needs lazy loading. |
+| D3.6 | Updated screenshots for mockups | 4h | PARKED | Fresh screenshots of all redesigned pages (light + dark) for ShowcaseGallery and UseCaseSection floating browser frames. |
 
 ---
 
@@ -189,7 +216,7 @@ Simulate concurrent load: 50, 100, 1000 simultaneous analyses. Tools: `locust` o
 
 | Step | Scope | Effort | Status | Details |
 |------|-------|--------|--------|---------|
-| F1 | Search query fix | 3-4h | TODO | Full-text default (not `keyword:`), parse X-Total-Results, fix slider/cap mismatch |
+| F1 | Search query fix | 3-4h | DONE | Full-text default already correct (no `keyword:` prefix), X-Total-Results parsed |
 | F2 | Search summary banner | 2h | TODO | "Found 204 of 12,345 entries" + filters + "View on UniProt" link |
 | F3 | Metadata enrichment | 5-6h | TODO | Add gene_names, cc_function, annotation_score to fetch + display |
 | F4 | Dedicated `/search` page | 8-10h | TODO | Own sidebar tab, browse table with checkboxes, "Analyze Selected" (ties into D7) |

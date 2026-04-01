@@ -23,6 +23,7 @@ import {
   Legend,
 } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { BgDotGrid } from "@/components/BgDotGrid";
 
 const COLORS = {
   // Use existing CSS variables that are actually defined
@@ -41,7 +42,7 @@ export default function MetricDetail() {
 
   if (!metric || !metricId) {
     return (
-      <div className="min-h-screen bg-gradient-surface flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Card>
           <CardContent className="p-6">
             <p className="text-muted-foreground">Metric not found</p>
@@ -140,27 +141,29 @@ export default function MetricDetail() {
   const filteredPeptides = peptidesTyped;
 
   return (
-    <div className="min-h-screen bg-gradient-surface">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-background relative">
+      <BgDotGrid />
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-10 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="space-y-6"
+          transition={{ duration: 0.5 }}
+          className="space-y-8"
         >
           {/* Header */}
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               onClick={() => navigate("/results")}
-              className="gap-2"
+              className="h-9 btn-press shrink-0 w-fit"
             >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Results
+              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+              Results
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold">{metric.title}</h1>
-              <p className="text-muted-foreground mt-1">{metric.description}</p>
+            <div className="min-w-0">
+              <h1 className="text-h1 text-foreground truncate">{metric.title}</h1>
+              <p className="text-body text-muted-foreground mt-1">{metric.description}</p>
             </div>
           </div>
 

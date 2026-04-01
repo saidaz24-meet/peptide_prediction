@@ -20,6 +20,7 @@ import { AlphaFoldViewer } from "@/components/AlphaFoldViewer";
 import { S4PredChart } from "@/components/S4PredChart";
 import { ConsensusCard } from "@/components/ConsensusCard";
 import { useChartSelection } from "@/stores/chartSelectionStore";
+import { BgDotGrid } from "@/components/BgDotGrid";
 
 // NEW: small additions for sliding-window profiles
 import { useMemo, useState } from "react";
@@ -54,7 +55,7 @@ export default function PeptideDetail() {
 
   if (!peptide) {
     return (
-      <div className="min-h-screen bg-gradient-surface flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Card className="max-w-md w-full mx-4">
           <CardHeader className="text-center">
             <CardTitle>Peptide Not Found</CardTitle>
@@ -157,37 +158,39 @@ export default function PeptideDetail() {
   }, [profilePoints, peptide.tango?.agg, win]);
 
   return (
-    <div className="min-h-screen bg-gradient-surface">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-background relative">
+      <BgDotGrid />
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-10 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
           className="max-w-5xl mx-auto space-y-8"
         >
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-center gap-4">
               <Button
                 variant="outline"
                 size="sm"
+                className="h-9 btn-press"
                 onClick={() => {
                   clearSelection();
                   navigate("/results");
                 }}
               >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Results
+                <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+                Results
               </Button>
 
               <div>
-                <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-                  Peptide{" "}
+                <h1 className="text-h1 text-foreground flex items-center gap-2 break-all">
                   {/^[A-Z][0-9][A-Z0-9]{3}[0-9](-\d+)?$/i.test(peptide.id) ? (
                     <a
                       href={`https://www.uniprot.org/uniprotkb/${peptide.id}/entry`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline inline-flex items-center gap-1"
+                      className="text-primary hover:underline inline-flex items-center gap-1"
                       title="Open UniProt entry"
                     >
                       {peptide.id}
@@ -197,14 +200,14 @@ export default function PeptideDetail() {
                     <span>{peptide.id}</span>
                   )}
                 </h1>
-                {peptide.species && (
-                  <p className="text-muted-foreground">Organism: {peptide.species}</p>
-                )}
+                <p className="text-body text-muted-foreground mt-0.5">
+                  {peptide.length ?? "?"} amino acids
+                  {peptide.species && <> &middot; {peptide.species}</>}
+                </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Provider status pills */}
               {peptide.providerStatus?.tango && (
                 <ProviderBadge name="Tango" status={peptide.providerStatus.tango as any} />
               )}
@@ -212,17 +215,17 @@ export default function PeptideDetail() {
                 <ProviderBadge name="S4PRED" status={peptide.providerStatus.s4pred as any} />
               )}
 
-              <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm" onClick={handleCopySequence}>
-                  <Copy className="w-4 h-4 mr-2" />
-                  Copy Sequence
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <Button variant="outline" size="sm" className="h-9 text-small btn-press" onClick={handleCopySequence}>
+                  <Copy className="w-3.5 h-3.5 mr-1.5" />
+                  Copy
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleDownloadFASTA}>
-                  <Download className="w-4 h-4 mr-2" />
+                <Button variant="outline" size="sm" className="h-9 text-small btn-press" onClick={handleDownloadFASTA}>
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
                   FASTA
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleDownloadJSON}>
-                  <Download className="w-4 h-4 mr-2" />
+                <Button variant="outline" size="sm" className="h-9 text-small btn-press" onClick={handleDownloadJSON}>
+                  <Download className="w-3.5 h-3.5 mr-1.5" />
                   JSON
                 </Button>
               </div>
@@ -230,14 +233,13 @@ export default function PeptideDetail() {
           </div>
 
           {/* Main Info Card */}
-          <Card className="shadow-medium">
-            <CardHeader>
-              <div className="flex items-center justify-between">
+          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl overflow-hidden">
+            <CardHeader className="pb-2">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-                  <CardTitle>Peptide Information</CardTitle>
-                  <CardDescription>Length: {peptide.length ?? "?"} amino acids</CardDescription>
+                  <CardTitle className="text-h3">Peptide Information</CardTitle>
                 </div>
-                <div className="flex items-center space-x-2 flex-wrap gap-1">
+                <div className="flex items-center flex-wrap gap-1.5">
                   {getSSWBadge()}
                   {typeof peptide.s4predHelixPercent === "number" && (
                     <Badge variant="outline" className="text-helix border-helix">
@@ -301,7 +303,7 @@ export default function PeptideDetail() {
 
           {/* Charts */}
           <div className="grid lg:grid-cols-2 gap-6">
-            <Card className="shadow-medium">
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardHeader>
                 <CardTitle>Feature Comparison</CardTitle>
                 <CardDescription>How this peptide compares to the cohort</CardDescription>
@@ -311,7 +313,7 @@ export default function PeptideDetail() {
               </CardContent>
             </Card>
 
-            <Card className="shadow-medium">
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardHeader>
                 <CardTitle>Cohort Position</CardTitle>
                 <CardDescription>Percentile ranking across key metrics</CardDescription>
@@ -326,7 +328,7 @@ export default function PeptideDetail() {
           {peptide.length <= 40 &&
           ((typeof peptide.ffHelixPercent === "number" && peptide.ffHelixPercent > 0) ||
             (typeof peptide.s4predHelixPercent === "number" && peptide.s4predHelixPercent > 0)) ? (
-            <Card className="shadow-medium">
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardHeader>
                 <CardTitle>Helical Wheel Projection</CardTitle>
                 <CardDescription>
@@ -351,7 +353,7 @@ export default function PeptideDetail() {
               </CardContent>
             </Card>
           ) : peptide.length <= 40 ? (
-            <Card className="shadow-medium">
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardContent className="py-6">
                 <p className="text-sm text-muted-foreground text-center">
                   Helical wheel not shown — neither Chou-Fasman nor S4PRED predict helical structure
@@ -364,7 +366,7 @@ export default function PeptideDetail() {
           {/* NEW: Sliding-Window Profiles (frontend-only, non-destructive) */}
           {/* Gate: Hide per-residue charts for sequences > 200 residues (unreadable and slow) */}
           {peptide.length <= 200 ? (
-            <Card className="shadow-medium">
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardHeader>
                 <CardTitle>Sliding-Window Profiles</CardTitle>
                 <CardDescription>
@@ -563,7 +565,7 @@ export default function PeptideDetail() {
               </CardContent>
             </Card>
           ) : (
-            <Card className="shadow-medium">
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardHeader>
                 <CardTitle>Sliding-Window Profiles</CardTitle>
                 <CardDescription>
@@ -584,9 +586,9 @@ export default function PeptideDetail() {
           )}
 
           {/* S4PRED Secondary Structure Predictions */}
-          <S4PredChart peptide={peptide} className="shadow-medium">
+          <S4PredChart peptide={peptide} className="shadow-soft border-[hsl(var(--border))] rounded-xl">
             {/* S4PRED summary stats */}
-            <div className="grid grid-cols-3 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-sm">
               <div className="text-center p-2 rounded bg-muted/50">
                 <div className="font-semibold text-helix">
                   {typeof peptide.s4predHelixPercent === "number"
@@ -617,7 +619,7 @@ export default function PeptideDetail() {
 
           {/* TANGO Aggregation Heatmap */}
           {peptide.tango?.agg && peptide.tango.agg.length > 0 && (
-            <Card className="shadow-medium">
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardHeader>
                 <CardTitle>TANGO Aggregation Profile</CardTitle>
                 <CardDescription>
@@ -642,7 +644,7 @@ export default function PeptideDetail() {
           {typeof peptide.ffHelixPercent === "number" &&
             typeof peptide.tangoAggMax === "number" &&
             peptides.length > 1 && (
-              <Card className="shadow-medium">
+              <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
                 <CardHeader>
                   <CardTitle>FF-Helix vs Aggregation Max</CardTitle>
                   <CardDescription>

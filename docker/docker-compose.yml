@@ -1,88 +1,42 @@
 # =============================================================================
 # Peptide Visual Lab - Docker Compose (Development)
-# Strategy: Volume-mounted assets
+# Extends base with hot-reload, debug logging, and dev CORS origins.
 # =============================================================================
 # Usage:
 #   docker compose -f docker/docker-compose.yml up --build
 #   docker compose -f docker/docker-compose.yml down -v
 # =============================================================================
 
+include:
+  - docker-compose.base.yml
+
 services:
   # ---------------------------------------------------------------------------
-  # Backend API Service
+  # Backend API Service (dev overrides)
   # ---------------------------------------------------------------------------
   backend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.backend
-      args:
-        PYTHON_VERSION: "3.11"
     container_name: pvl-backend-dev
     ports:
       - "8000:8000"
     volumes:
       # Source code mount for hot reload (development only)
       - ../backend:/app:cached
-      # Persistent data volumes
-      - pvl-runs:/data/runs
-      - pvl-uploads:/data/uploads
-      # Tool assets (bind-mount from project root tools/ directory)
-      - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
-      # Runtime cache
-      - pvl-cache:/app/.run_cache
     environment:
-      # Server config
       - ENVIRONMENT=development
       - LOG_LEVEL=DEBUG
-      - HOST=0.0.0.0
-      - PORT=8000
-      # Provider flags (both ON — requires tools volume mounted)
-      - USE_TANGO=${USE_TANGO:-1}
-      - USE_S4PRED=${USE_S4PRED:-1}
       # CORS (allow frontend dev server)
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173,http://127.0.0.1:5173
-      # Tool paths (in mounted volumes)
-      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
-      - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
-      # Optional: Sentry DSN
-      - SENTRY_DSN=${SENTRY_DSN:-}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
     restart: unless-stopped
     # Override CMD for development with reload
     command: ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
   # ---------------------------------------------------------------------------
-  # Frontend Service (Nginx)
+  # Frontend Service (dev overrides)
   # ---------------------------------------------------------------------------
   frontend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.frontend
-      args:
-        VITE_API_BASE_URL: ""
-        VITE_SENTRY_DSN: ${SENTRY_DSN:-}
     container_name: pvl-frontend-dev
     ports:
       - "3000:80"
-    depends_on:
-      backend:
-        condition: service_healthy
     restart: unless-stopped
-
-# =============================================================================
-# Named Volumes
-# =============================================================================
-volumes:
-  # Persistent data
-  pvl-runs:
-    driver: local
-  pvl-uploads:
-    driver: local
-  # Runtime cache
-  pvl-cache:
-    driver: local

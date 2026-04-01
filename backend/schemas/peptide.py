@@ -203,6 +203,10 @@ class PeptideSchema(BaseModel):
     s4pred_p_c_curve: Optional[List[float]] = Field(None, alias="S4PRED P_C curve")
     s4pred_ss_prediction: Optional[List[str]] = Field(None, alias="S4PRED SS prediction")
 
+    # ISSUE-024: Non-standard AA substitution transparency
+    sequence_notes: Optional[str] = Field(None, alias="sequenceNotes")
+    original_sequence: Optional[str] = Field(None, alias="originalSequence")
+
     # Provider status (Principle B: mandatory provider status)
     # Note: provider_status is NOT in CSV/DataFrame - it's added during normalization
     provider_status: Optional[PeptideProviderStatus] = Field(None)

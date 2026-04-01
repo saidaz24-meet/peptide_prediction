@@ -367,6 +367,10 @@ export function mapApiRowToPeptide(row: ApiPeptideRow | Record<string, any>, sou
     s4predSswDiff,
     s4predHasData,
 
+    // ISSUE-024: Non-standard AA substitution transparency
+    sequenceNotes: row.sequenceNotes ?? null,
+    originalSequence: row.originalSequence ?? null,
+
     // Provider status (Principle B: mandatory provider status)
     providerStatus,
 

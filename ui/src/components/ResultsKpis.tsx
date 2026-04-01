@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { MetricId } from "@/types/metrics";
 import { Abbr } from "@/components/Abbr";
 import { useChartSelection } from "@/stores/chartSelectionStore";
+import { smoothEase } from "@/lib/animations";
 
 interface ResultsKpisProps {
   stats: DatasetStats | null;
@@ -18,12 +19,12 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
 
   if (!stats) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         {[...Array(4)].map((_, i) => (
-          <Card key={i} className="shadow-soft">
+          <Card key={i} className="rounded-xl border-[hsl(var(--border))]">
             <CardContent className="p-6">
               <div className="animate-pulse">
-                <div className="h-4 bg-muted rounded w-1/2 mb-2"></div>
+                <div className="h-3 bg-muted rounded w-1/2 mb-3"></div>
                 <div className="h-8 bg-muted rounded w-3/4"></div>
               </div>
             </CardContent>
@@ -33,20 +34,9 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
     );
   }
 
-  // Determine availability for each KPI based on provider status
-  // NO LYING UI rule: If TANGO is OFF or UNAVAILABLE, show N/A
-  // AVAILABLE or PARTIAL means TANGO ran and produced output
-  // Note: We don't check 'ran' field - 'status' is authoritative
   const tangoStatus = meta?.provider_status?.tango?.status;
   const tangoAvailable = tangoStatus === "AVAILABLE" || tangoStatus === "PARTIAL";
 
-  const s4predStatus = meta?.provider_status?.s4pred?.status;
-  const s4predAvailable = s4predStatus === "AVAILABLE" || s4predStatus === "PARTIAL";
-
-  const ffAvailable = (stats.ffHelixAvailable ?? 0) > 0;
-  const sswAvailable = (stats.sswAvailable ?? 0) > 0;
-
-  // Helper to format percentage or show N/A
   const formatPercent = (value: number | null | undefined, decimals: number = 1): string => {
     if (value === null || value === undefined || Number.isNaN(value)) {
       return "N/A";
@@ -77,7 +67,7 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
       titleKey: "ff-helix",
       value: formatPercent(stats.ffHelixCandidatePercent),
       icon: Heater,
-      color: "text-green-600",
+      color: "text-green-600 dark:text-green-400",
       bgColor: "bg-green-600/10",
       metricId: null as MetricId | null,
       onClick: () => {
@@ -96,14 +86,13 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
     {
       title: (
         <>
-          {" "}
           <Abbr title="Fibril-Forming Structural Switching">FF-SSW</Abbr> %
         </>
       ),
       titleKey: "ff-ssw",
       value: tangoAvailable ? formatPercent(stats.ffSswCandidatePercent) : "N/A",
       icon: FlaskConical,
-      color: "text-blue-600",
+      color: "text-blue-600 dark:text-blue-400",
       bgColor: "bg-blue-600/10",
       metricId: null as MetricId | null,
       onClick: () => {
@@ -123,7 +112,6 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
     {
       title: (
         <>
-          {" "}
           % <Abbr title="Structural Switching (TANGO)">SSW</Abbr>
         </>
       ),
@@ -145,7 +133,7 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
       {kpis.map((kpi, index) => {
         const Icon = kpi.icon;
         return (
@@ -153,32 +141,32 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
             key={"titleKey" in kpi ? kpi.titleKey : String(kpi.title)}
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
+            transition={{ delay: index * 0.08, duration: 0.5, ease: smoothEase }}
           >
             <Card
-              className={`shadow-soft transition-all cursor-pointer hover:shadow-medium hover:-translate-y-0.5 active:scale-[0.98]`}
+              className="rounded-xl border-[hsl(var(--border))] shadow-soft cursor-pointer transition-all duration-300 hover:shadow-medium hover:-translate-y-1 hover:border-[hsl(var(--border-hover))] active:scale-[0.98] group"
               onClick={kpi.onClick}
             >
               <CardContent className="p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-1">{kpi.title}</p>
+                <div className="flex items-start justify-between">
+                  <div className="space-y-1">
+                    <p className="text-small text-muted-foreground">{kpi.title}</p>
                     <motion.p
-                      className="text-3xl font-bold"
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      transition={{ delay: index * 0.1 + 0.2, type: "spring" }}
+                      className="text-3xl font-bold tracking-tight text-foreground"
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: index * 0.08 + 0.2, type: "spring", stiffness: 200 }}
                     >
                       {kpi.value}
                     </motion.p>
                     {"subtitle" in kpi && kpi.subtitle && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{kpi.subtitle}</p>
+                      <p className="text-caption text-[hsl(var(--faint))] mt-1">{kpi.subtitle}</p>
                     )}
                   </div>
                   <div
-                    className={`w-12 h-12 rounded-lg ${kpi.bgColor} flex items-center justify-center`}
+                    className={`w-11 h-11 rounded-xl ${kpi.bgColor} flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110`}
                   >
-                    <Icon className={`w-6 h-6 ${kpi.color}`} />
+                    <Icon className={`w-5 h-5 ${kpi.color}`} />
                   </div>
                 </div>
               </CardContent>

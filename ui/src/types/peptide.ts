@@ -139,6 +139,10 @@ export type Peptide = {
     betaSegments?: Array<[number, number]>; // Beta segment tuples (from ssw fragments)
   };
 
+  // ISSUE-024: Non-standard AA substitution transparency
+  sequenceNotes?: string | null;
+  originalSequence?: string | null;
+
   // Provider status (Principle B: mandatory provider status)
   // Row-level provider status (from row.providerStatus or row.provider_status)
   // Passed through from backend without modification

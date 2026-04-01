@@ -1,6 +1,6 @@
 # =============================================================================
 # Peptide Visual Lab - Docker Compose (Production)
-# Strategy: Volume-mounted assets
+# Extends base with resource limits, restart policy, and structured logging.
 # =============================================================================
 # Usage:
 #   docker compose -f docker/docker-compose.prod.yml up -d
@@ -8,47 +8,22 @@
 #   docker compose -f docker/docker-compose.prod.yml down
 # =============================================================================
 
+include:
+  - docker-compose.base.yml
+
 services:
   # ---------------------------------------------------------------------------
-  # Backend API Service
+  # Backend API Service (prod overrides)
   # ---------------------------------------------------------------------------
   backend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.backend
-      args:
-        PYTHON_VERSION: "3.11"
     image: pvl-backend:latest
     container_name: pvl-backend
-    volumes:
-      # Persistent data volumes (NO source mounts in production)
-      - pvl-runs:/data/runs
-      - pvl-uploads:/data/uploads
-      # Tool assets (volume-mounted per Strategy A)
-      - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
-      # Runtime cache
-      - pvl-cache:/app/.run_cache
     environment:
-      # Server config
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
-      - HOST=0.0.0.0
-      - PORT=8000
-      # Provider flags (both ON for production — requires tools volume)
-      - USE_TANGO=${USE_TANGO:-1}
-      - USE_S4PRED=${USE_S4PRED:-1}
       # CORS
       - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
-      # Tool paths
-      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
-      - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
-      # Sentry (optional)
-      - SENTRY_DSN=${SENTRY_DSN:-}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
       start_period: 20s
     restart: always
     deploy:
@@ -66,23 +41,14 @@ services:
         max-file: "3"
 
   # ---------------------------------------------------------------------------
-  # Frontend Service (Nginx)
+  # Frontend Service (prod overrides)
   # ---------------------------------------------------------------------------
   frontend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.frontend
-      args:
-        VITE_API_BASE_URL: ""
-        VITE_SENTRY_DSN: ${SENTRY_DSN:-}
     image: pvl-frontend:latest
     container_name: pvl-frontend
     ports:
       - "80:80"
       - "3000:80"
-    depends_on:
-      backend:
-        condition: service_healthy
     restart: always
     deploy:
       resources:
@@ -97,17 +63,6 @@ services:
       options:
         max-size: "5m"
         max-file: "3"
-
-# =============================================================================
-# Named Volumes
-# =============================================================================
-volumes:
-  pvl-runs:
-    driver: local
-  pvl-uploads:
-    driver: local
-  pvl-cache:
-    driver: local
 
 # =============================================================================
 # Networks (optional - for additional services like monitoring)

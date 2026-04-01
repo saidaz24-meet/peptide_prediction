@@ -6,6 +6,7 @@ import asyncio
 import concurrent.futures
 import logging
 import os
+import signal
 import uuid
 
 import sentry_sdk
@@ -28,7 +29,24 @@ SENTRY_INITIALIZED = False
 _running_under_pytest = "pytest" in os.environ.get("_", "") or "pytest" in " ".join(os.sys.argv)
 if settings.SENTRY_DSN and not _running_under_pytest:
     try:
+        # Resolve release: explicit env var → git SHA fallback
         release = settings.SENTRY_RELEASE
+        if not release:
+            import subprocess
+            try:
+                release = subprocess.check_output(
+                    ["git", "rev-parse", "--short", "HEAD"],
+                    stderr=subprocess.DEVNULL,
+                    timeout=5,
+                ).decode().strip()
+            except Exception:
+                release = None
+
+        # Environment-aware sampling rates
+        is_production = settings.ENVIRONMENT == "production"
+        traces_rate = 0.1 if is_production else 1.0
+        profiles_rate = 1.0  # Keep full profiling (low traffic)
+
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
             integrations=[
@@ -39,9 +57,8 @@ if settings.SENTRY_DSN and not _running_under_pytest:
                 ),
             ],
             send_default_pii=True,
-            # Free tier: 100% sampling OK for low-traffic research tool
-            traces_sample_rate=1.0,
-            profiles_sample_rate=1.0,
+            traces_sample_rate=traces_rate,
+            profiles_sample_rate=profiles_rate,
             environment=settings.ENVIRONMENT,
             release=release,
             debug=settings.SENTRY_DEBUG,
@@ -49,7 +66,7 @@ if settings.SENTRY_DSN and not _running_under_pytest:
         SENTRY_INITIALIZED = True
         log_info(
             "sentry_init",
-            f"Initialized successfully (environment={settings.ENVIRONMENT}, release={release or 'not set'})",
+            f"Initialized successfully (environment={settings.ENVIRONMENT}, release={release or 'not set'}, traces_rate={traces_rate})",
         )
     except Exception as e:
         log_error("sentry_init", f"Failed to initialize: {e}")
@@ -166,6 +183,12 @@ def _configure_thread_pool():
     loop.set_default_executor(
         concurrent.futures.ThreadPoolExecutor(max_workers=4, thread_name_prefix="pvl")
     )
+
+
+@app.on_event("shutdown")
+async def _graceful_shutdown():
+    """Handle SIGTERM for graceful K8s pod shutdown."""
+    log_info("shutdown", "Graceful shutdown initiated")
 
 
 # Log boot message

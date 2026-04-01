@@ -538,6 +538,52 @@ Removed `asChild` and the `<motion.div>` wrapper from `DialogContent`. The Dialo
 
 ---
 
+## ISSUE-024: No user notification when non-standard amino acids are substituted
+
+| Field | Value |
+|-------|-------|
+| **Priority** | P1 |
+| **Status** | Open |
+| **Blast Radius** | MEDIUM — affects scientific transparency |
+| **Root Module** | `backend/auxiliary.py`, `backend/services/predict_service.py`, `ui/src/pages/QuickAnalyze.tsx`, `ui/src/components/PeptideTable.tsx` |
+| **Reported by** | Said (2026-04-01) |
+
+### Symptom
+When a user submits a sequence containing non-standard amino acids (X, Z, B, U, O, J), the pipeline silently substitutes them (X→A, Z→E, B→D, U→C, O→K, J→L) and also strips non-letter characters and terminal modifications (e.g., `-NH2`). The user sees the corrected sequence in results with no indication that modifications were made.
+
+### Root Cause
+`auxiliary.py:get_corrected_sequence()` performs substitutions correctly, but:
+1. The original sequence is not preserved in the API response
+2. No substitution details are returned (which letters were changed)
+3. Frontend has no mechanism to display substitution warnings
+
+### Fix (Proposed)
+
+**Backend** (`predict_service.py` and `upload_service.py`):
+- Compare original sequence vs corrected sequence
+- If different, add `sequenceNotes` field to the response row:
+  ```json
+  "sequenceNotes": "Non-standard residues substituted: X→A (pos 3, 7), O→K (pos 15). Terminal '-NH2' removed."
+  ```
+- Also add `originalSequence` field (the raw input before correction)
+
+**Frontend** (QuickAnalyze + PeptideViewer + PeptideTable):
+- When `sequenceNotes` is present, show a subtle amber info banner:
+  "Some non-standard amino acids were substituted for compatibility with prediction tools. [Show details]"
+- On "Show details": list each substitution with position
+
+### Success Criteria
+- [ ] API response includes `sequenceNotes` when substitutions occur
+- [ ] API response includes `originalSequence` when different from `sequence`
+- [ ] QuickAnalyze shows substitution notice
+- [ ] PeptideTable shows an indicator icon on rows with substitutions
+- [ ] No notification when sequence is already clean (standard AAs only)
+
+### Note from Peleg
+These substitutions are intentional — chosen to get results most likely to predict fibril formation correctly. The user should know they happened but should NOT be blocked from analysis.
+
+---
+
 # How to Add Issues
 
 Use this template:

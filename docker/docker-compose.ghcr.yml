@@ -1,0 +1,100 @@
+# =============================================================================
+# Peptide Visual Lab - Docker Compose (GHCR Pull)
+# Pulls pre-built images from GitHub Container Registry instead of building.
+# =============================================================================
+# Usage:
+#   docker compose -f docker/docker-compose.ghcr.yml pull
+#   docker compose -f docker/docker-compose.ghcr.yml up -d
+#
+# Override image tag via environment:
+#   PVL_TAG=sha-abc1234 docker compose -f docker/docker-compose.ghcr.yml up -d
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Backend API Service (pre-built from GHCR)
+  # ---------------------------------------------------------------------------
+  backend:
+    image: ghcr.io/saidaz24-meet/pvl-backend:${PVL_TAG:-latest}
+    container_name: pvl-backend
+    volumes:
+      - pvl-runs:/data/runs
+      - pvl-uploads:/data/uploads
+      - ${TOOLS_HOST_PATH:-./tools}:/opt/tools:ro
+      - pvl-cache:/app/.run_cache
+    environment:
+      - ENVIRONMENT=production
+      - LOG_LEVEL=INFO
+      - HOST=0.0.0.0
+      - PORT=8000
+      - USE_TANGO=${USE_TANGO:-1}
+      - USE_S4PRED=${USE_S4PRED:-1}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
+      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
+      - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
+      - SENTRY_DSN=${SENTRY_DSN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '3'
+          memory: 4G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Frontend Service (pre-built from GHCR)
+  # ---------------------------------------------------------------------------
+  frontend:
+    image: ghcr.io/saidaz24-meet/pvl-frontend:${PVL_TAG:-latest}
+    container_name: pvl-frontend
+    ports:
+      - "80:80"
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+# =============================================================================
+# Named Volumes
+# =============================================================================
+volumes:
+  pvl-runs:
+    driver: local
+  pvl-uploads:
+    driver: local
+  pvl-cache:
+    driver: local
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  default:
+    name: pvl-network

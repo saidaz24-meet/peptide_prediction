@@ -699,7 +699,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
               ))}
             </div>
           </summary>
-          <div className="mt-2 grid grid-cols-2 gap-3">
+          <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {providers.map((provider) => (
               <div key={provider.name} className="border rounded-lg p-3 space-y-1.5 text-sm">
                 <div className="flex items-center justify-between">

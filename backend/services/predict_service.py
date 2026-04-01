@@ -33,6 +33,7 @@ from services.normalize import (
     finalize_ui_aliases as _finalize_ui_aliases,
 )
 from services.provider_status_builder import build_provider_meta
+from services.result_cache import cache_key as _cache_key, get_cached, set_cached
 from services.thresholds import resolve_thresholds
 from services.trace_helpers import ensure_trace_id_in_meta, get_trace_id_for_response
 
@@ -178,6 +179,13 @@ def process_single_sequence(
     seq = df.iloc[0]["Sequence"]
     entry_id = df.iloc[0]["Entry"]
 
+    # --- Cache lookup ---
+    ck = _cache_key(seq, threshold_config_requested)
+    cached = get_cached(ck)
+    if cached is not None:
+        log_info("cache_hit", f"Returning cached result for {entry_id}", sequence_len=len(seq))
+        return cached
+
     # Compute FF-Helix %
     ensure_ff_cols(df)
     ensure_computed_cols(df)
@@ -248,11 +256,17 @@ def process_single_sequence(
             row=validated_row,
             meta=validated_meta
         )
-        return response.model_dump(exclude_none=True)
+        result = response.model_dump(exclude_none=True)
     except Exception as e:
         # Graceful fallback: log warning and return unvalidated dict
         log_warning("response_validation_failed", f"PredictResponse validation failed: {e}")
-        return {
+        result = {
             "row": row_data,
             "meta": meta_dict,
         }
+
+    # --- Cache store ---
+    set_cached(ck, seq, result)
+    log_info("cache_store", f"Cached result for {entry_id}", sequence_len=len(seq))
+
+    return result
