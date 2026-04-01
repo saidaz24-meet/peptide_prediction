@@ -158,22 +158,27 @@ export default function Compare() {
     onDrop: (accepted) => {
       if (accepted.length > 0) processFile(accepted[0]);
     },
-    accept: { "text/csv": [".csv", ".tsv", ".txt"] },
+    accept: {
+      "text/csv": [".csv", ".tsv", ".txt"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+      "application/octet-stream": [".fasta", ".fa"],
+    },
     multiple: false,
     disabled: uploading,
   });
 
   // Stats
-  const statsA = useMemo(() => computeStats(cohortA), [cohortA]);
+  const statsA = useMemo(() => computeStats(effectiveCohortA), [effectiveCohortA]);
   const statsB = useMemo(() => (cohortB ? computeStats(cohortB) : null), [cohortB]);
 
-  // Histogram data
+  // Histogram data (use effectiveCohortA for dual-upload support)
   const hydroHistA = useMemo(
     () =>
-      cohortA
+      effectiveCohortA
         .map((p) => p.hydrophobicity)
         .filter((v): v is number => typeof v === "number" && Number.isFinite(v)),
-    [cohortA]
+    [effectiveCohortA]
   );
   const hydroHistB = useMemo(
     () =>
@@ -186,10 +191,10 @@ export default function Compare() {
 
   const lenHistA = useMemo(
     () =>
-      cohortA
+      effectiveCohortA
         .map((p) => p.length)
         .filter((v): v is number => typeof v === "number" && Number.isFinite(v)),
-    [cohortA]
+    [effectiveCohortA]
   );
   const lenHistB = useMemo(
     () =>
@@ -203,10 +208,10 @@ export default function Compare() {
   // Scatter data (H vs μH) for both cohorts
   const scatterA = useMemo(
     () =>
-      cohortA
+      effectiveCohortA
         .filter((p) => typeof p.muH === "number" && Number.isFinite(p.muH))
         .map((p) => ({ h: p.hydrophobicity, muH: p.muH as number })),
-    [cohortA]
+    [effectiveCohortA]
   );
   const scatterB = useMemo(
     () =>
@@ -216,15 +221,118 @@ export default function Compare() {
     [cohortB]
   );
 
-  // Redirect if no primary dataset
-  if (cohortA.length === 0) {
+  // Dual upload mode: allow uploading Cohort A directly from Compare page
+  const [cohortALocal, setCohortALocal] = useState<Peptide[] | null>(null);
+  const [uploadingA, setUploadingA] = useState(false);
+  const [aFilename, setAFilename] = useState<string>("");
+
+  const processFileA = useCallback(async (file: File) => {
+    setUploadingA(true);
+    setError(null);
+    setAFilename(file.name);
+    try {
+      const response = await uploadCSV(file);
+      const rows = response.rows || response.data || [];
+      const mapped = rows
+        .map((r: any, idx: number) => {
+          try {
+            return mapApiRowToPeptide(r, `cohortA[${idx}]`);
+          } catch {
+            return null;
+          }
+        })
+        .filter((p: any): p is Peptide => p !== null);
+      if (mapped.length === 0) {
+        setError("No valid peptides in Cohort A file.");
+      } else {
+        setCohortALocal(mapped);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to process Cohort A file.");
+    } finally {
+      setUploadingA(false);
+    }
+  }, []);
+
+  const dropzoneA = useDropzone({
+    onDrop: (accepted) => {
+      if (accepted.length > 0) processFileA(accepted[0]);
+    },
+    accept: {
+      "text/csv": [".csv", ".tsv", ".txt"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+      "application/octet-stream": [".fasta", ".fa"],
+    },
+    multiple: false,
+    disabled: uploadingA,
+  });
+
+  // Use local Cohort A if uploaded here, otherwise fall back to dataset store
+  const effectiveCohortA = cohortALocal ?? cohortA;
+
+  // Show dual upload mode if no primary dataset and no local Cohort A
+  if (effectiveCohortA.length === 0) {
     return (
-      <div className="p-8 max-w-4xl mx-auto text-center space-y-4">
-        <h1 className="text-2xl font-bold">Cohort Comparison</h1>
-        <p className="text-muted-foreground">
-          Upload a primary dataset first, then return here to compare.
-        </p>
-        <Button onClick={() => navigate("/upload")}>Go to Upload</Button>
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6 relative">
+        <BgDotGrid opacity={0.02} />
+        <div>
+          <h1 className="text-h1 text-foreground page-header-title">Cohort Comparison</h1>
+          <p className="text-body text-muted-foreground mt-1">
+            Compare two datasets side by side. Upload both cohorts below.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-4">
+          {/* Cohort A upload */}
+          <Card
+            {...dropzoneA.getRootProps()}
+            className={`cursor-pointer border-2 border-dashed rounded-xl transition-all ${
+              dropzoneA.isDragActive
+                ? "border-blue-500 bg-blue-50 dark:bg-blue-950/20"
+                : "border-blue-300/50 hover:border-blue-400"
+            }`}
+          >
+            <input {...dropzoneA.getInputProps()} />
+            <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center mb-3">
+                <Upload className="w-5 h-5 text-blue-600" />
+              </div>
+              <p className="font-medium text-sm">Cohort A</p>
+              <p className="text-xs text-muted-foreground mt-1">Drop file or click to browse</p>
+            </CardContent>
+          </Card>
+          {/* Cohort B upload */}
+          <Card
+            {...getRootProps()}
+            className={`cursor-pointer border-2 border-dashed rounded-xl transition-all ${
+              isDragActive
+                ? "border-orange-500 bg-orange-50 dark:bg-orange-950/20"
+                : "border-orange-300/50 hover:border-orange-400"
+            }`}
+          >
+            <input {...getInputProps()} />
+            <CardContent className="flex flex-col items-center justify-center py-10 text-center">
+              <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center mb-3">
+                <Upload className="w-5 h-5 text-orange-600" />
+              </div>
+              <p className="font-medium text-sm">Cohort B</p>
+              <p className="text-xs text-muted-foreground mt-1">Drop file or click to browse</p>
+            </CardContent>
+          </Card>
+        </div>
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+        <div className="text-center text-sm text-muted-foreground">
+          Or{" "}
+          <button onClick={() => navigate("/upload")} className="text-primary hover:underline">
+            upload a primary dataset first
+          </button>
+          , then return here.
+        </div>
       </div>
     );
   }
