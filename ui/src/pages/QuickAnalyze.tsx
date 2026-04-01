@@ -1,6 +1,11 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion, cubicBezier } from "framer-motion";
-import { FlaskConical, ChevronRight, ArrowLeft, AlertTriangle as AlertTriangleIcon } from "lucide-react";
+import {
+  FlaskConical,
+  ChevronRight,
+  ArrowLeft,
+  AlertTriangle as AlertTriangleIcon,
+} from "lucide-react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,14 +146,17 @@ export default function QuickAnalyze() {
   }, [hasUnsavedResults]);
 
   // Guarded navigation — shows dialog if results exist
-  const guardedNavigate = useCallback((path: string) => {
-    if (hasUnsavedResults) {
-      setPendingNavPath(path);
-      setShowLeaveDialog(true);
-    } else {
-      navigate(path);
-    }
-  }, [hasUnsavedResults, navigate]);
+  const guardedNavigate = useCallback(
+    (path: string) => {
+      if (hasUnsavedResults) {
+        setPendingNavPath(path);
+        setShowLeaveDialog(true);
+      } else {
+        navigate(path);
+      }
+    },
+    [hasUnsavedResults, navigate]
+  );
 
   const confirmLeave = useCallback(() => {
     setShowLeaveDialog(false);
@@ -382,6 +390,23 @@ export default function QuickAnalyze() {
             </form>
           </CardContent>
         </Card>
+
+        {/* ==================== SEQUENCE NOTES ==================== */}
+        {p?.sequenceNotes && (
+          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+            <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 dark:text-amber-200">
+                <strong>Sequence modified:</strong> {p.sequenceNotes}
+                {p.originalSequence && (
+                  <span className="block mt-1 text-xs text-amber-600 dark:text-amber-400 font-mono break-all">
+                    Original: {p.originalSequence}
+                  </span>
+                )}
+              </AlertDescription>
+            </Alert>
+          </motion.div>
+        )}
 
         {/* ==================== RESULTS ==================== */}
         {p && (

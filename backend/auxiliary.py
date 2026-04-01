@@ -408,6 +408,27 @@ def get_corrected_sequence(sequence) -> str:
     if not isinstance(sequence, str):
         sequence = str(sequence)
 
+    # B10: Strip known chemical modifications before cleaning
+    for prefix in (
+        "Ac-",
+        "ac-",
+        "Acetyl-",
+        "acetyl-",
+        "pGlu-",
+        "pglu-",
+        "Pyr-",
+        "For-",
+        "Myr-",
+        "Palm-",
+    ):
+        if sequence.startswith(prefix):
+            sequence = sequence[len(prefix) :]
+            break
+    for suffix in ("-NH2", "-nh2", "-amide", "-OH", "-COOH", "-CONH2"):
+        if sequence.endswith(suffix):
+            sequence = sequence[: -len(suffix)]
+            break
+
     # Strip non-letter characters (keep dashes for terminal modification handling)
     sequence = re.sub(r"[^A-Za-z-]", "", sequence)
     if not sequence or sequence == "-":
@@ -455,6 +476,41 @@ def get_corrected_sequence_with_notes(
 
     note_parts: List[str] = []
 
+    # B10: Strip common chemical modifications before cleaning
+    # N-terminal modifications (prefixes)
+    _n_terminal_mods = [
+        ("Ac-", "N-terminal acetylation (Ac-)"),
+        ("ac-", "N-terminal acetylation (Ac-)"),
+        ("Acetyl-", "N-terminal acetylation (Acetyl-)"),
+        ("acetyl-", "N-terminal acetylation (Acetyl-)"),
+        ("pGlu-", "N-terminal pyroglutamylation (pGlu-)"),
+        ("pglu-", "N-terminal pyroglutamylation (pGlu-)"),
+        ("Pyr-", "N-terminal pyroglutamylation (Pyr-)"),
+        ("For-", "N-terminal formylation (For-)"),
+        ("Myr-", "N-terminal myristoylation (Myr-)"),
+        ("Palm-", "N-terminal palmitoylation (Palm-)"),
+    ]
+    for prefix, description in _n_terminal_mods:
+        if sequence.startswith(prefix):
+            note_parts.append(f"{description} removed")
+            sequence = sequence[len(prefix) :]
+            break
+
+    # C-terminal modifications (suffixes)
+    _c_terminal_mods = [
+        ("-NH2", "C-terminal amidation (-NH2)"),
+        ("-nh2", "C-terminal amidation (-NH2)"),
+        ("-amide", "C-terminal amidation (-amide)"),
+        ("-OH", "C-terminal free acid (-OH)"),
+        ("-COOH", "C-terminal carboxyl (-COOH)"),
+        ("-CONH2", "C-terminal amidation (-CONH2)"),
+    ]
+    for suffix, description in _c_terminal_mods:
+        if sequence.endswith(suffix):
+            note_parts.append(f"{description} removed")
+            sequence = sequence[: -len(suffix)]
+            break
+
     # Track non-letter characters stripped
     non_letters = re.findall(r"[^A-Za-z-]", sequence)
     if non_letters:
@@ -465,7 +521,7 @@ def get_corrected_sequence_with_notes(
     if not stripped or stripped == "-":
         return "", [], ""
 
-    # Track terminal modification removal
+    # Track any remaining terminal modification removal (generic dash pattern)
     terminal_mod = None
     if "-" in stripped:
         parts = stripped.split("-", 1)

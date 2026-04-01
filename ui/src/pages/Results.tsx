@@ -302,7 +302,10 @@ export default function Results() {
   return (
     <div className="min-h-screen bg-background relative">
       <BgDotGrid />
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-10 relative z-10" id="results-root">
+      <div
+        className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-10 relative z-10"
+        id="results-root"
+      >
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -316,7 +319,10 @@ export default function Results() {
               <p className="text-body text-muted-foreground mt-1">
                 {peptidesTyped.length} peptide{peptidesTyped.length !== 1 ? "s" : ""} analyzed
                 {meta?.source === "uniprot_api" && meta?.query && (
-                  <> &middot; UniProt: &ldquo;<em>{meta.query}</em>&rdquo;</>
+                  <>
+                    {" "}
+                    &middot; UniProt: &ldquo;<em>{meta.query}</em>&rdquo;
+                  </>
                 )}
               </p>
             </div>
@@ -328,15 +334,22 @@ export default function Results() {
                   {meta.provider_status?.tango ? (
                     <ProviderBadge name="TANGO" status={meta.provider_status.tango as any} />
                   ) : (
-                    <Badge variant="outline" className="text-xs font-normal">TANGO: {meta.use_tango ? "ON" : "OFF"}</Badge>
+                    <Badge variant="outline" className="text-xs font-normal">
+                      TANGO: {meta.use_tango ? "ON" : "OFF"}
+                    </Badge>
                   )}
                   {meta.provider_status?.s4pred ? (
                     <ProviderBadge name="S4PRED" status={meta.provider_status.s4pred as any} />
                   ) : (
-                    <Badge variant="outline" className="text-xs font-normal">S4PRED: OFF</Badge>
+                    <Badge variant="outline" className="text-xs font-normal">
+                      S4PRED: OFF
+                    </Badge>
                   )}
                   {thresholdsModified && (
-                    <Badge variant="secondary" className="text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700">
+                    <Badge
+                      variant="secondary"
+                      className="text-xs bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700"
+                    >
                       Custom Thresholds
                     </Badge>
                   )}
@@ -443,6 +456,17 @@ export default function Results() {
               });
             }
 
+            // ISSUE-024: Sequence modification notes
+            const modifiedCount = peptidesTyped.filter((p) => p.sequenceNotes).length;
+            if (modifiedCount > 0 && !dismissedBanners.has("seq-notes")) {
+              banners.push({
+                key: "seq-notes",
+                icon: <AlertTriangle className="h-4 w-4 text-amber-600" />,
+                borderClass: "border-l-4 border-l-amber-400",
+                message: `${modifiedCount} peptide${modifiedCount !== 1 ? "s" : ""} had non-standard residues that were substituted before analysis. Look for ⚠ icons in the ID column.`,
+              });
+            }
+
             if (banners.length === 0) return null;
             return (
               <div className="space-y-2">
@@ -499,9 +523,24 @@ export default function Results() {
           {/* Main Content Tabs — Data Table first (researcher workflow) */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList className="grid w-full grid-cols-3 h-11 bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] rounded-xl p-1">
-              <TabsTrigger value="data" className="rounded-lg text-small font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm">Data Table</TabsTrigger>
-              <TabsTrigger value="ranking" className="rounded-lg text-small font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"><span className="hidden sm:inline">Candidate </span>Ranking</TabsTrigger>
-              <TabsTrigger value="charts" className="rounded-lg text-small font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"><span className="hidden sm:inline">Charts & </span>Analysis</TabsTrigger>
+              <TabsTrigger
+                value="data"
+                className="rounded-lg text-small font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                Data Table
+              </TabsTrigger>
+              <TabsTrigger
+                value="ranking"
+                className="rounded-lg text-small font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <span className="hidden sm:inline">Candidate </span>Ranking
+              </TabsTrigger>
+              <TabsTrigger
+                value="charts"
+                className="rounded-lg text-small font-medium data-[state=active]:bg-background data-[state=active]:shadow-sm"
+              >
+                <span className="hidden sm:inline">Charts & </span>Analysis
+              </TabsTrigger>
             </TabsList>
 
             {/* Data Table — default view */}
@@ -678,10 +717,7 @@ export default function Results() {
               <ThresholdTuner peptides={peptidesTyped} />
 
               {/* FF-Helix explanation */}
-              <Alert
-                variant="default"
-                className="border-primary/20 bg-primary/5 rounded-xl"
-              >
+              <Alert variant="default" className="border-primary/20 bg-primary/5 rounded-xl">
                 <Info className="h-4 w-4 text-primary" />
                 <AlertDescription className="text-small text-muted-foreground">
                   <strong className="text-foreground">FF-Helix %</strong> measures intrinsic amino

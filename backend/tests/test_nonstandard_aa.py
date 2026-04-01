@@ -183,12 +183,11 @@ class TestCorrectedSequenceWithNotes:
         assert "O→K" in notes
 
     def test_terminal_modification(self):
-        """Terminal modification should be noted (digits stripped first)."""
+        """Terminal modification should be noted."""
         seq, subs, notes = get_corrected_sequence_with_notes("PEPTIDE-NH2")
         assert seq == "PEPTIDE"
-        assert "Terminal modification" in notes
-        # Note: digit "2" is stripped before dash handling, so mod is "-NH"
-        assert "NH" in notes
+        assert "amidation" in notes or "Terminal modification" in notes
+        assert "NH2" in notes
 
     def test_stripped_characters(self):
         """Digits and symbols should be noted."""

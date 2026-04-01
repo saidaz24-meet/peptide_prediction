@@ -535,22 +535,34 @@ export default function Upload() {
                       {/* Entry count and time estimate */}
                       {(() => {
                         const count = rawData.rowCount ?? rawData.rows?.length ?? 0;
-                        if (count > 500) {
-                          const timeNoTango = Math.ceil(count / 100);
-                          const timeWithTango = Math.ceil((count * 3) / 60);
+                        if (count > 100) {
+                          const timeNoTango = Math.max(1, Math.ceil((count * 0.017) / 60));
+                          const timeWithTango = Math.max(1, Math.ceil((count * 0.02) / 60));
+                          const isMedium = count > 500;
+                          const isLarge = count > 3000;
                           return (
                             <Alert
                               className={
-                                count > 3000
-                                  ? "border-amber-300 bg-amber-50"
-                                  : "bg-muted/50 border-muted"
+                                isLarge
+                                  ? "border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700"
+                                  : isMedium
+                                    ? "border-amber-200 bg-amber-50/50 dark:bg-amber-900/10 dark:border-amber-800"
+                                    : "bg-muted/50 border-muted"
                               }
                             >
-                              <AlertTriangle className="h-4 w-4" />
+                              <Info className="h-4 w-4" />
                               <AlertDescription className="text-xs">
-                                <strong>{count} sequences detected.</strong> Estimated time: ~
-                                {timeNoTango} min without TANGO, ~{timeWithTango} min with TANGO.
-                                {count > 3000 && " Consider disabling TANGO for faster results."}
+                                <strong>{count.toLocaleString()} sequences detected.</strong>{" "}
+                                Estimated time: ~{timeWithTango} min (both tools), ~{timeNoTango}{" "}
+                                min (S4PRED only).
+                                {isMedium &&
+                                  " Analysis runs in the background — you can navigate away safely."}
+                                {isLarge && (
+                                  <span className="block mt-1 font-medium text-amber-700 dark:text-amber-300">
+                                    Large dataset: consider disabling TANGO for significantly faster
+                                    results. TANGO adds aggregation data but is the slowest step.
+                                  </span>
+                                )}
                               </AlertDescription>
                             </Alert>
                           );

@@ -94,10 +94,9 @@ Data-driven jsPDF with summary, top-N table, methodology notes.
 Full PeptideDetail-parity: SequenceTrack, HelicalWheel, S4PRED chart, TANGO heatmap, AlphaFold, KPI tiles.
 
 ### B10. Chemical Modification Support
-**Status**: NOT STARTED | **Effort**: 16-24h | **Requested by**: Alex (2026-03-25)
-Parse peptide sequences with chemical modifications (e.g., `MWDDDAD-NH2`, terminal amide, formyl groups). TANGO and S4PRED only accept standard amino acids, so modifications must be stripped before prediction but preserved as metadata.
-**Scope**: Input parsing (inline notation like `-NH2`, `Ac-` + optional flag/dropdown), adjusted biochem calculations (charge, hydrophobicity affected by terminal modifications), UI display of detected modifications, validation rules.
-**Key constraint**: Predictors run on clean sequences; modifications only affect our own biochem calculations.
+**Status**: DONE | **Effort**: 16-24h | **Completed**: 2026-04-02
+Parse peptide sequences with chemical modifications. Strips N-terminal (Ac-, pGlu-, Pyr-, For-, Myr-, Palm-) and C-terminal (-NH2, -amide, -OH, -COOH, -CONH2) modifications before prediction. Modifications tracked as metadata via `sequenceNotes` and `originalSequence` fields in API response. UI shows modification banners in QuickAnalyze, Results page, and warning icons in PeptideTable.
+**Files**: `backend/auxiliary.py` (B10 stripping in both `get_corrected_sequence` and `get_corrected_sequence_with_notes`), `ui/src/pages/QuickAnalyze.tsx`, `ui/src/pages/Results.tsx`.
 
 ### B11. FASTA Upload Support
 **Status**: NOT STARTED | **Effort**: 4-6h | **Requested by**: Alex (2026-03-25)
@@ -113,7 +112,13 @@ Improve the upload experience with better information:
 - Show required columns: "Your file must include a 'Sequence' column. Optional: 'Entry', 'Organism', 'Length'."
 - Currently only shows "50MB max" with no guidance on entry counts or required format.
 
-### B13. Cohort Comparison: Dual Upload
+### B13. 2D Backbone Visualization (atom2svg)
+**Status**: NOT STARTED | **Effort**: 6-8h | **Requested by**: Alex (gist: biochem-fan/026ec2f191fee9285424d12fc2b84ce7)
+Lightweight 2D protein backbone SVG rendering from AlphaFold PDB files. Shows main chain as connected alpha carbons with color-coded residues (hydrophobic, acidic, basic, etc.) and single-letter AA labels. Complements the existing Mol* 3D viewer with a simpler, publication-ready 2D view.
+**Scope**: Port atom2svg.py logic to React/SVG component, integrate into PeptideDetail page alongside Mol* viewer, use PVL's color scheme.
+**Reference**: https://gist.github.com/biochem-fan/026ec2f191fee9285424d12fc2b84ce7
+
+### B14. Cohort Comparison: Dual Upload
 **Status**: NOT STARTED | **Effort**: 6-8h | **Requested by**: Alex (2026-03-28)
 Currently Cohort Comparison requires a dataset already loaded (Cohort A) and then uploading Cohort B. Alex requests:
 - **Option 1** (current): Upload B, compare with already-loaded A
