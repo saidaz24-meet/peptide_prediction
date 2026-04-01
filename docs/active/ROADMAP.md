@@ -1,6 +1,6 @@
 # Peptide Visual Lab (PVL) — Development Roadmap
 
-**Last Updated**: 2026-03-30
+**Last Updated**: 2026-04-02
 **Status**: Active Development (pre-paper, deployment-ready)
 **Branch**: `main` (merged from `ref-impl-replacement`)
 
@@ -55,10 +55,9 @@ PVL occupies a unique niche: the **only web tool** combining aggregation propens
 ## Phase B: User Adoption (3-6 months)
 
 ### B1. Async Job Queue (Celery + Redis)
-**Status**: NOT STARTED | **Effort**: 24h | **Blocked**: Needs VM
-Replace synchronous prediction with background jobs. `POST /api/upload-csv` returns `{jobId, status: "queued"}`, poll `GET /api/jobs/{jobId}`.
-**Why**: Current architecture caps at ~30s (proxy timeout). 500+ peptide batches need async.
-**Files**: New `backend/worker.py`, `backend/api/routes/jobs.py`, add Redis + worker to compose.
+**Status**: DONE | **Effort**: 24h | **Completed**: 2026-04-02
+Full Celery + Redis implementation with separate batch/quick queues, progress reporting, cancellation, sidebar job indicator, and graceful sync fallback.
+**Files**: `backend/celery_app.py`, `backend/tasks.py`, `backend/api/routes/jobs.py`, `ui/src/stores/jobStore.ts`, `ui/src/lib/jobApi.ts`. Docker: redis, celery-batch, celery-quick, flower (optional).
 
 ### B2. Cohort Comparison Dashboard
 **Status**: DONE | **Effort**: 16h
