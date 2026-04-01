@@ -162,58 +162,55 @@ export function WeightBar({ weights, activeMetrics, onChange, disabled }: Weight
     [weights, activeMetrics, onChange, disabled]
   );
 
-  // Manual weight editing
-  const [editingMetric, setEditingMetric] = useState<RankingMetric | null>(null);
-  const [editValue, setEditValue] = useState("");
+  // Manual weight editing — batch mode with Apply button
+  const [editingWeights, setEditingWeights] = useState<Record<string, string> | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
 
-  const handleSegmentClick = useCallback(
-    (metric: RankingMetric) => {
-      if (disabled || dragging != null) return;
-      setEditingMetric(metric);
-      setEditValue(String(Math.round(weights[metric] ?? 0)));
-    },
-    [disabled, dragging, weights],
-  );
+  const startEditing = useCallback(() => {
+    if (disabled || dragging != null) return;
+    const initial: Record<string, string> = {};
+    for (const m of activeMetrics) initial[m] = String(Math.round(weights[m] ?? 0));
+    setEditingWeights(initial);
+    setEditError(null);
+  }, [disabled, dragging, weights, activeMetrics]);
 
-  const applyManualWeight = useCallback(() => {
-    if (!editingMetric) return;
-    const newVal = Math.max(0, Math.min(100, Number(editValue) || 0));
-    const oldVal = weights[editingMetric] ?? 0;
-    const diff = newVal - oldVal;
+  const updateEditValue = useCallback((metric: RankingMetric, value: string) => {
+    setEditingWeights((prev) => (prev ? { ...prev, [metric]: value } : null));
+    setEditError(null);
+  }, []);
 
-    if (diff === 0) {
-      setEditingMetric(null);
+  const applyManualWeights = useCallback(() => {
+    if (!editingWeights) return;
+
+    const newWeights = { ...weights };
+    let total = 0;
+    for (const m of activeMetrics) {
+      const v = Math.max(0, Math.min(100, Number(editingWeights[m]) || 0));
+      newWeights[m] = Math.round(v * 10) / 10;
+      total += newWeights[m];
+    }
+
+    if (Math.abs(total - 100) > 0.5) {
+      setEditError(`Total is ${Math.round(total)}% — must equal 100%`);
       return;
     }
 
-    const newWeights = { ...weights };
-    newWeights[editingMetric] = newVal;
-
-    // Redistribute the difference proportionally among other metrics
-    const others = activeMetrics.filter((m) => m !== editingMetric);
-    const othersTotal = others.reduce((s, m) => s + (weights[m] ?? 0), 0);
-
-    if (others.length > 0 && othersTotal > 0) {
-      let remaining = 100 - newVal;
-      for (let i = 0; i < others.length; i++) {
-        if (i === others.length - 1) {
-          newWeights[others[i]] = Math.max(0, Math.round(remaining * 10) / 10);
-        } else {
-          const proportion = (weights[others[i]] ?? 0) / othersTotal;
-          const adjusted = Math.max(0, Math.round(remaining * proportion * 10) / 10);
-          newWeights[others[i]] = adjusted;
-          remaining -= adjusted;
-        }
-      }
-    } else if (others.length > 0) {
-      // All others were 0, distribute evenly
-      const each = Math.round(((100 - newVal) / others.length) * 10) / 10;
-      for (const m of others) newWeights[m] = each;
+    // Fix rounding to exactly 100
+    const diff = 100 - total;
+    if (diff !== 0 && activeMetrics.length > 0) {
+      const last = activeMetrics[activeMetrics.length - 1];
+      newWeights[last] = Math.round((newWeights[last] + diff) * 10) / 10;
     }
 
     onChange(newWeights);
-    setEditingMetric(null);
-  }, [editingMetric, editValue, weights, activeMetrics, onChange]);
+    setEditingWeights(null);
+    setEditError(null);
+  }, [editingWeights, weights, activeMetrics, onChange]);
+
+  const cancelEditing = useCallback(() => {
+    setEditingWeights(null);
+    setEditError(null);
+  }, []);
 
   if (segments.length === 0) return null;
 
@@ -269,41 +266,59 @@ export function WeightBar({ weights, activeMetrics, onChange, disabled }: Weight
         ))}
       </div>
 
-      {/* Individual weight labels (tap to edit) */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1">
+      {/* Individual weight labels — batch edit mode */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {segments.map((seg) => (
           <div key={seg.metric} className="flex items-center gap-1 text-[11px]">
             <span className={`w-2 h-2 rounded-full ${seg.color}`} />
             <span className="text-muted-foreground">{seg.label}:</span>
-            {editingMetric === seg.metric ? (
+            {editingWeights ? (
               <input
                 type="number"
                 min={0}
                 max={100}
-                value={editValue}
-                onChange={(e) => setEditValue(e.target.value)}
-                onBlur={applyManualWeight}
+                value={editingWeights[seg.metric] ?? ""}
+                onChange={(e) => updateEditValue(seg.metric, e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") applyManualWeight();
-                  if (e.key === "Escape") setEditingMetric(null);
+                  if (e.key === "Enter") applyManualWeights();
+                  if (e.key === "Escape") cancelEditing();
                 }}
                 className="w-12 h-5 px-1 text-[11px] font-semibold border rounded bg-background text-center"
-                autoFocus
               />
             ) : (
               <button
-                onClick={() => handleSegmentClick(seg.metric)}
+                onClick={startEditing}
                 className="font-semibold text-foreground hover:underline cursor-pointer"
-                title="Click to edit weight"
+                title="Click to edit weights"
               >
                 {Math.round(seg.weight)}%
               </button>
             )}
           </div>
         ))}
-        <span className="text-[11px] text-muted-foreground ml-auto">
-          Total: {Math.round(segments.reduce((s, seg) => s + seg.weight, 0))}%
-        </span>
+        {editingWeights ? (
+          <div className="flex items-center gap-1.5 ml-auto">
+            {editError && (
+              <span className="text-[10px] text-destructive font-medium">{editError}</span>
+            )}
+            <button
+              onClick={applyManualWeights}
+              className="h-5 px-2 text-[10px] font-medium rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+            >
+              Apply
+            </button>
+            <button
+              onClick={cancelEditing}
+              className="h-5 px-2 text-[10px] font-medium rounded border border-border text-muted-foreground hover:bg-muted transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <span className="text-[11px] text-muted-foreground ml-auto">
+            Total: {Math.round(segments.reduce((s, seg) => s + seg.weight, 0))}%
+          </span>
+        )}
       </div>
     </div>
   );

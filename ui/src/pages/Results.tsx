@@ -491,28 +491,57 @@ export default function Results() {
 
           {/* UniProt source banner */}
           {meta?.source === "uniprot_api" && (
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 bg-[hsl(var(--surface-1))] rounded-xl px-4 sm:px-5 py-3 text-small border border-[hsl(var(--border))]">
-              <span className="text-muted-foreground">
-                Showing <strong className="text-foreground">{meta.size_returned}</strong>
-                {meta.total_available != null &&
-                  meta.total_available > 0 &&
-                  ` of ${meta.total_available.toLocaleString()}`}
-                {meta.query && (
-                  <>
-                    {" "}
-                    entries matching &ldquo;<em className="text-foreground">{meta.query}</em>&rdquo;
-                  </>
+            <div className="bg-[hsl(var(--surface-1))] rounded-xl px-4 sm:px-5 py-3 text-small border border-[hsl(var(--border))] space-y-1">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <span className="text-muted-foreground">
+                  Showing <strong className="text-foreground">{meta.size_returned}</strong>
+                  {meta.total_available != null &&
+                    meta.total_available > 0 &&
+                    ` of ${meta.total_available.toLocaleString()}`}
+                  {meta.query && (
+                    <>
+                      {" "}
+                      {meta.mode === "accession" ? (
+                        <>
+                          for accession <strong className="text-foreground">{meta.query}</strong>
+                        </>
+                      ) : (
+                        <>
+                          entries matching &ldquo;<em className="text-foreground">{meta.query}</em>
+                          &rdquo;
+                        </>
+                      )}
+                    </>
+                  )}
+                </span>
+                {meta.url && (
+                  <a
+                    href={meta.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline text-small font-medium shrink-0"
+                  >
+                    View on UniProt &rarr;
+                  </a>
                 )}
-              </span>
-              {meta.url && (
-                <a
-                  href={meta.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-primary hover:underline text-small font-medium"
-                >
-                  View on UniProt &rarr;
-                </a>
+              </div>
+              {/* Filter details row */}
+              {(meta.api_query_string || meta.run_tango != null) && (
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                  {meta.api_query_string && meta.api_query_string.includes("reviewed:true") && (
+                    <span>Swiss-Prot (reviewed)</span>
+                  )}
+                  {meta.use_tango && <span>TANGO: {meta.run_tango ? "ON" : "OFF"}</span>}
+                  {meta.use_s4pred && <span>S4PRED: ON</span>}
+                  {meta.total_available != null &&
+                    meta.size_returned != null &&
+                    meta.total_available > meta.size_returned && (
+                      <span className="text-amber-600 dark:text-amber-400">
+                        Results capped at {meta.size_returned} &mdash; narrow your search or
+                        increase max results
+                      </span>
+                    )}
+                </div>
               )}
             </div>
           )}

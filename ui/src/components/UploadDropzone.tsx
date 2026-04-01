@@ -153,10 +153,10 @@ export function UploadDropzone({ onFileSelected, onFileProcessed }: UploadDropzo
       >
         <Card
           {...getRootProps()}
-          className={`relative overflow-hidden cursor-pointer transition-all duration-200 border-2 border-dashed
-            ${isDragActive && !isDragReject ? "border-primary bg-primary/5" : ""}
+          className={`relative overflow-hidden cursor-pointer transition-all duration-200 border-2 border-dashed rounded-xl
+            ${isDragActive && !isDragReject ? "border-primary bg-primary/10 shadow-lg shadow-primary/10" : ""}
             ${isDragReject ? "border-destructive bg-destructive/5" : ""}
-            ${!isDragActive ? "border-border hover:border-primary/50 hover:bg-muted/30" : ""}
+            ${!isDragActive ? "border-primary/30 bg-primary/[0.02] hover:border-primary hover:bg-primary/5 hover:shadow-md hover:shadow-primary/5" : ""}
             ${isProcessing ? "pointer-events-none opacity-60" : ""}`}
         >
           <input
@@ -167,10 +167,10 @@ export function UploadDropzone({ onFileSelected, onFileProcessed }: UploadDropzo
               if (f) processFile(f);
             }}
           />
-          <CardContent className="flex flex-col items-center justify-center py-12 px-6 text-center">
+          <CardContent className="flex flex-col items-center justify-center py-14 px-6 text-center">
             <motion.div
               animate={{
-                scale: isDragActive ? 1.1 : 1,
+                scale: isDragActive ? 1.15 : 1,
                 rotate: isProcessing ? 360 : 0,
               }}
               transition={{
@@ -181,39 +181,45 @@ export function UploadDropzone({ onFileSelected, onFileProcessed }: UploadDropzo
                   ease: "linear",
                 },
               }}
-              className="mb-4"
+              className="mb-5"
             >
               <div
-                className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                  isDragActive || isProcessing ? "bg-primary/10" : "bg-muted"
+                className={`w-20 h-20 rounded-2xl flex items-center justify-center transition-colors ${
+                  isDragActive || isProcessing
+                    ? "bg-primary/15 border-2 border-primary/30"
+                    : "bg-primary/5 border-2 border-primary/10"
                 }`}
               >
                 {isDragActive || isProcessing ? (
-                  <Upload className="w-8 h-8 text-primary" />
+                  <Upload className="w-9 h-9 text-primary" />
                 ) : (
-                  <FileText className="w-8 h-8 text-muted-foreground" />
+                  <Upload className="w-9 h-9 text-primary/60" />
                 )}
               </div>
             </motion.div>
 
-            <h3 className="text-xl font-semibold mb-2">
+            <h3 className="text-xl font-semibold mb-1.5">
               {isProcessing
-                ? "Processing your file…"
+                ? "Processing your file..."
                 : isDragActive
                   ? "Drop your file here"
-                  : "Upload Peptide Dataset"}
+                  : "Drop your file here"}
             </h3>
 
-            <p className="text-muted-foreground mb-4 max-w-sm">
+            <p className="text-muted-foreground mb-3 max-w-sm">
               {isProcessing
                 ? "Please wait while we prepare your data"
-                : "Drag & drop your CSV/TSV, Excel, or FASTA file here, or click to browse"}
+                : (
+                  <>
+                    or <span className="text-primary font-medium underline underline-offset-2">click to browse</span> your computer
+                  </>
+                )}
             </p>
 
             {!isProcessing && (
-              <div className="text-sm text-muted-foreground">
-                <p>Supported formats: CSV, TSV, XLSX, XLS, FASTA</p>
-                <p>Maximum file size: 50MB</p>
+              <div className="text-xs text-muted-foreground/70 space-y-0.5">
+                <p>CSV, TSV, Excel (.xlsx), FASTA</p>
+                <p>Up to 50 MB &middot; Required column: <code className="bg-muted px-1 py-0.5 rounded text-[11px]">Sequence</code></p>
               </div>
             )}
 

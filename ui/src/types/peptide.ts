@@ -279,7 +279,12 @@ export type DatasetMetadata = {
   // UniProt-specific metadata (only present for UniProt-sourced data)
   source?: "uniprot_api" | null;
   query?: string | null;
+  api_query_string?: string | null;
+  mode?: string | null;
   url?: string | null;
+  row_count?: number | null;
+  size_requested?: number | null;
   size_returned?: number | null;
   total_available?: number | null;
+  run_tango?: boolean | null;
 };

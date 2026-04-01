@@ -194,6 +194,48 @@ Simulate concurrent load: 50, 100, 1000 simultaneous analyses. Tools: `locust` o
 | D2.6 | Mobile responsive polish | 8h | IN PROGRESS | Typography scaling, grid stacking, table column visibility |
 | D2.7 | Code-splitting / lazy routes | 4h | DONE | React.lazy + manualChunks in vite.config |
 
+## Phase D2.8: Visualization Upgrade Cycle (Cowork)
+
+**Status**: PLANNED | **When**: Last step before production-ready version, alongside Phase D3.
+**Prerequisites**: All functional features complete. All bugs fixed. Mobile responsive done.
+
+**Process (repeat for EVERY chart and graph in the app):**
+
+1. Said opens the chart/graph in the app and describes exactly what needs to change
+2. Claude forms a detailed Cowork prompt with the specific redesign instructions
+3. Cowork executes the prompt and generates the redesigned component
+4. Said reviews the output, provides corrections if needed
+5. Iterate until the chart meets the quality bar
+
+**Scope — Two Stages:**
+
+**Stage 1: Macro (Stripe SaaS-like visualizations)**
+- Add polished dashboard-level KPI cards, summary visualizations
+- Ensure overall layout feels like a premium SaaS product
+- Landing page visualization polish
+- Results page overview cards
+
+**Stage 2: Micro (Per-chart redesign)**
+Each graph goes through the cycle above. Charts to redesign:
+- Results tab: Hydrophobicity distribution, μH distribution, length distribution
+- Results tab: Aggregation propensity distribution
+- Results tab: SSW+ vs SSW- grouped bar comparison
+- Results tab: Pipeline Overview (Euler/Venn diagram)
+- Results tab: UpSet matrix
+- Results tab: AA Composition grouped chart
+- PeptideDetail: Feature Comparison radar chart
+- PeptideDetail: Cohort Position bars
+- PeptideDetail: Helical Wheel projection
+- PeptideDetail: Sliding-Window hydrophobicity + μH profiles
+- PeptideDetail: S4PRED per-residue probability chart
+- PeptideDetail: TANGO aggregation heatmap
+- PeptideDetail: FF-Helix vs Agg Max scatter
+- Compare page: All comparison charts
+
+**Quality bar**: Each chart should feel like it belongs in a Nature/Science paper supplement or a Bloomberg terminal. Clean, precise, publication-ready.
+
+---
+
 ## Phase D3: Advanced Visualizations (PARKED — Post-Launch)
 
 **Prerequisites**: Live deployment, updated screenshots, stable base.
@@ -221,8 +263,8 @@ Simulate concurrent load: 50, 100, 1000 simultaneous analyses. Tools: `locust` o
 | Step | Scope | Effort | Status | Details |
 |------|-------|--------|--------|---------|
 | F1 | Search query fix | 3-4h | DONE | Full-text default already correct (no `keyword:` prefix), X-Total-Results parsed |
-| F2 | Search summary banner | 2h | TODO | "Found 204 of 12,345 entries" + filters + "View on UniProt" link |
-| F3 | Metadata enrichment | 5-6h | TODO | Add gene_names, cc_function, annotation_score to fetch + display |
+| F2 | Search summary banner | 2h | DONE | Enhanced banner with query mode detection, filter details, cap warning, "View on UniProt" link |
+| F3 | Metadata enrichment | 5-6h | DONE | gene_names, cc_function, annotation_score already fetched; now displayed on PeptideDetail (gene in header, function card, annotation stars) |
 | F4 | Dedicated `/search` page | 8-10h | TODO | Own sidebar tab, browse table with checkboxes, "Analyze Selected" (ties into D7) |
 | F5 | Browse-then-analyze | 6-8h | TODO | Lightweight browse first (metadata only), user-triggered analysis on selection |
 | F6 | Advanced search | 6-8h | TODO | "Search in" selector, raised caps, smart suggestions, pagination |

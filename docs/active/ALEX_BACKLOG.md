@@ -36,10 +36,10 @@
 
 | ID | Item | Phase | Status |
 |----|------|-------|--------|
-| P1 | Two tracks: one for helix, one for SSW, both with sequence letters | D | TODO |
-| P2 | Have sequence shown again under SSW track with SSW-specific calcs | D | TODO |
-| P3 | Clickable/expandable titles for faster scrolling | D | TODO |
-| P4 | Show three aggregation graphs for S4PRED helix results (same as SSW graphs) | D | TODO |
+| P1 | Two tracks: one for helix, one for SSW, both with sequence letters | D | DONE |
+| P2 | Have sequence shown again under SSW track with SSW-specific calcs | D | DONE |
+| P3 | Clickable/expandable titles for faster scrolling | D | DONE |
+| P4 | Show three aggregation graphs for S4PRED helix results (same as SSW graphs) | D | DONE |
 | P5 | Remove "concerns and flagging risks" — aggregation is not a risk to biologists | D | DONE |
 | P6 | Aggregation graph: calmer colors proportional to score | D | DONE |
 | P7 | "High confidence switch zone" warning — research Hamodrakas 2007 for amyloid-forming hallmark | D | TODO |
@@ -50,7 +50,7 @@
 | ID | Item | Phase | Status |
 |----|------|-------|--------|
 | CH1 | Pipeline overview: different colors per region, summary table of colors + percentages underneath | D | TODO |
-| CH2 | Dynamic Venn diagram: if no FF-Helix+SSW overlap exists, don't show crossing circles | D | TODO |
+| CH2 | Dynamic Venn diagram: if no FF-Helix+SSW overlap exists, don't show crossing circles | D | DONE |
 | CH3 | Clickable diagram sections: click "helix & SSW but not FF-Helix" to filter table | D | TODO |
 | CH4 | Top 2 charts: more rows, more colors, more distribution, user-customizable (show what they want in one diagram instead of 10 separate ones) | D | TODO |
 | CH5 | Peptide markers in table below charts for quick visual relationships | D | TODO |
@@ -143,9 +143,9 @@
 
 | ID | Item | Phase | Status |
 |----|------|-------|--------|
-| UU1 | Alex keeps clicking violet "Upload Data" button instead of dropzone — rename/tone down or make dropzone more prominent | D | TODO |
-| UU2 | Alex also clicks "Upload File" near progress bar — confusing with actual upload area | D | TODO |
-| UU3 | Make real upload dropzone the main focus: more contrast, color, "click here" indicator | D | TODO |
+| UU1 | Alex keeps clicking violet "Upload Data" button instead of dropzone — rename/tone down or make dropzone more prominent | D | DONE |
+| UU2 | Alex also clicks "Upload File" near progress bar — confusing with actual upload area | D | DONE |
+| UU3 | Make real upload dropzone the main focus: more contrast, color, "click here" indicator | D | DONE |
 
 ## Quick Analyze UX (2026-03-30)
 

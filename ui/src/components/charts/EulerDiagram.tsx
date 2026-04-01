@@ -115,9 +115,17 @@ export function EulerDiagram({ peptides }: EulerDiagramProps) {
 
   const pct = (n: number) => ((n / total) * 100).toFixed(1);
 
+  // CH2: Dynamic layout — hide circles when no SSW or no Helix exists
+  const hasSSW = regions.sswTotal > 0;
+  const hasHelix = regions.helixTotal > 0;
+
   // SVG dimensions
   const W = 480;
   const H = 320;
+
+  // Adjust circle positions for single-circle scenarios
+  const sswCx = hasSSW && hasHelix ? 185 : 240; // center if only SSW
+  const helixCx = hasSSW && hasHelix ? 295 : 240; // center if only Helix
 
   const click = (ids: string[], label: string) => {
     if (ids.length > 0) selectBin({ ids, binLabel: label, source: SOURCE });
@@ -167,51 +175,59 @@ export function EulerDiagram({ peptides }: EulerDiagramProps) {
             All: {total}
           </text>
 
-          {/* SSW circle (left) — filled region */}
-          <circle
-            cx={185}
-            cy={160}
-            r={110}
-            fill={SSW_COLOR}
-            fillOpacity={0.12}
-            stroke={SSW_COLOR}
-            strokeWidth={2}
-            className="cursor-pointer"
-            onClick={() => click(sswOnlyPlain.ids, sswOnlyPlain.label)}
-          />
-
-          {/* Helix circle (right) — filled region */}
-          <circle
-            cx={295}
-            cy={160}
-            r={110}
-            fill={HELIX_COLOR}
-            fillOpacity={0.12}
-            stroke={HELIX_COLOR}
-            strokeWidth={2}
-            className="cursor-pointer"
-            onClick={() => click(helixOnlyPlain.ids, helixOnlyPlain.label)}
-          />
-
-          {/* Overlap region (SSW ∩ Helix) — lens-shaped clickable area */}
-          <clipPath id="ssw-clip">
-            <circle cx={185} cy={160} r={110} />
-          </clipPath>
-          <circle
-            cx={295}
-            cy={160}
-            r={110}
-            clipPath="url(#ssw-clip)"
-            fill={BOTH_COLOR}
-            fillOpacity={0.2}
-            className="cursor-pointer"
-            onClick={() => click(overlapIds, "SSW ∩ Helix (all)")}
-          />
-
-          {/* FF-SSW nested circle (inside SSW, left) */}
-          {regions.ffSswTotal > 0 && (
+          {/* SSW circle (left or center) — conditionally rendered */}
+          {hasSSW && (
             <circle
-              cx={145}
+              cx={sswCx}
+              cy={160}
+              r={110}
+              fill={SSW_COLOR}
+              fillOpacity={0.12}
+              stroke={SSW_COLOR}
+              strokeWidth={2}
+              className="cursor-pointer"
+              onClick={() => click(sswOnlyPlain.ids, sswOnlyPlain.label)}
+            />
+          )}
+
+          {/* Helix circle (right or center) — conditionally rendered */}
+          {hasHelix && (
+            <circle
+              cx={helixCx}
+              cy={160}
+              r={110}
+              fill={HELIX_COLOR}
+              fillOpacity={0.12}
+              stroke={HELIX_COLOR}
+              strokeWidth={2}
+              className="cursor-pointer"
+              onClick={() => click(helixOnlyPlain.ids, helixOnlyPlain.label)}
+            />
+          )}
+
+          {/* Overlap region (SSW ∩ Helix) — only when both exist */}
+          {hasSSW && hasHelix && (
+            <>
+              <clipPath id="ssw-clip">
+                <circle cx={sswCx} cy={160} r={110} />
+              </clipPath>
+              <circle
+                cx={helixCx}
+                cy={160}
+                r={110}
+                clipPath="url(#ssw-clip)"
+                fill={BOTH_COLOR}
+                fillOpacity={0.2}
+                className="cursor-pointer"
+                onClick={() => click(overlapIds, "SSW ∩ Helix (all)")}
+              />
+            </>
+          )}
+
+          {/* FF-SSW nested circle (inside SSW) */}
+          {regions.ffSswTotal > 0 && hasSSW && (
+            <circle
+              cx={hasHelix ? 145 : sswCx - 30}
               cy={180}
               r={50}
               fill={FF_SSW_COLOR}
@@ -226,10 +242,10 @@ export function EulerDiagram({ peptides }: EulerDiagramProps) {
             />
           )}
 
-          {/* FF-Helix nested circle (inside Helix, right) */}
-          {regions.ffHelixTotal > 0 && (
+          {/* FF-Helix nested circle (inside Helix) */}
+          {regions.ffHelixTotal > 0 && hasHelix && (
             <circle
-              cx={335}
+              cx={hasSSW ? 335 : helixCx + 30}
               cy={180}
               r={50}
               fill={FF_HELIX_COLOR}
@@ -247,82 +263,98 @@ export function EulerDiagram({ peptides }: EulerDiagramProps) {
           {/* ── Labels ── */}
 
           {/* SSW circle label */}
-          <text x={110} y={75} textAnchor="middle" fontSize={12} fontWeight={600} fill={SSW_COLOR}>
-            SSW ({regions.sswTotal})
-          </text>
+          {hasSSW && (
+            <text x={hasHelix ? 110 : sswCx} y={75} textAnchor="middle" fontSize={12} fontWeight={600} fill={SSW_COLOR}>
+              SSW ({regions.sswTotal})
+            </text>
+          )}
 
           {/* Helix circle label */}
-          <text
-            x={370}
-            y={75}
-            textAnchor="middle"
-            fontSize={12}
-            fontWeight={600}
-            fill={HELIX_COLOR}
-          >
-            Helix ({regions.helixTotal})
-          </text>
+          {hasHelix && (
+            <text
+              x={hasSSW ? 370 : helixCx}
+              y={75}
+              textAnchor="middle"
+              fontSize={12}
+              fontWeight={600}
+              fill={HELIX_COLOR}
+            >
+              Helix ({regions.helixTotal})
+            </text>
+          )}
 
           {/* SSW-only count */}
-          <text
-            x={110}
-            y={140}
-            textAnchor="middle"
-            fontSize={14}
-            fontWeight={700}
-            fill="currentColor"
-          >
-            {sswOnlyPlain.ids.length}
-          </text>
-          <text x={110} y={155} textAnchor="middle" fontSize={9} fill="#666">
-            SSW only ({pct(sswOnlyPlain.ids.length)}%)
-          </text>
-
-          {/* Helix-only count */}
-          <text
-            x={370}
-            y={140}
-            textAnchor="middle"
-            fontSize={14}
-            fontWeight={700}
-            fill="currentColor"
-          >
-            {helixOnlyPlain.ids.length}
-          </text>
-          <text x={370} y={155} textAnchor="middle" fontSize={9} fill="#666">
-            Helix only ({pct(helixOnlyPlain.ids.length)}%)
-          </text>
-
-          {/* Overlap count */}
-          <text
-            x={240}
-            y={130}
-            textAnchor="middle"
-            fontSize={14}
-            fontWeight={700}
-            fill="currentColor"
-            className="cursor-pointer"
-            onClick={() => click(overlapIds, "SSW ∩ Helix (all)")}
-          >
-            {overlapIds.length}
-          </text>
-          <text
-            x={240}
-            y={145}
-            textAnchor="middle"
-            fontSize={9}
-            fill="#666"
-            className="cursor-pointer"
-            onClick={() => click(overlapIds, "SSW ∩ Helix (all)")}
-          >
-            Both ({pct(overlapIds.length)}%)
-          </text>
-
-          {/* FF-SSW count */}
-          {regions.ffSswTotal > 0 && (
+          {hasSSW && (
             <>
               <text
-                x={145}
+                x={hasHelix ? 110 : sswCx}
+                y={hasHelix ? 140 : 150}
+                textAnchor="middle"
+                fontSize={14}
+                fontWeight={700}
+                fill="currentColor"
+              >
+                {sswOnlyPlain.ids.length}
+              </text>
+              <text x={hasHelix ? 110 : sswCx} y={hasHelix ? 155 : 165} textAnchor="middle" fontSize={9} fill="#666">
+                {hasHelix ? `SSW only (${pct(sswOnlyPlain.ids.length)}%)` : `${pct(sswOnlyPlain.ids.length)}%`}
+              </text>
+            </>
+          )}
+
+          {/* Helix-only count */}
+          {hasHelix && (
+            <>
+              <text
+                x={hasSSW ? 370 : helixCx}
+                y={hasSSW ? 140 : 150}
+                textAnchor="middle"
+                fontSize={14}
+                fontWeight={700}
+                fill="currentColor"
+              >
+                {helixOnlyPlain.ids.length}
+              </text>
+              <text x={hasSSW ? 370 : helixCx} y={hasSSW ? 155 : 165} textAnchor="middle" fontSize={9} fill="#666">
+                {hasSSW ? `Helix only (${pct(helixOnlyPlain.ids.length)}%)` : `${pct(helixOnlyPlain.ids.length)}%`}
+              </text>
+            </>
+          )}
+
+          {/* Overlap count — only when both circles exist */}
+          {hasSSW && hasHelix && overlapIds.length > 0 && (
+            <>
+              <text
+                x={240}
+                y={130}
+                textAnchor="middle"
+                fontSize={14}
+                fontWeight={700}
+                fill="currentColor"
+                className="cursor-pointer"
+                onClick={() => click(overlapIds, "SSW ∩ Helix (all)")}
+              >
+                {overlapIds.length}
+              </text>
+              <text
+                x={240}
+                y={145}
+                textAnchor="middle"
+                fontSize={9}
+                fill="#666"
+                className="cursor-pointer"
+                onClick={() => click(overlapIds, "SSW ∩ Helix (all)")}
+              >
+                Both ({pct(overlapIds.length)}%)
+              </text>
+            </>
+          )}
+
+          {/* FF-SSW count */}
+          {regions.ffSswTotal > 0 && hasSSW && (
+            <>
+              <text
+                x={hasHelix ? 145 : sswCx - 30}
                 y={177}
                 textAnchor="middle"
                 fontSize={14}
@@ -331,17 +363,17 @@ export function EulerDiagram({ peptides }: EulerDiagramProps) {
               >
                 {regions.ffSswTotal}
               </text>
-              <text x={145} y={192} textAnchor="middle" fontSize={9} fill="#666">
+              <text x={hasHelix ? 145 : sswCx - 30} y={192} textAnchor="middle" fontSize={9} fill="#666">
                 FF-SSW ({pct(regions.ffSswTotal)}%)
               </text>
             </>
           )}
 
           {/* FF-Helix count */}
-          {regions.ffHelixTotal > 0 && (
+          {regions.ffHelixTotal > 0 && hasHelix && (
             <>
               <text
-                x={335}
+                x={hasSSW ? 335 : helixCx + 30}
                 y={177}
                 textAnchor="middle"
                 fontSize={14}
@@ -350,19 +382,30 @@ export function EulerDiagram({ peptides }: EulerDiagramProps) {
               >
                 {regions.ffHelixTotal}
               </text>
-              <text x={335} y={192} textAnchor="middle" fontSize={9} fill="#666">
+              <text x={hasSSW ? 335 : helixCx + 30} y={192} textAnchor="middle" fontSize={9} fill="#666">
                 FF-Helix ({pct(regions.ffHelixTotal)}%)
               </text>
             </>
           )}
 
           {/* Neither count */}
-          <text x={50} y={40} textAnchor="middle" fontSize={12} fontWeight={600} fill="#999">
-            {neither.ids.length}
-          </text>
-          <text x={50} y={53} textAnchor="middle" fontSize={9} fill="#999">
-            Neither
-          </text>
+          {neither.ids.length > 0 && (
+            <>
+              <text x={50} y={40} textAnchor="middle" fontSize={12} fontWeight={600} fill="#999">
+                {neither.ids.length}
+              </text>
+              <text x={50} y={53} textAnchor="middle" fontSize={9} fill="#999">
+                Neither
+              </text>
+            </>
+          )}
+
+          {/* No structural predictions message */}
+          {!hasSSW && !hasHelix && (
+            <text x={W / 2} y={H / 2} textAnchor="middle" fontSize={13} fill="#999">
+              No SSW or Helix predictions detected
+            </text>
+          )}
         </svg>
       </div>
 
