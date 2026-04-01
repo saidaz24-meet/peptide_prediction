@@ -70,7 +70,7 @@ function AppLayout() {
         /* App pages: Sidebar + constrained content */
         <div className="flex min-h-screen">
           <AppSidebar />
-          <main className="flex-1 min-w-0">
+          <main className="flex-1 min-w-0 pt-12 md:pt-0">
             <Suspense
               fallback={
                 <div className="flex items-center justify-center min-h-screen">

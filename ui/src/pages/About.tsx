@@ -105,7 +105,7 @@ export default function About() {
 
           {/* Title */}
           <div>
-            <h1 className="text-h1 text-foreground">Peptide Visual Lab</h1>
+            <h1 className="text-h1 text-foreground page-header-title">Peptide Visual Lab</h1>
             <p className="text-body text-muted-foreground mt-1">DESY &middot; Landau Group</p>
           </div>
 

@@ -285,8 +285,8 @@ export default function Compare() {
       <BgDotGrid />
       {/* Header */}
       <div>
-        <h1 className="text-h1 text-foreground">Cohort Comparison</h1>
-        <p className="text-body text-muted-foreground mt-1">
+        <h1 className="text-h1 text-foreground page-header-title">Cohort Comparison</h1>
+        <p className="text-body text-muted-foreground mt-1 page-header-title">
           Compare your current dataset (Cohort A) against a second dataset (Cohort B).
         </p>
       </div>

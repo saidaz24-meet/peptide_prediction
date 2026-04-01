@@ -87,7 +87,7 @@ export default function Help() {
             <div className="flex items-center justify-center w-14 h-14 mx-auto bg-primary/10 rounded-2xl">
               <BookOpen className="w-7 h-7 text-primary" />
             </div>
-            <h1 className="text-h1 text-foreground">Help & Documentation</h1>
+            <h1 className="text-h1 text-foreground page-header-title">Help & Documentation</h1>
             <p className="text-body text-muted-foreground max-w-2xl mx-auto">
               Learn how to interpret peptide metrics and make the most of your analysis results.
             </p>

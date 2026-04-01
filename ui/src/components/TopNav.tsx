@@ -1,8 +1,7 @@
 /** TopNav — Stripe-style top bar for the landing page. Transparent → frosted glass on scroll. */
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { ArrowRight, Moon, Sun, Menu } from "lucide-react";
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { ArrowRight, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* Theme helpers (same logic as AppSidebar — keep in sync) */
@@ -99,46 +98,64 @@ export function TopNav({ className }: TopNavProps) {
             </Link>
           </div>
 
-          {/* Hamburger (mobile) */}
+          {/* Animated hamburger / X (mobile) */}
           <button
-            onClick={() => setMobileOpen(true)}
-            className={cn(iconBtnClass, "md:hidden")}
-            aria-label="Open menu"
+            onClick={() => setMobileOpen((o) => !o)}
+            className={cn("relative w-10 h-10 flex items-center justify-center rounded-lg md:hidden", "hover:bg-[hsl(var(--accent))]")}
+            aria-label={mobileOpen ? "Close menu" : "Open menu"}
           >
-            <Menu className="h-5 w-5" />
+            <TopNavHamburger open={mobileOpen} />
           </button>
         </div>
       </nav>
 
-      {/* Mobile Sheet */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetContent side="right" className="w-72 p-0">
-          <SheetHeader className="px-6 pt-6 pb-4 border-b border-[hsl(var(--border))]">
-            <SheetTitle className="text-left">
+      {/* Mobile overlay nav — same pattern as inner pages */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden" onClick={closeMobile}>
+          <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
+          <nav
+            className="absolute top-16 left-0 bottom-0 w-64 bg-[hsl(var(--background))] border-r border-[hsl(var(--border))] shadow-xl overflow-y-auto animate-slide-in-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2.5 px-5 py-4 border-b border-[hsl(var(--border))]">
               <span className="text-lg font-bold text-[hsl(var(--primary))]">PVL</span>
-            </SheetTitle>
-          </SheetHeader>
-          <div className="flex flex-col py-4">
-            {NAV_LINKS.map((l) => (
-              <Link key={l.href} to={l.href} onClick={closeMobile}
-                className={cn("px-6 py-3", linkClass, "hover:bg-[hsl(var(--accent))]")}>
-                {l.label}
-              </Link>
-            ))}
-            <div className="mx-6 my-3 h-px bg-[hsl(var(--border))]" />
-            <button onClick={handleToggle}
-              className={cn("flex items-center gap-3 px-6 py-3 w-full text-left", linkClass, "hover:bg-[hsl(var(--accent))]")}>
-              <ThemeIcon className="h-4 w-4" />
-              {dark ? "Light mode" : "Dark mode"}
-            </button>
-            <div className="px-6 pt-4">
-              <Link to="/upload" onClick={closeMobile} className={cn(ctaClass, "justify-center w-full px-5 py-2.5")}>
-                Start Analysis <ArrowRight className="h-3.5 w-3.5" />
-              </Link>
+              <span className="text-[10px] text-[hsl(var(--muted-foreground))]">Peptide Visual Lab</span>
             </div>
-          </div>
-        </SheetContent>
-      </Sheet>
+            <div className="flex flex-col py-2">
+              {NAV_LINKS.map((l) => (
+                <Link key={l.href} to={l.href} onClick={closeMobile}
+                  className={cn("px-5 py-3 text-sm font-medium transition-colors", "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]")}>
+                  {l.label}
+                </Link>
+              ))}
+              <div className="mx-5 my-2 h-px bg-[hsl(var(--border))]" />
+              <button onClick={() => { handleToggle(); closeMobile(); }}
+                className={cn("flex items-center gap-3 px-5 py-3 w-full text-left text-sm font-medium", "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))] hover:bg-[hsl(var(--accent))]")}>
+                <ThemeIcon className="h-4 w-4" />
+                {dark ? "Light mode" : "Dark mode"}
+              </button>
+              <div className="px-5 pt-3">
+                <Link to="/upload" onClick={closeMobile} className={cn(ctaClass, "justify-center w-full px-5 py-2.5")}>
+                  Start Analysis <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </div>
+            </div>
+          </nav>
+        </div>
+      )}
     </>
+  );
+}
+
+/** Animated hamburger icon for TopNav — matches AppSidebar pattern */
+function TopNavHamburger({ open }: { open: boolean }) {
+  const barBase = "block h-[2px] rounded-full transition-all duration-300 ease-in-out";
+  const color = "bg-[hsl(var(--foreground))]";
+  return (
+    <div className="w-5 h-4 flex flex-col justify-between">
+      <span className={cn(barBase, color, "w-5", open && "translate-y-[7px] rotate-45")} />
+      <span className={cn(barBase, color, "w-4", open && "opacity-0 scale-x-0")} />
+      <span className={cn(barBase, color, "w-5", open && "-translate-y-[7px] -rotate-45")} />
+    </div>
   );
 }

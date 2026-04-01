@@ -315,7 +315,7 @@ export default function Results() {
           {/* ── Header ── */}
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h1 className="text-h1 text-foreground">Analysis Results</h1>
+              <h1 className="text-h1 text-foreground page-header-title">Analysis Results</h1>
               <p className="text-body text-muted-foreground mt-1">
                 {peptidesTyped.length} peptide{peptidesTyped.length !== 1 ? "s" : ""} analyzed
                 {meta?.source === "uniprot_api" && meta?.query && (

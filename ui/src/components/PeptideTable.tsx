@@ -861,7 +861,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             size="sm"
             onClick={() => setShowFilters(!showFilters)}
           >
-            <Filter className="w-4 h-4 sm:mr-2" />
+            <Filter className="w-4 h-4 sm:mr-2" title="Toggle column filters" />
             <span className="hidden sm:inline">Filters</span>
             {activeFilterCount > 0 && (
               <Badge variant="secondary" className="ml-1 h-5 px-1.5 text-xs">
@@ -871,7 +871,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" title="Show/hide table columns">
                 <Columns3 className="w-4 h-4 sm:mr-2" />
                 <span className="hidden sm:inline">Columns</span>
               </Button>
@@ -913,11 +913,11 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={exportToCSV} size="sm" variant="outline">
+          <Button onClick={exportToCSV} size="sm" variant="outline" title="Export filtered rows as CSV">
             <Download className="w-4 h-4 sm:mr-2" />
             <span className="hidden sm:inline">Export Filtered</span>
           </Button>
-          <Button onClick={exportFullCSV} size="sm">
+          <Button onClick={exportFullCSV} size="sm" title="Export all rows as CSV">
             <Download className="w-4 h-4 sm:mr-2" />
             <span className="hidden sm:inline">Export All</span>
           </Button>

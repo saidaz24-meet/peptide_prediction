@@ -184,7 +184,7 @@ export default function PeptideDetail() {
               </Button>
 
               <div>
-                <h1 className="text-h1 text-foreground flex items-center gap-2 break-all">
+                <h1 className="text-h1 text-foreground flex items-center gap-2 break-all page-header-title">
                   {/^[A-Z][0-9][A-Z0-9]{3}[0-9](-\d+)?$/i.test(peptide.id) ? (
                     <a
                       href={`https://www.uniprot.org/uniprotkb/${peptide.id}/entry`}

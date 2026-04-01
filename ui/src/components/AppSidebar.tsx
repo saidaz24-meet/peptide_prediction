@@ -18,7 +18,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useDatasetStore } from "@/stores/datasetStore";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+// Sheet removed — mobile uses custom overlay instead
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -252,6 +252,64 @@ function JobIndicator({ collapsed }: { collapsed: boolean }) {
   );
 }
 
+/** Animated hamburger → X icon using CSS transforms on dot-composed bars */
+function HamburgerIcon({ open }: { open: boolean }) {
+  const barClass = "block h-[2px] rounded-full bg-current transition-all duration-300 ease-in-out";
+  return (
+    <div className="w-5 h-4 flex flex-col justify-between text-foreground">
+      <span
+        className={cn(barClass, "w-5", open && "translate-y-[7px] rotate-45")}
+        style={{ background: "currentColor", backgroundImage: open ? "none" : "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: open ? "auto" : "4px 2px" }}
+      />
+      <span
+        className={cn(barClass, "w-4", open && "opacity-0 scale-x-0")}
+        style={{ background: "currentColor", backgroundImage: open ? "none" : "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: open ? "auto" : "4px 2px" }}
+      />
+      <span
+        className={cn(barClass, "w-5", open && "-translate-y-[7px] -rotate-45")}
+        style={{ background: "currentColor", backgroundImage: open ? "none" : "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: open ? "auto" : "4px 2px" }}
+      />
+    </div>
+  );
+}
+
+/** Shows current page title in mobile top bar */
+function MobilePageTitle() {
+  const location = useLocation();
+
+  // Special routes with dynamic titles
+  if (location.pathname.startsWith("/peptides/")) {
+    const id = location.pathname.split("/peptides/")[1];
+    return (
+      <div className="flex items-center gap-2 min-w-0">
+        <FlaskConical className="h-4 w-4 text-primary shrink-0" />
+        <span className="text-sm font-semibold text-foreground truncate">{id || "Peptide"}</span>
+      </div>
+    );
+  }
+  if (location.pathname.startsWith("/metrics/")) {
+    return (
+      <div className="flex items-center gap-2 min-w-0">
+        <BarChart3 className="h-4 w-4 text-primary shrink-0" />
+        <span className="text-sm font-semibold text-foreground truncate">Metric Detail</span>
+      </div>
+    );
+  }
+
+  const match = NAV_ITEMS.find((item) =>
+    item.path === "/" ? location.pathname === "/" : location.pathname.startsWith(item.path),
+  );
+  const title = match?.label ?? "PVL";
+  const Icon = match?.icon ?? FlaskConical;
+
+  return (
+    <div className="flex items-center gap-2 min-w-0">
+      <Icon className="h-4 w-4 text-primary shrink-0" />
+      <span className="text-sm font-semibold text-foreground truncate">{title}</span>
+    </div>
+  );
+}
+
 export function AppSidebar() {
   const isMobile = useIsMobile();
   const [collapsed, setCollapsed] = useState(() => {
@@ -275,40 +333,66 @@ export function AppSidebar() {
   };
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Mobile: use Sheet (slide-out drawer)
+  // Mobile: fixed top bar + full-screen overlay nav (no Sheet)
   if (isMobile) {
     return (
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="fixed top-3 left-3 z-40 md:hidden"
-            aria-label="Open navigation"
+      <>
+        {/* Fixed mobile top bar */}
+        <header className="fixed top-0 left-0 right-0 z-40 md:hidden h-12 bg-[hsl(var(--background))]/95 backdrop-blur-sm border-b border-[hsl(var(--border))] flex items-center px-3 gap-3">
+          {/* Hamburger / X toggle */}
+          <button
+            onClick={() => setMobileOpen((o) => !o)}
+            className="relative w-10 h-10 flex items-center justify-center rounded-lg hover:bg-[hsl(var(--surface-2))] transition-colors"
+            aria-label={mobileOpen ? "Close navigation" : "Open navigation"}
           >
-            <PanelLeft className="h-5 w-5" />
-          </Button>
-        </SheetTrigger>
-        <SheetContent side="left" className="w-64 p-0 pt-10 bg-[hsl(var(--background))]">
-          <div className="flex items-center gap-2.5 px-5 pb-4 border-b border-[hsl(var(--border))]">
-            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
-              <FlaskConical className="h-4 w-4 text-primary" />
-            </div>
-            <div>
-              <span className="font-semibold text-small text-foreground">PVL</span>
-              <span className="block text-[10px] text-[hsl(var(--faint))] leading-none mt-0.5">
-                Peptide Visual Lab
-              </span>
-            </div>
+            <HamburgerIcon open={mobileOpen} />
+          </button>
+
+          {/* Current page title */}
+          <MobilePageTitle />
+
+          {/* Right slot: theme toggle */}
+          <div className="ml-auto">
+            <ThemeToggleButton collapsed={true} />
           </div>
-          <div className="pt-4">
-            <NavContent collapsed={false} onNavigate={() => setMobileOpen(false)} />
+        </header>
+
+        {/* Note: main content padding (pt-12) is set in App.tsx */}
+
+        {/* Full-screen nav overlay */}
+        {mobileOpen && (
+          <div
+            className="fixed inset-0 z-30 md:hidden"
+            onClick={() => setMobileOpen(false)}
+          >
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/20 backdrop-blur-[2px]" />
+            {/* Nav panel — slides from left */}
+            <nav
+              className="absolute top-12 left-0 bottom-0 w-64 bg-[hsl(var(--background))] border-r border-[hsl(var(--border))] shadow-xl overflow-y-auto animate-slide-in-left"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-2.5 px-5 py-4 border-b border-[hsl(var(--border))]">
+                <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <FlaskConical className="h-4 w-4 text-primary" />
+                </div>
+                <div>
+                  <span className="font-semibold text-small text-foreground">PVL</span>
+                  <span className="block text-[10px] text-[hsl(var(--faint))] leading-none mt-0.5">
+                    Peptide Visual Lab
+                  </span>
+                </div>
+              </div>
+              <div className="pt-4">
+                <NavContent collapsed={false} onNavigate={() => setMobileOpen(false)} />
+              </div>
+              <div className="mt-auto border-t border-[hsl(var(--border))] p-2">
+                <ThemeToggleButton collapsed={false} />
+              </div>
+            </nav>
           </div>
-          <div className="mt-auto border-t border-[hsl(var(--border))] p-2">
-            <ThemeToggleButton collapsed={false} />
-          </div>
-        </SheetContent>
-      </Sheet>
+        )}
+      </>
     );
   }
 

@@ -4,10 +4,11 @@ import { useLocation } from "react-router-dom";
 export default function ScrollToTop() {
   const { pathname } = useLocation();
   useEffect(() => {
-    // try a page-specific anchor first
-    const topAnchor = document.querySelector('[data-scroll-top]') as HTMLElement | null;
-    if (topAnchor) topAnchor.scrollIntoView({ behavior: "instant", block: "start" });
-    else window.scrollTo({ top: 0, behavior: "instant" });
+    // Scroll window to top
+    window.scrollTo({ top: 0, behavior: "instant" });
+    // Also scroll any overflow container (for sidebar layouts)
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }, [pathname]);
   return null;
 }

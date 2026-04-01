@@ -258,8 +258,8 @@ export default function QuickAnalyze() {
         )}
 
         <div>
-          <h1 className="text-h1 text-foreground">Quick Analyze</h1>
-          <p className="text-body text-muted-foreground mt-1">
+          <h1 className="text-h1 text-foreground page-header-title">Quick Analyze</h1>
+          <p className="text-body text-muted-foreground mt-1 hidden md:block">
             Paste a single peptide sequence for instant prediction.
           </p>
         </div>
@@ -355,13 +355,28 @@ export default function QuickAnalyze() {
                 </Alert>
               )}
               {sequence && !/^[A-Za-z]*$/.test(sequence) && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>
-                    Non-amino-acid characters detected (digits, spaces, symbols). These will be
-                    rejected before analysis.
-                  </AlertDescription>
-                </Alert>
+                (() => {
+                  // Check if it looks like a chemical modification pattern (Ac-SEQ-NH2, pGlu-SEQ, etc.)
+                  const chemModPattern = /^(Ac-|Acetyl-|pGlu-|Pyr-|For-|Myr-|Palm-)?[A-Za-z]+(-(NH2|amide|OH|COOH|CONH2))?$/i;
+                  const isChemMod = chemModPattern.test(sequence.trim());
+                  return isChemMod ? (
+                    <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800 animate-attention">
+                      <AlertTriangle className="h-4 w-4 text-blue-600" />
+                      <AlertDescription className="text-blue-800 dark:text-blue-200">
+                        Chemical modifications detected — these will be stripped before prediction
+                        and noted in the results.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <Alert variant="destructive" className="animate-attention">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription>
+                        Sequence must contain only amino acid letters (A-Z). Remove numbers, spaces,
+                        or symbols.
+                      </AlertDescription>
+                    </Alert>
+                  );
+                })()
               )}
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
@@ -393,7 +408,7 @@ export default function QuickAnalyze() {
 
         {/* ==================== SEQUENCE NOTES ==================== */}
         {p?.sequenceNotes && (
-          <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>
+          <div className="animate-attention">
             <Alert className="border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700">
               <AlertTriangle className="h-4 w-4 text-amber-600" />
               <AlertDescription className="text-amber-800 dark:text-amber-200">
@@ -405,7 +420,7 @@ export default function QuickAnalyze() {
                 )}
               </AlertDescription>
             </Alert>
-          </motion.div>
+          </div>
         )}
 
         {/* ==================== RESULTS ==================== */}

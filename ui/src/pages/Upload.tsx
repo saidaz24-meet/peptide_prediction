@@ -333,8 +333,8 @@ export default function Upload() {
         >
           {/* Header & progress */}
           <div className="mb-10">
-            <h1 className="text-h1 text-foreground mb-2">Upload & Process Dataset</h1>
-            <p className="text-body text-muted-foreground mb-8">
+            <h1 className="text-h1 text-foreground mb-2 page-header-title">Upload & Process Dataset</h1>
+            <p className="text-body text-muted-foreground mb-8 hidden md:block">
               Upload your peptide CSV/TSV/XLSX — columns are auto-detected.
             </p>
 
