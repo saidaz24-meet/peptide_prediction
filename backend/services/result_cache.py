@@ -4,14 +4,13 @@ Disk-backed prediction cache using DuckDB.
 Key: SHA256(sequence + threshold_config_hash)
 Value: serialized prediction result (JSON)
 """
+
 import hashlib
 import json
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 import duckdb
-
-from services.logger import log_info
 
 CACHE_DIR = Path("/data/cache") if Path("/data/cache").exists() else Path(".run_cache")
 DB_PATH = CACHE_DIR / "predictions.duckdb"

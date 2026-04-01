@@ -194,7 +194,6 @@ async def list_jobs():
 
     try:
         import redis as redis_lib
-
         from celery.result import AsyncResult
 
         from celery_app import celery_app

@@ -6,7 +6,6 @@ import asyncio
 import concurrent.futures
 import logging
 import os
-import signal
 import uuid
 
 import sentry_sdk
