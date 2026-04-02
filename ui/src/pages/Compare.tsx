@@ -24,6 +24,7 @@ import { uploadCSV } from "@/lib/api";
 import { mapApiRowToPeptide } from "@/lib/peptideMapper";
 import type { Peptide, DatasetStats } from "@/types/peptide";
 import { BgDotGrid } from "@/components/BgDotGrid";
+import AppFooter from "@/components/AppFooter";
 
 // Colors for the two cohorts
 const COHORT_A_COLOR = "hsl(210, 80%, 55%)"; // blue
@@ -333,6 +334,7 @@ export default function Compare() {
           </button>
           , then return here.
         </div>
+        <AppFooter />
       </div>
     );
   }
@@ -672,6 +674,7 @@ export default function Compare() {
           </div>
         </>
       )}
+      <AppFooter />
     </div>
   );
 }

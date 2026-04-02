@@ -32,6 +32,7 @@ import { PeptideViewer } from "@/components/PeptideViewer";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { BgDotGrid } from "@/components/BgDotGrid";
 import { setNavGuard } from "@/hooks/use-nav-guard";
+import AppFooter from "@/components/AppFooter";
 
 async function predictSequence(
   sequence: string,
@@ -354,10 +355,12 @@ export default function QuickAnalyze() {
                   </AlertDescription>
                 </Alert>
               )}
-              {sequence && !/^[A-Za-z]*$/.test(sequence) && (
+              {sequence &&
+                !/^[A-Za-z]*$/.test(sequence) &&
                 (() => {
                   // Check if it looks like a chemical modification pattern (Ac-SEQ-NH2, pGlu-SEQ, etc.)
-                  const chemModPattern = /^(Ac-|Acetyl-|pGlu-|Pyr-|For-|Myr-|Palm-)?[A-Za-z]+(-(NH2|amide|OH|COOH|CONH2))?$/i;
+                  const chemModPattern =
+                    /^(Ac-|Acetyl-|pGlu-|Pyr-|For-|Myr-|Palm-)?[A-Za-z]+(-(NH2|amide|OH|COOH|CONH2))?$/i;
                   const isChemMod = chemModPattern.test(sequence.trim());
                   return isChemMod ? (
                     <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-900/20 dark:border-blue-800 animate-attention">
@@ -376,8 +379,7 @@ export default function QuickAnalyze() {
                       </AlertDescription>
                     </Alert>
                   );
-                })()
-              )}
+                })()}
 
               <div className="flex flex-col sm:flex-row gap-3 pt-2">
                 <Button type="submit" disabled={loading} className="px-6 btn-press">
@@ -429,6 +431,7 @@ export default function QuickAnalyze() {
             <PeptideViewer peptide={p} />
           </motion.div>
         )}
+        <AppFooter />
       </motion.div>
     </>
   );

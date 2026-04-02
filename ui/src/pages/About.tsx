@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { motion, cubicBezier } from "framer-motion";
 import * as Sentry from "@sentry/react";
 import { BgNotebook } from "@/components/BgNotebook";
+import AppFooter from "@/components/AppFooter";
 
 /** ---------- ScreenTransition (local, no extra files) ---------- */
 type Phase = "idle" | "enter" | "exit";
@@ -239,6 +240,7 @@ export default function About() {
             </Card>
           )}
         </div>
+        <AppFooter />
       </motion.div>
     </>
   );

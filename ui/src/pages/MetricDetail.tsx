@@ -24,6 +24,7 @@ import {
 } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
 import { BgDotGrid } from "@/components/BgDotGrid";
+import AppFooter from "@/components/AppFooter";
 
 const COLORS = {
   // Use existing CSS variables that are actually defined
@@ -249,6 +250,7 @@ export default function MetricDetail() {
             </CardContent>
           </Card>
         </motion.div>
+        <AppFooter />
       </div>
     </div>
   );

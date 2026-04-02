@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { HelpCircle, BarChart3, Zap, Waves, Target, Layers, BookOpen, Info } from "lucide-react";
 import { BgNotebook } from "@/components/BgNotebook";
+import AppFooter from "@/components/AppFooter";
 
 const metrics = [
   {
@@ -350,6 +351,7 @@ export default function Help() {
             </CardContent>
           </Card>
         </motion.div>
+        <AppFooter />
       </div>
     </div>
   );
