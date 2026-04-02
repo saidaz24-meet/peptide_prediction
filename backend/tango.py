@@ -189,13 +189,11 @@ def build_records_from_dataframe(df: pd.DataFrame) -> List[Tuple[str, str]]:
     Returns:
         List of (entry_id, sanitized_sequence) tuples
     """
+    entries = (df[KEY].astype(str).str.strip() if KEY in df.columns else pd.Series("", index=df.index))
+    seqs_raw = df["Sequence"] if "Sequence" in df.columns else pd.Series(None, index=df.index)
     records: List[Tuple[str, str]] = []
-    for _, row in df.iterrows():
-        entry_id = str(row.get(KEY) or "").strip()
-        if not entry_id:
-            continue
-        seq_raw = row.get("Sequence")
-        if pd.isna(seq_raw):
+    for entry_id, seq_raw in zip(entries, seqs_raw):
+        if not entry_id or pd.isna(seq_raw):
             continue
         seq = _sanitize_seq(auxiliary.get_corrected_sequence(str(seq_raw)))
         if len(seq) < 5:
@@ -762,8 +760,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
 
         # Collect all Entry IDs from database
         entry_set = set()
-        for _, row in database.iterrows():
-            entry = str(row.get(KEY) or "").strip()
+        for entry in (database[KEY].astype(str).str.strip() if KEY in database.columns else pd.Series("", index=database.index)):
             if entry:
                 entry_set.add(entry)
                 # Initialize defaults for this entry (use None for missing data, not -1)
@@ -986,8 +983,7 @@ def process_tango_output(database: pd.DataFrame, run_dir: Optional[str] = None) 
 
         # Build dict keyed by Entry for Entry-aligned assignment
         results_by_entry: Dict[str, Dict[str, Any]] = {}
-        for _, row in database.iterrows():
-            entry = str(row.get(KEY) or "").strip()
+        for entry in (database[KEY].astype(str).str.strip() if KEY in database.columns else pd.Series("", index=database.index)):
             if entry:
                 results_by_entry[entry] = {
                     "SSW fragments": "-",

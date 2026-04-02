@@ -507,13 +507,16 @@ def run_s4pred_processing(
             s4pred_provider_reason = reason
             return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
 
-        # Build sequence list from DataFrame
-        sequences = []
-        for _, row in df.iterrows():
-            entry_id = str(row.get("Entry", ""))
-            sequence = str(row.get("Sequence", ""))
-            if entry_id and sequence:
-                sequences.append((entry_id, sequence))
+        # Build sequence list from DataFrame columns directly (avoids iterrows)
+        entries = (
+            df["Entry"].astype(str) if "Entry" in df.columns else pd.Series("", index=df.index)
+        )
+        seqs = (
+            df["Sequence"].astype(str)
+            if "Sequence" in df.columns
+            else pd.Series("", index=df.index)
+        )
+        sequences = [(e, s) for e, s in zip(entries, seqs) if e and s]
 
         if not sequences:
             log_warning("s4pred_no_sequences", "No valid sequences for S4PRED")
@@ -687,10 +690,18 @@ def compute_reproducibility_primitives(
     trace_id = get_trace_id_for_response()
 
     # 3. Compute inputs_hash from cleaned sequences + IDs
+    _entries = (
+        df["Entry"].astype(str).str.strip()
+        if "Entry" in df.columns
+        else pd.Series("", index=df.index)
+    )
+    _seqs_raw = (
+        df["Sequence"].astype(str).str.strip()
+        if "Sequence" in df.columns
+        else pd.Series("", index=df.index)
+    )
     inputs_data = []
-    for _, row in df.iterrows():
-        entry_id = str(row.get("Entry", "")).strip()
-        seq_raw = str(row.get("Sequence", "")).strip()
+    for entry_id, seq_raw in zip(_entries, _seqs_raw):
         seq_cleaned = auxiliary.get_corrected_sequence(seq_raw) if seq_raw else ""
         if entry_id and seq_cleaned:
             inputs_data.append(f"{entry_id}:{seq_cleaned}")
@@ -770,14 +781,20 @@ def process_upload_dataframe(
         UploadProcessingError: For processing errors that should be returned as HTTP errors
     """
     # ISSUE-024: Track non-standard AA substitutions for user transparency
-    for idx, row in df.iterrows():
-        raw_seq = str(row.get("Sequence", ""))
-        if raw_seq:
-            corrected, _subs, notes = auxiliary.get_corrected_sequence_with_notes(raw_seq)
-            if notes:
-                df.at[idx, "sequenceNotes"] = notes
-            if raw_seq.upper() != corrected:
-                df.at[idx, "originalSequence"] = raw_seq
+    _notes_list = []
+    _orig_list = []
+    for seq_raw in df["Sequence"].astype(str):
+        if seq_raw:
+            corrected, _subs, notes = auxiliary.get_corrected_sequence_with_notes(seq_raw)
+            _notes_list.append(notes if notes else None)
+            _orig_list.append(seq_raw if seq_raw.upper() != corrected else None)
+        else:
+            _notes_list.append(None)
+            _orig_list.append(None)
+    if any(n is not None for n in _notes_list):
+        df["sequenceNotes"] = _notes_list
+    if any(o is not None for o in _orig_list):
+        df["originalSequence"] = _orig_list
 
     # Performance timing: FF-Helix computation
     ff_helix_start_time = time.time()

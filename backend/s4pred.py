@@ -535,13 +535,10 @@ def run_s4pred_database(
     Returns:
         (success, stats) tuple
     """
-    # Extract sequences
-    sequences = []
-    for _, row in database.iterrows():
-        entry_id = str(row.get('Entry', ''))
-        sequence = str(row.get('Sequence', ''))
-        if entry_id and sequence:
-            sequences.append((entry_id, sequence))
+    # Extract sequences from columns directly (avoids iterrows)
+    _entries = database["Entry"].astype(str) if "Entry" in database.columns else pd.Series("", index=database.index)
+    _seqs = database["Sequence"].astype(str) if "Sequence" in database.columns else pd.Series("", index=database.index)
+    sequences = [(e, s) for e, s in zip(_entries, _seqs) if e and s]
 
     if not sequences:
         logger.warning(f"[{trace_id}] No valid sequences for S4PRED")
@@ -582,23 +579,19 @@ def run_s4pred_database(
     # Map results back to DataFrame
     entry_to_result = {r['entry_id']: r for r in results if 'entry_id' in r}
 
-    for idx, row in database.iterrows():
-        entry_id = str(row.get('Entry', ''))
+    # Map results back to DataFrame using entry_id lookup (avoids iterrows)
+    entry_ids = database["Entry"].astype(str) if "Entry" in database.columns else pd.Series("", index=database.index)
+    all_map_cols = analysis_columns + [S4PRED_P_H_CURVE, S4PRED_P_E_CURVE, S4PRED_P_C_CURVE, S4PRED_SS_PREDICTION]
+    curve_keys = {'P_H': S4PRED_P_H_CURVE, 'P_E': S4PRED_P_E_CURVE, 'P_C': S4PRED_P_C_CURVE, 'ss_prediction': S4PRED_SS_PREDICTION}
+    for idx, entry_id in zip(database.index, entry_ids):
         if entry_id in entry_to_result:
             result = entry_to_result[entry_id]
-            # Map analysis columns
             for col in analysis_columns:
                 if col in result:
                     database.at[idx, col] = result[col]
-            # Map per-residue curves
-            if 'P_H' in result:
-                database.at[idx, S4PRED_P_H_CURVE] = result['P_H']
-            if 'P_E' in result:
-                database.at[idx, S4PRED_P_E_CURVE] = result['P_E']
-            if 'P_C' in result:
-                database.at[idx, S4PRED_P_C_CURVE] = result['P_C']
-            if 'ss_prediction' in result:
-                database.at[idx, S4PRED_SS_PREDICTION] = result['ss_prediction']
+            for key, col_name in curve_keys.items():
+                if key in result:
+                    database.at[idx, col_name] = result[key]
 
     return True, stats
 
@@ -637,15 +630,11 @@ def filter_by_s4pred_diff(
         List of predictions (1=positive, -1=negative, None=unavailable)
     """
     # Step 1: Compute average SSW diff across sequences WITH SSW fragments
-    valid_diffs = []
-    for _, row in database.iterrows():
-        ssw_diff = row.get(SSW_DIFF_S4PRED)
-        if (
-            ssw_diff is not None
-            and not (isinstance(ssw_diff, float) and pd.isna(ssw_diff))
-            and ssw_diff >= 0  # -1.0 is the no-data sentinel
-        ):
-            valid_diffs.append(ssw_diff)
+    if SSW_DIFF_S4PRED in database.columns:
+        _diffs = pd.to_numeric(database[SSW_DIFF_S4PRED], errors="coerce")
+        valid_diffs = _diffs[_diffs.notna() & (_diffs >= 0)].tolist()
+    else:
+        valid_diffs = []
 
     # Compute threshold: mean of valid diffs, or 0.0 if no valid diffs.
     # Single peptide: mean([x]) = x, so x < x is always False → SSW always -1.
@@ -656,12 +645,12 @@ def filter_by_s4pred_diff(
         avg_diff = sum(valid_diffs) / len(valid_diffs)
 
     # Step 2: Classify each sequence
+    # Step 2: Classify each sequence using column access (avoids iterrows)
     predictions: List[Optional[int]] = []
+    _diff_col = database[SSW_DIFF_S4PRED] if SSW_DIFF_S4PRED in database.columns else pd.Series(None, index=database.index)
+    _helix_col = database[HELIX_PREDICTION_S4PRED] if HELIX_PREDICTION_S4PRED in database.columns else pd.Series(None, index=database.index)
 
-    for _, row in database.iterrows():
-        ssw_diff = row.get(SSW_DIFF_S4PRED)
-        helix_pred = row.get(HELIX_PREDICTION_S4PRED)
-
+    for ssw_diff, helix_pred in zip(_diff_col, _helix_col):
         # Check if S4PRED ran for this row
         s4pred_ran = (
             helix_pred is not None
@@ -681,13 +670,10 @@ def filter_by_s4pred_diff(
         )
 
         if not has_valid_diff:
-            # No SSW fragments → negative prediction
             predictions.append(-1)
         elif ssw_diff < avg_diff:
-            # SSW diff below average → positive (helix/beta switching)
             predictions.append(1)
         else:
-            # SSW diff at or above average → negative (one dominates)
             predictions.append(-1)
 
     return predictions
