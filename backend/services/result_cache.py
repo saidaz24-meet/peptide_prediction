@@ -15,11 +15,43 @@ import duckdb
 CACHE_DIR = Path("/data/cache") if Path("/data/cache").exists() else Path(".run_cache")
 DB_PATH = CACHE_DIR / "predictions.duckdb"
 
+# Singleton connection — DuckDB is thread-safe for reads, and we serialize writes.
+# Avoids creating a new connection (+ table check) per call.
+_conn: Optional[duckdb.DuckDBPyConnection] = None
+_conn_path: Optional[str] = None
+
+
+def _reset_conn() -> None:
+    """Reset singleton connection (used by tests when CACHE_DIR/DB_PATH change)."""
+    global _conn, _conn_path
+    if _conn is not None:
+        try:
+            _conn.close()
+        except Exception:
+            pass
+    _conn = None
+    _conn_path = None
+
 
 def _get_conn() -> duckdb.DuckDBPyConnection:
+    global _conn, _conn_path
+    current_path = str(DB_PATH)
+    if _conn is not None and _conn_path == current_path:
+        try:
+            _conn.execute("SELECT 1")
+            return _conn
+        except Exception:
+            _conn = None
+    # Path changed or connection dead — create new connection
+    if _conn is not None:
+        try:
+            _conn.close()
+        except Exception:
+            pass
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    conn = duckdb.connect(str(DB_PATH))
-    conn.execute("""
+    _conn = duckdb.connect(str(DB_PATH))
+    _conn_path = str(DB_PATH)
+    _conn.execute("""
         CREATE TABLE IF NOT EXISTS prediction_cache (
             cache_key VARCHAR PRIMARY KEY,
             sequence VARCHAR NOT NULL,
@@ -28,7 +60,7 @@ def _get_conn() -> duckdb.DuckDBPyConnection:
             threshold_hash VARCHAR
         )
     """)
-    return conn
+    return _conn
 
 
 def cache_key(sequence: str, threshold_config: Optional[Dict[str, Any]] = None) -> str:
@@ -42,15 +74,12 @@ def cache_key(sequence: str, threshold_config: Optional[Dict[str, Any]] = None) 
 def get_cached(key: str) -> Optional[Dict[str, Any]]:
     """Look up a cached prediction result. Returns None on miss."""
     conn = _get_conn()
-    try:
-        result = conn.execute(
-            "SELECT result_json FROM prediction_cache WHERE cache_key = ?", [key]
-        ).fetchone()
-        if result:
-            return json.loads(result[0])
-        return None
-    finally:
-        conn.close()
+    result = conn.execute(
+        "SELECT result_json FROM prediction_cache WHERE cache_key = ?", [key]
+    ).fetchone()
+    if result:
+        return json.loads(result[0])
+    return None
 
 
 def set_cached(
@@ -61,22 +90,16 @@ def set_cached(
 ) -> None:
     """Store a prediction result in the cache."""
     conn = _get_conn()
-    try:
-        conn.execute(
-            """INSERT OR REPLACE INTO prediction_cache
-               (cache_key, sequence, result_json, threshold_hash)
-               VALUES (?, ?, ?, ?)""",
-            [key, sequence, json.dumps(result), threshold_hash],
-        )
-    finally:
-        conn.close()
+    conn.execute(
+        """INSERT OR REPLACE INTO prediction_cache
+           (cache_key, sequence, result_json, threshold_hash)
+           VALUES (?, ?, ?, ?)""",
+        [key, sequence, json.dumps(result), threshold_hash],
+    )
 
 
 def cache_stats() -> Dict[str, Any]:
     """Return basic cache statistics."""
     conn = _get_conn()
-    try:
-        row = conn.execute("SELECT COUNT(*) FROM prediction_cache").fetchone()
-        return {"total_entries": row[0] if row else 0}
-    finally:
-        conn.close()
+    row = conn.execute("SELECT COUNT(*) FROM prediction_cache").fetchone()
+    return {"total_entries": row[0] if row else 0}
