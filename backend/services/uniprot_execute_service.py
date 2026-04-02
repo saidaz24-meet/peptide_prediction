@@ -16,6 +16,7 @@ import asyncio
 import hashlib
 import json
 import re
+import threading
 import uuid
 from typing import Any, Dict, Optional, Tuple
 
@@ -334,14 +335,31 @@ async def _fetch_uniprot_paginated(
 # ---------------------------------------------------------------------------
 
 
+class CancelledError(Exception):
+    """Raised when analysis is cancelled due to client disconnect."""
+
+    pass
+
+
+def _check_cancelled(cancel_event: Optional[threading.Event], stage: str) -> None:
+    """Check if the analysis has been cancelled. Raises CancelledError if so."""
+    if cancel_event and cancel_event.is_set():
+        log_info("analysis_cancelled", f"Analysis cancelled before {stage}")
+        raise CancelledError(f"Cancelled before {stage}")
+
+
 def _run_analysis_pipeline(
     df: pd.DataFrame,
     run_tango: bool,
     run_s4pred: bool,
     sentry_initialized: bool,
+    cancel_event: Optional[threading.Event] = None,
 ) -> Dict[str, Any]:
     """
     Run the full analysis pipeline on a DataFrame of UniProt sequences.
+
+    Args:
+        cancel_event: If set, pipeline checks this between stages and aborts early.
 
     Returns dict with keys:
         rows_out, tango_stats, tango_status, tango_reason, tango_ran, run_dir,
@@ -358,9 +376,13 @@ def _run_analysis_pipeline(
     if "Length" not in df_normalized.columns:
         df_normalized["Length"] = df_normalized["Sequence"].astype(str).str.len()
 
+    _check_cancelled(cancel_event, "ff_helix")
+
     # FF-Helix
     ensure_ff_cols(df_normalized)
     ensure_computed_cols(df_normalized)
+
+    _check_cancelled(cancel_event, "tango")
 
     # TANGO (reuse upload_service's function, with opt-in gate)
     tango_stats, tango_status, tango_reason, tango_ran, run_dir = run_tango_processing(
@@ -370,6 +392,8 @@ def _run_analysis_pipeline(
         tango_requested=run_tango,
     )
 
+    _check_cancelled(cancel_event, "s4pred")
+
     # S4PRED (reuse upload_service's function, with opt-in gate)
     s4pred_stats, s4pred_status, s4pred_reason, s4pred_ran = run_s4pred_processing(
         df_normalized,
@@ -377,6 +401,8 @@ def _run_analysis_pipeline(
         sentry_initialized=sentry_initialized,
         s4pred_requested=run_s4pred,
     )
+
+    _check_cancelled(cancel_event, "biochem")
 
     # Biochem + finalize (UniProt queries use default thresholds)
     calc_biochem(df_normalized)
@@ -718,11 +744,14 @@ def _extract_error_text(response_text: str, status_code: int) -> str:
 async def execute_uniprot_query(
     request: UniProtQueryExecuteRequest,
     sentry_initialized: bool,
+    cancel_event: Optional[threading.Event] = None,
 ) -> Dict[str, Any]:
     """
     Execute a UniProt query: fetch → analyze → build response.
 
-    This is the main entry point called by the route handler.
+    Args:
+        cancel_event: If set by the route handler on client disconnect,
+            the analysis pipeline will abort between stages.
 
     Raises:
         HTTPException on errors (400, 500, 502, 504).
@@ -785,16 +814,28 @@ async def execute_uniprot_query(
                 },
             }
 
-        # 5. Run analysis pipeline
+        # 5. Run analysis pipeline with cancellation support
         log_info("uniprot_analysis_start", "Running analysis pipeline")
 
-        result = await asyncio.to_thread(
-            _run_analysis_pipeline,
-            df,
-            run_tango=request.run_tango,
-            run_s4pred=request.run_s4pred,
-            sentry_initialized=sentry_initialized,
+        _cancel = cancel_event or threading.Event()
+
+        # Run analysis in thread with cancellation support
+        analysis_task = asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: _run_analysis_pipeline(
+                df,
+                run_tango=request.run_tango,
+                run_s4pred=request.run_s4pred,
+                sentry_initialized=sentry_initialized,
+                cancel_event=_cancel,
+            ),
         )
+
+        try:
+            result = await analysis_task
+        except CancelledError:
+            log_info("uniprot_analysis_cancelled", "Analysis cancelled by client disconnect")
+            raise HTTPException(499, detail="Client disconnected, analysis cancelled")
 
         log_info(
             "uniprot_analysis_complete",

@@ -1,6 +1,9 @@
 """
 UniProt query endpoints.
 """
+
+import asyncio
+import threading
 from typing import Dict
 
 from fastapi import APIRouter
@@ -11,6 +14,7 @@ from schemas.uniprot_query import (
     UniProtQueryParseRequest,
     UniProtQueryParseResponse,
 )
+from services.logger import log_info
 from services.uniprot_service import (
     parse_query as parse_uniprot_query_service,
 )
@@ -47,8 +51,24 @@ async def window_sequences_endpoint(request: Dict):
 
 @router.post("/api/uniprot/execute", response_model=RowsResponse)
 async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
-    """Execute a UniProt query and return results with full analysis pipeline."""
-    # Lazy import to avoid circular import (SENTRY_INITIALIZED set during app init)
+    """Execute a UniProt query and return results with full analysis pipeline.
+
+    Supports cancellation: if the client disconnects (timeout, abort, navigate away),
+    the analysis pipeline is cancelled between stages to free resources.
+    """
     from api.main import SENTRY_INITIALIZED
     from services.uniprot_execute_service import execute_uniprot_query as execute
-    return await execute(request, SENTRY_INITIALIZED)
+
+    cancel_event = threading.Event()
+
+    async def _run():
+        return await execute(request, SENTRY_INITIALIZED, cancel_event=cancel_event)
+
+    task = asyncio.ensure_future(_run())
+    try:
+        return await task
+    except asyncio.CancelledError:
+        # Client disconnected — signal the analysis thread to stop
+        cancel_event.set()
+        log_info("uniprot_client_disconnect", "Client disconnected, cancelling analysis")
+        raise

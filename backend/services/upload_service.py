@@ -61,6 +61,19 @@ class UploadProcessingError(Exception):
         self.status_code = status_code
 
 
+class AnalysisCancelledError(Exception):
+    """Raised when analysis is cancelled due to client disconnect."""
+
+    pass
+
+
+def _check_cancel(cancel_event: Optional[Any], stage: str) -> None:
+    """Check if analysis should be cancelled. Raises AnalysisCancelledError if so."""
+    if cancel_event and cancel_event.is_set():
+        log_info("upload_cancelled", f"Upload analysis cancelled before {stage}")
+        raise AnalysisCancelledError(f"Cancelled before {stage}")
+
+
 def _set_ssw_fields_to_none(df: pd.DataFrame) -> None:
     """Set all SSW fields to None for all rows."""
     n = len(df)
@@ -774,6 +787,7 @@ def process_upload_dataframe(
     trace_entry: Optional[str] = None,
     sentry_initialized: bool = False,
     progress_callback: Optional[Callable[[str, int], None]] = None,
+    cancel_event: Optional[Any] = None,
 ) -> Dict[str, Any]:
     """
     Process an uploaded DataFrame through the full pipeline.
@@ -811,6 +825,8 @@ def process_upload_dataframe(
     if any(o is not None for o in _orig_list):
         df["originalSequence"] = _orig_list
 
+    _check_cancel(cancel_event, "ff_helix")
+
     # Performance timing: FF-Helix computation
     ff_helix_start_time = time.time()
     log_info("ff_helix_compute_start", "Computing FF-Helix % for all sequences")
@@ -825,6 +841,8 @@ def process_upload_dataframe(
     if progress_callback:
         progress_callback("ff_helix", 15)
 
+    _check_cancel(cancel_event, "tango")
+
     # --- TANGO processing ---
     tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = (
         run_tango_processing(df, trace_entry, sentry_initialized)
@@ -833,6 +851,8 @@ def process_upload_dataframe(
     tango_requested_flag = True
     if progress_callback:
         progress_callback("tango", 60)
+
+    _check_cancel(cancel_event, "s4pred")
 
     # --- S4PRED processing ---
     s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = (

@@ -4,6 +4,7 @@ File upload endpoint.
 
 import asyncio
 import json
+import threading
 import time
 from typing import Optional
 
@@ -131,15 +132,24 @@ async def upload_csv(
     # Process the DataFrame through the full pipeline
     from api.main import SENTRY_INITIALIZED
 
+    cancel_event = threading.Event()
     try:
-        return await asyncio.to_thread(
-            process_upload_dataframe,
-            df=df,
-            threshold_config_requested=threshold_config_requested,
-            threshold_config_resolved=threshold_config_resolved,
-            trace_entry=trace_entry,
-            sentry_initialized=SENTRY_INITIALIZED,
+        task = asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: process_upload_dataframe(
+                df=df,
+                threshold_config_requested=threshold_config_requested,
+                threshold_config_resolved=threshold_config_resolved,
+                trace_entry=trace_entry,
+                sentry_initialized=SENTRY_INITIALIZED,
+                cancel_event=cancel_event,
+            ),
         )
+        return await task
+    except asyncio.CancelledError:
+        cancel_event.set()
+        log_info("upload_client_disconnect", "Client disconnected, cancelling upload analysis")
+        raise
     except UploadProcessingError as e:
         raise HTTPException(
             status_code=e.status_code, detail=json.dumps(e.detail) if e.detail else e.message
