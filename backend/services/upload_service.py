@@ -474,10 +474,19 @@ def run_tango_processing(
 
 
 def run_s4pred_processing(
-    df: pd.DataFrame, trace_entry: Optional[str], sentry_initialized: bool
+    df: pd.DataFrame,
+    trace_entry: Optional[str],
+    sentry_initialized: bool,
+    s4pred_requested: bool = True,
 ) -> Tuple[Dict[str, Any], str, Optional[str], bool]:
     """
     Run S4PRED processing pipeline.
+
+    Args:
+        df: DataFrame with Entry and Sequence columns
+        trace_entry: Optional entry ID for tracing
+        sentry_initialized: Whether Sentry is available
+        s4pred_requested: Whether S4PRED was requested (False = skip even if USE_S4PRED=1)
 
     Returns:
         Tuple of (s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran)
@@ -489,6 +498,12 @@ def run_s4pred_processing(
     s4pred_ran = False
 
     try:
+        if not s4pred_requested:
+            log_info("s4pred_skipped", "S4PRED skipped — not requested by user")
+            s4pred_provider_status = "OFF"
+            s4pred_provider_reason = "Not requested"
+            return s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran
+
         if not s4pred_enabled_flag:
             log_info(
                 "s4pred_disabled",

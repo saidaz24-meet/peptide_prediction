@@ -60,6 +60,10 @@ class UniProtQueryExecuteRequest(BaseModel):
         False,
         description="If True, run TANGO analysis (default False for UniProt queries to ensure fast response)",
     )
+    run_s4pred: Optional[bool] = Field(
+        False,
+        description="If True, run S4PRED analysis (default False for UniProt queries to ensure fast response)",
+    )
     max_provider_sequences: Optional[int] = Field(
         50,
         description="Maximum number of sequences to process with providers (TANGO/S4PRED) when enabled. Prevents blocking on large queries.",

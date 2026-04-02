@@ -141,7 +141,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
       if (abortRef.current) abortRef.current.abort();
       const abortController = new AbortController();
       abortRef.current = abortController;
-      const timeoutId = setTimeout(() => abortController.abort(), 120000);
+      // Scale timeout with size: 2 min base + 30s per 500 entries (S4PRED ~1s/seq)
+      const timeoutMs = 120000 + Math.floor(controls.size / 500) * 30000;
+      const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
       try {
         let sortValue: string | null = null;

@@ -72,13 +72,16 @@ def cache_key(sequence: str, threshold_config: Optional[Dict[str, Any]] = None) 
 
 
 def get_cached(key: str) -> Optional[Dict[str, Any]]:
-    """Look up a cached prediction result. Returns None on miss."""
-    conn = _get_conn()
-    result = conn.execute(
-        "SELECT result_json FROM prediction_cache WHERE cache_key = ?", [key]
-    ).fetchone()
-    if result:
-        return json.loads(result[0])
+    """Look up a cached prediction result. Returns None on miss or error."""
+    try:
+        conn = _get_conn()
+        result = conn.execute(
+            "SELECT result_json FROM prediction_cache WHERE cache_key = ?", [key]
+        ).fetchone()
+        if result:
+            return json.loads(result[0])
+    except Exception:
+        pass
     return None
 
 
@@ -88,18 +91,24 @@ def set_cached(
     result: Dict[str, Any],
     threshold_hash: str = "",
 ) -> None:
-    """Store a prediction result in the cache."""
-    conn = _get_conn()
-    conn.execute(
-        """INSERT OR REPLACE INTO prediction_cache
-           (cache_key, sequence, result_json, threshold_hash)
-           VALUES (?, ?, ?, ?)""",
-        [key, sequence, json.dumps(result), threshold_hash],
-    )
+    """Store a prediction result in the cache. Silently fails on lock errors."""
+    try:
+        conn = _get_conn()
+        conn.execute(
+            """INSERT OR REPLACE INTO prediction_cache
+               (cache_key, sequence, result_json, threshold_hash)
+               VALUES (?, ?, ?, ?)""",
+            [key, sequence, json.dumps(result), threshold_hash],
+        )
+    except Exception:
+        pass
 
 
 def cache_stats() -> Dict[str, Any]:
     """Return basic cache statistics."""
-    conn = _get_conn()
-    row = conn.execute("SELECT COUNT(*) FROM prediction_cache").fetchone()
-    return {"total_entries": row[0] if row else 0}
+    try:
+        conn = _get_conn()
+        row = conn.execute("SELECT COUNT(*) FROM prediction_cache").fetchone()
+        return {"total_entries": row[0] if row else 0}
+    except Exception:
+        return {"total_entries": 0, "error": "cache unavailable"}

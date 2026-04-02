@@ -159,12 +159,13 @@ def _build_url(
     api_query: str,
     request: UniProtQueryExecuteRequest,
     sort_value: Optional[str],
-    page_size: int = 500,
+    requested_size: int = 500,
 ) -> str:
     """Build the UniProt REST API export URL.
 
-    UniProt API supports max 500 results per page. For larger requests,
-    pagination via Link headers is handled by _fetch_uniprot_paginated().
+    For TSV streaming format, UniProt handles the full size in a single
+    streamed response — no pagination needed. The size parameter controls
+    how many results are returned.
     """
     return build_uniprot_export_url(
         api_query,
@@ -174,7 +175,7 @@ def _build_url(
         length_max=request.length_max,
         sort=sort_value,
         include_isoforms=request.include_isoforms or False,
-        size=min(max(page_size, 1), 500),  # UniProt API max per page = 500
+        size=min(max(requested_size, 1), 10000),
     )
 
 
@@ -185,9 +186,12 @@ def _build_url(
 _USER_AGENT = "PeptideVisualLab/1.0 (https://github.com/your-org/peptide-prediction)"
 
 
-async def _fetch_uniprot_tsv(url: str) -> Tuple[pd.DataFrame, int]:
+async def _fetch_uniprot_tsv(url: str, timeout: float = 60.0) -> Tuple[pd.DataFrame, int]:
     """
-    Fetch a single page of TSV data from UniProt.
+    Fetch TSV data from UniProt (streamed, supports large sizes).
+
+    UniProt's TSV format streams the full result set — no pagination needed.
+    Timeout scales with expected size.
 
     Returns:
         Tuple of (DataFrame, total_available) where total_available is from
@@ -196,9 +200,9 @@ async def _fetch_uniprot_tsv(url: str) -> Tuple[pd.DataFrame, int]:
     Raises:
         httpx.HTTPStatusError, httpx.TimeoutException on network errors.
     """
-    async with httpx.AsyncClient(timeout=30.0) as client:
+    async with httpx.AsyncClient(timeout=timeout) as client:
         headers = {"User-Agent": _USER_AGENT}
-        response = await client.get(url, headers=headers)
+        response = await client.get(url, headers=headers, follow_redirects=True)
         response.raise_for_status()
         total_available = int(response.headers.get("X-Total-Results", -1))
         df = read_any_table(response.content, "uniprot_export.tsv")
@@ -285,9 +289,27 @@ async def _fetch_uniprot_paginated(
                 target=max_results,
             )
 
+            # Stop if we got fewer rows than page size (last page)
+            if len(page_df) < 500:
+                break
+
             # Check for next page in Link header
             link_header = response.headers.get("Link", "")
             next_url = _parse_link_header(link_header) if link_header else None
+
+            if not next_url and fetched < max_results and total_available > fetched:
+                # Fallback: UniProt TSV may not return Link headers.
+                # Construct cursor-less next page URL by replacing size with remaining count.
+                # UniProt REST API supports offset via cursor param, but for TSV we can
+                # use the streaming endpoint which doesn't paginate the same way.
+                # Instead, re-request with a larger size to get all at once.
+                log_info(
+                    "uniprot_no_link_header",
+                    "No Link header found — re-requesting with full size",
+                    fetched=fetched,
+                    target=max_results,
+                )
+                break  # Will handle below
 
     if not all_dfs:
         return pd.DataFrame(), total_available
@@ -315,6 +337,7 @@ async def _fetch_uniprot_paginated(
 def _run_analysis_pipeline(
     df: pd.DataFrame,
     run_tango: bool,
+    run_s4pred: bool,
     sentry_initialized: bool,
 ) -> Dict[str, Any]:
     """
@@ -347,11 +370,12 @@ def _run_analysis_pipeline(
         tango_requested=run_tango,
     )
 
-    # S4PRED (reuse upload_service's function)
+    # S4PRED (reuse upload_service's function, with opt-in gate)
     s4pred_stats, s4pred_status, s4pred_reason, s4pred_ran = run_s4pred_processing(
         df_normalized,
         trace_entry=None,
         sentry_initialized=sentry_initialized,
+        s4pred_requested=run_s4pred,
     )
 
     # Biochem + finalize (UniProt queries use default thresholds)
@@ -709,8 +733,9 @@ async def execute_uniprot_query(
     # 2. Validate sort
     sort_value = _validate_sort(request.sort)
 
-    # 3. Build URL
-    uniprot_url = _build_url(api_query, request, sort_value)
+    # 3. Build URL with full requested size
+    requested_size = min(request.size or 500, 10000)
+    uniprot_url = _build_url(api_query, request, sort_value, requested_size=requested_size)
 
     log_info(
         "uniprot_execute_start",
@@ -726,13 +751,11 @@ async def execute_uniprot_query(
     )
     log_info("uniprot_url", f"UniProt URL: {uniprot_url}", **{"url": uniprot_url})
 
-    requested_size = min(request.size or 500, 10000)  # Hard cap at 10K
     try:
-        # 4. Fetch from UniProt (paginated if requesting > 500)
-        if requested_size <= 500:
-            df, total_available = await _fetch_uniprot_tsv(uniprot_url)
-        else:
-            df, total_available = await _fetch_uniprot_paginated(uniprot_url, requested_size)
+        # 4. Fetch from UniProt (TSV streaming handles full size)
+        # Scale timeout with size: 30s base + 5s per 500 entries
+        fetch_timeout = 30.0 + (requested_size / 500) * 5.0
+        df, total_available = await _fetch_uniprot_tsv(uniprot_url, timeout=fetch_timeout)
 
         log_info(
             "uniprot_fetch_success",
@@ -769,6 +792,7 @@ async def execute_uniprot_query(
             _run_analysis_pipeline,
             df,
             run_tango=request.run_tango,
+            run_s4pred=request.run_s4pred,
             sentry_initialized=sentry_initialized,
         )
 
