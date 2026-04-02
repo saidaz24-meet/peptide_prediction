@@ -392,7 +392,7 @@ On a Linux server or x86 Mac: `USE_TANGO=1 USE_S4PRED=1 make docker-up` should s
 | Field | Value |
 |-------|-------|
 | **Priority** | P1 |
-| **Status** | Open |
+| **Status** | **FIXED** (2026-04-02) |
 | **Blast Radius** | LOW |
 | **Root Module** | `ui/src/pages/Upload.tsx` |
 | **Reported by** | Alex (2026-03-25) |
@@ -409,9 +409,15 @@ User clicks "Load Example Dataset" on the Upload page. Data loads and preview ap
 ### Affected Files
 1. `ui/src/pages/Upload.tsx` — example loader flow + button disabled condition
 
+### Fix Applied
+- Removed broken "Load Example Dataset" button from UploadDropzone (was loading non-existent file)
+- Example CSV buttons in Upload.tsx call `handleLocalPreview(file)` which sets `localFile` (enables button) and advances to step 1 via async callbacks
+- Gold standard XLSX button (2916 peptides) also works via same flow
+- Button at `disabled={!localFile || isAnalyzing}` is correctly enabled after any example load
+
 ### Success Criteria
-- [ ] Load example dataset → "Analyze Dataset" button becomes clickable
-- [ ] Analysis completes successfully with example data
+- [x] Load example dataset → "Analyze Dataset" button becomes clickable
+- [x] Analysis completes successfully with example data
 
 ---
 
@@ -420,7 +426,7 @@ User clicks "Load Example Dataset" on the Upload page. Data loads and preview ap
 | Field | Value |
 |-------|-------|
 | **Priority** | P1 |
-| **Status** | Open |
+| **Status** | **FIXED** (2026-04-02) |
 | **Blast Radius** | MEDIUM |
 | **Root Module** | `backend/auxiliary.py`, `ui/src/pages/QuickAnalyze.tsx` |
 | **Reported by** | Alex (2026-03-25) |
@@ -443,10 +449,15 @@ User enters `XXXX11111` in Quick Analyze → gets analyzed as `AAAA11111`. Numbe
    ```
 2. **Frontend QuickAnalyze**: Add hard validation before submission — reject sequences with non-letter characters with clear error message: "Sequence must contain only amino acid letters (A-Z). Numbers and symbols are not allowed."
 
+### Fix Applied
+- **Frontend** (`QuickAnalyze.tsx:177`): Hard validation `!/^[A-Za-z]+$/.test(trimmed)` rejects non-letter input with clear error: "Sequence must contain only amino acid letters (A-Z). Remove numbers, spaces, or symbols."
+- **Backend** (`auxiliary.py:433`): `re.sub(r"[^A-Za-z-]", "", sequence)` strips non-letter characters before substitution. Numbers, symbols, spaces all removed.
+- **Upload page** (`Upload.tsx:isValidSeq()`): Already had `^[A-Za-z]+$` regex for QC indicator on upload preview.
+
 ### Success Criteria
-- [ ] `XXXX11111` → rejected with clear error (or stripped to `AAAA` with warning)
-- [ ] `FOFJJJFFOOO` → accepted with substitution notice: "Non-standard amino acids corrected: O→K, J→L"
-- [ ] Pure letter sequences continue to work normally
+- [x] `XXXX11111` → rejected with clear error in QuickAnalyze; stripped to `AAAA` in backend
+- [x] `FOFJJJFFOOO` → accepted, O→K, J→L substitutions applied (notification via ISSUE-024)
+- [x] Pure letter sequences continue to work normally
 
 ---
 
