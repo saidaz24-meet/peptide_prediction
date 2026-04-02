@@ -1,26 +1,32 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
   Database,
   ExternalLink,
   ArrowRight,
-  Check,
   CheckSquare,
   Square,
-  ChevronDown,
   ChevronRight,
-  Star,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { UniProtQueryInput } from "@/components/UniProtQueryInput";
 import { useDatasetStore } from "@/stores/datasetStore";
-import { mapApiRowToPeptide } from "@/lib/peptideMapper";
 import { BgDotGrid } from "@/components/BgDotGrid";
-import type { Peptide } from "@/types/peptide";
+import AppFooter from "@/components/AppFooter";
+import { setNavGuard } from "@/hooks/use-nav-guard";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface BrowseRow {
   id: string;
@@ -43,6 +49,27 @@ export default function DatabaseSearch() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [showLeaveDialog, setShowLeaveDialog] = useState(false);
+  const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
+
+  // Navigation guard — warn when search results exist
+  const hasResults = browseRows.length > 0;
+
+  useEffect(() => {
+    if (!hasResults) {
+      setNavGuard(false);
+      return;
+    }
+    setNavGuard(true, () => setShowLeaveDialog(true));
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => {
+      setNavGuard(false);
+      window.removeEventListener("beforeunload", handler);
+    };
+  }, [hasResults]);
 
   const handleQueryExecuted = useCallback((rows: any[], meta: any) => {
     setSearchMeta(meta);
@@ -395,6 +422,42 @@ export default function DatabaseSearch() {
           </div>
         </>
       )}
+
+      <AppFooter />
+
+      {/* Leave confirmation dialog */}
+      <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave search results?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Your search results ({browseRows.length} entries) will be lost if you navigate away.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setShowLeaveDialog(false);
+                setPendingNavPath(null);
+              }}
+            >
+              Stay
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowLeaveDialog(false);
+                setBrowseRows([]);
+                if (pendingNavPath) {
+                  navigate(pendingNavPath);
+                  setPendingNavPath(null);
+                }
+              }}
+            >
+              Leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 }
