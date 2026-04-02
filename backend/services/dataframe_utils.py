@@ -155,41 +155,30 @@ def apply_ff_flags(
         else:
             ssw_hydro_threshold = settings.PELEG_DEFAULT_HYDRO_THRESHOLD
 
-        ff_ssw_flags = []
-        ff_ssw_scores = []
-        for _, r in df.iterrows():
-            ssw_val = r.get(ssw_col)
+        ssw_series = pd.to_numeric(df[ssw_col], errors="coerce")
+        has_data = ssw_series.notna()
 
-            # No SSW data → null
-            if ssw_val is None or (isinstance(ssw_val, float) and pd.isna(ssw_val)):
-                ff_ssw_flags.append(None)
-                ff_ssw_scores.append(None)
-                continue
+        # Flag: SSW != -1 AND hydrophobicity >= threshold
+        hydro_col = "Hydrophobicity"
+        hydro_series = pd.to_numeric(df[hydro_col], errors="coerce") if hydro_col in df.columns else pd.Series(float("nan"), index=df.index)
+        is_candidate = (
+            has_data
+            & (ssw_series != -1)
+            & pd.notna(ssw_hydro_threshold)
+            & (hydro_series >= ssw_hydro_threshold)
+        )
+        # Build flags: None (no data), -1 (not candidate), 1 (candidate)
+        # Use numpy for fast vectorized logic, then convert to Python types
+        import numpy as np
+        flags_arr = np.where(is_candidate, 1, np.where(has_data, -1, None))
+        ff_ssw_flags = [int(v) if v is not None else None for v in flags_arr]
 
-            # SSW data available — compute flag
-            if ssw_val != -1 and pd.notna(ssw_hydro_threshold):
-                h = r.get("Hydrophobicity")
-                if pd.notna(h) and h >= ssw_hydro_threshold:
-                    ff_ssw_flags.append(1)
-                else:
-                    ff_ssw_flags.append(-1)
-            else:
-                ff_ssw_flags.append(-1)
-
-            # Score: Hydrophobicity + Beta_uH + Full_length_uH + SSW_prediction
-            h = r.get("Hydrophobicity")
-            beta_uh = r.get("Beta full length uH")
-            full_uh = r.get("Full length uH")
-            components = [h, beta_uh, full_uh]
-            if all(x is not None and not (isinstance(x, float) and pd.isna(x)) for x in components):
-                try:
-                    ff_ssw_scores.append(
-                        float(h) + float(beta_uh) + float(full_uh) + float(ssw_val)
-                    )
-                except (TypeError, ValueError):
-                    ff_ssw_scores.append(None)
-            else:
-                ff_ssw_scores.append(None)
+        # Score: Hydrophobicity + Beta_uH + Full_length_uH + SSW_prediction
+        beta_uh = pd.to_numeric(df["Beta full length uH"], errors="coerce") if "Beta full length uH" in df.columns else pd.Series(float("nan"), index=df.index)
+        full_uh = pd.to_numeric(df["Full length uH"], errors="coerce") if "Full length uH" in df.columns else pd.Series(float("nan"), index=df.index)
+        all_valid = has_data & hydro_series.notna() & beta_uh.notna() & full_uh.notna()
+        raw_scores = hydro_series + beta_uh + full_uh + ssw_series
+        ff_ssw_scores = [float(raw_scores.iloc[i]) if all_valid.iloc[i] else None for i in range(len(df))]
 
         df["FF-Secondary structure switch"] = ff_ssw_flags
         df["FF-SSW score"] = ff_ssw_scores
@@ -235,41 +224,29 @@ def apply_ff_flags(
         else:
             helix_uH_threshold = settings.PELEG_DEFAULT_HELIX_UH_THRESHOLD
 
-        ff_helix_flags = []
-        ff_helix_scores = []
-        for _, r in df.iterrows():
-            pred_val = r.get(helix_pred_col)
-            uh_val = r.get(helix_uh_col)
+        pred_series = pd.to_numeric(df[helix_pred_col], errors="coerce")
+        uh_series = pd.to_numeric(df[helix_uh_col], errors="coerce")
+        has_helix_data = pred_series.notna()
 
-            # No helix data → null
-            if pred_val is None or (isinstance(pred_val, float) and pd.isna(pred_val)):
-                ff_helix_flags.append(None)
-                ff_helix_scores.append(None)
-                continue
+        # Flag: pred != -1 AND uH >= threshold
+        is_helix_candidate = (
+            has_helix_data
+            & (pred_series != -1)
+            & pd.notna(helix_uH_threshold)
+            & uh_series.notna()
+            & (uh_series >= helix_uH_threshold)
+        )
+        import numpy as np
+        flags_arr = np.where(is_helix_candidate, 1, np.where(has_helix_data, -1, None))
+        ff_helix_flags = [int(v) if v is not None else None for v in flags_arr]
 
-            # Helix data available — compute flag
-            if pred_val != -1 and pd.notna(helix_uH_threshold) and pd.notna(uh_val):
-                if uh_val >= helix_uH_threshold:
-                    ff_helix_flags.append(1)
-                else:
-                    ff_helix_flags.append(-1)
-            else:
-                ff_helix_flags.append(-1)
-
-            # Score: helix_uH + helix_score
-            score_val = r.get(helix_score_col) if helix_score_col else None
-            if (
-                uh_val is not None
-                and not (isinstance(uh_val, float) and pd.isna(uh_val))
-                and score_val is not None
-                and not (isinstance(score_val, float) and pd.isna(score_val))
-            ):
-                try:
-                    ff_helix_scores.append(float(uh_val) + float(score_val))
-                except (TypeError, ValueError):
-                    ff_helix_scores.append(None)
-            else:
-                ff_helix_scores.append(None)
+        # Score: helix_uH + helix_score
+        ff_helix_scores = [None] * len(df)
+        if helix_score_col and helix_score_col in df.columns:
+            score_series = pd.to_numeric(df[helix_score_col], errors="coerce")
+            both_valid = uh_series.notna() & score_series.notna()
+            raw_scores = uh_series + score_series
+            ff_helix_scores = [float(raw_scores.iloc[i]) if both_valid.iloc[i] else None for i in range(len(df))]
 
         df["FF-Helix (Jpred)"] = ff_helix_flags
         df["FF-Helix score"] = ff_helix_scores
@@ -295,18 +272,15 @@ def _compute_beta_uh(df: pd.DataFrame) -> None:
     from auxiliary import get_corrected_sequence
     from biochem_calculation import hydrophobic_moment
 
-    beta_uh_values = []
-    for _, row in df.iterrows():
-        seq = row.get("Sequence", "")
-        if seq and isinstance(seq, str) and not pd.isna(seq) and len(seq) > 0:
-            try:
-                corrected = get_corrected_sequence(seq)
-                beta_uh_values.append(hydrophobic_moment(corrected, angle=160))
-            except Exception:
-                beta_uh_values.append(None)
-        else:
-            beta_uh_values.append(None)
-    df["Beta full length uH"] = beta_uh_values
+    def _calc(seq):
+        if not seq or not isinstance(seq, str) or pd.isna(seq) or len(seq) == 0:
+            return None
+        try:
+            return hydrophobic_moment(get_corrected_sequence(seq), angle=160)
+        except Exception:
+            return None
+
+    df["Beta full length uH"] = df["Sequence"].map(_calc)
 
 
 def _compute_helix_uh(df: pd.DataFrame, fragments_col: str, uh_col: str) -> None:
@@ -318,22 +292,24 @@ def _compute_helix_uh(df: pd.DataFrame, fragments_col: str, uh_col: str) -> None
     """
     from auxiliary import get_avg_uH_by_segments, get_corrected_sequence
 
+    if fragments_col not in df.columns:
+        df[uh_col] = None
+        return
+
+    sequences = df["Sequence"]
+    fragments = df[fragments_col]
     uh_values = []
-    for _, row in df.iterrows():
-        seq = row.get("Sequence", "")
-        fragments = row.get(fragments_col)
+    for seq, frags in zip(sequences, fragments):
         if (
             seq
             and isinstance(seq, str)
             and not pd.isna(seq)
-            and fragments is not None
-            and not (isinstance(fragments, float) and pd.isna(fragments))
-            and isinstance(fragments, list)
-            and len(fragments) > 0
+            and frags is not None
+            and not (isinstance(frags, float) and pd.isna(frags))
+            and isinstance(frags, list)
+            and len(frags) > 0
         ):
-            corrected_seq = get_corrected_sequence(seq)
-            uh = get_avg_uH_by_segments(corrected_seq, fragments)
-            uh_values.append(uh)
+            uh_values.append(get_avg_uH_by_segments(get_corrected_sequence(seq), frags))
         else:
             uh_values.append(None)
     df[uh_col] = uh_values
