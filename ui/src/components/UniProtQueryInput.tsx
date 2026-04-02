@@ -42,6 +42,8 @@ interface UniProtQueryInputProps {
   onLoadingChange?: (loading: boolean) => void;
 }
 
+type SearchField = "all" | "protein_name" | "gene" | "cc_function" | "keyword" | "organism_name";
+
 interface QueryControls {
   reviewed: boolean | null;
   lengthMin: number | null;
@@ -51,6 +53,7 @@ interface QueryControls {
   size: number;
   runTango: boolean;
   runS4pred: boolean;
+  searchIn: SearchField;
 }
 
 const UNIPROT_SORT_MAP: Record<string, string | null> = {
@@ -81,6 +84,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
 
     runTango: false,
     runS4pred: false,
+    searchIn: "all" as SearchField,
   });
 
   // Auto-parse query (debounced, non-blocking)
@@ -132,8 +136,19 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
           sortValue = UNIPROT_SORT_MAP[sortKey] ?? null;
         }
 
+        // Wrap query with field prefix if "Search in" is set
+        let effectiveQuery = query;
+        if (
+          controls.searchIn !== "all" &&
+          query.trim() &&
+          selectedMode !== "accession" &&
+          selectedMode !== "organism"
+        ) {
+          effectiveQuery = `${controls.searchIn}:${query.trim()}`;
+        }
+
         const requestBody: any = {
-          query,
+          query: effectiveQuery,
           mode: selectedMode,
           include_isoforms: controls.includeIsoforms,
           size: controls.size,
@@ -155,7 +170,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
 
           const rowCount = result.meta?.row_count || result.rows.length;
           if (rowCount === 0) {
-            toast.error("No results found. Try a different query, broader filters, or check the organism ID.");
+            toast.error(
+              "No results found. Try a different query, broader filters, or check the organism ID."
+            );
           } else {
             onQueryExecuted(result.rows, result.meta);
             toast.success(`Retrieved ${rowCount} entries from UniProt`);
@@ -198,6 +215,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
 
   const hasFilters =
     controls.reviewed !== true ||
+    controls.searchIn !== "all" ||
     controls.lengthMin != null ||
     controls.lengthMax != null ||
     controls.sort !== "best" ||
@@ -245,6 +263,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               : controls.reviewed === false
                 ? "TrEMBL (unreviewed)"
                 : "All UniProtKB"}
+            {controls.searchIn !== "all" ? ` · in ${controls.searchIn.replace("_", " ")}` : ""}
             {controls.lengthMin || controls.lengthMax
               ? ` · ${controls.lengthMin ?? "any"}–${controls.lengthMax ?? "any"} aa`
               : ""}
@@ -269,8 +288,8 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
       <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
         <CollapsibleContent>
           <div className="rounded-xl border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] p-4 space-y-4">
-            {/* Row 1: Database + Sort + Mode */}
-            <div className="grid grid-cols-3 gap-3">
+            {/* Row 1: Database + Search In + Sort + Mode */}
+            <div className="grid grid-cols-4 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Database</Label>
                 <Select
@@ -296,6 +315,26 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                     <SelectItem value="reviewed">Reviewed (Swiss-Prot)</SelectItem>
                     <SelectItem value="unreviewed">Unreviewed (TrEMBL)</SelectItem>
                     <SelectItem value="all">All UniProtKB</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Search in</Label>
+                <Select
+                  value={controls.searchIn}
+                  onValueChange={(v) => setControls((p) => ({ ...p, searchIn: v as SearchField }))}
+                  disabled={isExecuting}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All fields</SelectItem>
+                    <SelectItem value="protein_name">Protein name</SelectItem>
+                    <SelectItem value="gene">Gene name</SelectItem>
+                    <SelectItem value="cc_function">Function</SelectItem>
+                    <SelectItem value="keyword">Keyword</SelectItem>
+                    <SelectItem value="organism_name">Organism</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -432,7 +471,8 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               </div>
               {(controls.runTango || controls.runS4pred) && controls.size > 100 && (
                 <p className="text-[10px] text-amber-600 dark:text-amber-400 ml-auto">
-                  {controls.runTango ? "TANGO" : "S4PRED"} on {controls.size} sequences may take several minutes
+                  {controls.runTango ? "TANGO" : "S4PRED"} on {controls.size} sequences may take
+                  several minutes
                 </p>
               )}
             </div>
