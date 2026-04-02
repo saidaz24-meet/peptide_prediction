@@ -22,6 +22,7 @@ import { BackboneViewer } from "@/components/BackboneViewer";
 import { S4PredChart } from "@/components/S4PredChart";
 import { ConsensusCard } from "@/components/ConsensusCard";
 import { useChartSelection } from "@/stores/chartSelectionStore";
+import { cn } from "@/lib/utils";
 import { BgDotGrid } from "@/components/BgDotGrid";
 
 // NEW: small additions for sliding-window profiles
@@ -82,6 +83,39 @@ function CollapsibleCard({
         </CollapsibleContent>
       </Collapsible>
     </Card>
+  );
+}
+
+/** Collapsible protein function — shows 3 lines, expands on click */
+function FunctionBlock({ text }: { text: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = text.length > 250;
+
+  return (
+    <div className="space-y-1">
+      <p className="text-caption text-muted-foreground">Function</p>
+      <div className="relative">
+        <p
+          className={cn(
+            "text-small text-foreground/85 leading-relaxed",
+            !expanded && isLong && "line-clamp-3"
+          )}
+        >
+          {text}
+        </p>
+        {isLong && !expanded && (
+          <div className="absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-background to-transparent" />
+        )}
+      </div>
+      {isLong && (
+        <button
+          onClick={() => setExpanded((e) => !e)}
+          className="text-xs text-primary hover:underline"
+        >
+          {expanded ? "Show less" : "Show more"}
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -210,159 +244,179 @@ export default function PeptideDetail() {
           transition={{ duration: 0.5 }}
           className="max-w-5xl mx-auto space-y-8"
         >
-          {/* Header */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="flex items-center gap-4">
+          {/* ─── Hero Header (open layout, no card wrapper) ─── */}
+          <div className="space-y-6">
+            {/* Back + actions bar */}
+            <div className="flex items-center justify-between">
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="h-9 btn-press"
+                className="h-8 -ml-2 text-xs text-muted-foreground hover:text-foreground"
                 onClick={() => {
                   clearSelection();
                   navigate("/results");
                 }}
               >
                 <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-                Results
+                Back to Results
               </Button>
 
-              <div>
-                <h1 className="text-h1 text-foreground flex items-center gap-2 break-all page-header-title">
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={handleCopySequence}>
+                  <Copy className="w-3.5 h-3.5 mr-1" />
+                  Copy
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={handleDownloadFASTA}>
+                  <Download className="w-3.5 h-3.5 mr-1" />
+                  FASTA
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={handleDownloadJSON}>
+                  <Download className="w-3.5 h-3.5 mr-1" />
+                  JSON
+                </Button>
+              </div>
+            </div>
+
+            {/* ID + providers + subtitle */}
+            <div>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-display text-foreground break-all page-header-title">
                   {/^[A-Z][0-9][A-Z0-9]{3}[0-9](-\d+)?$/i.test(peptide.id) ? (
                     <a
                       href={`https://www.uniprot.org/uniprotkb/${peptide.id}/entry`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary hover:underline inline-flex items-center gap-1"
+                      className="hover:text-primary transition-colors inline-flex items-center gap-2"
                       title="Open UniProt entry"
                     >
                       {peptide.id}
-                      <ExternalLink className="w-4 h-4" />
+                      <ExternalLink className="w-5 h-5 text-muted-foreground" />
                     </a>
                   ) : (
                     <span>{peptide.id}</span>
                   )}
                 </h1>
-                <p className="text-body text-muted-foreground mt-0.5">
-                  {peptide.length ?? "?"} amino acids
-                  {peptide.geneName && (
-                    <>
-                      {" "}
-                      &middot;{" "}
-                      <span className="font-medium text-foreground">{peptide.geneName}</span>
-                    </>
-                  )}
-                  {peptide.species && <> &middot; {peptide.species}</>}
-                  {typeof peptide.annotationScore === "number" && (
-                    <>
-                      {" "}
-                      &middot;{" "}
-                      <span title={`UniProt annotation score: ${peptide.annotationScore}/5`}>
-                        {"★".repeat(peptide.annotationScore)}
-                        {"☆".repeat(5 - peptide.annotationScore)}
-                      </span>
-                    </>
-                  )}
-                </p>
+                {peptide.providerStatus?.tango && (
+                  <ProviderBadge name="Tango" status={peptide.providerStatus.tango as any} />
+                )}
+                {peptide.providerStatus?.s4pred && (
+                  <ProviderBadge name="S4PRED" status={peptide.providerStatus.s4pred as any} />
+                )}
+              </div>
+
+              <div className="flex items-center gap-2 flex-wrap mt-1 text-body text-muted-foreground">
+                <span>{peptide.length ?? "?"} amino acids</span>
+                {peptide.geneName && (
+                  <>
+                    <span className="text-[hsl(var(--faint))]">/</span>
+                    <span className="font-semibold text-foreground">{peptide.geneName}</span>
+                  </>
+                )}
+                {peptide.name && peptide.name !== peptide.geneName && (
+                  <>
+                    <span className="text-[hsl(var(--faint))]">/</span>
+                    <span>{peptide.name}</span>
+                  </>
+                )}
+                {peptide.species && (
+                  <>
+                    <span className="text-[hsl(var(--faint))]">&middot;</span>
+                    <span className="italic">{peptide.species}</span>
+                  </>
+                )}
+                {typeof peptide.annotationScore === "number" && (
+                  <>
+                    <span className="text-[hsl(var(--faint))]">&middot;</span>
+                    <span
+                      className="text-amber-500"
+                      title={`Annotation score: ${peptide.annotationScore}/5`}
+                    >
+                      {"★".repeat(peptide.annotationScore)}
+                      {"☆".repeat(5 - peptide.annotationScore)}
+                    </span>
+                  </>
+                )}
               </div>
             </div>
 
+            {/* Classification pills — what researchers care about FIRST */}
             <div className="flex items-center gap-2 flex-wrap">
-              {peptide.providerStatus?.tango && (
-                <ProviderBadge name="Tango" status={peptide.providerStatus.tango as any} />
+              {getSSWBadge()}
+              {typeof peptide.s4predHelixPercent === "number" && (
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${peptide.s4predHelixPercent > 30 ? "border-helix text-helix" : "text-muted-foreground"}`}
+                >
+                  Helix {peptide.s4predHelixPercent.toFixed(1)}%
+                </Badge>
               )}
-              {peptide.providerStatus?.s4pred && (
-                <ProviderBadge name="S4PRED" status={peptide.providerStatus.s4pred as any} />
+              {peptide.ffHelixFlag === 1 ? (
+                <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20 text-xs">
+                  FF-Helix Candidate
+                </Badge>
+              ) : peptide.ffHelixFlag === -1 ? (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  FF-Helix: No
+                </Badge>
+              ) : null}
+              {peptide.ffSswFlag === 1 ? (
+                <Badge className="bg-blue-500/10 text-blue-700 dark:text-blue-400 border border-blue-500/20 text-xs">
+                  FF-SSW Candidate
+                </Badge>
+              ) : peptide.ffSswFlag === -1 ? (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  FF-SSW: No
+                </Badge>
+              ) : null}
+              {peptide.ffHelixPercent != null && (
+                <Badge variant="outline" className="text-xs text-muted-foreground">
+                  FF-Helix {peptide.ffHelixPercent.toFixed(0)}%
+                </Badge>
               )}
-
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 text-small btn-press"
-                  onClick={handleCopySequence}
-                >
-                  <Copy className="w-3.5 h-3.5 mr-1.5" />
-                  Copy
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 text-small btn-press"
-                  onClick={handleDownloadFASTA}
-                >
-                  <Download className="w-3.5 h-3.5 mr-1.5" />
-                  FASTA
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-9 text-small btn-press"
-                  onClick={handleDownloadJSON}
-                >
-                  <Download className="w-3.5 h-3.5 mr-1.5" />
-                  JSON
-                </Button>
-              </div>
             </div>
+
+            {/* Protein function — collapsible, 3 lines by default */}
+            {peptide.proteinFunction && (
+              <FunctionBlock text={peptide.proteinFunction.replace(/^FUNCTION:\s*/i, "")} />
+            )}
+
+            {/* Thin separator */}
+            <div className="border-b border-[hsl(var(--border))]" />
           </div>
 
-          {/* Protein Function Card (UniProt-sourced data) */}
-          {peptide.proteinFunction && (
-            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl overflow-hidden">
-              <CardContent className="py-4 space-y-2">
-                <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                  Function
-                </p>
-                <p className="text-small text-foreground leading-relaxed">
-                  {peptide.proteinFunction.replace(/^FUNCTION:\s*/i, "")}
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Main Info Card */}
+          {/* Sequence & Structure Card */}
           <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl overflow-hidden">
             <CardHeader className="pb-2">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <div>
-                  <CardTitle className="text-h3">Peptide Information</CardTitle>
-                </div>
-                <div className="flex items-center flex-wrap gap-1.5">
-                  {getSSWBadge()}
-                  {typeof peptide.s4predHelixPercent === "number" && (
-                    <Badge variant="outline" className="text-helix border-helix">
-                      S4PRED Helix: {peptide.s4predHelixPercent.toFixed(1)}%
-                    </Badge>
-                  )}
-                  {peptide.ffHelixFlag === 1 && (
-                    <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100">
-                      FF-Helix: Candidate
-                    </Badge>
-                  )}
-                  {peptide.ffHelixFlag === -1 && (
-                    <Badge variant="outline" className="text-muted-foreground">
-                      FF-Helix: Not Candidate
-                    </Badge>
-                  )}
-                  {peptide.ffSswFlag === 1 && (
-                    <Badge className="bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-100">
-                      FF-SSW: Candidate
-                    </Badge>
-                  )}
-                  {peptide.ffSswFlag === -1 && (
-                    <Badge variant="outline" className="text-muted-foreground">
-                      FF-SSW: Not Candidate
-                    </Badge>
-                  )}
-                </div>
+                <CardTitle className="text-h3">Sequence & Structure</CardTitle>
+                {/* S4PRED composition legend */}
+                {(peptide.s4predHelixPercent != null || peptide.helixPercent != null) && (
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <span className="w-2.5 h-2.5 rounded-sm bg-helix inline-block" />
+                      Helix ({(peptide.s4predHelixPercent ?? peptide.helixPercent ?? 0).toFixed(0)}%)
+                    </span>
+                    {peptide.betaPercent != null && (
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-beta inline-block" />
+                        Beta ({peptide.betaPercent.toFixed(0)}%)
+                      </span>
+                    )}
+                    {peptide.s4predHelixPercent != null && peptide.betaPercent != null && (
+                      <span className="flex items-center gap-1">
+                        <span className="w-2.5 h-2.5 rounded-sm bg-coil inline-block" />
+                        Coil ({(100 - (peptide.s4predHelixPercent ?? 0) - (peptide.betaPercent ?? 0)).toFixed(0)}%)
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Sequence with S4PRED coloring */}
               <SequenceTrack peptide={peptide} />
 
-              {/* Segment track (visual bar) */}
+              {/* Segment track (helix bar) */}
               {peptide.s4pred?.helixSegments?.length ? (
                 <SegmentTrack
                   sequence={peptide.sequence}

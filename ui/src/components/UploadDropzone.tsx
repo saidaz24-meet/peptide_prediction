@@ -1,16 +1,14 @@
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { motion } from "framer-motion";
-import { Upload, FileText, CheckCircle } from "lucide-react";
+import { Upload, CheckCircle } from "lucide-react";
 import Papa from "papaparse";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { ParsedCSVData } from "@/types/peptide";
 import { toast } from "sonner";
-import * as XLSX from "xlsx";
 
 /** so we now should try to do the one sequence immideate results rq. */
 
@@ -167,7 +165,7 @@ export function UploadDropzone({ onFileSelected, onFileProcessed }: UploadDropzo
               if (f) processFile(f);
             }}
           />
-          <CardContent className="flex flex-col items-center justify-center py-14 px-6 text-center">
+          <CardContent className="flex flex-col items-center justify-center py-8 px-6 text-center">
             <motion.div
               animate={{
                 scale: isDragActive ? 1.15 : 1,
@@ -181,24 +179,24 @@ export function UploadDropzone({ onFileSelected, onFileProcessed }: UploadDropzo
                   ease: "linear",
                 },
               }}
-              className="mb-5"
+              className="mb-4"
             >
               <div
-                className={`w-20 h-20 rounded-2xl flex items-center justify-center transition-colors ${
+                className={`w-14 h-14 rounded-xl flex items-center justify-center transition-colors ${
                   isDragActive || isProcessing
                     ? "bg-primary/15 border-2 border-primary/30"
                     : "bg-primary/5 border-2 border-primary/10"
                 }`}
               >
                 {isDragActive || isProcessing ? (
-                  <Upload className="w-9 h-9 text-primary" />
+                  <Upload className="w-6 h-6 text-primary" />
                 ) : (
-                  <Upload className="w-9 h-9 text-primary/60" />
+                  <Upload className="w-6 h-6 text-primary/60" />
                 )}
               </div>
             </motion.div>
 
-            <h3 className="text-xl font-semibold mb-1.5">
+            <h3 className="text-base font-semibold mb-1">
               {isProcessing
                 ? "Processing your file..."
                 : isDragActive
@@ -207,19 +205,26 @@ export function UploadDropzone({ onFileSelected, onFileProcessed }: UploadDropzo
             </h3>
 
             <p className="text-muted-foreground mb-3 max-w-sm">
-              {isProcessing
-                ? "Please wait while we prepare your data"
-                : (
-                  <>
-                    or <span className="text-primary font-medium underline underline-offset-2">click to browse</span> your computer
-                  </>
-                )}
+              {isProcessing ? (
+                "Please wait while we prepare your data"
+              ) : (
+                <>
+                  or{" "}
+                  <span className="text-primary font-medium underline underline-offset-2">
+                    click to browse
+                  </span>{" "}
+                  your computer
+                </>
+              )}
             </p>
 
             {!isProcessing && (
               <div className="text-xs text-muted-foreground/70 space-y-0.5">
                 <p>CSV, TSV, Excel (.xlsx), FASTA</p>
-                <p>Up to 50 MB &middot; Required column: <code className="bg-muted px-1 py-0.5 rounded text-[11px]">Sequence</code></p>
+                <p>
+                  Up to 50 MB &middot; Required column:{" "}
+                  <code className="bg-muted px-1 py-0.5 rounded text-[11px]">Sequence</code>
+                </p>
               </div>
             )}
 
@@ -243,53 +248,6 @@ export function UploadDropzone({ onFileSelected, onFileProcessed }: UploadDropzo
           </Alert>
         </motion.div>
       )}
-
-      {/* Example dataset loader (from /public) */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={async () => {
-          try {
-            const resp = await fetch("/Final_Staphylococcus_2023_new.xlsx");
-            const buffer = await resp.arrayBuffer();
-
-            const workbook = XLSX.read(buffer, { type: "array" });
-            const firstSheetName = workbook.SheetNames[0];
-            const worksheet = workbook.Sheets[firstSheetName];
-            const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 }) as string[][];
-
-            if (jsonData.length < 2) {
-              toast.error("Example file has no rows");
-              return;
-            }
-
-            const headers = jsonData[0];
-            const rows = jsonData.slice(1).map((row) => {
-              const rowObj: Record<string, any> = {};
-              headers.forEach((header, i) => {
-                rowObj[header] = row[i] || "";
-              });
-              return rowObj;
-            });
-
-            setRawData({
-              headers,
-              rows,
-              fileName: "peptide_data_example.xlsx",
-              rowCount: rows.length,
-            });
-
-            toast.success(`Loaded ${rows.length} example rows from XLSX`);
-            onFileProcessed();
-          } catch (err) {
-            toast.error("Failed to load example dataset");
-            console.error(err);
-          }
-        }}
-      >
-        <FileText className="w-4 h-4 mr-2" />
-        Load Example Dataset
-      </Button>
     </div>
   );
 }

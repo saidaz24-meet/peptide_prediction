@@ -21,7 +21,7 @@ import { UniProtQueryInput } from "@/components/UniProtQueryInput";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { toast } from "sonner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertTriangle, Info } from "lucide-react";
+import { AlertTriangle, Info, FlaskConical } from "lucide-react";
 import { Search } from "lucide-react";
 import { ThresholdConfigPanel } from "@/components/ThresholdConfigPanel";
 import type { ThresholdConfig } from "@/types/peptide";
@@ -324,7 +324,7 @@ export default function Upload() {
   return (
     <div className="min-h-screen bg-background relative">
       <BgDashLines />
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-8 sm:py-10 relative z-10">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-4 sm:py-6 relative z-10">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -332,11 +332,11 @@ export default function Upload() {
           className="max-w-4xl mx-auto"
         >
           {/* Header & progress */}
-          <div className="mb-10">
-            <h1 className="text-h1 text-foreground mb-2 page-header-title">
+          <div className="mb-6">
+            <h1 className="text-h1 text-foreground mb-1 page-header-title">
               Upload & Process Dataset
             </h1>
-            <p className="text-body text-muted-foreground mb-8 hidden md:block">
+            <p className="text-body text-muted-foreground mb-4 hidden md:block">
               Upload your peptide CSV/TSV/XLSX — columns are auto-detected.
             </p>
 
@@ -399,8 +399,8 @@ export default function Upload() {
 
                   {/* Try Example Data */}
                   {uploadMode === "file" && (
-                    <div className="text-center">
-                      <p className="text-xs text-muted-foreground mb-2">
+                    <div className="text-center space-y-3">
+                      <p className="text-xs text-muted-foreground">
                         Or try an example dataset:
                       </p>
                       <div className="flex gap-2 justify-center flex-wrap">
@@ -444,6 +444,41 @@ export default function Upload() {
                             {ex.label}
                           </Button>
                         ))}
+                      </div>
+
+                      {/* Gold Standard Dataset */}
+                      <div className="pt-2 border-t border-[hsl(var(--border))]">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-xs h-8 border-primary/30 text-primary hover:bg-primary/5 hover:border-primary/50"
+                          onClick={async () => {
+                            try {
+                              toast.loading("Loading gold standard dataset...", { id: "gold-std" });
+                              const resp = await fetch("/Final_Staphylococcus_2023_new.xlsx");
+                              if (!resp.ok) {
+                                toast.error("Failed to load dataset", { id: "gold-std" });
+                                return;
+                              }
+                              const arrayBuf = await resp.arrayBuffer();
+                              const blob = new Blob([arrayBuf], {
+                                type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                              });
+                              const file = new File(
+                                [blob],
+                                "Final_Staphylococcus_2023_new.xlsx",
+                                { type: blob.type }
+                              );
+                              toast.success("Dataset loaded — 2916 peptides", { id: "gold-std" });
+                              handleLocalPreview(file);
+                            } catch {
+                              toast.error("Failed to load dataset", { id: "gold-std" });
+                            }
+                          }}
+                        >
+                          <FlaskConical className="w-3.5 h-3.5 mr-1.5" />
+                          Gold Standard — Staphylococcus 2023 (2,916 peptides)
+                        </Button>
                       </div>
                     </div>
                   )}

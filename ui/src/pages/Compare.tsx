@@ -168,6 +168,56 @@ export default function Compare() {
     disabled: uploading,
   });
 
+  // Dual upload mode: allow uploading Cohort A directly from Compare page
+  const [cohortALocal, setCohortALocal] = useState<Peptide[] | null>(null);
+  const [uploadingA, setUploadingA] = useState(false);
+  const [aFilename, setAFilename] = useState<string>("");
+
+  const processFileA = useCallback(async (file: File) => {
+    setUploadingA(true);
+    setError(null);
+    setAFilename(file.name);
+    try {
+      const response = await uploadCSV(file);
+      const rows = response.rows || response.data || [];
+      const mapped = rows
+        .map((r: any, idx: number) => {
+          try {
+            return mapApiRowToPeptide(r, `cohortA[${idx}]`);
+          } catch {
+            return null;
+          }
+        })
+        .filter((p: any): p is Peptide => p !== null);
+      if (mapped.length === 0) {
+        setError("No valid peptides in Cohort A file.");
+      } else {
+        setCohortALocal(mapped);
+      }
+    } catch (err: any) {
+      setError(err?.message || "Failed to process Cohort A file.");
+    } finally {
+      setUploadingA(false);
+    }
+  }, []);
+
+  const dropzoneA = useDropzone({
+    onDrop: (accepted) => {
+      if (accepted.length > 0) processFileA(accepted[0]);
+    },
+    accept: {
+      "text/csv": [".csv", ".tsv", ".txt"],
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
+      "application/vnd.ms-excel": [".xls"],
+      "application/octet-stream": [".fasta", ".fa"],
+    },
+    multiple: false,
+    disabled: uploadingA,
+  });
+
+  // Use local Cohort A if uploaded here, otherwise fall back to dataset store
+  const effectiveCohortA = cohortALocal ?? cohortA;
+
   // Stats
   const statsA = useMemo(() => computeStats(effectiveCohortA), [effectiveCohortA]);
   const statsB = useMemo(() => (cohortB ? computeStats(cohortB) : null), [cohortB]);
@@ -220,56 +270,6 @@ export default function Compare() {
         .map((p) => ({ h: p.hydrophobicity, muH: p.muH as number })),
     [cohortB]
   );
-
-  // Dual upload mode: allow uploading Cohort A directly from Compare page
-  const [cohortALocal, setCohortALocal] = useState<Peptide[] | null>(null);
-  const [uploadingA, setUploadingA] = useState(false);
-  const [aFilename, setAFilename] = useState<string>("");
-
-  const processFileA = useCallback(async (file: File) => {
-    setUploadingA(true);
-    setError(null);
-    setAFilename(file.name);
-    try {
-      const response = await uploadCSV(file);
-      const rows = response.rows || response.data || [];
-      const mapped = rows
-        .map((r: any, idx: number) => {
-          try {
-            return mapApiRowToPeptide(r, `cohortA[${idx}]`);
-          } catch {
-            return null;
-          }
-        })
-        .filter((p: any): p is Peptide => p !== null);
-      if (mapped.length === 0) {
-        setError("No valid peptides in Cohort A file.");
-      } else {
-        setCohortALocal(mapped);
-      }
-    } catch (err: any) {
-      setError(err?.message || "Failed to process Cohort A file.");
-    } finally {
-      setUploadingA(false);
-    }
-  }, []);
-
-  const dropzoneA = useDropzone({
-    onDrop: (accepted) => {
-      if (accepted.length > 0) processFileA(accepted[0]);
-    },
-    accept: {
-      "text/csv": [".csv", ".tsv", ".txt"],
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": [".xlsx"],
-      "application/vnd.ms-excel": [".xls"],
-      "application/octet-stream": [".fasta", ".fa"],
-    },
-    multiple: false,
-    disabled: uploadingA,
-  });
-
-  // Use local Cohort A if uploaded here, otherwise fall back to dataset store
-  const effectiveCohortA = cohortALocal ?? cohortA;
 
   // Show dual upload mode if no primary dataset and no local Cohort A
   if (effectiveCohortA.length === 0) {

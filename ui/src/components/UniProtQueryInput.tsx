@@ -78,6 +78,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
     sort: "best",
     includeIsoforms: false,
     size: 500,
+
     runTango: false,
     runS4pred: false,
   });
@@ -138,7 +139,6 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
           size: controls.size,
           run_tango: controls.runTango,
           run_s4pred: controls.runS4pred,
-          max_provider_sequences: 50,
         };
 
         if (controls.reviewed !== null) requestBody.reviewed = controls.reviewed;
@@ -152,10 +152,14 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
           const result = await executeUniProtQuery(requestBody, abortController.signal);
           clearTimeout(timeoutId);
           setFinalApiQuery(result.meta?.api_query_string || parsedQuery?.api_query_string || query);
-          onQueryExecuted(result.rows, result.meta);
-          toast.success(
-            `Retrieved ${result.meta?.row_count || result.rows.length} entries from UniProt`
-          );
+
+          const rowCount = result.meta?.row_count || result.rows.length;
+          if (rowCount === 0) {
+            toast.error("No results found. Try a different query, broader filters, or check the organism ID.");
+          } else {
+            onQueryExecuted(result.rows, result.meta);
+            toast.success(`Retrieved ${rowCount} entries from UniProt`);
+          }
         } catch (error: any) {
           clearTimeout(timeoutId);
           const is400 =
@@ -371,12 +375,12 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                 <Input
                   type="number"
                   min="1"
-                  max="500"
+                  max="10000"
                   placeholder="500"
                   value={controls.size}
                   onChange={(e) => {
                     const v = parseInt(e.target.value);
-                    setControls((p) => ({ ...p, size: v && v > 0 ? Math.min(v, 500) : 500 }));
+                    setControls((p) => ({ ...p, size: v && v > 0 ? Math.min(v, 10000) : 500 }));
                   }}
                   disabled={isExecuting}
                   className="h-9 text-xs"
@@ -426,9 +430,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                   Isoforms
                 </Label>
               </div>
-              {(controls.runTango || controls.runS4pred) && (
-                <p className="text-[10px] text-muted-foreground ml-auto">
-                  Predictions limited to first 50 sequences
+              {(controls.runTango || controls.runS4pred) && controls.size > 100 && (
+                <p className="text-[10px] text-amber-600 dark:text-amber-400 ml-auto">
+                  {controls.runTango ? "TANGO" : "S4PRED"} on {controls.size} sequences may take several minutes
                 </p>
               )}
             </div>
