@@ -93,43 +93,43 @@
      DARK MODE (primary — this is PVL's native look)
      ═══════════════════════════════════════════════ */
   .dark {
-    /* ── Surfaces ── */
-    --background: 220 27% 6%;
-    --foreground: 0 0% 96%;
+    /* ── Surfaces (Supabase-inspired: warm dark grays, not pure black) ── */
+    --background: 200 10% 9%;
+    --foreground: 210 10% 93%;
 
-    --card: 220 27% 9%;
-    --card-foreground: 0 0% 96%;
+    --card: 200 10% 11%;
+    --card-foreground: 210 10% 93%;
 
-    --popover: 220 27% 9%;
-    --popover-foreground: 0 0% 96%;
+    --popover: 200 10% 11%;
+    --popover-foreground: 210 10% 93%;
 
     /* ── Elevated Surfaces ── */
-    --surface-1: 220 27% 9%;
-    --surface-2: 220 27% 12%;
-    --surface-3: 220 27% 16%;
+    --surface-1: 200 10% 12%;
+    --surface-2: 200 10% 15%;
+    --surface-3: 200 10% 19%;
 
     /* ── Brand ── */
     --primary: 258 90% 72%;
     --primary-foreground: 0 0% 100%;
-    --primary-hover: 258 90% 56%;
-    --primary-muted: 258 90% 72%;
+    --primary-hover: 258 90% 62%;
+    --primary-muted: 258 60% 60%;
 
     /* ── Neutrals ── */
-    --secondary: 220 27% 12%;
-    --secondary-foreground: 0 0% 96%;
+    --secondary: 200 10% 15%;
+    --secondary-foreground: 210 10% 93%;
 
-    --muted: 220 27% 12%;
-    --muted-foreground: 220 9% 55%;
+    --muted: 200 10% 15%;
+    --muted-foreground: 210 8% 55%;
 
-    --accent: 220 20% 14%;
-    --accent-foreground: 0 0% 96%;
+    --accent: 200 10% 17%;
+    --accent-foreground: 210 10% 93%;
 
-    --faint: 220 9% 35%;
+    --faint: 210 8% 38%;
 
     /* ── Semantic Status ── */
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-    --success: 142 71% 45%;
+    --success: 152 60% 48%;
     --success-foreground: 0 0% 100%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 100%;
@@ -137,17 +137,17 @@
     /* ── Scientific Palette ── */
     --helix: 211 96% 68%;
     --helix-foreground: 0 0% 100%;
-    --beta: 25 95% 53%;
+    --beta: 25 95% 58%;
     --beta-foreground: 0 0% 100%;
-    --coil: 220 9% 46%;
+    --coil: 210 8% 46%;
 
     --chameleon-positive: 258 90% 72%;
-    --chameleon-negative: 220 9% 55%;
+    --chameleon-negative: 210 8% 55%;
 
     /* ── Borders ── */
-    --border: 220 20% 14%;
-    --border-hover: 220 20% 22%;
-    --input: 220 20% 14%;
+    --border: 200 10% 17%;
+    --border-hover: 200 10% 25%;
+    --input: 200 10% 17%;
     --ring: 258 90% 72%;
 
     /* ── Gradients ── */

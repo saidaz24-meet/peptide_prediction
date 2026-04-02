@@ -15,14 +15,17 @@ import { Search, Loader2, Info, ChevronDown, ExternalLink, SlidersHorizontal } f
 import { toast } from "sonner";
 import { API_BASE, executeUniProtQuery } from "@/lib/api";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type QueryMode = "auto" | "accession" | "keyword" | "organism" | "keyword_organism";
-type SortOrder = "best" | "length-asc" | "length-desc" | "protein-asc" | "protein-desc" | "organism-asc" | "organism-desc";
+type SortOrder =
+  | "best"
+  | "length-asc"
+  | "length-desc"
+  | "protein-asc"
+  | "protein-desc"
+  | "organism-asc"
+  | "organism-desc";
 
 interface ParsedQuery {
   mode: QueryMode;
@@ -97,80 +100,105 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
         if (cancelled || !res.ok) return;
         const parsed: ParsedQuery = await res.json();
         if (!cancelled) setParsedQuery(parsed);
-      } catch { /* silent */ }
+      } catch {
+        /* silent */
+      }
     }, 500);
-    return () => { cancelled = true; clearTimeout(tid); };
+    return () => {
+      cancelled = true;
+      clearTimeout(tid);
+    };
   }, [query, selectedMode]);
 
-  const handleExecute = useCallback(async (retryWithoutSort = false, retryWithoutLength = false) => {
-    if (!query.trim()) { toast.error("Please enter a query"); return; }
-
-    setIsExecuting(true);
-    onLoadingChange?.(true);
-    setFinalApiQuery(null);
-
-    const abortController = new AbortController();
-    const timeoutId = setTimeout(() => abortController.abort(), 120000);
-
-    try {
-      let sortValue: string | null = null;
-      if (!retryWithoutSort) {
-        const sortKey = (controls.sort as string) === "score" ? "best" : controls.sort;
-        sortValue = UNIPROT_SORT_MAP[sortKey] ?? null;
+  const handleExecute = useCallback(
+    async (retryWithoutSort = false, retryWithoutLength = false) => {
+      if (!query.trim()) {
+        toast.error("Please enter a query");
+        return;
       }
 
-      const requestBody: any = {
-        query,
-        mode: selectedMode,
-        include_isoforms: controls.includeIsoforms,
-        size: controls.size,
-        run_tango: controls.runTango,
-        run_s4pred: controls.runS4pred,
-        max_provider_sequences: 50,
-      };
+      setIsExecuting(true);
+      onLoadingChange?.(true);
+      setFinalApiQuery(null);
 
-      if (controls.reviewed !== null) requestBody.reviewed = controls.reviewed;
-      if (!retryWithoutLength) {
-        if (controls.lengthMin != null) requestBody.length_min = controls.lengthMin;
-        if (controls.lengthMax != null) requestBody.length_max = controls.lengthMax;
-      }
-      if (sortValue) requestBody.sort = sortValue;
+      const abortController = new AbortController();
+      const timeoutId = setTimeout(() => abortController.abort(), 120000);
 
       try {
-        const result = await executeUniProtQuery(requestBody, abortController.signal);
-        clearTimeout(timeoutId);
-        setFinalApiQuery(result.meta?.api_query_string || parsedQuery?.api_query_string || query);
-        onQueryExecuted(result.rows, result.meta);
-        toast.success(`Retrieved ${result.meta?.row_count || result.rows.length} entries from UniProt`);
-      } catch (error: any) {
-        clearTimeout(timeoutId);
-        const is400 = (error as any).status === 400 || error.message?.toLowerCase().includes("400");
-        if (is400 && !retryWithoutSort && !retryWithoutLength) {
-          toast("Adjusted query. Retrying...");
-          setIsExecuting(false);
-          onLoadingChange?.(false);
-          return handleExecute(true, true);
+        let sortValue: string | null = null;
+        if (!retryWithoutSort) {
+          const sortKey = (controls.sort as string) === "score" ? "best" : controls.sort;
+          sortValue = UNIPROT_SORT_MAP[sortKey] ?? null;
         }
-        if (error.name === "AbortError") {
-          toast.error("Query timed out after 2 minutes.");
-        } else {
-          toast.error(error.message || "Failed to execute UniProt query");
+
+        const requestBody: any = {
+          query,
+          mode: selectedMode,
+          include_isoforms: controls.includeIsoforms,
+          size: controls.size,
+          run_tango: controls.runTango,
+          run_s4pred: controls.runS4pred,
+          max_provider_sequences: 50,
+        };
+
+        if (controls.reviewed !== null) requestBody.reviewed = controls.reviewed;
+        if (!retryWithoutLength) {
+          if (controls.lengthMin != null) requestBody.length_min = controls.lengthMin;
+          if (controls.lengthMax != null) requestBody.length_max = controls.lengthMax;
         }
+        if (sortValue) requestBody.sort = sortValue;
+
+        try {
+          const result = await executeUniProtQuery(requestBody, abortController.signal);
+          clearTimeout(timeoutId);
+          setFinalApiQuery(result.meta?.api_query_string || parsedQuery?.api_query_string || query);
+          onQueryExecuted(result.rows, result.meta);
+          toast.success(
+            `Retrieved ${result.meta?.row_count || result.rows.length} entries from UniProt`
+          );
+        } catch (error: any) {
+          clearTimeout(timeoutId);
+          const is400 =
+            (error as any).status === 400 || error.message?.toLowerCase().includes("400");
+          if (is400 && !retryWithoutSort && !retryWithoutLength) {
+            toast("Adjusted query. Retrying...");
+            setIsExecuting(false);
+            onLoadingChange?.(false);
+            return handleExecute(true, true);
+          }
+          if (error.name === "AbortError") {
+            toast.error("Query timed out after 2 minutes.");
+          } else {
+            toast.error(error.message || "Failed to execute UniProt query");
+          }
+        }
+      } finally {
+        setIsExecuting(false);
+        onLoadingChange?.(false);
       }
-    } finally {
-      setIsExecuting(false);
-      onLoadingChange?.(false);
-    }
-  }, [query, selectedMode, controls, parsedQuery, onQueryExecuted, onLoadingChange]);
+    },
+    [query, selectedMode, controls, parsedQuery, onQueryExecuted, onLoadingChange]
+  );
 
   const detectedMode = parsedQuery?.mode || "auto";
-  const detectedLabel = detectedMode === "accession" ? "Accession" :
-    detectedMode === "organism" ? "Organism" :
-    detectedMode === "keyword" ? "Keyword" :
-    detectedMode === "keyword_organism" ? "Keyword + Organism" : null;
+  const detectedLabel =
+    detectedMode === "accession"
+      ? "Accession"
+      : detectedMode === "organism"
+        ? "Organism"
+        : detectedMode === "keyword"
+          ? "Keyword"
+          : detectedMode === "keyword_organism"
+            ? "Keyword + Organism"
+            : null;
 
-  const hasFilters = controls.reviewed !== true || controls.lengthMin != null ||
-    controls.lengthMax != null || controls.sort !== "best" || controls.runTango || controls.runS4pred;
+  const hasFilters =
+    controls.reviewed !== true ||
+    controls.lengthMin != null ||
+    controls.lengthMax != null ||
+    controls.sort !== "best" ||
+    controls.runTango ||
+    controls.runS4pred;
 
   return (
     <div className="space-y-4">
@@ -183,7 +211,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               placeholder='Search UniProt — e.g. "amyloid", P12345, 9606'
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onKeyDown={(e) => { if (e.key === "Enter" && !isExecuting) handleExecute(); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !isExecuting) handleExecute();
+              }}
               disabled={isExecuting}
               className="pl-9 h-11 text-base"
             />
@@ -206,8 +236,14 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
         {/* Quick info line */}
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span>
-            {controls.reviewed === true ? "Swiss-Prot (reviewed)" : controls.reviewed === false ? "TrEMBL (unreviewed)" : "All UniProtKB"}
-            {controls.lengthMin || controls.lengthMax ? ` · ${controls.lengthMin ?? "any"}–${controls.lengthMax ?? "any"} aa` : ""}
+            {controls.reviewed === true
+              ? "Swiss-Prot (reviewed)"
+              : controls.reviewed === false
+                ? "TrEMBL (unreviewed)"
+                : "All UniProtKB"}
+            {controls.lengthMin || controls.lengthMax
+              ? ` · ${controls.lengthMin ?? "any"}–${controls.lengthMax ?? "any"} aa`
+              : ""}
             {controls.runTango ? " · TANGO" : ""}
             {controls.runS4pred ? " · S4PRED" : ""}
             {` · max ${controls.size}`}
@@ -218,7 +254,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
           >
             <SlidersHorizontal className="w-3 h-3" />
             {showAdvanced ? "Hide options" : "Options"}
-            {hasFilters && !showAdvanced && <span className="w-1.5 h-1.5 rounded-full bg-primary" />}
+            {hasFilters && !showAdvanced && (
+              <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            )}
           </button>
         </div>
       </div>
@@ -232,11 +270,24 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               <div className="space-y-1.5">
                 <Label className="text-xs">Database</Label>
                 <Select
-                  value={controls.reviewed === true ? "reviewed" : controls.reviewed === false ? "unreviewed" : "all"}
-                  onValueChange={(v) => setControls((p) => ({ ...p, reviewed: v === "reviewed" ? true : v === "unreviewed" ? false : null }))}
+                  value={
+                    controls.reviewed === true
+                      ? "reviewed"
+                      : controls.reviewed === false
+                        ? "unreviewed"
+                        : "all"
+                  }
+                  onValueChange={(v) =>
+                    setControls((p) => ({
+                      ...p,
+                      reviewed: v === "reviewed" ? true : v === "unreviewed" ? false : null,
+                    }))
+                  }
                   disabled={isExecuting}
                 >
-                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="reviewed">Reviewed (Swiss-Prot)</SelectItem>
                     <SelectItem value="unreviewed">Unreviewed (TrEMBL)</SelectItem>
@@ -246,8 +297,14 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Sort</Label>
-                <Select value={controls.sort} onValueChange={(v) => setControls((p) => ({ ...p, sort: v as SortOrder }))} disabled={isExecuting}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <Select
+                  value={controls.sort}
+                  onValueChange={(v) => setControls((p) => ({ ...p, sort: v as SortOrder }))}
+                  disabled={isExecuting}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="best">Best Match</SelectItem>
                     <SelectItem value="length-asc">Length (short first)</SelectItem>
@@ -259,8 +316,14 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Query Mode</Label>
-                <Select value={selectedMode} onValueChange={(v) => setSelectedMode(v as QueryMode)} disabled={isExecuting}>
-                  <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                <Select
+                  value={selectedMode}
+                  onValueChange={(v) => setSelectedMode(v as QueryMode)}
+                  disabled={isExecuting}
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="auto">Auto-detect</SelectItem>
                     <SelectItem value="accession">Accession</SelectItem>
@@ -276,9 +339,14 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               <div className="space-y-1.5">
                 <Label className="text-xs">Min Length</Label>
                 <Input
-                  type="number" min="1" placeholder="e.g. 5"
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 5"
                   value={controls.lengthMin ?? ""}
-                  onChange={(e) => { const v = e.target.value ? parseInt(e.target.value) : null; setControls((p) => ({ ...p, lengthMin: v && v > 0 ? v : null })); }}
+                  onChange={(e) => {
+                    const v = e.target.value ? parseInt(e.target.value) : null;
+                    setControls((p) => ({ ...p, lengthMin: v && v > 0 ? v : null }));
+                  }}
                   disabled={isExecuting}
                   className="h-9 text-xs"
                 />
@@ -286,9 +354,14 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               <div className="space-y-1.5">
                 <Label className="text-xs">Max Length</Label>
                 <Input
-                  type="number" min="1" placeholder="e.g. 50"
+                  type="number"
+                  min="1"
+                  placeholder="e.g. 50"
                   value={controls.lengthMax ?? ""}
-                  onChange={(e) => { const v = e.target.value ? parseInt(e.target.value) : null; setControls((p) => ({ ...p, lengthMax: v && v > 0 ? v : null })); }}
+                  onChange={(e) => {
+                    const v = e.target.value ? parseInt(e.target.value) : null;
+                    setControls((p) => ({ ...p, lengthMax: v && v > 0 ? v : null }));
+                  }}
                   disabled={isExecuting}
                   className="h-9 text-xs"
                 />
@@ -296,9 +369,15 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
               <div className="space-y-1.5">
                 <Label className="text-xs">Max Results</Label>
                 <Input
-                  type="number" min="1" max="500" placeholder="500"
+                  type="number"
+                  min="1"
+                  max="500"
+                  placeholder="500"
                   value={controls.size}
-                  onChange={(e) => { const v = parseInt(e.target.value); setControls((p) => ({ ...p, size: v && v > 0 ? Math.min(v, 500) : 500 })); }}
+                  onChange={(e) => {
+                    const v = parseInt(e.target.value);
+                    setControls((p) => ({ ...p, size: v && v > 0 ? Math.min(v, 500) : 500 }));
+                  }}
                   disabled={isExecuting}
                   className="h-9 text-xs"
                 />
@@ -316,7 +395,9 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                   disabled={isExecuting}
                   className="h-4 w-8"
                 />
-                <Label htmlFor="run-tango" className="text-xs cursor-pointer">TANGO</Label>
+                <Label htmlFor="run-tango" className="text-xs cursor-pointer">
+                  TANGO
+                </Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch
@@ -326,20 +407,30 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
                   disabled={isExecuting}
                   className="h-4 w-8"
                 />
-                <Label htmlFor="run-s4pred" className="text-xs cursor-pointer">S4PRED</Label>
+                <Label htmlFor="run-s4pred" className="text-xs cursor-pointer">
+                  S4PRED
+                </Label>
               </div>
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
                   id="include-isoforms"
                   checked={controls.includeIsoforms}
-                  onChange={(e) => setControls((p) => ({ ...p, includeIsoforms: e.target.checked }))}
+                  onChange={(e) =>
+                    setControls((p) => ({ ...p, includeIsoforms: e.target.checked }))
+                  }
                   disabled={isExecuting}
                   className="h-3.5 w-3.5 rounded cursor-pointer"
                 />
-                <Label htmlFor="include-isoforms" className="text-xs cursor-pointer">Isoforms</Label>
+                <Label htmlFor="include-isoforms" className="text-xs cursor-pointer">
+                  Isoforms
+                </Label>
               </div>
-              <p className="text-[10px] text-muted-foreground ml-auto">Predictions limited to first 50 sequences</p>
+              {(controls.runTango || controls.runS4pred) && (
+                <p className="text-[10px] text-muted-foreground ml-auto">
+                  Predictions limited to first 50 sequences
+                </p>
+              )}
             </div>
           </div>
         </CollapsibleContent>
