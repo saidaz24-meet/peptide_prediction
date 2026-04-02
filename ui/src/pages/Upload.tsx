@@ -333,7 +333,9 @@ export default function Upload() {
         >
           {/* Header & progress */}
           <div className="mb-10">
-            <h1 className="text-h1 text-foreground mb-2 page-header-title">Upload & Process Dataset</h1>
+            <h1 className="text-h1 text-foreground mb-2 page-header-title">
+              Upload & Process Dataset
+            </h1>
             <p className="text-body text-muted-foreground mb-8 hidden md:block">
               Upload your peptide CSV/TSV/XLSX — columns are auto-detected.
             </p>
@@ -455,23 +457,29 @@ export default function Upload() {
                       />
 
                       {/* Upload guidance */}
-                      <Alert className="bg-[hsl(var(--surface-1))] border-[hsl(var(--border))] rounded-xl">
-                        <Info className="h-4 w-4" />
-                        <AlertDescription className="text-caption space-y-1">
-                          <p>
-                            <strong>Required:</strong> Your file must include a{" "}
-                            <code>Sequence</code> column.
+                      <div className="grid sm:grid-cols-3 gap-3 text-xs">
+                        <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
+                          <p className="font-medium text-foreground">Required Column</p>
+                          <p className="text-muted-foreground">
+                            <code className="bg-muted px-1 py-0.5 rounded text-[10px]">
+                              Sequence
+                            </code>{" "}
+                            — amino acid letters (A-Z)
                           </p>
-                          <p>
-                            <strong>Recommended:</strong> Up to ~500 sequences. Larger batches take
-                            longer with TANGO enabled.
+                        </div>
+                        <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
+                          <p className="font-medium text-foreground">Optional Columns</p>
+                          <p className="text-muted-foreground">
+                            Entry, Organism, Length, Protein name
                           </p>
-                          <p>
-                            <strong>From UniProt:</strong> Search → Download → TSV → include Entry
-                            and Sequence columns.
+                        </div>
+                        <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
+                          <p className="font-medium text-foreground">Practical Limits</p>
+                          <p className="text-muted-foreground">
+                            ~500 entries (TANGO on) &middot; ~3000 (TANGO off)
                           </p>
-                        </AlertDescription>
-                      </Alert>
+                        </div>
+                      </div>
                     </>
                   )}
 
