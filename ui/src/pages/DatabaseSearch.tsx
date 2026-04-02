@@ -52,15 +52,18 @@ export default function DatabaseSearch() {
   const [showLeaveDialog, setShowLeaveDialog] = useState(false);
   const [pendingNavPath, setPendingNavPath] = useState<string | null>(null);
 
-  // Navigation guard — warn when search results exist
-  const hasResults = browseRows.length > 0;
+  // Navigation guard — warn when search results exist OR analysis is running
+  const shouldGuard = browseRows.length > 0 || isLoading;
 
   useEffect(() => {
-    if (!hasResults) {
+    if (!shouldGuard) {
       setNavGuard(false);
       return;
     }
-    setNavGuard(true, () => setShowLeaveDialog(true));
+    setNavGuard(true, (dest: string) => {
+      setPendingNavPath(dest);
+      setShowLeaveDialog(true);
+    });
     const handler = (e: BeforeUnloadEvent) => {
       e.preventDefault();
     };
@@ -69,7 +72,7 @@ export default function DatabaseSearch() {
       setNavGuard(false);
       window.removeEventListener("beforeunload", handler);
     };
-  }, [hasResults]);
+  }, [shouldGuard]);
 
   const handleQueryExecuted = useCallback((rows: any[], meta: any) => {
     setSearchMeta(meta);
@@ -429,9 +432,13 @@ export default function DatabaseSearch() {
       <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Leave search results?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isLoading ? "Analysis in progress" : "Leave search results?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Your search results ({browseRows.length} entries) will be lost if you navigate away.
+              {isLoading
+                ? "An analysis is currently running. Leaving will cancel it and discard any results."
+                : `Your search results (${browseRows.length} entries) will be lost if you navigate away.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

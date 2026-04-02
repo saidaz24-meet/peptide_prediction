@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -73,6 +73,17 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
   const [isExecuting, setIsExecuting] = useState(false);
   const [finalApiQuery, setFinalApiQuery] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Abort running query on unmount (navigating away)
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        abortRef.current.abort();
+        abortRef.current = null;
+      }
+    };
+  }, []);
 
   const [controls, setControls] = useState<QueryControls>({
     reviewed: true,
@@ -126,7 +137,10 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
       onLoadingChange?.(true);
       setFinalApiQuery(null);
 
+      // Abort any previous request
+      if (abortRef.current) abortRef.current.abort();
       const abortController = new AbortController();
+      abortRef.current = abortController;
       const timeoutId = setTimeout(() => abortController.abort(), 120000);
 
       try {
@@ -188,12 +202,15 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
             return handleExecute(true, true);
           }
           if (error.name === "AbortError") {
+            // Don't show error if component unmounted (user navigated away)
+            if (!abortRef.current) return;
             toast.error("Query timed out after 2 minutes.");
           } else {
             toast.error(error.message || "Failed to execute UniProt query");
           }
         }
       } finally {
+        abortRef.current = null;
         setIsExecuting(false);
         onLoadingChange?.(false);
       }

@@ -137,7 +137,8 @@ export default function QuickAnalyze() {
   // Register global nav guard so sidebar intercepts navigation
   useEffect(() => {
     if (hasUnsavedResults) {
-      setNavGuard(true, () => {
+      setNavGuard(true, (dest: string) => {
+        setPendingNavPath(dest);
         setShowLeaveDialog(true);
       });
     } else {

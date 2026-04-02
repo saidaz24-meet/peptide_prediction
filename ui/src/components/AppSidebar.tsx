@@ -98,7 +98,7 @@ function NavContent({ showLabels, onNavigate }: { showLabels: boolean; onNavigat
 
   const handleClick = useCallback(
     (path: string) => {
-      if (checkNavGuard()) return;
+      if (checkNavGuard(path)) return;
       navigate(path);
       onNavigate?.();
     },
@@ -106,7 +106,7 @@ function NavContent({ showLabels, onNavigate }: { showLabels: boolean; onNavigat
   );
 
   const handleNewAnalysis = useCallback(() => {
-    if (checkNavGuard()) return;
+    if (checkNavGuard("/upload")) return;
     resetData();
     navigate("/upload");
     onNavigate?.();
@@ -489,10 +489,7 @@ export function AppSidebar() {
     <>
       {/* Fixed-width spacer that always takes w-14 in the layout (hover/collapsed) or w-52 (expanded) */}
       <div
-        className={cn(
-          "shrink-0 hidden md:block",
-          sidebarMode === "expanded" ? "w-52" : "w-14"
-        )}
+        className={cn("shrink-0 hidden md:block", sidebarMode === "expanded" ? "w-52" : "w-14")}
       />
 
       {/* The actual sidebar — positioned fixed so it overlays content on hover */}
