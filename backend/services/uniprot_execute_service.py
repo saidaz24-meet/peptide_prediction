@@ -156,9 +156,16 @@ def _validate_sort(sort: Optional[str]) -> Optional[str]:
 
 
 def _build_url(
-    api_query: str, request: UniProtQueryExecuteRequest, sort_value: Optional[str]
+    api_query: str,
+    request: UniProtQueryExecuteRequest,
+    sort_value: Optional[str],
+    page_size: int = 500,
 ) -> str:
-    """Build the UniProt REST API export URL."""
+    """Build the UniProt REST API export URL.
+
+    UniProt API supports max 500 results per page. For larger requests,
+    pagination via Link headers is handled by _fetch_uniprot_paginated().
+    """
     return build_uniprot_export_url(
         api_query,
         format="tsv",
@@ -167,7 +174,7 @@ def _build_url(
         length_max=request.length_max,
         sort=sort_value,
         include_isoforms=request.include_isoforms or False,
-        size=min(max(request.size or 500, 1), 500),
+        size=min(max(page_size, 1), 500),  # UniProt API max per page = 500
     )
 
 
@@ -180,7 +187,7 @@ _USER_AGENT = "PeptideVisualLab/1.0 (https://github.com/your-org/peptide-predict
 
 async def _fetch_uniprot_tsv(url: str) -> Tuple[pd.DataFrame, int]:
     """
-    Fetch TSV data from UniProt and parse into a DataFrame.
+    Fetch a single page of TSV data from UniProt.
 
     Returns:
         Tuple of (DataFrame, total_available) where total_available is from
@@ -196,6 +203,108 @@ async def _fetch_uniprot_tsv(url: str) -> Tuple[pd.DataFrame, int]:
         total_available = int(response.headers.get("X-Total-Results", -1))
         df = read_any_table(response.content, "uniprot_export.tsv")
         return df, total_available
+
+
+def _parse_link_header(link_header: str) -> Optional[str]:
+    """Extract 'next' URL from UniProt Link header.
+
+    UniProt returns: <https://rest.uniprot.org/...?cursor=xxx>; rel="next"
+    """
+    for part in link_header.split(","):
+        part = part.strip()
+        if 'rel="next"' in part:
+            url_match = re.match(r"<(.+?)>", part)
+            if url_match:
+                return url_match.group(1)
+    return None
+
+
+async def _fetch_uniprot_paginated(
+    url: str,
+    max_results: int,
+) -> Tuple[pd.DataFrame, int]:
+    """
+    Fetch multiple pages from UniProt using cursor-based pagination.
+
+    UniProt API returns max 500 results per page. For larger requests,
+    follows the Link header to fetch subsequent pages until max_results
+    is reached or no more pages are available.
+
+    Includes rate limiting: 200ms delay between pages to respect UniProt's
+    public API guidelines (~5 requests/second).
+
+    Returns:
+        Tuple of (combined DataFrame, total_available from first page).
+    """
+    all_dfs = []
+    total_available = -1
+    fetched = 0
+    page = 0
+    next_url: Optional[str] = url
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        headers = {"User-Agent": _USER_AGENT}
+
+        while next_url and fetched < max_results:
+            page += 1
+            if page > 1:
+                # Rate limiting between pages (UniProt recommends ~5 req/s for public API)
+                await asyncio.sleep(0.2)
+
+            try:
+                response = await client.get(next_url, headers=headers)
+                response.raise_for_status()
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 429:
+                    # Rate limited — wait and retry once
+                    retry_after = int(e.response.headers.get("Retry-After", "5"))
+                    log_warning(
+                        "uniprot_rate_limited", f"Rate limited, waiting {retry_after}s", page=page
+                    )
+                    await asyncio.sleep(retry_after)
+                    response = await client.get(next_url, headers=headers)
+                    response.raise_for_status()
+                else:
+                    raise
+
+            if page == 1:
+                total_available = int(response.headers.get("X-Total-Results", -1))
+
+            page_df = read_any_table(response.content, f"uniprot_page_{page}.tsv")
+            if len(page_df) == 0:
+                break
+
+            all_dfs.append(page_df)
+            fetched += len(page_df)
+
+            log_info(
+                "uniprot_page_fetched",
+                f"Page {page}: {len(page_df)} rows (total so far: {fetched})",
+                page=page,
+                fetched=fetched,
+                target=max_results,
+            )
+
+            # Check for next page in Link header
+            link_header = response.headers.get("Link", "")
+            next_url = _parse_link_header(link_header) if link_header else None
+
+    if not all_dfs:
+        return pd.DataFrame(), total_available
+
+    combined = pd.concat(all_dfs, ignore_index=True)
+    # Trim to exact requested size
+    if len(combined) > max_results:
+        combined = combined.head(max_results)
+
+    log_info(
+        "uniprot_pagination_complete",
+        f"Fetched {len(combined)} rows across {page} page(s)",
+        total_fetched=len(combined),
+        pages=page,
+        total_available=total_available,
+    )
+    return combined, total_available
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +515,7 @@ async def _handle_400_fallback(
         "query": api_query,
         "format": "json",
         "fields": minimal_fields,
-        "size": min(max(request.size or 500, 1), 500),
+        "size": min(max(request.size or 500, 1), 500),  # Fallback is JSON, keep at 500 per page
     }
 
     # Add reviewed filter if set
@@ -617,9 +726,14 @@ async def execute_uniprot_query(
     )
     log_info("uniprot_url", f"UniProt URL: {uniprot_url}", **{"url": uniprot_url})
 
+    requested_size = min(request.size or 500, 10000)  # Hard cap at 10K
     try:
-        # 4. Fetch from UniProt
-        df, total_available = await _fetch_uniprot_tsv(uniprot_url)
+        # 4. Fetch from UniProt (paginated if requesting > 500)
+        if requested_size <= 500:
+            df, total_available = await _fetch_uniprot_tsv(uniprot_url)
+        else:
+            df, total_available = await _fetch_uniprot_paginated(uniprot_url, requested_size)
+
         log_info(
             "uniprot_fetch_success",
             f"Retrieved {len(df)} rows (total available: {total_available})",
