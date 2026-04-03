@@ -21,7 +21,7 @@ services:
       - pvl-runs:/data/runs
       - pvl-uploads:/data/uploads
       - ${TOOLS_HOST_PATH:-./tools}:/opt/tools:ro
-      - pvl-cache:/app/.run_cache
+      - pvl-cache:/data/cache
     environment:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
@@ -33,6 +33,14 @@ services:
       - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
       - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
       - SENTRY_DSN=${SENTRY_DSN:-}
+      - TANGO_RUNTIME_DIR=/data/runs/tango
+      - CELERY_ENABLED=${CELERY_ENABLED:-1}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
       interval: 30s
@@ -40,6 +48,7 @@ services:
       retries: 3
       start_period: 20s
     restart: always
+    stop_grace_period: 90s
     deploy:
       resources:
         limits:
@@ -48,6 +57,130 @@ services:
         reservations:
           cpus: '0.5'
           memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Redis (Message Broker + Result Backend)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: pvl-redis
+    volumes:
+      - pvl-redis:/data
+    command: redis-server --maxmemory 160mb --maxmemory-policy allkeys-lru --save ""
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: always
+    deploy:
+      resources:
+        limits:
+          cpus: '0.25'
+          memory: 192M
+        reservations:
+          cpus: '0.05'
+          memory: 64M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Celery Worker — Batch Queue (heavy analysis jobs)
+  # ---------------------------------------------------------------------------
+  celery-batch:
+    image: ghcr.io/saidaz24-meet/pvl-backend:${PVL_TAG:-latest}
+    container_name: pvl-celery-batch
+    command: >
+      celery -A celery_app worker
+      --queues=batch
+      --concurrency=2
+      --pool=prefork
+      --max-tasks-per-child=500
+      --loglevel=info
+      --hostname=batch@%h
+    volumes:
+      - pvl-runs:/data/runs
+      - pvl-uploads:/data/uploads
+      - ${TOOLS_HOST_PATH:-./tools}:/opt/tools:ro
+      - pvl-cache:/data/cache
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - USE_TANGO=${USE_TANGO:-1}
+      - USE_S4PRED=${USE_S4PRED:-1}
+      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
+      - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - TANGO_RUNTIME_DIR=/data/runs/tango
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    stop_grace_period: 120s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.5'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ---------------------------------------------------------------------------
+  # Celery Worker — Quick Queue (single-sequence predictions)
+  # ---------------------------------------------------------------------------
+  celery-quick:
+    image: ghcr.io/saidaz24-meet/pvl-backend:${PVL_TAG:-latest}
+    container_name: pvl-celery-quick
+    command: >
+      celery -A celery_app worker
+      --queues=quick
+      --concurrency=2
+      --pool=prefork
+      --max-tasks-per-child=500
+      --loglevel=info
+      --hostname=quick@%h
+    volumes:
+      - pvl-runs:/data/runs
+      - pvl-uploads:/data/uploads
+      - pvl-cache:/data/cache
+      - ${TOOLS_HOST_PATH:-./tools}:/opt/tools:ro
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - USE_TANGO=${USE_TANGO:-1}
+      - USE_S4PRED=${USE_S4PRED:-1}
+      - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
+      - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
+      - SENTRY_DSN=${SENTRY_DSN:-}
+      - TANGO_RUNTIME_DIR=/data/runs/tango
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: always
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+        reservations:
+          cpus: '0.1'
+          memory: 256M
     logging:
       driver: "json-file"
       options:
@@ -90,6 +223,8 @@ volumes:
   pvl-uploads:
     driver: local
   pvl-cache:
+    driver: local
+  pvl-redis:
     driver: local
 
 # =============================================================================

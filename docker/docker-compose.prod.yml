@@ -26,6 +26,7 @@ services:
     healthcheck:
       start_period: 20s
     restart: always
+    stop_grace_period: 90s
     deploy:
       resources:
         limits:
@@ -71,6 +72,7 @@ services:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
     restart: always
+    stop_grace_period: 120s
     deploy:
       resources:
         limits:
@@ -95,6 +97,7 @@ services:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
     restart: always
+    stop_grace_period: 60s
     deploy:
       resources:
         limits:
