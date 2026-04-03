@@ -20,7 +20,11 @@ from services.dataframe_utils import read_any_table, require_cols
 from services.logger import get_trace_id, log_error, log_info
 from services.normalize import normalize_cols
 from services.thresholds import parse_threshold_config
-from services.upload_service import AnalysisCancelledError, UploadProcessingError, process_upload_dataframe
+from services.upload_service import (
+    AnalysisCancelledError,
+    UploadProcessingError,
+    process_upload_dataframe,
+)
 
 router = APIRouter()
 
@@ -36,7 +40,9 @@ async def cancel_sync_job(cancel_token: str):
         event.set()
         log_info("job_cancel_requested", f"Cancel requested for sync job {cancel_token[:8]}")
         return {"status": "CANCELLED", "cancelToken": cancel_token}
-    raise HTTPException(404, detail="No active job with this cancel token")
+    # Token already cleaned up (job finished) — return 200 silently
+    # This is expected when sendBeacon fires after navigation
+    return {"status": "ALREADY_COMPLETE", "cancelToken": cancel_token}
 
 
 @router.post("/api/jobs/upload")
