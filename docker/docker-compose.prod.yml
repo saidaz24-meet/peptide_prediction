@@ -22,7 +22,7 @@ services:
       - ENVIRONMENT=production
       - LOG_LEVEL=INFO
       # CORS
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://localhost}
+      - CORS_ORIGINS=${CORS_ORIGINS:-http://94.130.178.182,http://94.130.178.182:3000,http://94.130.178.182:80,http://localhost}
     healthcheck:
       start_period: 20s
     restart: always
@@ -45,6 +45,7 @@ services:
   # ---------------------------------------------------------------------------
   redis:
     container_name: pvl-redis
+    command: redis-server --maxmemory 160mb --maxmemory-policy allkeys-lru --save ""
     restart: always
     deploy:
       resources:
@@ -73,7 +74,7 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '2'
+          cpus: '1.5'
           memory: 2G
         reservations:
           cpus: '0.5'
@@ -97,10 +98,10 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '1'
-          memory: 2G
+          cpus: '0.5'
+          memory: 1G
         reservations:
-          cpus: '0.25'
+          cpus: '0.1'
           memory: 256M
     logging:
       driver: "json-file"

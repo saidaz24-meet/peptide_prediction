@@ -14,6 +14,7 @@ import { Switch } from "@/components/ui/switch";
 import { Search, Loader2, Info, ChevronDown, ExternalLink, SlidersHorizontal } from "lucide-react";
 import { toast } from "sonner";
 import { API_BASE, executeUniProtQuery } from "@/lib/api";
+import { cancelSyncJob } from "@/lib/jobApi";
 import { AnalysisProgress } from "@/components/AnalysisProgress";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
@@ -74,14 +75,34 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
   const [finalApiQuery, setFinalApiQuery] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
+  const cancelTokenRef = useRef<string | null>(null);
 
-  // Abort running query on unmount (navigating away)
+  // Cancel backend job + abort fetch on unmount (navigation) or tab close
   useEffect(() => {
-    return () => {
+    const cancelBackend = () => {
+      const token = cancelTokenRef.current;
+      if (token) {
+        const url = `${API_BASE}/api/jobs/cancel-sync/${token}`;
+        navigator.sendBeacon(url);
+        cancelTokenRef.current = null;
+      }
       if (abortRef.current) {
         abortRef.current.abort();
         abortRef.current = null;
       }
+    };
+
+    const handler = (e: BeforeUnloadEvent) => {
+      if (cancelTokenRef.current) {
+        e.preventDefault();
+        cancelBackend();
+      }
+    };
+
+    window.addEventListener("beforeunload", handler);
+    return () => {
+      window.removeEventListener("beforeunload", handler);
+      cancelBackend();
     };
   }, []);
 
@@ -141,8 +162,20 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
       if (abortRef.current) abortRef.current.abort();
       const abortController = new AbortController();
       abortRef.current = abortController;
-      // Scale timeout with size: 2 min base + 30s per 500 entries (S4PRED ~1s/seq)
-      const timeoutMs = 120000 + Math.floor(controls.size / 500) * 30000;
+      const token = crypto.randomUUID();
+      cancelTokenRef.current = token;
+
+      // Timeout — UniProt returns FULL proteins (some 1000+ aa).
+      // S4PRED LSTM on CPU: ~30-60s per large protein on a laptop.
+      // With cancel button users can abort early — so be very generous here.
+      const fetchTime = Math.ceil(controls.size / 500) * 20_000;
+      // S4PRED: ~1s/short peptide, ~15s/full protein on VPS. Use 10s avg.
+      const s4predTime = controls.runS4pred ? controls.size * 10_000 : 0;
+      // TANGO: parallelized, ~0.5s/peptide with 4 workers
+      const tangoTime = controls.runTango ? Math.ceil(controls.size / 4) * 2_000 : 0;
+      const baseMs = controls.runS4pred || controls.runTango ? 120_000 : 60_000;
+      // Cap at 30 minutes — user can cancel anytime
+      const timeoutMs = Math.min(30 * 60_000, Math.max(180_000, baseMs + fetchTime + s4predTime + tangoTime));
       const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
       try {
@@ -180,7 +213,7 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
         if (sortValue) requestBody.sort = sortValue;
 
         try {
-          const result = await executeUniProtQuery(requestBody, abortController.signal);
+          const result = await executeUniProtQuery(requestBody, abortController.signal, token);
           clearTimeout(timeoutId);
           setFinalApiQuery(result.meta?.api_query_string || parsedQuery?.api_query_string || query);
 
@@ -206,7 +239,10 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
           if (error.name === "AbortError") {
             // Don't show error if component unmounted (user navigated away)
             if (!abortRef.current) return;
-            toast.error("Query timed out after 2 minutes.");
+            const mins = Math.round(timeoutMs / 60_000);
+            toast.error(
+              `Query timed out after ${mins} minute${mins !== 1 ? "s" : ""}. Try reducing the result count or disabling predictors.`
+            );
           } else {
             toast.error(error.message || "Failed to execute UniProt query");
           }
@@ -508,7 +544,27 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
       )}
 
       {/* ── Loading state ── */}
-      <AnalysisProgress isActive={isExecuting} peptideCount={controls.size} />
+      <AnalysisProgress
+        isActive={isExecuting}
+        peptideCount={controls.size}
+        hasS4pred={controls.runS4pred}
+        hasTango={controls.runTango}
+        onCancel={() => {
+          // Tell backend to stop processing
+          if (cancelTokenRef.current) {
+            cancelSyncJob(cancelTokenRef.current);
+            cancelTokenRef.current = null;
+          }
+          // Abort the HTTP request
+          if (abortRef.current) {
+            abortRef.current.abort();
+            abortRef.current = null;
+          }
+          setIsExecuting(false);
+          onLoadingChange?.(false);
+          toast("Analysis cancelled");
+        }}
+      />
     </div>
   );
 }

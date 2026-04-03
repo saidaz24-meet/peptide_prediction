@@ -9,6 +9,7 @@ GET  /api/jobs         — List active jobs
 
 import asyncio
 import json
+import threading
 import time
 from typing import Optional
 
@@ -19,9 +20,23 @@ from services.dataframe_utils import read_any_table, require_cols
 from services.logger import get_trace_id, log_error, log_info
 from services.normalize import normalize_cols
 from services.thresholds import parse_threshold_config
-from services.upload_service import UploadProcessingError, process_upload_dataframe
+from services.upload_service import AnalysisCancelledError, UploadProcessingError, process_upload_dataframe
 
 router = APIRouter()
+
+# In-memory store for sync job cancel events (keyed by cancel token)
+_sync_cancel_events: dict[str, threading.Event] = {}
+
+
+@router.post("/api/jobs/cancel-sync/{cancel_token}")
+async def cancel_sync_job(cancel_token: str):
+    """Cancel a running sync job by its cancel token."""
+    event = _sync_cancel_events.get(cancel_token)
+    if event:
+        event.set()
+        log_info("job_cancel_requested", f"Cancel requested for sync job {cancel_token[:8]}")
+        return {"status": "CANCELLED", "cancelToken": cancel_token}
+    raise HTTPException(404, detail="No active job with this cancel token")
 
 
 @router.post("/api/jobs/upload")
@@ -29,6 +44,7 @@ async def submit_upload_job(
     file: UploadFile = File(...),
     debug_entry: Optional[str] = Query(None, description="Entry ID to trace through pipeline"),
     thresholdConfig: Optional[str] = Form(None, description="Threshold configuration JSON"),
+    cancelToken: Optional[str] = Query(None, description="Token for cancelling sync jobs"),
 ):
     """
     Submit a batch analysis job. Returns a job ID for polling.
@@ -109,31 +125,56 @@ async def submit_upload_job(
             )
             # Fall through to sync path
 
-    # Sync fallback path
+    # Sync fallback path — with cancellation support
     log_info("job_sync", f"Processing {peptide_count} peptides synchronously", stage="job")
 
     from api.main import SENTRY_INITIALIZED
 
+    cancel_event = threading.Event()
+
+    # Register cancel event so the cancel endpoint can find it
+    if cancelToken:
+        _sync_cancel_events[cancelToken] = cancel_event
+
     try:
-        result = await asyncio.to_thread(
-            process_upload_dataframe,
-            df=df,
-            threshold_config_requested=threshold_config_requested,
-            threshold_config_resolved=threshold_config_resolved,
-            trace_entry=trace_entry,
-            sentry_initialized=SENTRY_INITIALIZED,
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: process_upload_dataframe(
+                df=df,
+                threshold_config_requested=threshold_config_requested,
+                threshold_config_resolved=threshold_config_resolved,
+                trace_entry=trace_entry,
+                sentry_initialized=SENTRY_INITIALIZED,
+                cancel_event=cancel_event,
+            ),
         )
+
+        if cancel_event.is_set():
+            log_info("job_cancelled", "Upload analysis cancelled by user")
+            return {"jobId": None, "status": "CANCELLED", "mode": "sync", "result": None}
+
         return {
             "jobId": None,
             "status": "SUCCESS",
             "mode": "sync",
             "result": result,
         }
+    except asyncio.CancelledError:
+        cancel_event.set()
+        log_info("job_client_disconnect", "Client disconnected, cancelling upload analysis")
+        raise
+    except AnalysisCancelledError:
+        log_info("job_cancelled", "Upload analysis cancelled by user")
+        return {"jobId": None, "status": "CANCELLED", "mode": "sync", "result": None}
     except UploadProcessingError as e:
         raise HTTPException(
             status_code=e.status_code,
             detail=json.dumps(e.detail) if e.detail else e.message,
         ) from e
+    finally:
+        if cancelToken:
+            _sync_cancel_events.pop(cancelToken, None)
 
 
 @router.get("/api/jobs/{job_id}")

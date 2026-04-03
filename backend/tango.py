@@ -235,32 +235,31 @@ def run_tango_on_dataframe(df: pd.DataFrame) -> str:
 # ---------------------------------------------------------------------
 def _write_simple_bat(records: List[Tuple[str, str]], script_path: str) -> List[Dict[str, str]]:
     """
-    Create a simple per-peptide runner script (bash script).
-    Each line calls the Tango binary with inline params and redirects to <ID>.txt.
-    Script is written to run_dir, and executed with cwd=run_dir, so outputs go to run_dir.
-    Uses absolute path to the TANGO binary to avoid path resolution issues.
+    Create a per-peptide runner script that calls the TANGO binary in parallel.
+
+    Each TANGO invocation is launched as a background job (&).  A simple
+    job-counting loop limits concurrency to ``MAX_PARALLEL`` (default 4)
+    so the OS is not overwhelmed on large batches.  On a 4-core VPS this
+    gives ~4× speedup vs the previous serial script.
 
     Returns:
-        List of entry_mapping dicts: [{"peptide_id": ..., "tango_entry_id": ..., "expected_output": ...}, ...]
-        This mapping is the SINGLE SOURCE OF TRUTH for output file names.
+        List of entry_mapping dicts (single source of truth for output file names).
     """
     os.makedirs(os.path.dirname(script_path), exist_ok=True)
-    # Resolve TANGO binary via platform-aware resolver
     abs_bin = _resolve_tango_bin()
     if not abs_bin:
-        abs_bin = os.path.abspath(
-            os.path.join(TANGO_DIR, "bin", "tango")
-        )  # will fail later with clear error
-    lines = []
+        abs_bin = os.path.abspath(os.path.join(TANGO_DIR, "bin", "tango"))
+
+    # Detect available CPU cores; cap at 4 to leave headroom for FastAPI + other services
+    try:
+        max_parallel = min(os.cpu_count() or 2, 4)
+    except Exception:
+        max_parallel = 2
+
+    lines: List[str] = []
     lines.append("#!/bin/bash\n")
-    # Use set -u (undefined variables) but NOT set -e (exit on error).
-    # If one peptide's TANGO call fails, the script must continue with the
-    # remaining peptides. The failed peptide's output will be empty/partial,
-    # which process_tango_output handles gracefully.
     lines.append("set -u\n")
-    # Use absolute path to binary (computed at script generation time)
     lines.append(f'BIN="{abs_bin}"\n')
-    # Ensure binary is executable and not quarantined (macOS safety — no-op on Linux)
     if platform.system() == "Darwin":
         lines.append('xattr -d com.apple.quarantine "$BIN" >/dev/null 2>&1 || true\n')
     lines.append('chmod +x "$BIN" || true\n')
@@ -268,7 +267,10 @@ def _write_simple_bat(records: List[Tuple[str, str]], script_path: str) -> List[
         'if [ ! -x "$BIN" ]; then echo "[TANGO] tango binary missing at $BIN"; exit 1; fi\n'
     )
 
-    # Build entry_mapping as we write the script - this is the SINGLE SOURCE OF TRUTH
+    # Parallel job control
+    lines.append(f"MAX_PARALLEL={max_parallel}\n")
+    lines.append("NJOBS=0\n")
+
     entry_mapping: List[Dict[str, str]] = []
     for entry_id, seq in records:
         safe = _safe_id(entry_id)
@@ -280,12 +282,17 @@ def _write_simple_bat(records: List[Tuple[str, str]], script_path: str) -> List[
                 "expected_output": expected_output,
             }
         )
-        # Each TANGO call uses || true to ensure the script continues
-        # even if the binary returns non-zero for this peptide.
-        # stderr is redirected to /dev/null to avoid noise in script output.
+        # Launch each TANGO call as a background job
         lines.append(
-            f'"$BIN" {safe} nt="N" ct="N" ph="7" te="298" io="0.1" tf="0" seq="{seq}" > "{expected_output}" 2>/dev/null || true\n'
+            f'("$BIN" {safe} nt="N" ct="N" ph="7" te="298" io="0.1" tf="0" seq="{seq}" > "{expected_output}" 2>/dev/null || true) &\n'
         )
+        # Job throttle: wait for all current jobs when limit reached
+        lines.append("NJOBS=$((NJOBS + 1))\n")
+        lines.append('if [ "$NJOBS" -ge "$MAX_PARALLEL" ]; then wait; NJOBS=0; fi\n')
+
+    # Wait for any remaining background jobs
+    lines.append("wait\n")
+
     with open(script_path, "w", encoding="utf-8") as fh:
         fh.writelines(lines)
     os.chmod(script_path, 0o755)
@@ -361,7 +368,10 @@ def _write_run_meta(
         )
 
 
-def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> str:
+def run_tango_simple(
+    records: Optional[List[Tuple[str, str]]],
+    cancel_event: Optional[Any] = None,
+) -> str:
     """
     Mac-native TANGO runner:
       - Creates per-run folder Tango/out/run_*/
@@ -473,11 +483,61 @@ def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> str:
     trace_id = get_trace_id()
 
     try:
-        proc = subprocess.run(cmd, cwd=run_dir, capture_output=True, text=True, timeout=300)
-        stderr_tail = (
-            proc.stderr[-2048:] if proc.stderr and len(proc.stderr) > 2048 else (proc.stderr or "")
+        # Timeout scales with batch size: 120s base + 1s per sequence (parallelized).
+        # Full proteins (400+ aa) are much slower than short peptides.
+        # With cancel button, users can abort early — this is a safety net.
+        tango_timeout = max(120, 120 + len(records))
+
+        # Use Popen with process group so we can kill on cancel
+        import signal
+
+        proc = subprocess.Popen(
+            cmd,
+            cwd=run_dir,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
         )
-        stdout_preview = proc.stdout[:500] if proc.stdout else ""
+
+        # Poll loop: check cancel_event every 0.5s, enforce timeout
+        import time as _time
+
+        poll_start = _time.monotonic()
+        cancelled = False
+        while proc.poll() is None:
+            if cancel_event and cancel_event.is_set():
+                cancelled = True
+                log_info("tango_cancel_kill", f"Killing TANGO subprocess (pid={proc.pid})")
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                except OSError:
+                    proc.kill()
+                proc.wait(timeout=5)
+                break
+            if _time.monotonic() - poll_start > tango_timeout:
+                log_error("tango_timeout", f"TANGO exceeded {tango_timeout}s timeout, killing")
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                except OSError:
+                    proc.kill()
+                proc.wait(timeout=5)
+                raise subprocess.TimeoutExpired(cmd, tango_timeout)
+            _time.sleep(0.5)
+
+        stdout_data = proc.stdout.read() if proc.stdout else ""
+        stderr_data = proc.stderr.read() if proc.stderr else ""
+        proc.stdout.close()
+        proc.stderr.close()
+
+        if cancelled:
+            log_info("tango_cancelled", "TANGO run cancelled by user")
+            return run_dir
+
+        stderr_tail = (
+            stderr_data[-2048:] if stderr_data and len(stderr_data) > 2048 else (stderr_data or "")
+        )
+        stdout_preview = stdout_data[:500] if stdout_data else ""
         output_files = [
             f for f in os.listdir(run_dir) if f.lower().endswith(".txt") and f != "Tango_run.sh"
         ]
@@ -537,7 +597,7 @@ def run_tango_simple(records: Optional[List[Tuple[str, str]]]) -> str:
             trace_id,
             "Timeout",
             bin_exists=True,
-            stderr_tail="Execution timed out after 300 seconds",
+            stderr_tail=f"Execution timed out after {tango_timeout} seconds",
             exception_type="TimeoutExpired",
             **meta_common,
         )
@@ -1617,48 +1677,50 @@ def filter_by_avg_diff(
     # This means diff >= avg → -1 (NOT SSW), diff < avg → 1 (IS SSW)
     # The comparison operator determines when to mark as 1 (default: "<" to match reference)
     comparison_op = os.getenv("SSW_DIFF_COMPARISON", "<").strip()
-    preds = []
-    for _idx, row in database.iterrows():
-        ssw_diff_val = row["SSW diff"]
-        helix_pct = row.get("SSW helix percentage")
-        beta_pct = row.get("SSW beta percentage")
 
-        # Determine if TANGO actually ran for this row
-        # TANGO ran if we have helix or beta percentages (even if 0.0),
-        # OR if the "Tango attempted" flag is set (TANGO ran but output was
-        # empty/unparseable — still means "no switch", not "unknown").
-        tango_attempted = bool(row.get("Tango attempted", False))
-        tango_has_data = bool(row.get("Tango has data", False))
-        tango_ran = (
-            (helix_pct is not None and not (isinstance(helix_pct, float) and math.isnan(helix_pct)))
-            or (beta_pct is not None and not (isinstance(beta_pct, float) and math.isnan(beta_pct)))
-            or tango_attempted
-            or tango_has_data
-        )
+    # Vectorized SSW prediction (replaces iterrows loop)
+    ssw_diff_series = pd.to_numeric(database["SSW diff"], errors="coerce")
 
-        # Guard: Handle missing SSW diff
-        if ssw_diff_val is None or (
-            isinstance(ssw_diff_val, float)
-            and (math.isnan(ssw_diff_val) or not math.isfinite(ssw_diff_val))
-        ):
-            if tango_ran:
-                # TANGO ran but no SSW fragments found → predict -1 (no structural switch)
-                # This is different from "TANGO didn't run" (which would be None)
-                preds.append(-1)
-            else:
-                # TANGO didn't run → set to None (will be converted to null in JSON)
-                preds.append(None)
-        elif comparison_op == ">=":
-            preds.append(1 if ssw_diff_val >= avg_diff else -1)
-        elif comparison_op == "<=":
-            preds.append(1 if ssw_diff_val <= avg_diff else -1)
-        elif comparison_op == ">":
-            preds.append(1 if ssw_diff_val > avg_diff else -1)
-        elif comparison_op == "<":
-            preds.append(1 if ssw_diff_val < avg_diff else -1)
-        else:
-            # Default to "<" (reference behavior: prediction = 1 if diff < avg_diff)
-            preds.append(1 if ssw_diff_val < avg_diff else -1)
+    # Determine which rows have valid helix/beta percentages (not None/NaN)
+    helix_pct_s = pd.to_numeric(
+        database["SSW helix percentage"] if "SSW helix percentage" in database.columns
+        else pd.Series(dtype="float64", index=database.index),
+        errors="coerce",
+    )
+    beta_pct_s = pd.to_numeric(
+        database["SSW beta percentage"] if "SSW beta percentage" in database.columns
+        else pd.Series(dtype="float64", index=database.index),
+        errors="coerce",
+    )
+    tango_attempted_s = database.get("Tango attempted", pd.Series(False, index=database.index)).fillna(False).astype(bool)
+    tango_has_data_s = database.get("Tango has data", pd.Series(False, index=database.index)).fillna(False).astype(bool)
+
+    # TANGO ran if we have helix/beta data OR the attempted/has_data flags are set
+    tango_ran_mask = helix_pct_s.notna() | beta_pct_s.notna() | tango_attempted_s | tango_has_data_s
+
+    # Valid diff = not NaN (coerced from None / non-numeric)
+    has_valid_diff = ssw_diff_series.notna()
+
+    # Comparison: which rows pass the threshold
+    if comparison_op == ">=":
+        passes_threshold = ssw_diff_series >= avg_diff
+    elif comparison_op == "<=":
+        passes_threshold = ssw_diff_series <= avg_diff
+    elif comparison_op == ">":
+        passes_threshold = ssw_diff_series > avg_diff
+    else:
+        # Default "<" (reference behavior: prediction = 1 if diff < avg_diff)
+        passes_threshold = ssw_diff_series < avg_diff
+
+    # Build predictions:
+    #   valid diff + passes → 1, valid diff + fails → -1
+    #   no valid diff + tango ran → -1 (no structural switch)
+    #   no valid diff + tango didn't run → None
+    preds = [
+        (1 if passes else -1) if valid
+        else (-1 if ran else None)
+        for valid, passes, ran in zip(has_valid_diff, passes_threshold, tango_ran_mask)
+    ]
 
     # Assign using index-aligned Series to ensure proper alignment
     # Use object dtype to allow None values

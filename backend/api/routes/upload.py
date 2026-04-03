@@ -8,7 +8,7 @@ import threading
 import time
 from typing import Optional
 
-from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Request, UploadFile
 
 from config import settings
 from schemas.api_models import RowsResponse
@@ -28,6 +28,7 @@ DEBUG_ENTRY = settings.DEBUG_ENTRY
 
 @router.post("/api/upload-csv", response_model=RowsResponse)
 async def upload_csv(
+    request: Request,
     file: UploadFile = File(...),
     debug_entry: Optional[str] = Query(None, description="Entry ID to trace through pipeline"),
     thresholdConfig: Optional[str] = Form(None, description="Threshold configuration JSON"),
@@ -133,8 +134,22 @@ async def upload_csv(
     from api.main import SENTRY_INITIALIZED
 
     cancel_event = threading.Event()
+
+    async def _detect_disconnect():
+        try:
+            while not cancel_event.is_set():
+                if await request.is_disconnected():
+                    cancel_event.set()
+                    log_info("upload_client_disconnect", "Client disconnected, cancelling upload analysis")
+                    break
+                await asyncio.sleep(0.5)
+        except Exception:
+            pass
+
+    disconnect_task = asyncio.create_task(_detect_disconnect())
+
     try:
-        task = asyncio.get_event_loop().run_in_executor(
+        result = await asyncio.get_event_loop().run_in_executor(
             None,
             lambda: process_upload_dataframe(
                 df=df,
@@ -145,7 +160,9 @@ async def upload_csv(
                 cancel_event=cancel_event,
             ),
         )
-        return await task
+        if cancel_event.is_set():
+            raise asyncio.CancelledError()
+        return result
     except asyncio.CancelledError:
         cancel_event.set()
         log_info("upload_client_disconnect", "Client disconnected, cancelling upload analysis")
@@ -154,3 +171,5 @@ async def upload_csv(
         raise HTTPException(
             status_code=e.status_code, detail=json.dumps(e.detail) if e.detail else e.message
         ) from e
+    finally:
+        disconnect_task.cancel()

@@ -116,9 +116,11 @@ export async function fetchExampleDataset(recalc = 0): Promise<RowsResponse> {
  */
 export async function executeUniProtQuery(
   requestBody: any,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  cancelToken?: string
 ): Promise<RowsResponse> {
-  const response = await fetch(`${API_BASE}/api/uniprot/execute`, {
+  const params = cancelToken ? `?cancelToken=${cancelToken}` : "";
+  const response = await fetch(`${API_BASE}/api/uniprot/execute${params}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody),

@@ -161,13 +161,16 @@ def _build_url(
     request: UniProtQueryExecuteRequest,
     sort_value: Optional[str],
     requested_size: int = 500,
+    endpoint: str = "search",
 ) -> str:
     """Build the UniProt REST API export URL.
 
-    For TSV streaming format, UniProt handles the full size in a single
-    streamed response — no pagination needed. The size parameter controls
-    how many results are returned.
+    Args:
+        endpoint: "search" (paginated, max 500/page) or "stream" (single response).
     """
+    # For search endpoint, cap at 500 per page (UniProt limit).
+    # For stream endpoint, pass the full requested size.
+    size = requested_size if endpoint == "stream" else min(max(requested_size, 1), 500)
     return build_uniprot_export_url(
         api_query,
         format="tsv",
@@ -176,7 +179,8 @@ def _build_url(
         length_max=request.length_max,
         sort=sort_value,
         include_isoforms=request.include_isoforms or False,
-        size=min(max(requested_size, 1), 10000),
+        size=size,
+        endpoint=endpoint,
     )
 
 
@@ -189,17 +193,13 @@ _USER_AGENT = "PeptideVisualLab/1.0 (https://github.com/your-org/peptide-predict
 
 async def _fetch_uniprot_tsv(url: str, timeout: float = 60.0) -> Tuple[pd.DataFrame, int]:
     """
-    Fetch TSV data from UniProt (streamed, supports large sizes).
+    Fetch a single page of TSV data from UniProt (max 500 rows).
 
-    UniProt's TSV format streams the full result set — no pagination needed.
-    Timeout scales with expected size.
+    For requests >500, use ``_fetch_uniprot_paginated`` instead.
 
     Returns:
-        Tuple of (DataFrame, total_available) where total_available is from
-        the X-Total-Results header (-1 if missing).
-
-    Raises:
-        httpx.HTTPStatusError, httpx.TimeoutException on network errors.
+        (DataFrame, total_available) where total_available is from
+        the ``X-Total-Results`` header (-1 if missing).
     """
     async with httpx.AsyncClient(timeout=timeout) as client:
         headers = {"User-Agent": _USER_AGENT}
@@ -207,6 +207,36 @@ async def _fetch_uniprot_tsv(url: str, timeout: float = 60.0) -> Tuple[pd.DataFr
         response.raise_for_status()
         total_available = int(response.headers.get("X-Total-Results", -1))
         df = read_any_table(response.content, "uniprot_export.tsv")
+        return df, total_available
+
+
+async def _fetch_uniprot_stream(url: str, timeout: float = 300.0) -> Tuple[pd.DataFrame, int]:
+    """
+    Fetch results from UniProt's ``/uniprotkb/stream`` endpoint.
+
+    The stream endpoint returns all matching results in a single response
+    (no pagination, up to 10M rows).  Ideal for bulk downloads >500 rows.
+
+    Args:
+        url: Full stream URL built by ``_build_url(endpoint="stream")``.
+        timeout: Read timeout — generous for large result sets.
+
+    Returns:
+        (DataFrame, total_available) where total_available is from
+        the ``X-Total-Results`` header (-1 if missing).
+    """
+    async with httpx.AsyncClient(timeout=timeout) as client:
+        headers = {"User-Agent": _USER_AGENT}
+        response = await client.get(url, headers=headers, follow_redirects=True)
+        response.raise_for_status()
+        total_available = int(response.headers.get("X-Total-Results", -1))
+        df = read_any_table(response.content, "uniprot_stream.tsv")
+        log_info(
+            "uniprot_stream_fetched",
+            f"Stream returned {len(df)} rows (total available: {total_available})",
+            fetched=len(df),
+            total_available=total_available,
+        )
         return df, total_available
 
 
@@ -231,43 +261,46 @@ async def _fetch_uniprot_paginated(
     """
     Fetch multiple pages from UniProt using cursor-based pagination.
 
-    UniProt API returns max 500 results per page. For larger requests,
-    follows the Link header to fetch subsequent pages until max_results
-    is reached or no more pages are available.
+    UniProt API returns max 500 results per page for TSV format.
+    For larger requests, follows the ``Link: <url>; rel="next"`` header
+    to fetch subsequent pages until *max_results* is reached or no more
+    pages are available.
 
-    Includes rate limiting: 200ms delay between pages to respect UniProt's
-    public API guidelines (~5 requests/second).
+    Rate limiting: 200 ms delay between pages (~5 req/s).  On HTTP 429
+    we honour the ``Retry-After`` header and retry once.
 
     Returns:
-        Tuple of (combined DataFrame, total_available from first page).
+        (combined DataFrame, total_available) where total_available comes
+        from the first page's ``X-Total-Results`` header (-1 if absent).
     """
-    all_dfs = []
+    all_dfs: list[pd.DataFrame] = []
     total_available = -1
     fetched = 0
     page = 0
     next_url: Optional[str] = url
 
+    # Per-page timeout: 60 s should be generous for 500 rows of TSV
     async with httpx.AsyncClient(timeout=60.0) as client:
         headers = {"User-Agent": _USER_AGENT}
 
         while next_url and fetched < max_results:
             page += 1
             if page > 1:
-                # Rate limiting between pages (UniProt recommends ~5 req/s for public API)
                 await asyncio.sleep(0.2)
 
             try:
-                response = await client.get(next_url, headers=headers)
+                response = await client.get(next_url, headers=headers, follow_redirects=True)
                 response.raise_for_status()
             except httpx.HTTPStatusError as e:
                 if e.response.status_code == 429:
-                    # Rate limited — wait and retry once
                     retry_after = int(e.response.headers.get("Retry-After", "5"))
                     log_warning(
-                        "uniprot_rate_limited", f"Rate limited, waiting {retry_after}s", page=page
+                        "uniprot_rate_limited",
+                        f"Rate limited on page {page}, waiting {retry_after}s",
+                        page=page,
                     )
                     await asyncio.sleep(retry_after)
-                    response = await client.get(next_url, headers=headers)
+                    response = await client.get(next_url, headers=headers, follow_redirects=True)
                     response.raise_for_status()
                 else:
                     raise
@@ -284,39 +317,42 @@ async def _fetch_uniprot_paginated(
 
             log_info(
                 "uniprot_page_fetched",
-                f"Page {page}: {len(page_df)} rows (total so far: {fetched})",
+                f"Page {page}: {len(page_df)} rows (total so far: {fetched}/{max_results})",
                 page=page,
                 fetched=fetched,
                 target=max_results,
             )
 
-            # Stop if we got fewer rows than page size (last page)
+            # Last page: fewer than 500 rows means no more data
             if len(page_df) < 500:
                 break
 
-            # Check for next page in Link header
-            link_header = response.headers.get("Link", "")
+            # Follow cursor via Link header
+            link_header = response.headers.get("link", response.headers.get("Link", ""))
             next_url = _parse_link_header(link_header) if link_header else None
 
-            if not next_url and fetched < max_results and total_available > fetched:
-                # Fallback: UniProt TSV may not return Link headers.
-                # Construct cursor-less next page URL by replacing size with remaining count.
-                # UniProt REST API supports offset via cursor param, but for TSV we can
-                # use the streaming endpoint which doesn't paginate the same way.
-                # Instead, re-request with a larger size to get all at once.
-                log_info(
+            log_info(
+                "uniprot_pagination_debug",
+                f"Page {page} Link header: {'found' if next_url else 'MISSING'}",
+                link_header_present=bool(link_header),
+                link_header_value=link_header[:200] if link_header else "",
+                next_url_found=bool(next_url),
+            )
+
+            if not next_url:
+                log_warning(
                     "uniprot_no_link_header",
-                    "No Link header found — re-requesting with full size",
+                    f"No Link header on page {page} — stopping pagination "
+                    f"({fetched}/{max_results} fetched, {total_available} available)",
                     fetched=fetched,
                     target=max_results,
                 )
-                break  # Will handle below
+                break
 
     if not all_dfs:
         return pd.DataFrame(), total_available
 
     combined = pd.concat(all_dfs, ignore_index=True)
-    # Trim to exact requested size
     if len(combined) > max_results:
         combined = combined.head(max_results)
 
@@ -365,6 +401,10 @@ def _run_analysis_pipeline(
         rows_out, tango_stats, tango_status, tango_reason, tango_ran, run_dir,
         s4pred_stats, s4pred_status, s4pred_reason, s4pred_ran, ssw_hits
     """
+    import time as _time
+
+    n_rows = len(df)
+
     # Normalize columns
     try:
         df_normalized = normalize_cols(df)
@@ -379,44 +419,56 @@ def _run_analysis_pipeline(
     _check_cancelled(cancel_event, "ff_helix")
 
     # FF-Helix
+    t0 = _time.time()
     ensure_ff_cols(df_normalized)
     ensure_computed_cols(df_normalized)
+    log_info("uniprot_stage_time", f"FF-Helix: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows", stage="ff_helix")
 
     _check_cancelled(cancel_event, "tango")
 
     # TANGO (reuse upload_service's function, with opt-in gate)
+    t0 = _time.time()
     tango_stats, tango_status, tango_reason, tango_ran, run_dir = run_tango_processing(
         df_normalized,
         trace_entry=None,
         sentry_initialized=sentry_initialized,
         tango_requested=run_tango,
+        cancel_event=cancel_event,
     )
+    log_info("uniprot_stage_time", f"TANGO: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows", stage="tango")
 
     _check_cancelled(cancel_event, "s4pred")
 
     # S4PRED (reuse upload_service's function, with opt-in gate)
+    t0 = _time.time()
     s4pred_stats, s4pred_status, s4pred_reason, s4pred_ran = run_s4pred_processing(
         df_normalized,
         trace_entry=None,
         sentry_initialized=sentry_initialized,
         s4pred_requested=run_s4pred,
+        cancel_check=cancel_event,
     )
+    log_info("uniprot_stage_time", f"S4PRED: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows", stage="s4pred")
 
     _check_cancelled(cancel_event, "biochem")
 
     # Biochem + finalize (UniProt queries use default thresholds)
+    t0 = _time.time()
     calc_biochem(df_normalized)
     apply_ff_flags(df_normalized)  # default mode, no user thresholds
     _finalize_ui_aliases(df_normalized)
     finalize_ff_fields(df_normalized)
+    log_info("uniprot_stage_time", f"Biochem+flags: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows", stage="biochem")
 
     # Normalize rows for UI
+    t0 = _time.time()
     rows_out = normalize_rows_for_ui(
         df_normalized,
         is_single_row=False,
-        tango_enabled=settings.USE_TANGO,
-        s4pred_enabled=settings.USE_S4PRED,
+        tango_enabled=run_tango,
+        s4pred_enabled=run_s4pred,
     )
+    log_info("uniprot_stage_time", f"Normalize: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows", stage="normalize")
 
     # SSW stats
     ssw_hits = (
@@ -498,7 +550,7 @@ def _build_response(
             "parsed_ok": result["tango_stats"].get("parsed_ok", 0),
             "parsed_bad": result["tango_stats"].get("parsed_bad", 0),
         }
-        if settings.USE_TANGO
+        if request.run_tango
         else None,
         "s4pred": {
             "status": result["s4pred_status"],
@@ -506,7 +558,7 @@ def _build_response(
             "parsed_ok": result["s4pred_stats"].get("parsed_ok", 0),
             "parsed_bad": result["s4pred_stats"].get("parsed_bad", 0),
         }
-        if settings.USE_S4PRED
+        if request.run_s4pred
         else None,
     }
 
@@ -524,9 +576,10 @@ def _build_response(
             "size_requested": request.size or 500,
             "size_returned": len(df),
             "total_available": total_available,
-            "use_s4pred": settings.USE_S4PRED,
-            "use_tango": settings.USE_TANGO,
+            "use_s4pred": request.run_s4pred,
+            "use_tango": request.run_tango,
             "run_tango": request.run_tango,
+            "run_s4pred": request.run_s4pred,
             "ssw_rows": result["ssw_hits"],
             "valid_seq_rows": len(df),
             "provider_status": provider_status_meta,
@@ -756,35 +809,74 @@ async def execute_uniprot_query(
     Raises:
         HTTPException on errors (400, 500, 502, 504).
     """
+    # Log exactly what the frontend sent so toggles/sizes are visible in logs
+    log_info(
+        "uniprot_request_params",
+        f"Request: size={request.size}, run_tango={request.run_tango}, "
+        f"run_s4pred={request.run_s4pred}, reviewed={request.reviewed}",
+        **{
+            "size": request.size,
+            "run_tango": request.run_tango,
+            "run_s4pred": request.run_s4pred,
+            "reviewed": request.reviewed,
+            "length_min": request.length_min,
+            "length_max": request.length_max,
+            "sort": request.sort,
+            "include_isoforms": request.include_isoforms,
+        },
+    )
+
     # 1. Parse query
     api_query, detected_mode = _parse_query(request)
 
     # 2. Validate sort
     sort_value = _validate_sort(request.sort)
 
-    # 3. Build URL with full requested size
+    # 3. Build URL
+    #    UniProt TSV does NOT return Link headers, so cursor pagination fails.
+    #    Strategy: search endpoint for <=500, stream endpoint for >500.
+    #    Stream returns ALL matching results (ignores size), so we trim after.
     requested_size = min(request.size or 500, 10000)
-    uniprot_url = _build_url(api_query, request, sort_value, requested_size=requested_size)
+
+    if requested_size <= 500:
+        use_endpoint = "search"
+    else:
+        use_endpoint = "stream"
+
+    uniprot_url = _build_url(
+        api_query, request, sort_value,
+        requested_size=requested_size,
+        endpoint=use_endpoint,
+    )
 
     log_info(
         "uniprot_execute_start",
         "Executing UniProt query",
         **{
             "query": api_query,
+            "requested_size": requested_size,
+            "endpoint": use_endpoint,
             "reviewed": request.reviewed,
-            "length_min": request.length_min,
-            "length_max": request.length_max,
             "sort": sort_value,
-            "size": request.size or 500,
         },
     )
     log_info("uniprot_url", f"UniProt URL: {uniprot_url}", **{"url": uniprot_url})
 
     try:
-        # 4. Fetch from UniProt (TSV streaming handles full size)
-        # Scale timeout with size: 30s base + 5s per 500 entries
-        fetch_timeout = 30.0 + (requested_size / 500) * 5.0
-        df, total_available = await _fetch_uniprot_tsv(uniprot_url, timeout=fetch_timeout)
+        # 4. Fetch from UniProt
+        if use_endpoint == "stream":
+            # Stream returns ALL matching results — we trim to requested_size after.
+            # Timeout is generous: large queries can take 30-60s to stream.
+            stream_timeout = max(60.0, 30.0 + (requested_size / 500) * 10.0)
+            df, total_available = await _fetch_uniprot_stream(
+                uniprot_url, timeout=stream_timeout
+            )
+            # Trim to requested size
+            if len(df) > requested_size:
+                df = df.head(requested_size)
+        else:
+            fetch_timeout = 30.0 + (requested_size / 500) * 5.0
+            df, total_available = await _fetch_uniprot_tsv(uniprot_url, timeout=fetch_timeout)
 
         log_info(
             "uniprot_fetch_success",

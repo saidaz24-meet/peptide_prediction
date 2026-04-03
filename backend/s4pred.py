@@ -434,7 +434,8 @@ def analyse_s4pred_result(prediction_result: Dict) -> Dict:
 
 def run_s4pred_sequences(
     sequences: List[Tuple[str, str]],
-    trace_id: Optional[str] = None
+    trace_id: Optional[str] = None,
+    cancel_check: Optional[Any] = None,
 ) -> Tuple[List[Dict], Dict[str, Any]]:
     """
     Run S4PRED on a list of sequences.
@@ -442,6 +443,7 @@ def run_s4pred_sequences(
     Args:
         sequences: List of (entry_id, sequence) tuples
         trace_id: Optional trace ID for logging
+        cancel_check: Optional threading.Event — if set, abort between sequences
 
     Returns:
         (results, stats) where:
@@ -476,6 +478,10 @@ def run_s4pred_sequences(
     results = []
 
     for entry_id, sequence in sequences:
+        # Check for cancellation between each sequence
+        if cancel_check and cancel_check.is_set():
+            logger.info(f"[{trace_id}] S4PRED cancelled after {stats['parsed_ok']} sequences")
+            break
         try:
             # Sanitize non-standard AAs before S4PRED (X→A, O→K, J→L, etc.)
             clean_seq = get_corrected_sequence(sequence)
@@ -522,7 +528,8 @@ def run_s4pred_sequences(
 def run_s4pred_database(
     database: pd.DataFrame,
     database_name: str,
-    trace_id: Optional[str] = None
+    trace_id: Optional[str] = None,
+    cancel_check: Optional[Any] = None,
 ) -> Tuple[bool, Dict[str, Any]]:
     """
     Run S4PRED on a DataFrame and add result columns in-place.
@@ -531,6 +538,7 @@ def run_s4pred_database(
         database: DataFrame with 'Entry' and 'Sequence' columns
         database_name: Name for logging
         trace_id: Optional trace ID
+        cancel_check: Optional threading.Event for cancellation
 
     Returns:
         (success, stats) tuple
@@ -544,7 +552,7 @@ def run_s4pred_database(
         logger.warning(f"[{trace_id}] No valid sequences for S4PRED")
         return False, {'requested': 0, 'parsed_ok': 0, 'parsed_bad': 0}
 
-    results, stats = run_s4pred_sequences(sequences, trace_id)
+    results, stats = run_s4pred_sequences(sequences, trace_id, cancel_check=cancel_check)
 
     if stats['parsed_ok'] == 0:
         return False, stats
@@ -579,19 +587,26 @@ def run_s4pred_database(
     # Map results back to DataFrame
     entry_to_result = {r['entry_id']: r for r in results if 'entry_id' in r}
 
-    # Map results back to DataFrame using entry_id lookup (avoids iterrows)
+    # Map results back to DataFrame using bulk column assignment (avoids .at[] per cell)
     entry_ids = database["Entry"].astype(str) if "Entry" in database.columns else pd.Series("", index=database.index)
-    all_map_cols = analysis_columns + [S4PRED_P_H_CURVE, S4PRED_P_E_CURVE, S4PRED_P_C_CURVE, S4PRED_SS_PREDICTION]
     curve_keys = {'P_H': S4PRED_P_H_CURVE, 'P_E': S4PRED_P_E_CURVE, 'P_C': S4PRED_P_C_CURVE, 'ss_prediction': S4PRED_SS_PREDICTION}
-    for idx, entry_id in zip(database.index, entry_ids):
+    all_target_cols = list(analysis_columns) + list(curve_keys.values())
+
+    # Pre-build column data as lists aligned to DataFrame index
+    col_data: dict[str, list] = {col: [None] * len(database) for col in all_target_cols}
+    for i, entry_id in enumerate(entry_ids):
         if entry_id in entry_to_result:
             result = entry_to_result[entry_id]
             for col in analysis_columns:
                 if col in result:
-                    database.at[idx, col] = result[col]
+                    col_data[col][i] = result[col]
             for key, col_name in curve_keys.items():
                 if key in result:
-                    database.at[idx, col_name] = result[key]
+                    col_data[col_name][i] = result[key]
+
+    # Bulk assign all columns at once
+    for col, values in col_data.items():
+        database[col] = pd.Series(values, index=database.index, dtype=object)
 
     return True, stats
 

@@ -24,7 +24,7 @@ services:
       # Tool assets (bind-mount from project root tools/ directory)
       - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
       # Runtime cache
-      - pvl-cache:/app/.run_cache
+      - pvl-cache:/data/cache
     environment:
       - HOST=0.0.0.0
       - PORT=8000
@@ -36,6 +36,8 @@ services:
       - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
       # Optional: Sentry DSN
       - SENTRY_DSN=${SENTRY_DSN:-}
+      # TANGO scratch directory (on named volume, not overlay)
+      - TANGO_RUNTIME_DIR=/data/runs/tango
       # Celery / Redis (enabled when redis service is present)
       - CELERY_ENABLED=${CELERY_ENABLED:-1}
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -58,7 +60,7 @@ services:
     image: redis:7-alpine
     volumes:
       - pvl-redis:/data
-    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save 60 1000
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --save ""
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 10s
@@ -80,13 +82,14 @@ services:
       --queues=batch
       --concurrency=2
       --pool=prefork
+      --max-tasks-per-child=500
       --loglevel=info
       --hostname=batch@%h
     volumes:
       - pvl-runs:/data/runs
       - pvl-uploads:/data/uploads
       - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
-      - pvl-cache:/app/.run_cache
+      - pvl-cache:/data/cache
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/1
@@ -95,6 +98,7 @@ services:
       - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
       - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
       - SENTRY_DSN=${SENTRY_DSN:-}
+      - TANGO_RUNTIME_DIR=/data/runs/tango
     depends_on:
       redis:
         condition: service_healthy
@@ -119,11 +123,13 @@ services:
       --queues=quick
       --concurrency=2
       --pool=prefork
+      --max-tasks-per-child=500
       --loglevel=info
       --hostname=quick@%h
     volumes:
       - pvl-runs:/data/runs
-      - pvl-cache:/app/.run_cache
+      - pvl-uploads:/data/uploads
+      - pvl-cache:/data/cache
       - ${TOOLS_HOST_PATH:-../tools}:/opt/tools:ro
     environment:
       - CELERY_BROKER_URL=redis://redis:6379/0
@@ -133,6 +139,7 @@ services:
       - TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
       - S4PRED_MODEL_PATH=/opt/tools/s4pred/models
       - SENTRY_DSN=${SENTRY_DSN:-}
+      - TANGO_RUNTIME_DIR=/data/runs/tango
     depends_on:
       redis:
         condition: service_healthy

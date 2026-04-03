@@ -1,6 +1,7 @@
 # Core web framework
 fastapi>=0.117,<1.0
 uvicorn[standard]>=0.37,<1.0
+gunicorn>=23.0,<24.0
 
 # Data processing
 pandas>=2.3,<3.0
@@ -19,7 +20,7 @@ sentry-sdk[fastapi]>=2.49,<3.0
 duckdb>=1.1,<2.0
 
 # Task queue & caching
-celery[redis]>=5.4,<6.0
+celery[redis]>=5.6,<6.0
 redis>=5.0,<6.0
 
 # Monitoring (optional — used by Flower dashboard)

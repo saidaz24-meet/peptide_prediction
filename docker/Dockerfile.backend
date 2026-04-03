@@ -70,6 +70,7 @@ COPY backend/ .
 RUN mkdir -p \
     /data/runs \
     /data/uploads \
+    /data/cache \
     /opt/tools \
     /app/.run_cache \
     /app/Tango/bin /app/Tango/out /app/Tango/work \
@@ -110,8 +111,19 @@ EXPOSE ${PORT}
 # Use tini as init system for proper signal handling
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
-# Run with uvicorn
-CMD ["python", "-m", "uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+# Run with Gunicorn + Uvicorn workers (production)
+# Gunicorn manages process lifecycle (fork, restart, signals)
+# Uvicorn workers handle async I/O within each process
+# --max-requests prevents slow memory leaks in long-running workers
+CMD ["gunicorn", "api.main:app", \
+     "--bind", "0.0.0.0:8000", \
+     "--workers", "2", \
+     "--worker-class", "uvicorn.workers.UvicornWorker", \
+     "--timeout", "120", \
+     "--max-requests", "1000", \
+     "--max-requests-jitter", "50", \
+     "--access-logfile", "-", \
+     "--error-logfile", "-"]
 
 # =============================================================================
 # Labels for image metadata

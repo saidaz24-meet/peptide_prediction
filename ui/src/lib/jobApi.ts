@@ -66,17 +66,21 @@ export const STAGE_LABELS: Record<string, string> = {
 
 export async function submitUploadJob(
   file: File,
-  thresholdConfig?: ThresholdConfig
+  thresholdConfig?: ThresholdConfig,
+  signal?: AbortSignal,
+  cancelToken?: string
 ): Promise<SubmitJobResponse> {
   const fd = new FormData();
   fd.append("file", file);
   if (thresholdConfig) {
     fd.append("thresholdConfig", JSON.stringify(thresholdConfig));
   }
-  const res = await fetch(`${API_BASE}/api/jobs/upload`, {
+  const params = cancelToken ? `?cancelToken=${cancelToken}` : "";
+  const res = await fetch(`${API_BASE}/api/jobs/upload${params}`, {
     method: "POST",
     body: fd,
     mode: "cors",
+    signal,
   });
   if (!res.ok) {
     const text = await res.text();
@@ -90,6 +94,18 @@ export async function submitUploadJob(
     throw new Error(detail);
   }
   return await res.json();
+}
+
+/** Cancel a running sync job by its cancel token. */
+export async function cancelSyncJob(cancelToken: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/jobs/cancel-sync/${cancelToken}`, {
+      method: "POST",
+      mode: "cors",
+    });
+  } catch {
+    // Best effort — job may already be done
+  }
 }
 
 export async function pollJobStatus(jobId: string): Promise<JobStatusResponse> {

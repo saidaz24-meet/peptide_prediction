@@ -90,6 +90,7 @@ def run_tango_processing(
     trace_entry: Optional[str],
     sentry_initialized: bool,
     tango_requested: bool = True,
+    cancel_event: Optional[Any] = None,
 ) -> Tuple[Dict[str, Any], str, Optional[str], bool, Optional[str]]:
     """
     Run TANGO processing pipeline.
@@ -99,6 +100,7 @@ def run_tango_processing(
         trace_entry: Optional entry ID for tracing
         sentry_initialized: Whether Sentry is available
         tango_requested: Whether TANGO was requested (False = skip even if USE_TANGO=1)
+        cancel_event: Optional threading.Event for cancellation
 
     Returns:
         Tuple of (tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir)
@@ -133,7 +135,7 @@ def run_tango_processing(
                     stage="tango_run",
                     **{"sequence_count": len(records)},
                 )
-                run_dir = tango.run_tango_simple(records)
+                run_dir = tango.run_tango_simple(records, cancel_event=cancel_event)
                 tango_ran = True
                 run_id = os.path.basename(run_dir) if run_dir else None
                 tango_run_elapsed = (time.time() - tango_run_start_time) * 1000
@@ -491,6 +493,7 @@ def run_s4pred_processing(
     trace_entry: Optional[str],
     sentry_initialized: bool,
     s4pred_requested: bool = True,
+    cancel_check: Optional[Any] = None,
 ) -> Tuple[Dict[str, Any], str, Optional[str], bool]:
     """
     Run S4PRED processing pipeline.
@@ -563,7 +566,7 @@ def run_s4pred_processing(
             **{"sequence_count": len(sequences)},
         )
 
-        success, stats = s4pred.run_s4pred_database(df, "upload", trace_id=get_trace_id())
+        success, stats = s4pred.run_s4pred_database(df, "upload", trace_id=get_trace_id(), cancel_check=cancel_check)
         s4pred_ran = True
         s4pred_stats.update(stats)
 
@@ -845,7 +848,7 @@ def process_upload_dataframe(
 
     # --- TANGO processing ---
     tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = (
-        run_tango_processing(df, trace_entry, sentry_initialized)
+        run_tango_processing(df, trace_entry, sentry_initialized, cancel_event=cancel_event)
     )
     tango_enabled_flag = settings.USE_TANGO
     tango_requested_flag = True
@@ -856,7 +859,7 @@ def process_upload_dataframe(
 
     # --- S4PRED processing ---
     s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = (
-        run_s4pred_processing(df, trace_entry, sentry_initialized)
+        run_s4pred_processing(df, trace_entry, sentry_initialized, cancel_check=cancel_event)
     )
     s4pred_enabled_flag = settings.USE_S4PRED
     if progress_callback:
@@ -906,6 +909,8 @@ def process_upload_dataframe(
                 entry=trace_entry,
             )
 
+    _check_cancel(cancel_event, "biochem")
+
     # Compute biochemical features and flags
     biochem_start_time = time.time()
     log_info("biochem_compute_start", "Computing biochemical features (Charge, Hydrophobicity, μH)")
@@ -945,6 +950,8 @@ def process_upload_dataframe(
                         entry=trace_entry,
                         **{"field": col, "value": str(val), "type": type(val).__name__},
                     )
+
+    _check_cancel(cancel_event, "normalize")
 
     # Normalize rows for UI
     normalize_ui_start_time = time.time()

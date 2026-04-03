@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import {
+  AlertTriangle,
   Database,
   ExternalLink,
   ArrowRight,
@@ -15,6 +16,7 @@ import { toast } from "sonner";
 import { UniProtQueryInput } from "@/components/UniProtQueryInput";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { BgDotGrid } from "@/components/BgDotGrid";
+import { BgDiagonalAccent } from "@/components/BgDiagonalAccent";
 import AppFooter from "@/components/AppFooter";
 import { setNavGuard } from "@/hooks/use-nav-guard";
 import {
@@ -145,6 +147,7 @@ export default function DatabaseSearch() {
       className="max-w-5xl mx-auto px-4 sm:px-6 py-8 sm:py-10 space-y-6 relative"
     >
       <BgDotGrid opacity={0.02} />
+      <BgDiagonalAccent />
 
       {/* Header */}
       <div>
@@ -219,7 +222,7 @@ export default function DatabaseSearch() {
               <div>Gene</div>
               <div>Organism</div>
               <div className="text-right">Length</div>
-              <div className="text-center">Score</div>
+              <div className="text-center" title="UniProt annotation evidence score (1-5)">Evidence</div>
             </div>
 
             {/* Rows */}
@@ -292,14 +295,18 @@ export default function DatabaseSearch() {
                         {row.length ?? "—"}
                       </div>
 
-                      {/* Annotation Score */}
+                      {/* Annotation Score (UniProt evidence level 1-5) */}
                       <div
                         className="text-center"
-                        title={row.annotationScore ? `${row.annotationScore}/5` : "No score"}
+                        title={row.annotationScore ? `UniProt evidence score: ${row.annotationScore}/5` : "No score"}
                       >
                         {typeof row.annotationScore === "number" ? (
-                          <span className="text-[10px] text-amber-500">
-                            {"★".repeat(Math.min(row.annotationScore, 5))}
+                          <span className={`text-[10px] font-medium tabular-nums ${
+                            row.annotationScore >= 5 ? "text-primary" :
+                            row.annotationScore >= 4 ? "text-amber-500" :
+                            "text-red-400 dark:text-red-300"
+                          }`}>
+                            {row.annotationScore}/5
                           </span>
                         ) : (
                           <span className="text-[10px] text-muted-foreground/30">—</span>
@@ -365,14 +372,6 @@ export default function DatabaseSearch() {
                   </>
                 )}
               </span>
-              <Button
-                size="sm"
-                onClick={handleAnalyzeSelected}
-                disabled={selectedIds.size === 0}
-                className="h-8"
-              >
-                Analyze {selectedIds.size} Selected <ArrowRight className="w-3 h-3 ml-1" />
-              </Button>
             </div>
           </CardContent>
         </Card>
@@ -430,19 +429,25 @@ export default function DatabaseSearch() {
 
       {/* Leave confirmation dialog */}
       <AlertDialog open={showLeaveDialog} onOpenChange={setShowLeaveDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-xl border-[hsl(var(--border))] shadow-strong max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {isLoading ? "Analysis in progress" : "Leave search results?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
+            <div className="flex items-center gap-3 mb-1">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <AlertDialogTitle className="text-h3">
+                {isLoading ? "Analysis in progress" : "Leave search results?"}
+              </AlertDialogTitle>
+            </div>
+            <AlertDialogDescription className="text-small text-muted-foreground">
               {isLoading
-                ? "An analysis is currently running. Leaving will cancel it and discard any results."
+                ? "Leaving will cancel the running analysis and discard any partial results."
                 : `Your search results (${browseRows.length} entries) will be lost if you navigate away.`}
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
             <AlertDialogCancel
+              className="btn-press"
               onClick={() => {
                 setShowLeaveDialog(false);
                 setPendingNavPath(null);
@@ -451,6 +456,7 @@ export default function DatabaseSearch() {
               Stay
             </AlertDialogCancel>
             <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700 text-white btn-press"
               onClick={() => {
                 setShowLeaveDialog(false);
                 setBrowseRows([]);
@@ -460,7 +466,7 @@ export default function DatabaseSearch() {
                 }
               }}
             >
-              Leave
+              Leave anyway
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

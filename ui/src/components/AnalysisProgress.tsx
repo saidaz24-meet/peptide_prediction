@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
+import { Button } from '@/components/ui/button';
 
 interface AnalysisProgressProps {
   isActive: boolean;
   peptideCount: number;
   hasTango?: boolean;
   hasS4pred?: boolean;
+  onCancel?: () => void;
 }
 
 function formatTime(seconds: number): string {
@@ -18,25 +20,27 @@ function formatTime(seconds: number): string {
 
 /**
  * Estimate total processing time in seconds.
- * Based on observed batch timings (not per-peptide):
- *   Biochem-only:  ~2s + 0.002s/peptide
- *   With TANGO:    ~5s + 0.01s/peptide  (batch binary)
- *   With S4PRED:   ~8s + 0.015s/peptide (batch PyTorch)
- *   Both:          ~10s + 0.02s/peptide
+ * Based on observed timings on VPS (4 vCPU, 8GB):
+ *   FF-Helix + Biochem: ~2s + 0.001s/peptide (fast, vectorized)
+ *   TANGO (parallelized): ~5s + 0.5s/peptide (batched subprocess, ~4 parallel)
+ *   S4PRED: ~3s + 1s/peptide (LSTM per-sequence, CPU-bound)
+ * For short peptides (<50 aa), S4PRED is ~0.1s/peptide.
+ * For full proteins (>200 aa), S4PRED is ~5-15s/protein.
+ * We use a conservative middle estimate.
  */
 function estimateTotal(count: number, tango: boolean, s4pred: boolean): number {
-  let base = 2;
-  let perPeptide = 0.002;
-  if (tango) { base += 3; perPeptide += 0.008; }
-  if (s4pred) { base += 6; perPeptide += 0.013; }
-  return Math.max(3, base + count * perPeptide);
+  let base = 3;
+  let perPeptide = 0.001;
+  if (tango) { base += 5; perPeptide += 0.5; }
+  if (s4pred) { base += 3; perPeptide += 1.0; }
+  return Math.max(5, base + count * perPeptide);
 }
 
 /**
  * Minimal inline progress indicator. Not an overlay — just renders
  * in the document flow where placed.
  */
-export function AnalysisProgress({ isActive, peptideCount, hasTango, hasS4pred }: AnalysisProgressProps) {
+export function AnalysisProgress({ isActive, peptideCount, hasTango, hasS4pred, onCancel }: AnalysisProgressProps) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -68,6 +72,17 @@ export function AnalysisProgress({ isActive, peptideCount, hasTango, hasS4pred }
           {formatTime(elapsed)} elapsed
           {remaining > 1 && <> · ~{formatTime(remaining)} left</>}
         </span>
+        {onCancel && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onCancel}
+            className="h-7 px-2 text-xs text-muted-foreground hover:text-destructive"
+          >
+            <X className="h-3 w-3 mr-1" />
+            Cancel
+          </Button>
+        )}
       </div>
       <Progress value={pct} className="h-1.5" />
     </div>

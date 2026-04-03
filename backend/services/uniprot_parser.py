@@ -274,6 +274,7 @@ def build_uniprot_export_url(
     sort: Optional[str] = None,  # None or "score" = omit (best match), or allowed sort value
     include_isoforms: bool = False,
     size: int = 500,
+    endpoint: str = "search",
 ) -> str:
     """
     Build UniProt REST API export URL with query controls.
@@ -288,11 +289,12 @@ def build_uniprot_export_url(
         sort: Sort order ("score" = best match first, "length_asc", "length_desc", "organism_name")
         include_isoforms: Include isoform sequences
         size: Maximum number of results (default 500)
+        endpoint: "search" (paginated, max 500/page) or "stream" (all results, single response)
 
     Returns:
         Full UniProt API URL
     """
-    base_url = "https://rest.uniprot.org/uniprotkb/search"
+    base_url = f"https://rest.uniprot.org/uniprotkb/{endpoint}"
 
     # Build query string with filters
     query_parts = [query_string]

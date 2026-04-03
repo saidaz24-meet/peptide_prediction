@@ -49,7 +49,17 @@ if settings.SENTRY_DSN and not _running_under_pytest:
         # Environment-aware sampling rates
         is_production = settings.ENVIRONMENT == "production"
         traces_rate = 0.1 if is_production else 1.0
-        profiles_rate = 1.0  # Keep full profiling (low traffic)
+        profiles_rate = 0.1 if is_production else 1.0
+
+        def _before_send(event, hint):
+            """Filter out expected noise from Sentry."""
+            exc_info = hint.get("exc_info")
+            if exc_info:
+                exc_type = exc_info[0]
+                # CancelledError is expected on client disconnect / server shutdown
+                if exc_type and issubclass(exc_type, (asyncio.CancelledError, KeyboardInterrupt)):
+                    return None
+            return event
 
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
@@ -60,7 +70,8 @@ if settings.SENTRY_DSN and not _running_under_pytest:
                     event_level=logging.ERROR,
                 ),
             ],
-            send_default_pii=True,
+            send_default_pii=False,
+            before_send=_before_send,
             traces_sample_rate=traces_rate,
             profiles_sample_rate=profiles_rate,
             environment=settings.ENVIRONMENT,

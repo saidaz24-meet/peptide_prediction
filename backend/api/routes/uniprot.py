@@ -6,7 +6,9 @@ import asyncio
 import threading
 from typing import Dict
 
-from fastapi import APIRouter
+from typing import Optional
+
+from fastapi import APIRouter, Query, Request
 
 from schemas.api_models import RowsResponse
 from schemas.uniprot_query import (
@@ -50,25 +52,33 @@ async def window_sequences_endpoint(request: Dict):
 
 
 @router.post("/api/uniprot/execute", response_model=RowsResponse)
-async def execute_uniprot_query(request: UniProtQueryExecuteRequest):
+async def execute_uniprot_query(
+    request: UniProtQueryExecuteRequest,
+    cancelToken: Optional[str] = Query(None, description="Token for cancelling this request"),
+):
     """Execute a UniProt query and return results with full analysis pipeline.
 
-    Supports cancellation: if the client disconnects (timeout, abort, navigate away),
-    the analysis pipeline is cancelled between stages to free resources.
+    Supports cancellation via cancel token: frontend generates a UUID,
+    passes it as ?cancelToken=xxx, and calls POST /api/jobs/cancel-sync/{token} to cancel.
     """
     from api.main import SENTRY_INITIALIZED
+    from api.routes.jobs import _sync_cancel_events
     from services.uniprot_execute_service import execute_uniprot_query as execute
 
     cancel_event = threading.Event()
 
-    async def _run():
-        return await execute(request, SENTRY_INITIALIZED, cancel_event=cancel_event)
+    if cancelToken:
+        _sync_cancel_events[cancelToken] = cancel_event
 
-    task = asyncio.ensure_future(_run())
     try:
-        return await task
+        result = await execute(request, SENTRY_INITIALIZED, cancel_event=cancel_event)
+        if cancel_event.is_set():
+            raise asyncio.CancelledError()
+        return result
     except asyncio.CancelledError:
-        # Client disconnected — signal the analysis thread to stop
         cancel_event.set()
-        log_info("uniprot_client_disconnect", "Client disconnected, cancelling analysis")
+        log_info("uniprot_client_disconnect", "Analysis cancelled")
         raise
+    finally:
+        if cancelToken:
+            _sync_cancel_events.pop(cancelToken, None)
