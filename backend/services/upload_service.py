@@ -1191,6 +1191,8 @@ def process_upload_dataframe(
             "use_s4pred": settings.USE_S4PRED,
             "ssw_rows": ssw_hits,
             "valid_seq_rows": int(df["Sequence"].notna().sum()),
+            "cache_hits": len(_df_hits) if not _df_hits.empty else 0,
+            "cache_misses": len(_miss_indices),
             "provider_status": provider_status_meta,
             # Reproducibility primitives
             "runId": repro_run_id,

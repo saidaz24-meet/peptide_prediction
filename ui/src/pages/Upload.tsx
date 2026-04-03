@@ -85,14 +85,8 @@ export default function Upload() {
   const [qc, setQc] = useState<null | { rejectedCount: number; download: () => void }>(null);
 
   // store
-  const {
-    rawData,
-    isLoading,
-    setRawPreview,
-    ingestBackendRows,
-    setLastRun,
-    setSourceFile,
-  } = useDatasetStore();
+  const { rawData, isLoading, setRawPreview, ingestBackendRows, setLastRun, setSourceFile } =
+    useDatasetStore();
   const navigate = useNavigate();
   const abortRef = useRef<AbortController | null>(null);
   const cancelTokenRef = useRef<string | null>(null);
@@ -313,7 +307,12 @@ export default function Upload() {
       try {
         const token = crypto.randomUUID();
         cancelTokenRef.current = token;
-        const jobResponse = await submitUploadJob(localFile, thresholdConfig, controller.signal, token);
+        const jobResponse = await submitUploadJob(
+          localFile,
+          thresholdConfig,
+          controller.signal,
+          token
+        );
 
         if (jobResponse.mode === "async" && jobResponse.jobId) {
           // Async path: job dispatched to Celery worker
@@ -328,6 +327,14 @@ export default function Upload() {
           // Sync fallback: result returned directly
           const { rows, meta } = jobResponse.result;
           ingestBackendRows(rows, meta);
+          if (meta?.cache_hits > 0) {
+            toast.success(`${meta.cache_hits} of ${rows.length} sequences loaded from cache`, {
+              description:
+                meta.cache_misses > 0
+                  ? `${meta.cache_misses} newly computed`
+                  : "All results cached — instant analysis",
+            });
+          }
           navigate("/results");
           return;
         }
@@ -342,6 +349,14 @@ export default function Upload() {
         controller.signal
       )) as any;
       ingestBackendRows(rows, meta);
+      if (meta?.cache_hits > 0) {
+        toast.success(`${meta.cache_hits} of ${rows.length} sequences loaded from cache`, {
+          description:
+            meta.cache_misses > 0
+              ? `${meta.cache_misses} newly computed`
+              : "All results cached — instant analysis",
+        });
+      }
       navigate("/results");
     } catch (e: any) {
       if (e.name === "AbortError") {
@@ -416,9 +431,7 @@ export default function Upload() {
                 <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
                   {/* Example datasets */}
                   <div className="text-center space-y-3">
-                    <p className="text-xs text-muted-foreground">
-                      Or try an example dataset:
-                    </p>
+                    <p className="text-xs text-muted-foreground">Or try an example dataset:</p>
                     <div className="flex gap-2 justify-center flex-wrap">
                       {[
                         {
@@ -480,11 +493,9 @@ export default function Upload() {
                             const blob = new Blob([arrayBuf], {
                               type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                             });
-                            const file = new File(
-                              [blob],
-                              "Final_Staphylococcus_2023_new.xlsx",
-                              { type: blob.type }
-                            );
+                            const file = new File([blob], "Final_Staphylococcus_2023_new.xlsx", {
+                              type: blob.type,
+                            });
                             toast.success("Dataset loaded — 2916 peptides", { id: "gold-std" });
                             handleLocalPreview(file);
                           } catch {
@@ -509,17 +520,13 @@ export default function Upload() {
                     <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
                       <p className="font-medium text-foreground">Required Column</p>
                       <p className="text-muted-foreground">
-                        <code className="bg-muted px-1 py-0.5 rounded text-[10px]">
-                          Sequence
-                        </code>{" "}
-                        — amino acid letters (A-Z)
+                        <code className="bg-muted px-1 py-0.5 rounded text-[10px]">Sequence</code> —
+                        amino acid letters (A-Z)
                       </p>
                     </div>
                     <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
                       <p className="font-medium text-foreground">Optional Columns</p>
-                      <p className="text-muted-foreground">
-                        Entry, Organism, Length, Protein name
-                      </p>
+                      <p className="text-muted-foreground">Entry, Organism, Length, Protein name</p>
                     </div>
                     <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
                       <p className="font-medium text-foreground">Practical Limits</p>
