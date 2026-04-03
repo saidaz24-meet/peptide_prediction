@@ -913,6 +913,23 @@ def process_upload_dataframe(
             s4pred_provider_status = "AVAILABLE" if settings.USE_S4PRED else "OFF"
             s4pred_provider_reason = None if settings.USE_S4PRED else "S4PRED not enabled"
 
+        # Re-run cohort-dependent SSW predictions on full merged dataset
+        # These were either skipped (all hits) or computed on wrong subset (partial hits)
+        if settings.USE_TANGO and "SSW diff" in df.columns:
+            try:
+                tango.filter_by_avg_diff(df, "upload", {"upload": {}})
+            except Exception as e:
+                log_warning("tango_refilter_error", f"SSW re-filter failed: {e}")
+        if settings.USE_S4PRED and "SSW diff (S4PRED)" in df.columns:
+            try:
+                import s4pred as _s4pred_mod
+
+                s4pred_preds = _s4pred_mod.filter_by_s4pred_diff(df)
+                df[_s4pred_mod.SSW_PREDICTION_S4PRED] = s4pred_preds
+                df["S4PRED has data"] = [p is not None for p in s4pred_preds]
+            except Exception as e:
+                log_warning("s4pred_refilter_error", f"S4PRED SSW re-filter failed: {e}")
+
     # Count SSW hits (rows with valid TANGO predictions)
     if "SSW prediction" in df.columns:
         ssw_hits = int(df["SSW prediction"].notna().sum())

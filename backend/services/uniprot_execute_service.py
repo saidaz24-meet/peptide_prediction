@@ -506,6 +506,22 @@ def _run_analysis_pipeline(
             s4pred_reason = None if run_s4pred else "S4PRED not requested"
         n_rows = len(df_normalized)  # update for downstream logging
 
+        # Re-run cohort-dependent SSW predictions on full merged dataset
+        if run_tango and "SSW diff" in df_normalized.columns:
+            try:
+                tango.filter_by_avg_diff(df_normalized, "uniprot", {"uniprot": {}})
+            except Exception as e:
+                log_warning("tango_refilter_error", f"SSW re-filter failed: {e}")
+        if run_s4pred and "SSW diff (S4PRED)" in df_normalized.columns:
+            try:
+                import s4pred as _s4pred_mod
+
+                s4pred_preds = _s4pred_mod.filter_by_s4pred_diff(df_normalized)
+                df_normalized[_s4pred_mod.SSW_PREDICTION_S4PRED] = s4pred_preds
+                df_normalized["S4PRED has data"] = [p is not None for p in s4pred_preds]
+            except Exception as e:
+                log_warning("s4pred_refilter_error", f"S4PRED SSW re-filter failed: {e}")
+
     _check_cancelled(cancel_event, "biochem")
 
     # Biochem + finalize (UniProt queries use default thresholds)
