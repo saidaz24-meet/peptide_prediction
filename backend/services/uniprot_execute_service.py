@@ -422,43 +422,110 @@ def _run_analysis_pipeline(
     t0 = _time.time()
     ensure_ff_cols(df_normalized)
     ensure_computed_cols(df_normalized)
-    log_info("uniprot_stage_time", f"FF-Helix: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows", stage="ff_helix")
+    log_info(
+        "uniprot_stage_time",
+        f"FF-Helix: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows",
+        stage="ff_helix",
+    )
+
+    # --- Provider cache: split hits/misses ---
+    _cache_active = False
+    _df_hits = pd.DataFrame(columns=df_normalized.columns)
+    try:
+        from services.provider_cache import split_cached_uncached, write_computed_to_cache
+
+        _df_hits, df_normalized = split_cached_uncached(df_normalized, run_tango, run_s4pred)
+        _cache_active = True
+        if not _df_hits.empty:
+            log_info(
+                "provider_cache_split",
+                f"Cache: {len(_df_hits)} hits, {len(df_normalized)} misses out of {len(_df_hits) + len(df_normalized)}",
+            )
+    except Exception as e:
+        log_warning("provider_cache_split_error", f"Cache error, running full pipeline: {e}")
 
     _check_cancelled(cancel_event, "tango")
 
-    # TANGO (reuse upload_service's function, with opt-in gate)
-    t0 = _time.time()
-    tango_stats, tango_status, tango_reason, tango_ran, run_dir = run_tango_processing(
-        df_normalized,
-        trace_entry=None,
-        sentry_initialized=sentry_initialized,
-        tango_requested=run_tango,
-        cancel_event=cancel_event,
-    )
-    log_info("uniprot_stage_time", f"TANGO: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows", stage="tango")
+    # TANGO (misses only)
+    tango_stats: Dict[str, Any] = {"requested": 0, "parsed_ok": 0, "parsed_bad": 0}
+    tango_status = "OFF"
+    tango_reason: Optional[str] = "No sequences to process"
+    tango_ran = False
+    run_dir: Optional[str] = None
+
+    if not df_normalized.empty:
+        t0 = _time.time()
+        tango_stats, tango_status, tango_reason, tango_ran, run_dir = run_tango_processing(
+            df_normalized,
+            trace_entry=None,
+            sentry_initialized=sentry_initialized,
+            tango_requested=run_tango,
+            cancel_event=cancel_event,
+        )
+        log_info(
+            "uniprot_stage_time",
+            f"TANGO: {(_time.time() - t0) * 1000:.0f}ms for {len(df_normalized)} rows",
+            stage="tango",
+        )
 
     _check_cancelled(cancel_event, "s4pred")
 
-    # S4PRED (reuse upload_service's function, with opt-in gate)
-    t0 = _time.time()
-    s4pred_stats, s4pred_status, s4pred_reason, s4pred_ran = run_s4pred_processing(
-        df_normalized,
-        trace_entry=None,
-        sentry_initialized=sentry_initialized,
-        s4pred_requested=run_s4pred,
-        cancel_check=cancel_event,
-    )
-    log_info("uniprot_stage_time", f"S4PRED: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows", stage="s4pred")
+    # S4PRED (misses only)
+    s4pred_stats: Dict[str, Any] = {"requested": 0, "parsed_ok": 0, "parsed_bad": 0}
+    s4pred_status = "OFF"
+    s4pred_reason: Optional[str] = "No sequences to process"
+    s4pred_ran = False
+
+    if not df_normalized.empty:
+        t0 = _time.time()
+        s4pred_stats, s4pred_status, s4pred_reason, s4pred_ran = run_s4pred_processing(
+            df_normalized,
+            trace_entry=None,
+            sentry_initialized=sentry_initialized,
+            s4pred_requested=run_s4pred,
+            cancel_check=cancel_event,
+        )
+        log_info(
+            "uniprot_stage_time",
+            f"S4PRED: {(_time.time() - t0) * 1000:.0f}ms for {len(df_normalized)} rows",
+            stage="s4pred",
+        )
+
+    # --- Cache: merge hits back + write misses ---
+    _miss_indices = set(df_normalized.index) if not df_normalized.empty else set()
+
+    if not _df_hits.empty:
+        df_normalized = pd.concat([_df_hits, df_normalized]).sort_index()
+        if tango_ran or (run_tango and not _df_hits.empty):
+            tango_ran = True
+            tango_status = "AVAILABLE" if run_tango else "OFF"
+            tango_reason = None if run_tango else "TANGO not requested"
+        if s4pred_ran or (run_s4pred and not _df_hits.empty):
+            s4pred_ran = True
+            s4pred_status = "AVAILABLE" if run_s4pred else "OFF"
+            s4pred_reason = None if run_s4pred else "S4PRED not requested"
+        n_rows = len(df_normalized)  # update for downstream logging
 
     _check_cancelled(cancel_event, "biochem")
 
     # Biochem + finalize (UniProt queries use default thresholds)
     t0 = _time.time()
     calc_biochem(df_normalized)
+
+    # Write misses to cache (after biochem)
+    if _cache_active and _miss_indices:
+        try:
+            write_computed_to_cache(df_normalized.loc[df_normalized.index.isin(_miss_indices)])
+        except Exception:
+            pass  # non-blocking
     apply_ff_flags(df_normalized)  # default mode, no user thresholds
     _finalize_ui_aliases(df_normalized)
     finalize_ff_fields(df_normalized)
-    log_info("uniprot_stage_time", f"Biochem+flags: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows", stage="biochem")
+    log_info(
+        "uniprot_stage_time",
+        f"Biochem+flags: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows",
+        stage="biochem",
+    )
 
     # Normalize rows for UI
     t0 = _time.time()
@@ -468,7 +535,11 @@ def _run_analysis_pipeline(
         tango_enabled=run_tango,
         s4pred_enabled=run_s4pred,
     )
-    log_info("uniprot_stage_time", f"Normalize: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows", stage="normalize")
+    log_info(
+        "uniprot_stage_time",
+        f"Normalize: {(_time.time() - t0) * 1000:.0f}ms for {n_rows} rows",
+        stage="normalize",
+    )
 
     # SSW stats
     ssw_hits = (
@@ -844,7 +915,9 @@ async def execute_uniprot_query(
         use_endpoint = "stream"
 
     uniprot_url = _build_url(
-        api_query, request, sort_value,
+        api_query,
+        request,
+        sort_value,
         requested_size=requested_size,
         endpoint=use_endpoint,
     )
@@ -868,9 +941,7 @@ async def execute_uniprot_query(
             # Stream returns ALL matching results — we trim to requested_size after.
             # Timeout is generous: large queries can take 30-60s to stream.
             stream_timeout = max(60.0, 30.0 + (requested_size / 500) * 10.0)
-            df, total_available = await _fetch_uniprot_stream(
-                uniprot_url, timeout=stream_timeout
-            )
+            df, total_available = await _fetch_uniprot_stream(uniprot_url, timeout=stream_timeout)
             # Trim to requested size
             if len(df) > requested_size:
                 df = df.head(requested_size)

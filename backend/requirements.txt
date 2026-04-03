@@ -18,6 +18,7 @@ sentry-sdk[fastapi]>=2.49,<3.0
 
 # Result caching
 duckdb>=1.1,<2.0
+filelock>=3.12,<4.0
 
 # Task queue & caching
 celery[redis]>=5.6,<6.0

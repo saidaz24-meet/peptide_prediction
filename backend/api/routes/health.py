@@ -308,3 +308,11 @@ async def health_dependencies(check_uniprot: bool = False):
         result["issues"] = issues
 
     return result
+
+
+@router.get("/api/cache/stats")
+def cache_stats():
+    """Return provider cache statistics (entries per provider, DB size)."""
+    from services.provider_cache import provider_cache_stats
+
+    return provider_cache_stats()

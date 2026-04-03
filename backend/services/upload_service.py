@@ -566,7 +566,9 @@ def run_s4pred_processing(
             **{"sequence_count": len(sequences)},
         )
 
-        success, stats = s4pred.run_s4pred_database(df, "upload", trace_id=get_trace_id(), cancel_check=cancel_check)
+        success, stats = s4pred.run_s4pred_database(
+            df, "upload", trace_id=get_trace_id(), cancel_check=cancel_check
+        )
         s4pred_ran = True
         s4pred_stats.update(stats)
 
@@ -844,12 +846,37 @@ def process_upload_dataframe(
     if progress_callback:
         progress_callback("ff_helix", 15)
 
+    # --- Provider cache: split hits/misses ---
+    _cache_active = False
+    _df_hits = pd.DataFrame(columns=df.columns)
+    try:
+        from services.provider_cache import split_cached_uncached, write_computed_to_cache
+
+        _df_hits, df = split_cached_uncached(df, settings.USE_TANGO, settings.USE_S4PRED)
+        _cache_active = True
+        if not _df_hits.empty:
+            log_info(
+                "provider_cache_split",
+                f"Cache: {len(_df_hits)} hits, {len(df)} misses out of {len(_df_hits) + len(df)}",
+            )
+        if progress_callback:
+            progress_callback("cache_lookup", 18)
+    except Exception as e:
+        log_warning("provider_cache_split_error", f"Cache error, running full pipeline: {e}")
+
     _check_cancel(cancel_event, "tango")
 
-    # --- TANGO processing ---
-    tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = (
-        run_tango_processing(df, trace_entry, sentry_initialized, cancel_event=cancel_event)
-    )
+    # --- TANGO processing (misses only) ---
+    tango_stats: Dict[str, Any] = {"requested": 0, "parsed_ok": 0, "parsed_bad": 0}
+    tango_provider_status = "OFF"
+    tango_provider_reason: Optional[str] = "No sequences to process"
+    tango_ran = False
+    run_dir: Optional[str] = None
+
+    if not df.empty:
+        tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = (
+            run_tango_processing(df, trace_entry, sentry_initialized, cancel_event=cancel_event)
+        )
     tango_enabled_flag = settings.USE_TANGO
     tango_requested_flag = True
     if progress_callback:
@@ -857,13 +884,34 @@ def process_upload_dataframe(
 
     _check_cancel(cancel_event, "s4pred")
 
-    # --- S4PRED processing ---
-    s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = (
-        run_s4pred_processing(df, trace_entry, sentry_initialized, cancel_check=cancel_event)
-    )
+    # --- S4PRED processing (misses only) ---
+    s4pred_stats: Dict[str, Any] = {"requested": 0, "parsed_ok": 0, "parsed_bad": 0}
+    s4pred_provider_status = "OFF"
+    s4pred_provider_reason: Optional[str] = "No sequences to process"
+    s4pred_ran = False
+
+    if not df.empty:
+        s4pred_stats, s4pred_provider_status, s4pred_provider_reason, s4pred_ran = (
+            run_s4pred_processing(df, trace_entry, sentry_initialized, cancel_check=cancel_event)
+        )
     s4pred_enabled_flag = settings.USE_S4PRED
     if progress_callback:
         progress_callback("s4pred", 80)
+
+    # --- Cache: merge hits back into df ---
+    _miss_indices = set(df.index) if not df.empty else set()  # track which rows need cache write
+
+    if not _df_hits.empty:
+        df = pd.concat([_df_hits, df]).sort_index()
+        # Update stats to reflect full dataset
+        if tango_ran or (settings.USE_TANGO and not _df_hits.empty):
+            tango_ran = True
+            tango_provider_status = "AVAILABLE" if settings.USE_TANGO else "OFF"
+            tango_provider_reason = None if settings.USE_TANGO else "TANGO not enabled"
+        if s4pred_ran or (settings.USE_S4PRED and not _df_hits.empty):
+            s4pred_ran = True
+            s4pred_provider_status = "AVAILABLE" if settings.USE_S4PRED else "OFF"
+            s4pred_provider_reason = None if settings.USE_S4PRED else "S4PRED not enabled"
 
     # Count SSW hits (rows with valid TANGO predictions)
     if "SSW prediction" in df.columns:
@@ -915,6 +963,13 @@ def process_upload_dataframe(
     biochem_start_time = time.time()
     log_info("biochem_compute_start", "Computing biochemical features (Charge, Hydrophobicity, μH)")
     calc_biochem(df)
+
+    # --- Cache: write newly computed sequences (misses) ---
+    if _cache_active and _miss_indices:
+        try:
+            write_computed_to_cache(df.loc[df.index.isin(_miss_indices)])
+        except Exception:
+            pass  # non-blocking
 
     # Resolve thresholds BEFORE apply_ff_flags so user thresholds are wired in
     threshold_mode = (threshold_config_requested or {}).get("mode", "default")
