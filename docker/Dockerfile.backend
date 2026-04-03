@@ -83,6 +83,7 @@ ENV PATH=/home/${APP_USER}/.local/bin:$PATH
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONFAULTHANDLER=1 \
+    PYTHONPATH=/app \
     # Application config
     ENVIRONMENT=production \
     HOST=0.0.0.0 \
