@@ -9,8 +9,9 @@ import { useDatasetStore } from "@/stores/datasetStore";
 import { SegmentTrack } from "@/components/SegmentTrack";
 import { DualStructureTrack } from "@/components/DualStructureTrack";
 import { EvidencePanel } from "@/components/EvidencePanel";
-import { PeptideRadarChart } from "@/components/PeptideRadarChart";
-import { PositionBars } from "@/components/PositionBars";
+// Peleg FIX-016: PeptideRadarChart + PositionBars + standalone stat tiles consolidated
+// into BiochemComparison (single source of truth for the biochem comparison panel).
+import { BiochemComparison, DEFAULT_PVL_METRICS } from "@/components/BiochemComparison";
 import { ProviderBadge } from "@/components/ProviderBadge";
 import { TangoBadge } from "@/components/TangoBadge";
 import { SequenceTrack } from "@/components/SequenceTrack";
@@ -464,28 +465,14 @@ export default function PeptideDetail() {
             </CardContent>
           </Card>
 
-          {/* Charts */}
-          <div className="grid lg:grid-cols-2 gap-6">
-            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
-              <CardHeader>
-                <CardTitle>Feature Comparison</CardTitle>
-                <CardDescription>How this peptide compares to the database</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PeptideRadarChart peptide={peptide} cohortStats={stats} />
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
-              <CardHeader>
-                <CardTitle>Database Position</CardTitle>
-                <CardDescription>Percentile ranking across key metrics</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <PositionBars peptide={peptide} allPeptides={peptides} />
-              </CardContent>
-            </Card>
-          </div>
+          {/* Peleg FIX-016: unified biochemical comparison (radar + percentile bars +
+              database-mean stat cards in one panel, declarative metrics list). */}
+          <BiochemComparison
+            peptide={peptide}
+            allPeptides={peptides}
+            stats={stats}
+            metrics={DEFAULT_PVL_METRICS}
+          />
 
           {/* Helical Wheel Projection — only for short peptides WITH some helix prediction */}
           {peptide.length <= 40 &&
@@ -867,71 +854,8 @@ export default function PeptideDetail() {
           {/* 2D Backbone Visualization (B13: atom2svg) */}
           <BackboneViewer peptideId={peptide.id} />
 
-          {/* Feature tiles */}
-          <div className="grid md:grid-cols-4 gap-4">
-            <Card className="shadow-soft">
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-primary">
-                  {peptide.hydrophobicity !== null ? peptide.hydrophobicity.toFixed(2) : "N/A"}
-                </div>
-                <div className="text-sm text-muted-foreground">Hydrophobicity</div>
-                {stats && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Database: {stats.meanHydrophobicity.toFixed(2)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-soft">
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-primary">
-                  {peptide.muH?.toFixed(2) ?? "N/A"}
-                </div>
-                <div className="text-sm text-muted-foreground">μH</div>
-                {stats && stats.meanMuH !== null && stats.meanMuH !== undefined && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Database: {stats.meanMuH.toFixed(2)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-soft">
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-primary">
-                  {peptide.charge !== null
-                    ? `${peptide.charge > 0 ? "+" : ""}${peptide.charge.toFixed(1)}`
-                    : "N/A"}
-                </div>
-                <div className="text-sm text-muted-foreground">Charge</div>
-                {stats && (
-                  <div className="text-xs text-muted-foreground mt-1">
-                    Database: {stats.meanCharge > 0 ? "+" : ""}
-                    {stats.meanCharge.toFixed(1)}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="shadow-soft">
-              <CardContent className="p-4">
-                <div className="text-2xl font-bold text-helix">
-                  {typeof peptide.s4predHelixPercent === "number"
-                    ? `${peptide.s4predHelixPercent.toFixed(0)}%`
-                    : "N/A"}
-                </div>
-                <div className="text-sm text-muted-foreground">S4PRED Helix</div>
-                {stats &&
-                  stats.meanS4predHelixPercent !== null &&
-                  stats.meanS4predHelixPercent !== undefined && (
-                    <div className="text-xs text-muted-foreground mt-1">
-                      Database: {stats.meanS4predHelixPercent.toFixed(0)}%
-                    </div>
-                  )}
-              </CardContent>
-            </Card>
-          </div>
+          {/* Peleg FIX-016: standalone feature tiles removed — moved into the
+              BiochemComparison stat-card sub-panel above. */}
 
           {/* Consensus Analysis */}
           <ConsensusCard peptide={peptide} />
