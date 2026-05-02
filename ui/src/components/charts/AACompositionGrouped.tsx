@@ -8,8 +8,15 @@ import {
   ResponsiveContainer,
   Legend as RechartsLegend,
 } from "recharts";
+import { Info } from "lucide-react";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { ExpandableChart } from "@/components/ExpandableChart";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { CHART_COLORS } from "@/lib/chartConfig";
 import type { Peptide } from "@/types/peptide";
 
@@ -128,11 +135,54 @@ export function AACompositionGrouped({ peptides }: AACompositionGroupedProps) {
     activeGroupKeys.map((k) => [k, { label: GROUP_LABELS[k], color: GROUP_COLORS[k] }])
   );
 
+  // Peleg FIX-020: info tooltip listing each biochemical group's amino-acid
+  // membership (verbatim from AA_CATEGORIES above).
+  const groupTooltip = (
+    <TooltipProvider delayDuration={150}>
+      <UITooltip>
+        <TooltipTrigger asChild>
+          <Info
+            className="h-3.5 w-3.5 text-muted-foreground/70 cursor-help"
+            aria-label="Amino acid group membership"
+          />
+        </TooltipTrigger>
+        <TooltipContent
+          side="left"
+          className="max-w-[300px] text-xs leading-relaxed space-y-0.5"
+        >
+          <p className="font-medium pb-1">Group membership</p>
+          <p>
+            <span className="font-medium">Hydrophobic:</span> I, V, L, M, C
+          </p>
+          <p>
+            <span className="font-medium">Aromatic:</span> F, W, Y
+          </p>
+          <p>
+            <span className="font-medium">Basic (+):</span> K, R, H
+          </p>
+          <p>
+            <span className="font-medium">Acidic (−):</span> D, E
+          </p>
+          <p>
+            <span className="font-medium">Polar:</span> N, Q, S, T
+          </p>
+          <p>
+            <span className="font-medium">Small:</span> A, G
+          </p>
+          <p>
+            <span className="font-medium">Helix breaker:</span> P
+          </p>
+        </TooltipContent>
+      </UITooltip>
+    </TooltipProvider>
+  );
+
   return (
     <ExpandableChart
       title="Amino Acid Composition by Classification"
       description="AA category % across results classification groups"
       peptides={peptides}
+      headerRight={groupTooltip}
     >
       {data.length === 0 ? (
         <div className="h-[300px] flex items-center justify-center text-sm text-muted-foreground">

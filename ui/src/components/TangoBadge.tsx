@@ -5,15 +5,15 @@
  * This is the ONLY component that should render SSW prediction badges.
  */
 
-import { Badge } from '@/components/ui/badge';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { CheckCircle, XCircle, Info, AlertTriangle, Minus } from 'lucide-react';
+import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { CheckCircle, XCircle, Info, AlertTriangle, Minus } from "lucide-react";
 import {
   getTangoDisplayState,
   getTangoDisplayProps,
   type ProviderStatusInfo,
   type SswContext,
-} from '@/lib/tangoDisplaySemantics';
+} from "@/lib/tangoDisplaySemantics";
 
 interface TangoBadgeProps {
   providerStatus: ProviderStatusInfo | undefined;
@@ -36,27 +36,33 @@ interface TangoBadgeProps {
  * - AVAILABLE + -1 → "Negative" (secondary)
  * - AVAILABLE + 0 or (null with data) → "Uncertain" (outline)
  */
-export function TangoBadge({ providerStatus, sswPrediction, hasTangoData = false, showIcon = true, sswContext }: TangoBadgeProps) {
+export function TangoBadge({
+  providerStatus,
+  sswPrediction,
+  hasTangoData = false,
+  showIcon = true,
+  sswContext,
+}: TangoBadgeProps) {
   const state = getTangoDisplayState(providerStatus, sswPrediction, hasTangoData, sswContext);
   const props = getTangoDisplayProps(state);
 
   const Icon = showIcon
-    ? props.icon === 'check'
+    ? props.icon === "check"
       ? CheckCircle
-      : props.icon === 'x'
-      ? XCircle
-      : props.icon === 'alert'
-      ? AlertTriangle
-      : props.icon === 'minus'
-      ? Minus
-      : props.icon === 'info'
-      ? Info
-      : null
+      : props.icon === "x"
+        ? XCircle
+        : props.icon === "alert"
+          ? AlertTriangle
+          : props.icon === "minus"
+            ? Minus
+            : props.icon === "info"
+              ? Info
+              : null
     : null;
 
   // Map variant to Badge variant + custom class for positive
   const badgeVariant = props.variant;
-  const isPositive = state.type === 'positive';
+  const isPositive = state.type === "positive";
 
   return (
     <TooltipProvider>
@@ -65,7 +71,7 @@ export function TangoBadge({ providerStatus, sswPrediction, hasTangoData = false
           <span>
             <Badge
               variant={badgeVariant}
-              className={isPositive ? 'bg-chameleon-positive text-white hover:bg-chameleon-positive/90' : ''}
+              className={isPositive ? "bg-ssw text-ssw-foreground hover:bg-ssw/90" : ""}
             >
               {Icon && <Icon className="w-3 h-3 mr-1" />}
               {props.label}

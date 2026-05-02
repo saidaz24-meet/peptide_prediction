@@ -9,9 +9,16 @@ import { useCallback, useRef, useState } from "react";
 import {
   METRIC_LABELS,
   METRIC_COLORS,
+  METRIC_DESCRIPTIONS,
   type RankingMetric,
   type ProportionalWeights,
 } from "@/lib/ranking";
+import {
+  Tooltip as UITooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 const MIN_WEIGHT = 0;
 
@@ -266,12 +273,22 @@ export function WeightBar({ weights, activeMetrics, onChange, disabled }: Weight
         ))}
       </div>
 
-      {/* Individual weight labels — batch edit mode */}
+      {/* Individual weight labels — batch edit mode (Peleg FIX-024 tooltips) */}
+      <TooltipProvider delayDuration={200}>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         {segments.map((seg) => (
           <div key={seg.metric} className="flex items-center gap-1 text-[11px]">
             <span className={`w-2 h-2 rounded-full ${seg.color}`} />
-            <span className="text-muted-foreground">{seg.label}:</span>
+            <UITooltip>
+              <TooltipTrigger asChild>
+                <span className="text-muted-foreground cursor-help underline decoration-dotted underline-offset-2">
+                  {seg.label}:
+                </span>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[280px] text-xs leading-relaxed">
+                <p>{METRIC_DESCRIPTIONS[seg.metric]}</p>
+              </TooltipContent>
+            </UITooltip>
             {editingWeights ? (
               <input
                 type="number"
@@ -320,6 +337,7 @@ export function WeightBar({ weights, activeMetrics, onChange, disabled }: Weight
           </span>
         )}
       </div>
+      </TooltipProvider>
     </div>
   );
 }

@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { TrendingUp, Users, Heater, FlaskConical } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { DatasetStats, DatasetMetadata } from "@/types/peptide";
 import { useNavigate } from "react-router-dom";
@@ -7,6 +6,12 @@ import { MetricId } from "@/types/metrics";
 import { Abbr } from "@/components/Abbr";
 import { useChartSelection } from "@/stores/chartSelectionStore";
 import { smoothEase } from "@/lib/animations";
+import {
+  PeptideChainIcon,
+  HelixToFibrilIcon,
+  StructuralSwitchIcon,
+  SwitchToFibrilIcon,
+} from "@/components/icons/PeptideIcons";
 
 interface ResultsKpisProps {
   stats: DatasetStats | null;
@@ -44,11 +49,14 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
     return `${value.toFixed(decimals)}%`;
   };
 
+  // FIX-004: Reorder per Peleg — Total → % FF-Helix → % SSW → % FF-SSW
+  // Icons replaced with scientific PeptideIcons per PROMPT 2
+  // Subtitles use Peleg's 4-category definitions with proper Greek μ
   const kpis = [
     {
       title: "Total Peptides",
       value: stats.totalPeptides.toLocaleString(),
-      icon: Users,
+      icon: PeptideChainIcon,
       color: "text-primary",
       bgColor: "bg-primary/10",
       metricId: null as MetricId | null,
@@ -61,74 +69,67 @@ export function ResultsKpis({ stats, meta }: ResultsKpisProps) {
     {
       title: (
         <>
-          <Abbr title="Fibril-Forming Helix">FF-Helix</Abbr> %
+          % <Abbr title="Fibril-Forming Helix">FF-Helix</Abbr>
         </>
       ),
       titleKey: "ff-helix",
       value: formatPercent(stats.ffHelixCandidatePercent),
-      icon: Heater,
-      color: "text-green-600 dark:text-green-400",
-      bgColor: "bg-green-600/10",
+      icon: HelixToFibrilIcon,
+      color: "text-[hsl(var(--ff-helix))]",
+      bgColor: "bg-[hsl(var(--ff-helix))]/10",
       metricId: null as MetricId | null,
       onClick: () => {
         setTableFilter({ label: "FF-Helix Candidates", field: "ffHelixFlag", value: 1 });
         setActiveTab("data");
       },
       clickable: true,
-      subtitle: (
-        <>
-          Helix + <Abbr title="Hydrophobic moment">uH</Abbr> {">"} avg
-        </>
-      ),
+      subtitle: "Helical + μH above threshold",
       tooltip:
-        "Percentage of peptides classified as FF-Helix candidates (helix uH above database average)",
+        "Percentage of peptides predicted as fibril-forming α-helical (helix + μH above database threshold)",
     },
     {
       title: (
         <>
-          <Abbr title="Fibril-Forming Structural Switching">FF-SSW</Abbr> %
-        </>
-      ),
-      titleKey: "ff-ssw",
-      value: tangoAvailable ? formatPercent(stats.ffSswCandidatePercent) : "N/A",
-      icon: FlaskConical,
-      color: "text-blue-600 dark:text-blue-400",
-      bgColor: "bg-blue-600/10",
-      metricId: null as MetricId | null,
-      onClick: () => {
-        setTableFilter({ label: "FF-SSW Candidates", field: "ffSswFlag", value: 1 });
-        setActiveTab("data");
-      },
-      clickable: true,
-      subtitle: (
-        <>
-          <Abbr title="Structural Switching (TANGO)">SSW</Abbr> and H {">"}= avg
-        </>
-      ),
-      tooltip: !tangoAvailable
-        ? "TANGO did not run or is unavailable"
-        : "Percentage of peptides classified as FF-SSW candidates (SSW + hydrophobicity above database average)",
-    },
-    {
-      title: (
-        <>
-          % <Abbr title="Structural Switching (TANGO)">SSW</Abbr>
+          % <Abbr title="Secondary Structure Switch">SSW</Abbr>
         </>
       ),
       titleKey: "ssw",
       value: tangoAvailable ? formatPercent(stats.sswPositivePercent) : "N/A",
-      icon: TrendingUp,
-      color: "text-chameleon-positive",
-      bgColor: "bg-chameleon-positive/10",
+      icon: StructuralSwitchIcon,
+      color: "text-[hsl(var(--ssw))]",
+      bgColor: "bg-[hsl(var(--ssw))]/10",
       metricId: "ssw-positive" as MetricId,
       onClick: () => {
         setTableFilter({ label: "SSW Positive", field: "sswPrediction", value: 1 });
         setActiveTab("data");
       },
       clickable: true,
+      subtitle: "Helix ↔ β scores within gap threshold",
       tooltip: !tangoAvailable
         ? "TANGO did not run or is unavailable"
-        : "Percentage of peptides with TANGO SSW prediction",
+        : "Percentage of peptides with secondary structure switch prediction (helix-beta score difference below threshold)",
+    },
+    {
+      title: (
+        <>
+          % <Abbr title="Fibril-Forming Secondary Structure Switch">FF-SSW</Abbr>
+        </>
+      ),
+      titleKey: "ff-ssw",
+      value: tangoAvailable ? formatPercent(stats.ffSswCandidatePercent) : "N/A",
+      icon: SwitchToFibrilIcon,
+      color: "text-[hsl(var(--ff-ssw))]",
+      bgColor: "bg-[hsl(var(--ff-ssw))]/10",
+      metricId: null as MetricId | null,
+      onClick: () => {
+        setTableFilter({ label: "FF-SSW Candidates", field: "ffSswFlag", value: 1 });
+        setActiveTab("data");
+      },
+      clickable: true,
+      subtitle: "SSW + hydrophobicity above threshold",
+      tooltip: !tangoAvailable
+        ? "TANGO did not run or is unavailable"
+        : "Percentage of peptides predicted as fibril-forming SSW (SSW + hydrophobicity above database threshold)",
     },
   ];
 

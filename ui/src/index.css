@@ -57,6 +57,14 @@
     --beta-foreground: 0 0% 100%;
     --coil: 220 9% 46%;
 
+    /* Peleg FIX-005: feature-name badge tokens (no purple collision with --primary) */
+    --ssw: 175 70% 41%;             /* teal */
+    --ssw-foreground: 0 0% 100%;
+    --ff-helix: 142 71% 45%;        /* green */
+    --ff-helix-foreground: 0 0% 100%;
+    --ff-ssw: 159 64% 38%;          /* darker green-teal — distinct from FF-Helix */
+    --ff-ssw-foreground: 0 0% 100%;
+
     --chameleon-positive: 258 90% 66%;
     --chameleon-negative: 220 9% 46%;
 
@@ -140,6 +148,14 @@
     --beta: 25 95% 58%;
     --beta-foreground: 0 0% 100%;
     --coil: 210 8% 46%;
+
+    /* Peleg FIX-005: feature-name badge tokens (dark mode) */
+    --ssw: 175 65% 48%;             /* teal — slightly lighter for dark bg */
+    --ssw-foreground: 0 0% 100%;
+    --ff-helix: 142 65% 55%;        /* green — lighter for dark bg */
+    --ff-helix-foreground: 0 0% 100%;
+    --ff-ssw: 159 55% 48%;          /* distinct green-teal */
+    --ff-ssw-foreground: 0 0% 100%;
 
     --chameleon-positive: 258 90% 72%;
     --chameleon-negative: 210 8% 55%;

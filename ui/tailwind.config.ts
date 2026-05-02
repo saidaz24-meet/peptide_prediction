@@ -75,6 +75,18 @@ export default {
           DEFAULT: "hsl(var(--helix))",
           foreground: "hsl(var(--helix-foreground))",
         },
+        ssw: {
+          DEFAULT: "hsl(var(--ssw))",
+          foreground: "hsl(var(--ssw-foreground))",
+        },
+        "ff-helix": {
+          DEFAULT: "hsl(var(--ff-helix))",
+          foreground: "hsl(var(--ff-helix-foreground))",
+        },
+        "ff-ssw": {
+          DEFAULT: "hsl(var(--ff-ssw))",
+          foreground: "hsl(var(--ff-ssw-foreground))",
+        },
         beta: {
           DEFAULT: "hsl(var(--beta))",
           foreground: "hsl(var(--beta-foreground))",

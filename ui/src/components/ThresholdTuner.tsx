@@ -284,26 +284,30 @@ export function ThresholdTuner({ peptides }: ThresholdTunerProps) {
           </div>
         </div>
 
-        {/* Threshold provenance note */}
+        {/* Peleg FIX-025: threshold provenance — show origin clearly. */}
         {isModified ? (
           <div className="flex items-start gap-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-2.5">
             <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
             <span>
-              You have changed from the original thresholds. These are derived from the recommended
-              rigorously tested reference dataset. Changing may affect scientific accuracy. Server
-              values: uH={original.muHCutoff.toFixed(2)}, H={original.hydroCutoff.toFixed(2)},
-              Aggregation={original.aggThreshold.toFixed(1)}%
+              <strong>Source: User-set</strong> — you have changed from the original thresholds.
+              The originals are the recommended values (computed from the dataset). Changing may
+              affect scientific accuracy. Original values: uH={original.muHCutoff.toFixed(2)},
+              H={original.hydroCutoff.toFixed(2)}, Aggregation=
+              {original.aggThreshold.toFixed(1)}%
             </span>
           </div>
         ) : (
           <div className="flex items-start gap-2 text-xs text-muted-foreground bg-muted/30 rounded-md p-2.5">
             <Info className="w-3.5 h-3.5 mt-0.5 shrink-0" />
             <span>
-              Using recommended thresholds (dataset-average). These are rigorously validated
-              values.
+              <strong>Source: Computed from dataset median.</strong> These are the recommended
+              thresholds derived from your data and rigorously validated reference values.
             </span>
           </div>
         )}
+        {/* PELEG-Q-FIX-025: Per-Residue Threshold parameter rationale pending discussion */}
+        {/* PELEG-Q-FIX-025: % of Length Cutoff parameter rationale pending discussion */}
+        {/* PELEG-Q-FIX-025: Min SSW Residues parameter rationale pending discussion */}
       </CardContent>
     </Card>
   );

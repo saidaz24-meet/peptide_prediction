@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 import { ResultsKpis } from "@/components/ResultsKpis";
+import { ActiveThresholdsPanel } from "@/components/ActiveThresholdsPanel";
 import { ResultsCharts } from "@/components/ResultsCharts";
 import { PeptideTable } from "@/components/PeptideTable";
 import { Legend } from "@/components/Legend";
@@ -546,6 +547,9 @@ export default function Results() {
             </div>
           )}
 
+          {/* Peleg FIX-032: active thresholds visible above the dashboard. */}
+          <ActiveThresholdsPanel />
+
           {/* KPIs */}
           <ResultsKpis stats={stats} meta={meta} />
 
@@ -606,7 +610,7 @@ export default function Results() {
                   {/* Row 1: Preset buttons */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium mr-1">Presets:</span>
-                    {(["equal", "amyloid", "switch"] as RankingPreset[]).map((p) => (
+                    {(["equal", "amyloid", "helix", "switch"] as RankingPreset[]).map((p) => (
                       <Button
                         key={p}
                         variant={preset === p ? "default" : "outline"}
@@ -616,8 +620,10 @@ export default function Results() {
                         {p === "equal"
                           ? "Equal"
                           : p === "amyloid"
-                            ? "Amyloid Focus"
-                            : "Switch Focus"}
+                            ? "Fibril-formation Focus"
+                            : p === "helix"
+                              ? "Helix Focus"
+                              : "Switch Focus"}
                       </Button>
                     ))}
                     {preset === "custom" && (
@@ -745,16 +751,15 @@ export default function Results() {
               {/* Threshold Controls (interactive re-classification) */}
               <ThresholdTuner peptides={peptidesTyped} />
 
-              {/* FF-Helix explanation */}
+              {/* FF-Helix explanation (Peleg FIX-028 verbatim rewrite) */}
               <Alert variant="default" className="border-primary/20 bg-primary/5 rounded-xl">
                 <Info className="h-4 w-4 text-primary" />
                 <AlertDescription className="text-small text-muted-foreground">
-                  <strong className="text-foreground">FF-Helix %</strong> measures intrinsic amino
-                  acid helix propensity using a sliding window (Fauchere-Pliska scale). It is{" "}
-                  <strong className="text-foreground">not</strong> a prediction of actual helical
-                  content. Values of 0% or 100% are expected for many peptides. Do not compare to CD
-                  spectroscopy measurements. See the{" "}
-                  <Link to="/help" className="underline text-purple-600 hover:text-purple-800">
+                  <strong className="text-foreground">FF-Helix</strong> (Fibril-Forming alpha helix)
+                  is determined by the uH threshold. If a peptide is predicted to be helical and its
+                  uH is higher than the threshold, it is predicted as a potential alpha-helical
+                  fibril-forming peptide. See the{" "}
+                  <Link to="/help" className="underline text-primary hover:text-primary/80">
                     Help page
                   </Link>{" "}
                   for details.

@@ -172,29 +172,19 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
   const [globalFilter, setGlobalFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>(EMPTY_FILTERS);
-  const hasUniProtMeta = useMemo(
-    () => peptides.some((p) => p.geneName != null),
-    [peptides]
-  );
+  // Peleg FIX-006: default column visibility must be identical regardless of
+  // data source (CSV upload, Quick Analyze, UniProt query). Gene name and
+  // Protein function are kept off by default; users enable via Columns dropdown.
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     species: false, // Secondary info — available via detail view
-    geneName: false, // Shown when UniProt data is present
-    proteinFunction: false, // Shown when UniProt data is present
+    geneName: false, // Optional: toggle via Columns dropdown
+    proteinFunction: false, // Optional: toggle via Columns dropdown
     s4predSswPrediction: false, // S4PRED SSW is secondary to TANGO SSW
     ffHelixPercent: false, // Chou-Fasman propensity — demoted to advanced (S4PRED Helix is primary)
     tangoSswResidues: false, // TANGO SSW residue overlap count — advanced
   });
   const navigate = useNavigate();
   const { tableFilter, setTableFilter } = useChartSelection();
-
-  // Auto-show Gene/Function columns when UniProt data is present
-  useEffect(() => {
-    setColumnVisibility((prev) => ({
-      ...prev,
-      geneName: hasUniProtMeta,
-      proteinFunction: hasUniProtMeta,
-    }));
-  }, [hasUniProtMeta]);
 
   // Hide dense columns on mobile — user can re-enable via Columns dropdown
   useEffect(() => {
@@ -337,26 +327,21 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             Helix
-            <HeaderTip tip="S4PRED helix detection. 'Yes' = helix segments found with ≥5 consecutive residues at P(Helix) ≥ 0.5." />
+            <HeaderTip tip="S4PRED helix detection. Helix = segments found with ≥5 consecutive residues at P(Helix) ≥ 0.5." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
+        // Peleg FIX-005: feature-name-as-text badges. Helix=blue (--helix token).
+        // Negative/null → em dash, no red.
         cell: (info) => {
           const value = info.getValue();
-          if (value == null)
-            return (
-              <Badge variant="outline" className="text-muted-foreground/50 text-xs">
-                N/A
-              </Badge>
-            );
+          if (value == null) return <span className="text-muted-foreground/50 text-xs">—</span>;
           return value === 1 ? (
-            <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100 text-xs">
-              Yes
+            <Badge className="bg-helix text-helix-foreground hover:bg-helix/90 text-xs">
+              Helix
             </Badge>
           ) : (
-            <Badge variant="outline" className="text-muted-foreground text-xs">
-              No
-            </Badge>
+            <span className="text-muted-foreground text-xs">—</span>
           );
         },
       }),
@@ -381,9 +366,9 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             peptide.tangoHasData ??
             Boolean(
               peptide.tango?.beta?.length ||
-                peptide.tango?.helix?.length ||
-                peptide.extra?.["Tango Beta curve"]?.length ||
-                peptide.extra?.["Tango Helix curve"]?.length
+              peptide.tango?.helix?.length ||
+              peptide.extra?.["Tango Beta curve"]?.length ||
+              peptide.extra?.["Tango Helix curve"]?.length
             );
           return (
             <TangoBadge
@@ -410,22 +395,16 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
+        // Peleg FIX-005: feature-name text + --ff-helix token. Negative/null → em dash.
         cell: (info) => {
           const value = info.getValue();
-          if (value == null)
-            return (
-              <Badge variant="outline" className="text-muted-foreground/50 text-xs">
-                N/A
-              </Badge>
-            );
+          if (value == null) return <span className="text-muted-foreground/50 text-xs">—</span>;
           return value === 1 ? (
-            <Badge className="bg-green-100 text-green-800 border-green-300 hover:bg-green-100 text-xs">
-              Yes
+            <Badge className="bg-ff-helix text-ff-helix-foreground hover:bg-ff-helix/90 text-xs">
+              FF-Helix
             </Badge>
           ) : (
-            <Badge variant="outline" className="text-muted-foreground text-xs">
-              No
-            </Badge>
+            <span className="text-muted-foreground text-xs">—</span>
           );
         },
       }),
@@ -443,22 +422,16 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
+        // Peleg FIX-005: feature-name text + --ff-ssw token. Negative/null → em dash.
         cell: (info) => {
           const value = info.getValue();
-          if (value == null)
-            return (
-              <Badge variant="outline" className="text-muted-foreground/50 text-xs">
-                N/A
-              </Badge>
-            );
+          if (value == null) return <span className="text-muted-foreground/50 text-xs">—</span>;
           return value === 1 ? (
-            <Badge className="bg-blue-100 text-blue-800 border-blue-300 hover:bg-blue-100 text-xs">
-              Yes
+            <Badge className="bg-ff-ssw text-ff-ssw-foreground hover:bg-ff-ssw/90 text-xs">
+              FF-SSW
             </Badge>
           ) : (
-            <Badge variant="outline" className="text-muted-foreground text-xs">
-              No
-            </Badge>
+            <span className="text-muted-foreground text-xs">—</span>
           );
         },
       }),
@@ -914,7 +887,12 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
                 })}
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button onClick={exportToCSV} size="sm" variant="outline" title="Export filtered rows as CSV">
+          <Button
+            onClick={exportToCSV}
+            size="sm"
+            variant="outline"
+            title="Export filtered rows as CSV"
+          >
             <Download className="w-4 h-4 sm:mr-2" />
             <span className="hidden sm:inline">Export Filtered</span>
           </Button>

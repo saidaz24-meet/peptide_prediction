@@ -6,45 +6,55 @@ import { HelpCircle, BarChart3, Zap, Waves, Target, Layers, BookOpen, Info } fro
 import { BgNotebook } from "@/components/BgNotebook";
 import AppFooter from "@/components/AppFooter";
 
+/**
+ * Peleg-verbatim metric definitions (FIX-026 / FIX-027).
+ * Ranges have been corrected to the actual Fauchere-Pliska + uH bounds.
+ */
 const metrics = [
   {
     icon: Zap,
     name: "Hydrophobicity",
-    description: "Measure of how water-repelling the peptide is",
-    interpretation: "Higher values indicate more hydrophobic peptides. Typical range: -2.0 to +2.0",
+    description: "Property quantifying the molecule or surface ability to repel water.",
+    interpretation:
+      "Range: −1.01 to 2.25. Higher values indicate more hydrophobic peptides. Here used as a feature to determine fibril-formation potential of secondary structure switch peptides.",
     color: "text-blue-600",
   },
   {
     icon: Waves,
-    name: "Hydrophobic Moment (μH)",
-    description: "Quantifies amphipathic character of the peptide",
+    name: "Hydrophobic Moment (uH)",
+    description:
+      "Quantitative measurement of the amphiphilicity (asymmetry of hydrophobicity) of a peptide structure, representing the vector sum of hydrophobicity for amino acids in a helical arrangement.",
     interpretation:
-      "Higher values suggest better membrane interaction potential. Range: 0.0 to 1.0",
+      "Range: 0 to 3.26. Here used as a feature to determine fibril-formation potential of alpha-helical peptides.",
     color: "text-cyan-600",
   },
   {
     icon: Target,
     name: "Charge",
-    description: "Net electrical charge of the peptide at physiological pH",
-    interpretation: "Positive values = cationic, negative = anionic, zero = neutral",
+    description: "Net electrical charge of the peptide at physiological pH (pH = 7.4).",
+    interpretation: "Positive values = cationic, negative = anionic, zero = neutral.",
+    // PELEG-Q-FIX-022: signed vs absolute charge — Peleg flagged that |charge| loses
+    // biological information. Discussion needed before changing presentation.
     color: "text-amber-600",
   },
   {
     icon: Layers,
-    name: "FF-Helix % (Fibril-Forming Helix Propensity)",
+    name: "FF-Helix (Fibril-Forming alpha helix)",
+    // Peleg FIX-027 verbatim: removes Fauchere-Pliska + CD spectroscopy framing.
     description:
-      "Percentage of residues in sliding windows (6 residues) with mean Fauchere-Pliska helix propensity above threshold (1.0). This is a sequence-based propensity score, NOT a prediction of actual helical content.",
+      "Determined by the uH threshold. If a peptide is predicted to be helical and its uH is higher than the threshold, it is predicted as a potential alpha-helical fibril-forming peptide.",
     interpretation:
-      "0% = no 6-residue window exceeds the propensity threshold. 100% = all residues participate in qualifying windows. FF-Helix measures intrinsic amino acid tendency only.",
+      "Classification is binary: candidate or not. Adjust the uH threshold to make the classification more or less strict.",
     color: "text-purple-600",
   },
   {
     icon: BarChart3,
     name: "SSW Prediction",
     description:
-      "Secondary Structure Switch prediction from TANGO and/or S4PRED. Indicates whether the peptide may undergo a conformational switch between helix and beta-sheet.",
+      "Secondary Structure Switch prediction from TANGO and/or S4PRED analysis. Indicates whether the peptide may undergo a conformational switch between helix and beta-sheet.",
+    // Peleg FIX-027 verbatim: positive/negative/N/A on separate lines, no amyloid framing.
     interpretation:
-      "Positive = predicted to undergo structural switch (potential amyloid/fibril former). Negative = predicted stable (no switch). N/A = provider not available or sequence too short.",
+      "Positive — predicted to undergo a structural switch.\nNegative — predicted stable (no switch).\nN/A — provider not available or sequence too short.\n\nThere is no connection between the SSW prediction and the fibril-forming potential. Only after taking hydrophobicity into account.",
     color: "text-chameleon-positive",
   },
 ];
@@ -53,7 +63,8 @@ const chartTypes = [
   {
     name: "Scatter Plot",
     description: "Hydrophobicity vs Hydrophobic Moment correlation",
-    insights: "Identify peptides with optimal amphipathic properties",
+    // Peleg FIX-029 verbatim
+    insights: "Identifies correlation between hydrophobicity and amphipathic nature of the peptide",
   },
   {
     name: "Distribution Histograms",
@@ -68,7 +79,9 @@ const chartTypes = [
   {
     name: "Radar Charts",
     description: "Multi-dimensional comparison profiles",
-    insights: "Compare SSW vs No SSW databases",
+    // Peleg FIX-029 verbatim
+    insights:
+      "Compare No SSW vs SSW vs FF-SSW and No Helix vs Helix vs FF-Helix",
   },
 ];
 
@@ -127,7 +140,10 @@ export default function Help() {
                         <p className="text-muted-foreground text-sm mb-2">{metric.description}</p>
                         <div className="bg-muted/50 rounded-lg p-3">
                           <p className="text-sm font-medium text-foreground">Interpretation:</p>
-                          <p className="text-sm text-muted-foreground">{metric.interpretation}</p>
+                          {/* Peleg FIX-027 SSW interpretation uses newline-separated lines */}
+                          <p className="text-sm text-muted-foreground whitespace-pre-line">
+                            {metric.interpretation}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -241,36 +257,37 @@ export default function Help() {
             </CardHeader>
             <CardContent>
               <div className="grid md:grid-cols-2 gap-6">
+                {/* Peleg FIX-030: FF-Helix classification consolidated into Peptide Metrics
+                    Explained (above). FF-SSW uses TANGO OR S4PRED (FIX-001 OR-logic). */}
                 {[
-                  {
-                    name: "FF-Helix Classification",
-                    description:
-                      "A peptide is classified as an FF-Helix candidate when S4PRED predicts helical structure AND the hydrophobic moment (μH) is above the database average. This identifies amphipathic helices that could form fibril-like assemblies.",
-                  },
                   {
                     name: "FF-SSW Classification",
                     description:
-                      "A peptide is classified as FF-SSW when TANGO predicts a Secondary Structure Switch (SSW) AND the mean hydrophobicity is above the database average. This identifies peptides with structural switching potential and a hydrophobic core — key features of amyloid fibril formation.",
+                      "A peptide is classified as FF-SSW when TANGO or S4PRED predicts a Secondary Structure Switch (SSW) AND the mean hydrophobicity is above the database hydrophobicity threshold. This identifies peptides with structural switching potential and hydrophobic character.",
                   },
                   {
                     name: "Aggregation Propensity Interpretation",
                     description:
-                      "The lollipop chart shows peak TANGO aggregation per peptide. Green (<5%) = low propensity, Yellow (5-20%) = moderate aggregation propensity, Red (>20%) = high aggregation propensity. Aggregation-prone regions are where per-residue aggregation exceeds the threshold.",
+                      "The lollipop chart shows peak TANGO aggregation per peptide. Higher peaks indicate regions with higher aggregation propensity. Aggregation-prone regions are where per-residue aggregation exceeds the configured threshold (see Threshold Presets).",
                   },
                   {
                     name: "Correlation Matrix Guide",
                     description:
-                      "The matrix shows Spearman rank correlation (ρ) between all metric pairs. Blue = positive correlation, Red = negative. Bold values indicate |ρ| > 0.5 (strong). Click any cell to view the underlying scatter plot with trend line and consensus tier coloring.",
+                      "The matrix shows Spearman rank correlation (ρ) between all metric pairs. Blue = positive correlation, Red = negative. Bold values indicate |ρ| > 0.5 (strong). Click any cell to view the underlying scatter plot with trend line.",
                   },
                   {
                     name: "Candidate Ranking System",
+                    // Peleg FIX-030 verbatim: drop TANGO aggregation and SSW score from default
+                    // ranking description. "We shouldn't look on the SSW score at all. It does
+                    // not mean anything." (Peleg)
                     description:
-                      "Ranking uses percentile normalization (0-100) across 6 metrics: hydrophobicity, |charge|, μH, FF-Helix %, SSW score, and TANGO Agg Max. Weight sliders (0-1) control each metric's influence. Presets: Equal (all 1.0), Physicochemical (emphasize biochem), Aggregation (emphasize TANGO).",
+                      "Ranking uses percentile normalization (0-100) across the active metrics: hydrophobicity, μH, FF-Helix, S4PRED helix %, and (optionally) |charge|. Weight sliders control each metric's influence. Presets: Equal, Fibril-formation Focus, Helix Focus, and Switch Focus.",
                   },
                   {
                     name: "Threshold Presets",
+                    // Peleg FIX-030: clarify which aggregation thresholds are used
                     description:
-                      "Recommended (default): thresholds computed from your data using database median. Custom: manually set μH threshold, hydrophobicity threshold, and aggregation thresholds. Custom values override the recommended reference values — use with care for publication-quality analysis.",
+                      "Recommended (default): thresholds computed from your data using database median. Custom: manually set the 9 thresholds (general SS, helical, SS-switch, fibril-formation). The aggregation-flagging parameters (per-residue aggregation %, % of length, minimum SSW residues) are listed under 'Advanced (TANGO aggregation)' in the threshold panel and are pending discussion.",
                   },
                 ].map((topic, index) => (
                   <motion.div

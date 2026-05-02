@@ -344,9 +344,7 @@ export default function Upload() {
           if (hits > 0) {
             toast.success(`${hits} of ${rows.length} sequences loaded from cache`, {
               description:
-                misses > 0
-                  ? `${misses} newly computed`
-                  : "All results cached — instant analysis",
+                misses > 0 ? `${misses} newly computed` : "All results cached — instant analysis",
             });
           }
           navigate("/results");
@@ -642,7 +640,10 @@ export default function Upload() {
                         return null;
                       })()}
 
-                      {/* Sequence length summary */}
+                      {/* Peleg FIX-031: simplify length warning to single ratio line.
+                          PELEG-Q-FIX-031: 15aa cutoff citation needed or soften wording — the
+                          15-residue lower bound is an empirical default; no S4PRED paper or
+                          repo statement found documenting it as a hard threshold. */}
                       {rawData.rows &&
                         rawData.rows.length > 0 &&
                         (() => {
@@ -652,8 +653,8 @@ export default function Upload() {
                             .map((r) => String(pickSeq(r)).length)
                             .filter((l) => l > 0);
                           const short = lengths.filter((l) => l < 15).length;
-                          const optimal = lengths.filter((l) => l >= 15 && l <= 100).length;
                           const long = lengths.filter((l) => l > 100).length;
+                          const total = lengths.length;
                           const hasWarnings = short > 0 || long > 0;
                           if (!hasWarnings) return null;
                           return (
@@ -663,15 +664,14 @@ export default function Upload() {
                                 <div className="text-sm space-y-1">
                                   {short > 0 && (
                                     <p>
-                                      {short} sequences too short (&lt;15 aa) — S4PRED may be
-                                      unreliable
+                                      {short}/{total} sequences are short (&lt;15 aa) — short
+                                      sequences are excluded from S4PRED by default.
                                     </p>
                                   )}
-                                  <p>{optimal} sequences in optimal range (15–100 aa)</p>
                                   {long > 0 && (
                                     <p>
-                                      {long} sequences too long (&gt;100 aa) — reduced TANGO
-                                      accuracy
+                                      {long}/{total} sequences are long (&gt;100 aa) — TANGO
+                                      accuracy is reduced.
                                     </p>
                                   )}
                                 </div>

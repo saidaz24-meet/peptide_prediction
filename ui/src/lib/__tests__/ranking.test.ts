@@ -248,12 +248,13 @@ describe("rankPeptides", () => {
   });
 
   it("optional metric toggle: 5 vs 7 metrics", () => {
+    // Peleg FIX-024 swapped tangoAggMax (now optional) with hydrophobicity (now default)
     const w5: ProportionalWeights = { ...PRESETS.equal.weights };
     const w7: ProportionalWeights = {
       ...PRESETS.equal.weights,
-      hydrophobicity: 14,
-      absCharge: 14,
       tangoAggMax: 14,
+      absCharge: 14,
+      hydrophobicity: 14,
       s4predHelixPercent: 14,
       ffHelixPercent: 14,
       muH: 15,
@@ -263,11 +264,11 @@ describe("rankPeptides", () => {
     const r5 = rankPeptides(cohort, w5);
     const r7 = rankPeptides(cohort, w7);
 
-    // With 7 metrics, hydrophobicity and absCharge percentiles should be set
-    expect(r7[0].metricPercentiles.hydrophobicity).not.toBeNull();
+    // With 7 metrics, optional add-ons should be set
+    expect(r7[0].metricPercentiles.tangoAggMax).not.toBeNull();
     expect(r7[0].metricPercentiles.absCharge).not.toBeNull();
     // With 5 metrics, optional metrics should be null
-    expect(r5[0].metricPercentiles.hydrophobicity).toBeNull();
+    expect(r5[0].metricPercentiles.tangoAggMax).toBeNull();
     expect(r5[0].metricPercentiles.absCharge).toBeNull();
   });
 });
@@ -314,20 +315,24 @@ describe("presets v2", () => {
     expect(sum).toBe(100);
   });
 
-  it("amyloid preset emphasizes TANGO (35%)", () => {
+  it("amyloid (Fibril-formation Focus) preset emphasises uH and hydrophobicity", () => {
+    // Peleg FIX-024: fibril-formation classification uses uH + hydrophobicity, not TANGO Agg
     const w = PRESETS.amyloid.weights;
-    expect(w.tangoAggMax).toBe(35);
-    expect((w.tangoAggMax ?? 0) > (w.s4predHelixPercent ?? 0)).toBe(true);
+    expect(w.muH).toBe(30);
+    expect(w.hydrophobicity).toBe(30);
+    expect((w.muH ?? 0) > (w.s4predHelixPercent ?? 0)).toBe(true);
   });
 
-  it("amyloid preset sets s4pred direction to low", () => {
-    expect(PRESETS.amyloid.directions.s4predHelixPercent).toBe("low");
+  it("helix preset emphasises S4PRED helix (35%)", () => {
+    const w = PRESETS.helix.weights;
+    expect(w.s4predHelixPercent).toBe(35);
+    expect(PRESETS.helix.directions.s4predHelixPercent).toBe("high");
   });
 
   it("switch preset emphasizes S4PRED (30%)", () => {
     const w = PRESETS.switch.weights;
     expect(w.s4predHelixPercent).toBe(30);
-    expect((w.s4predHelixPercent ?? 0) > (w.tangoAggMax ?? 0)).toBe(true);
+    expect((w.s4predHelixPercent ?? 0) > (w.muH ?? 0)).toBe(true);
   });
 
   it("switch preset sets s4pred direction to high", () => {
