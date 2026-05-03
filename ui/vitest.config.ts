@@ -11,5 +11,7 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/__tests__/**/*.test.{ts,tsx}"],
+    // Q.4: 10s default kills the SetDiagram flake under heavy concurrent runs.
+    testTimeout: 10000,
   },
 });

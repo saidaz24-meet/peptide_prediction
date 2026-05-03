@@ -55,6 +55,16 @@ export interface BiochemComparisonProps {
   metrics: BiochemMetric[];
   /** Layout mode. Compact stacks sub-panels; expanded shows side-by-side. */
   layout?: "compact" | "expanded";
+  /**
+   * Wave Q.1: explicit display mode override.
+   *  - "full" (default): all sub-panels render (stat cards + radar + percentiles)
+   *  - "single-peptide": stat cards render absolute values only; radar +
+   *    percentile bars are replaced with an empty-state pointing the user
+   *    to upload a CSV / run a UniProt query.
+   * If omitted, the component auto-detects single-peptide mode via
+   * `allPeptides.length < 2`.
+   */
+  mode?: "full" | "single-peptide";
 }
 
 // ── Default PVL metrics ──
@@ -121,7 +131,14 @@ export function BiochemComparison({
   stats,
   metrics,
   layout = "compact",
+  mode,
 }: BiochemComparisonProps) {
+  // Wave Q.1: detect single-peptide mode. Auto-detect by allPeptides.length < 2,
+  // overridable via the explicit `mode` prop. In single-peptide mode the
+  // stat-card row still renders (absolute values), but percentile bars + radar
+  // are replaced with a single empty-state pointing the user to a database.
+  const isSinglePeptide = mode === "single-peptide" || (mode !== "full" && allPeptides.length < 2);
+
   // Compute percentiles for each metric
   const metricsWithPercentiles = useMemo(() => {
     return metrics.map((m) => {
@@ -129,14 +146,16 @@ export function BiochemComparison({
       const allValues = allPeptides
         .map((p) => m.getValue(p))
         .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
+      // Suppress percentile computation in single-peptide mode — a single
+      // sample's percentile is meaningless.
       const percentile =
-        typeof value === "number" && Number.isFinite(value)
+        !isSinglePeptide && typeof value === "number" && Number.isFinite(value)
           ? calculatePercentile(value, allValues)
           : null;
       const mean = stats && m.getMean ? m.getMean(stats) : null;
       return { metric: m, value, percentile, mean };
     });
-  }, [peptide, allPeptides, stats, metrics]);
+  }, [peptide, allPeptides, stats, metrics, isSinglePeptide]);
 
   const statCardMetrics = metricsWithPercentiles.filter(
     (m) => m.metric.displayMode === "stat-card" || m.metric.displayMode === "all"
@@ -152,9 +171,7 @@ export function BiochemComparison({
     <Card className="rounded-xl border-[hsl(var(--border))]">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">Biochemical feature comparison</CardTitle>
-        <CardDescription>
-          How this peptide compares to the database
-        </CardDescription>
+        <CardDescription>How this peptide compares to the database</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Sub-panel 1: Stat cards row */}
@@ -171,10 +188,7 @@ export function BiochemComparison({
             {statCardMetrics.map(({ metric: m, value, mean, percentile }) => {
               const band = percentile !== null ? getPercentileBand(percentile) : null;
               return (
-                <div
-                  key={m.id}
-                  className="border rounded-lg p-3 space-y-1"
-                >
+                <div key={m.id} className="border rounded-lg p-3 space-y-1">
                   <p className="text-xs text-muted-foreground font-medium">
                     {m.label} {m.unit && <span className="text-[10px]">{m.unit}</span>}
                   </p>
@@ -197,8 +211,19 @@ export function BiochemComparison({
           </div>
         )}
 
-        {/* Sub-panel 2: Radar chart placeholder */}
-        {radarMetrics.length >= 3 && (
+        {/* Wave Q.1: single-peptide empty state — replaces both the radar and
+            percentile sub-panels when there's no database to compare against. */}
+        {isSinglePeptide && (
+          <div className="rounded-lg border border-dashed border-[hsl(var(--border))] bg-muted/30 p-4 text-center">
+            <p className="text-sm text-foreground font-medium">No database comparison available</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Compare with a database — upload a CSV or run a UniProt query.
+            </p>
+          </div>
+        )}
+
+        {/* Sub-panel 2: Radar chart placeholder (full mode only) */}
+        {!isSinglePeptide && radarMetrics.length >= 3 && (
           <div>
             <p className="text-xs text-muted-foreground mb-2">
               Radar comparison (peptide vs database mean)
@@ -207,8 +232,8 @@ export function BiochemComparison({
           </div>
         )}
 
-        {/* Sub-panel 3: Percentile bars */}
-        {percentileMetrics.length > 0 && (
+        {/* Sub-panel 3: Percentile bars (full mode only) */}
+        {!isSinglePeptide && percentileMetrics.length > 0 && (
           <div>
             <p className="text-xs text-muted-foreground mb-2">
               Percentile ranking across key metrics
@@ -237,9 +262,7 @@ export function BiochemComparison({
                       {percentile !== null ? `${percentile.toFixed(0)}%` : "—"}
                     </span>
                     {band && (
-                      <span className={`text-[10px] w-20 ${band.colorClass}`}>
-                        {band.label}
-                      </span>
+                      <span className={`text-[10px] w-20 ${band.colorClass}`}>{band.label}</span>
                     )}
                   </div>
                 );
@@ -359,13 +382,7 @@ function RadarComparisonSVG({
 
         {/* Data points */}
         {peptidePoints.map((p, i) => (
-          <circle
-            key={i}
-            cx={p.x}
-            cy={p.y}
-            r={3}
-            fill="hsl(var(--primary))"
-          />
+          <circle key={i} cx={p.x} cy={p.y} r={3} fill="hsl(var(--primary))" />
         ))}
 
         {/* Labels */}

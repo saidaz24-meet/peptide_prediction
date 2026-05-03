@@ -65,4 +65,37 @@ describe("SequenceTrack legend", () => {
     // Beta and coil have no canonical source — must NOT render numbers.
     expect(container.textContent).not.toContain("(0%)");
   });
+
+  // Q.2 — parity test against the canonical s4predHelixPercent.
+  // Said's screenshot showed Amyloid-β(25-35) "AIKKYEEKNKKSSRLFIFRK"
+  // with Helix (30%). Lock that the rendered legend % equals
+  // s4predHelixPercent.toFixed(0) verbatim — never a recomputed value.
+  it("legend helix % is exactly s4predHelixPercent.toFixed(0) — Amyloid-β parity", () => {
+    const cases = [
+      { s4predHelixPercent: 30, expectedLabel: "(30%)" },
+      { s4predHelixPercent: 0, expectedLabel: "(0%)" },
+      { s4predHelixPercent: 100, expectedLabel: "(100%)" },
+      // Decimal value floors via toFixed(0) — 29.49 → 29, not 30.
+      { s4predHelixPercent: 29.49, expectedLabel: "(29%)" },
+    ];
+
+    for (const { s4predHelixPercent, expectedLabel } of cases) {
+      const p = makePeptide({
+        sequence: "AIKKYEEKNKKSSRLFIFRK",
+        length: 20,
+        s4predHelixPercent,
+        betaPercent: 10,
+        s4pred: {
+          // Deliberately mostly-coil ssPrediction — proves the legend does
+          // NOT re-compute from this array (it would render ~5%, not 30).
+          ssPrediction: [
+            "C", "C", "C", "C", "C", "C", "C", "C", "C", "H",
+            "C", "C", "C", "C", "C", "C", "C", "C", "C", "C",
+          ],
+        },
+      });
+      const { container } = render(<SequenceTrack peptide={p} />);
+      expect(container.textContent).toContain(expectedLabel);
+    }
+  });
 });

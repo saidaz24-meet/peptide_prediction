@@ -198,4 +198,75 @@ So `max_results` produces a 422 instead of being silently ignored. Catches user 
 - Variant A response (500 rows of biochem-only): `/tmp/varA.json`
 - Variants B/C: empty (curl timed out before server completed)
 
+---
+
+## Resolution — Wave B (2026-05-03)
+
+Two of the six fix proposals (A and F) shipped in Wave B. The rest (B, C, D, E) remain queued behind T1's call.
+
+### What changed
+
+| Fix | Status | Where |
+|---|---|---|
+| **A.** Cap S4PRED at `S4PRED_MAX_LENGTH=100` | ✅ shipped | `backend/config.py` (new setting); `backend/s4pred.py` (skip-and-warn loop) |
+| **F.** `extra="forbid"` on every request schema | ✅ shipped | `backend/schemas/feedback.py`, `backend/schemas/uniprot_query.py` |
+| Bonus: AliasChoices for `max_results` / camelCase variants | ✅ shipped | `backend/schemas/uniprot_query.py` (`UniProtQueryExecuteRequest`) |
+| **B.** Disconnect detection on `/api/uniprot/execute` | ⏳ deferred | T1 sign-off |
+| **C.** `torch.set_num_threads(1)` + provider semaphore | ⏳ deferred | T1 sign-off |
+| **D.** Pre-warm S4PRED at startup | ⏳ deferred | T1 sign-off |
+| **E.** Celery + jobId polling for long queries | ⏳ deferred | Wave decision |
+
+### Effect on the silent contract bug
+
+Before Wave B, the user's literal curl payload `{"query":"amyloid","max_results":5}` was accepted with HTTP 200 because Pydantic v2's default is `extra="ignore"` — `max_results` was silently dropped, `size` defaulted to 500, and the server processed 500 rows of biochem-only.
+
+After Wave B, the same payload is **also** accepted with HTTP 200, but now `max_results` is a recognised alias for `size` via `AliasChoices`, so the request actually queries 5 rows. Anyone sending an *unknown* field (e.g. `max_resultz=5`) gets a clean HTTP 422 naming the offending field instead of a quiet success.
+
+### Effect on the S4PRED hang
+
+Sequences longer than `settings.S4PRED_MAX_LENGTH` (default 100 aa) are skipped at the top of `run_s4pred_sequences`. The skip is recorded as `stats["skipped_long"]` and emits a `logger.warning(... > S4PRED_MAX_LENGTH=...)` line. Concretely, for the original failing case (`amyloid`, size=5):
+
+| Sequence | Length | Behaviour after Wave B |
+|---|---|---|
+| P0DJI8 | 122 aa | **skipped** (122 > 100) |
+| P0DJI9 | 122 aa | **skipped** (122 > 100) |
+| P05067 (APP) | 770 aa | **skipped** (770 > 100) — the dominant cost |
+| P10997 | 89 aa | runs normally |
+| P29216 | 76 aa | runs normally |
+
+Expected new runtime: TANGO ~30 s (TANGO is unchanged; remaining proposals B/C still relevant) + S4PRED ~5 s (only 2 short sequences) + biochem/normalize ~3 s ≈ **~40 s end-to-end**, down from 615 s. Out of a curl 200 s budget, comfortably within reach.
+
+### How to verify the silent contract bug is now loud
+
+```bash
+# OLD silent-success (returned 200, processed 500 rows): now still 200, but routes to size=5
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8000/api/uniprot/execute \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"amyloid","max_results":5}'
+# → 200 (max_results is now an alias)
+
+# Typo / removed field: now LOUD 422 instead of silent success
+curl -s -X POST http://localhost:8000/api/uniprot/execute \
+  -H 'Content-Type: application/json' \
+  -d '{"query":"amyloid","run_psipred":false}'
+# → 422 with detail naming `run_psipred`
+```
+
+Or run the regression suite:
+
+```bash
+cd backend
+.venv/bin/python -m pytest tests/test_api_contract_strictness.py -v
+```
+
+### Test count delta
+
+`make test`: **436 → 457** passed.
+- +21 new tests in `tests/test_api_contract_strictness.py` (extra="forbid" parametrised over all three request schemas, alias coverage parametrised over 12 combinations, plus HTTP-level 422 + max_results round-trip).
+- +2 previously-skipped tests in `tests/test_api_contracts.py` now pass (their stale `run_psipred` field was renamed to `run_s4pred`, so the schema accepts the payload again).
+
+### Frontend impact
+
+None. The frontend (`ui/src/components/UniProtQueryInput.tsx:201-213`) already sends snake_case (`run_tango`, `run_s4pred`, `length_min`, `length_max`, `include_isoforms`). Aliases were added defensively for curl and any non-UI clients. T3 follow-ups: (a) optionally render a banner when `meta.warnings` includes the long-sequence skip note (not yet emitted by the backend — depends on future work), (b) `s4predSkipped`-style row-level UI is unchanged because backend still returns null S4PRED fields for skipped sequences, which the UI already renders as `—`.
+
 The investigation uvicorn (pid 13348, port 8765) has been stopped. The user's regular dev server (port 8000) was untouched.

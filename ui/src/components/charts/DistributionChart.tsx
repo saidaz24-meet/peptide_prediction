@@ -234,7 +234,7 @@ export function DistributionChart({
           {style === "lollipop" ? (
             <ComposedChart
               data={chartBins}
-              margin={{ top: 20, right: 30, bottom: 35, left: 40 }}
+              margin={{ top: 32, right: 30, bottom: 35, left: 40 }}
             >
               <CartesianGrid strokeOpacity={0.3} />
               <XAxis
@@ -316,7 +316,7 @@ export function DistributionChart({
           ) : (
             <BarChart
               data={chartBins}
-              margin={{ top: 20, right: 30, bottom: 35, left: 40 }}
+              margin={{ top: 32, right: 30, bottom: 35, left: 40 }}
             >
               <CartesianGrid strokeOpacity={0.3} />
               <XAxis

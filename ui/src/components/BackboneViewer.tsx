@@ -262,7 +262,13 @@ export function BackboneViewer({ peptideId, pdbUrl }: BackboneViewerProps) {
 
       {error && (
         <CardContent className="pt-0">
-          <p className="text-sm text-destructive">{error}</p>
+          {error.toLowerCase().includes("no alphafold") || error.toLowerCase().includes("not found") ? (
+            <p className="text-sm text-muted-foreground">
+              No AlphaFold structure available for this entry — this is expected for short or non-canonical peptides.
+            </p>
+          ) : (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
         </CardContent>
       )}
 

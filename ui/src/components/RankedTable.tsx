@@ -1,8 +1,11 @@
 /**
- * Ranked peptide table with per-metric percentile columns and consensus badge.
+ * Ranked peptide table with per-metric percentile columns.
  *
  * Displays the top-N candidates with composite score + per-metric score bars.
  * Row click navigates to /peptides/:id.
+ *
+ * Peleg FIX-013 / Wave Q.3: the Consensus tier column has been removed —
+ * tier system is unjustified scientifically and must not surface to users.
  */
 import { useMemo } from "react";
 import { useNavigate } from "react-router-dom";
@@ -22,8 +25,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ScoreBar } from "@/components/ScoreBar";
-import { ConsensusBadge } from "@/components/ConsensusBadge";
-import { getConsensusSS, type ConsensusResult } from "@/lib/consensus";
 import { type PeptideRanking, type RankingMetric, METRIC_LABELS } from "@/lib/ranking";
 import type { Peptide } from "@/types/peptide";
 
@@ -38,7 +39,6 @@ type RankedRow = {
   rank: number;
   peptide: Peptide;
   ranking: PeptideRanking;
-  consensus: ConsensusResult;
 };
 
 const columnHelper = createColumnHelper<RankedRow>();
@@ -59,7 +59,6 @@ export function RankedTable({ peptides, rankings, topN, activeMetrics }: RankedT
           rank: i + 1,
           peptide,
           ranking,
-          consensus: getConsensusSS(peptide),
         };
       })
       .filter((r): r is RankedRow => r != null);
@@ -111,14 +110,7 @@ export function RankedTable({ peptides, rankings, topN, activeMetrics }: RankedT
           size: 110,
         })
       ),
-      // Consensus tier badge
-      columnHelper.accessor((r) => r.consensus, {
-        id: "consensus",
-        header: "Consensus",
-        cell: (info) => <ConsensusBadge consensus={info.getValue()} />,
-        size: 120,
-        enableSorting: false,
-      }),
+      // Wave Q.3 / Peleg FIX-013: Consensus tier column removed.
       columnHelper.accessor((r) => r.peptide.length, {
         id: "length",
         header: "Len",

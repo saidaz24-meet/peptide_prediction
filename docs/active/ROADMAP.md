@@ -50,6 +50,8 @@ PVL occupies a unique niche: the **only web tool** combining aggregation propens
 | A3 | Example datasets | 3h | DONE | 3 curated sets with "Try example data" |
 | A4 | bio.tools registration | 1h | TODO | Needs live URL |
 | A5 | Zenodo DOI | 1h | TODO | Needs GitHub release |
+| A6 | One-click paper figure pack | 8-12h | TODO | Select N peptides → multi-panel SVG with consistent styling, ready for Nature/Science supplement. Includes radar overlay, sequence comparison, classification matrix, helical wheels. Embeds permalink to reproduce. |
+| A7 | JOSS paper draft + submission | 16-20h | TODO | paper.md + bibliography + author affiliations. Submission triggered by clean GitHub release + Zenodo DOI. |
 
 ---
 
@@ -77,6 +79,19 @@ pLDDT metrics, Mol* iframe viewer, PDB download for valid UniProt accessions.
 **Status**: PARTIAL (1293 → 15 LOC) | **Effort**: 16h
 **Done**: Extracted to `services/`, broke circular imports, fixed duplicate S4PRED bug.
 **Remaining**: `execute_uniprot_query` monolith (814 lines) needs dedicated plan.
+
+### B-CONTRACT — API contract hardening (Wave B)
+**Status**: PROPOSED | **Effort**: 4-6h | **Owner**: T2
+Critical reliability fix surfaced 2026-05-02:
+- `UniProtQueryExecuteRequest` (and likely siblings) use Pydantic v2 `extra="ignore"` → silently drops unknown fields. Frontend sending `max_results: 5` was coerced to `size=500` defaults silently, causing 615s timeouts on protein-length sequences.
+- Fix: set `model_config = ConfigDict(extra="forbid")` on every request schema; add `AliasChoices` so legacy field names (`max_results`) route to canonical (`size`); audit ALL request schemas in `backend/schemas/api_models.py`.
+- Add contract regression tests: `pytest backend/tests/test_api_contract_strictness.py` — assert 422 on unknown fields, assert aliases work.
+
+### B-S4PRED-CAP — S4PRED length cap (Wave B)
+**Status**: PROPOSED | **Effort**: 2-3h | **Owner**: T2
+- S4PRED runs a 5-model BiLSTM ensemble per residue. On 770aa proteins (e.g., APP) this is ~120s/sequence × 5 sequences = 600+s.
+- PVL is a peptide tool. Add length cap: reject S4PRED on sequences > 100 aa (configurable via settings) with clear error: "S4PRED is restricted to peptides ≤ 100 aa. For full proteins, use [link to alternative]".
+- Frontend respects cap: skips S4PRED for long sequences, runs only TANGO + biochem, surfaces a banner "S4PRED skipped — sequence too long for peptide pipeline."
 
 ### B6. DuckDB Result Cache
 **Status**: NOT STARTED | **Effort**: 12h
@@ -204,6 +219,32 @@ Prominent option on the landing page: "Run PVL on your own machine — Docker, M
 | D1.10 | Full landing page assembly | 4h | DONE | All sections wired into Index.tsx |
 | D1.11 | Inner pages redesign (Results, Upload, etc.) | 8h | DONE | All 9 data pages + sidebar redesigned |
 | D1.12 | Navigation guard (QuickAnalyze) | 2h | DONE | AlertDialog + global nav guard hook |
+
+## Phase D4: Universal Drill-Down + Hover Architecture (NEW — Wave H)
+
+**Goal**: every numeric value, every chart element, every metric label reveals contextual scientific detail on hover; every chart can expand into a slide-over inspector with full drill-down. This is the single biggest UX transformation in the roadmap — the difference between "PVL has charts" and "PVL is a research instrument."
+
+### D4.1 — RichHoverCard universal pattern
+**Effort**: 8-10h | **Status**: PROPOSED (Cowork V3-1)
+A single `<MetricHover metric={id} peptide={p}>` wrapper any number/element opts into. Reveals: scientific definition, current value, percentile in dataset, comparison to mean, 2-3 related peptides, "Drill in →" button.
+
+### D4.2 — DrillDown slide-over inspector
+**Effort**: 12-16h | **Status**: PROPOSED (Cowork V3-2)
+Right-side slide-over (Stripe Dashboard pattern, NOT modal — context preserved). Triggered by any chart's `↗` icon or any `MetricHover`'s "Drill in" button. Contains: 2× chart, scientific definition pane, interpretation pane, underlying peptides table, export buttons (SVG/PNG/CSV), "Send to Compare" action, keyboard shortcuts (cmd+K metric switch, arrows for peptide nav, esc close).
+
+### D4.3 — URL-routable analysis permalinks
+**Effort**: 6-8h | **Status**: PROPOSED
+Drill-down state captured in URL (`/results?drill=ff-helix&peptide=P12345`). Same for full analysis state — query, thresholds, ranking presets — encoded into a shareable hash. Researcher pastes link in paper / Slack / email; recipient sees the exact same view. This is reproducibility-as-feature.
+
+### D4.4 — Cross-chart linking
+**Effort**: 6-8h | **Status**: PROPOSED
+Hovering a percentile bar simultaneously highlights the corresponding bin in the matching distribution histogram + the matching vertex on the radar chart. This is what cellxgene does for single-cell data and it's why their tool feels alive.
+
+### D4.5 — Per-residue rich hover on sequence tracks
+**Effort**: 4-6h | **Status**: PROPOSED
+Hovering any residue on the sequence display reveals: position, AA letter + 3-letter code, S4PRED P(H/E/C), TANGO score, biochem class (hydrophobic/charged/etc.), is-in-segment? booleans for helix/SSW/FF-Helix.
+
+---
 
 ## Phase D2: Mobile Responsive + Polish (IN PROGRESS)
 

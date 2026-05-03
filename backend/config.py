@@ -191,6 +191,13 @@ class Settings:
     MAX_GAP: int = int(os.getenv("MAX_GAP", "3"))
     """Maximum gap to merge across in segment detection (Peleg default: 3)"""
 
+    # Wave B (B.4): per-sequence S4PRED length cap.
+    # Source: docs/active/UNIPROT_TIMEOUT_INVESTIGATION.md — APP (770 aa) on the
+    # 5-model BiLSTM ensemble takes ~2 minutes alone; PVL is a peptide tool, so
+    # any sequence longer than this is skipped with a warning surfaced via meta.
+    S4PRED_MAX_LENGTH: int = int(os.getenv("S4PRED_MAX_LENGTH", "100"))
+    """Maximum sequence length S4PRED will run on (Wave B default: 100 aa). Sequences exceeding this are skipped with a `s4pred_skipped_long_seq` warning and the row's S4PRED fields stay null."""
+
     # Group 2: Helical thresholds
     MIN_HELIX_PERCENT_CONTENT: float = float(os.getenv("MIN_HELIX_PERCENT_CONTENT", "0"))
     """Minimum % helix content (residues predicted helical) for helix classification (Peleg default: 0, range 0-100)"""

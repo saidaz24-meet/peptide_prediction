@@ -194,4 +194,70 @@ describe("BiochemComparison", () => {
       expect(badge.className).toContain("green");
     }
   });
+
+  // Wave Q.1: single-peptide mode (Quick Analyze) — no database to compare against.
+  describe("single-peptide mode (Wave Q.1)", () => {
+    it("auto-detects single-peptide via allPeptides.length < 2", () => {
+      const single = PEPTIDES[0];
+      const { container } = render(
+        <BiochemComparison
+          peptide={single}
+          allPeptides={[single]}
+          stats={null}
+          metrics={DEFAULT_PVL_METRICS}
+        />
+      );
+
+      // Stat cards still render values
+      expect(container.textContent).toContain("Hydrophobicity");
+      expect(container.textContent).toContain("Hydrophobic moment");
+
+      // Radar + percentile bars are replaced with the empty-state message
+      expect(container.textContent).toContain(
+        "Compare with a database — upload a CSV or run a UniProt query."
+      );
+
+      // The "Percentile ranking" / "Radar comparison" headings must NOT render
+      expect(container.textContent).not.toContain("Percentile ranking");
+      expect(container.textContent).not.toContain("Radar comparison");
+
+      // The "Above median" / "Top 10%" percentile bands must NOT render
+      // (a single-sample percentile is meaningless).
+      expect(container.textContent).not.toContain("Above median");
+      expect(container.textContent).not.toContain("Top 10%");
+    });
+
+    it("explicit mode='single-peptide' overrides allPeptides count", () => {
+      const { container } = render(
+        <BiochemComparison
+          peptide={PEPTIDES[0]}
+          allPeptides={PEPTIDES}
+          stats={STATS}
+          metrics={DEFAULT_PVL_METRICS}
+          mode="single-peptide"
+        />
+      );
+      expect(container.textContent).toContain(
+        "Compare with a database — upload a CSV or run a UniProt query."
+      );
+    });
+
+    it("explicit mode='full' overrides single-peptide auto-detect", () => {
+      // Even with a single peptide, mode="full" forces percentile bars to render.
+      const single = PEPTIDES[0];
+      const { container } = render(
+        <BiochemComparison
+          peptide={single}
+          allPeptides={[single]}
+          stats={STATS}
+          metrics={DEFAULT_PVL_METRICS}
+          mode="full"
+        />
+      );
+      expect(container.textContent).toContain("Percentile ranking");
+      expect(container.textContent).not.toContain(
+        "Compare with a database — upload a CSV or run a UniProt query."
+      );
+    });
+  });
 });

@@ -4,11 +4,14 @@ Pydantic schemas for UniProt query parsing and execution.
 
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class UniProtQueryParseRequest(BaseModel):
     """Request to parse a UniProt query"""
+
+    # Wave B (B.1): unknown fields produce 422 instead of being silently dropped.
+    model_config = ConfigDict(extra="forbid")
 
     query: str = Field(..., description="Raw query text from user")
 
@@ -36,6 +39,14 @@ class UniProtQueryParseResponse(BaseModel):
 class UniProtQueryExecuteRequest(BaseModel):
     """Request to execute a UniProt query"""
 
+    # Wave B (B.1 + B.2):
+    # - extra="forbid" → unknown fields produce 422 (cf. UNIPROT_TIMEOUT_INVESTIGATION.md
+    #   root cause #4: max_results was silently dropped, leaving size=500 default).
+    # - populate_by_name=True + AliasChoices → accept both the canonical snake_case name
+    #   AND a documented set of aliases (camelCase variants used by some clients, plus
+    #   the legacy max_results spelling for size).
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
     query: str = Field(..., description="Raw query text or pre-parsed API query string")
     mode: Optional[Literal["accession", "keyword", "organism", "keyword_organism", "auto"]] = Field(
         "auto", description="Query mode (auto = detect automatically)"
@@ -44,27 +55,46 @@ class UniProtQueryExecuteRequest(BaseModel):
         True,
         description="If True, only reviewed (Swiss-Prot). If False, only unreviewed (TrEMBL). If None, both.",
     )
-    length_min: Optional[int] = Field(None, description="Minimum sequence length filter")
-    length_max: Optional[int] = Field(None, description="Maximum sequence length filter")
+    length_min: Optional[int] = Field(
+        None,
+        validation_alias=AliasChoices("length_min", "lengthMin"),
+        description="Minimum sequence length filter",
+    )
+    length_max: Optional[int] = Field(
+        None,
+        validation_alias=AliasChoices("length_max", "lengthMax"),
+        description="Maximum sequence length filter",
+    )
     sort: Optional[str] = Field(
         None,
         description="Sort order in UniProt format (e.g., 'length asc', 'length desc', 'protein_name asc', etc.). Omit or null for best match.",
     )
-    include_isoforms: Optional[bool] = Field(False, description="Include isoform sequences")
+    include_isoforms: Optional[bool] = Field(
+        False,
+        validation_alias=AliasChoices("include_isoforms", "includeIsoforms"),
+        description="Include isoform sequences",
+    )
     size: Optional[int] = Field(
         500,
-        description="Maximum number of results to return (up to 10,000; pagination handles >500 automatically)",
+        validation_alias=AliasChoices("size", "max_results", "maxResults"),
+        description=(
+            "Maximum number of results to return (up to 10,000; pagination handles >500 "
+            "automatically). Aliases accepted: max_results, maxResults."
+        ),
     )
     # Provider execution flags (default False for UniProt queries to ensure fast response)
     run_tango: Optional[bool] = Field(
         False,
+        validation_alias=AliasChoices("run_tango", "runTango"),
         description="If True, run TANGO analysis (default False for UniProt queries to ensure fast response)",
     )
     run_s4pred: Optional[bool] = Field(
         False,
+        validation_alias=AliasChoices("run_s4pred", "runS4pred"),
         description="If True, run S4PRED analysis (default False for UniProt queries to ensure fast response)",
     )
     max_provider_sequences: Optional[int] = Field(
         50,
+        validation_alias=AliasChoices("max_provider_sequences", "maxProviderSequences"),
         description="Maximum number of sequences to process with providers (TANGO/S4PRED) when enabled. Prevents blocking on large queries.",
     )

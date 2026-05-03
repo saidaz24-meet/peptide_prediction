@@ -455,6 +455,10 @@ def run_s4pred_sequences(
         'requested': len(sequences),
         'parsed_ok': 0,
         'parsed_bad': 0,
+        # Wave B (B.4): sequences skipped because their length exceeds
+        # settings.S4PRED_MAX_LENGTH (S4PRED is too slow on protein-length
+        # sequences — see docs/active/UNIPROT_TIMEOUT_INVESTIGATION.md).
+        'skipped_long': 0,
         'runtime_ms': 0,
     }
 
@@ -489,6 +493,25 @@ def run_s4pred_sequences(
                 logger.warning(f"[{trace_id}] S4PRED skipping {entry_id}: empty after sanitization")
                 stats['parsed_bad'] += 1
                 results.append({'entry_id': entry_id})
+                continue
+
+            # Wave B (B.4): length cap — skip sequences longer than the configured
+            # cap to keep latency bounded. Surfaced via the `skipped_long` stat so
+            # the route can include a meta.warnings entry.
+            max_len = settings.S4PRED_MAX_LENGTH
+            if max_len > 0 and len(clean_seq) > max_len:
+                logger.warning(
+                    f"[{trace_id}] S4PRED skipping {entry_id}: length {len(clean_seq)} "
+                    f"> S4PRED_MAX_LENGTH={max_len} aa"
+                )
+                stats['skipped_long'] += 1
+                results.append({
+                    'entry_id': entry_id,
+                    's4pred_skipped': True,
+                    's4pred_skipped_reason': 'too_long',
+                    's4pred_skipped_max_length': max_len,
+                    's4pred_skipped_actual_length': len(clean_seq),
+                })
                 continue
 
             # Run prediction
