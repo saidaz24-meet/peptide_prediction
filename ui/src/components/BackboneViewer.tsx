@@ -245,26 +245,33 @@ export function BackboneViewer({ peptideId, pdbUrl }: BackboneViewerProps) {
               AlphaFold-predicted backbone with color-coded residues
             </CardDescription>
           </div>
-          {!visible && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="btn-press"
-              onClick={fetchPdb}
-              disabled={loading}
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
-              {loading ? "Loading..." : "Show 2D Backbone"}
-            </Button>
-          )}
+          {!visible &&
+            !(
+              error &&
+              (error.toLowerCase().includes("no alphafold") ||
+                error.toLowerCase().includes("not found"))
+            ) && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="btn-press"
+                onClick={fetchPdb}
+                disabled={loading}
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-1.5" /> : null}
+                {loading ? "Loading..." : "Show 2D Backbone"}
+              </Button>
+            )}
         </div>
       </CardHeader>
 
       {error && (
         <CardContent className="pt-0">
-          {error.toLowerCase().includes("no alphafold") || error.toLowerCase().includes("not found") ? (
+          {error.toLowerCase().includes("no alphafold") ||
+          error.toLowerCase().includes("not found") ? (
             <p className="text-sm text-muted-foreground">
-              No AlphaFold structure available for this entry — this is expected for short or non-canonical peptides.
+              No AlphaFold structure available for this entry — this is expected for short or
+              non-canonical peptides.
             </p>
           ) : (
             <p className="text-sm text-destructive">{error}</p>
