@@ -30,4 +30,4 @@ flower>=2.0,<3.0
 # S4PRED neural network inference
 # Note: In Docker, use CPU-only torch via --extra-index-url
 # (see Dockerfile.backend for details)
-torch>=2.10,<3.0
+torch>=2.11.0,<3.0
