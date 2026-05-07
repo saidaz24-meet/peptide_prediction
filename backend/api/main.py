@@ -12,6 +12,7 @@ import sentry_sdk
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sentry_sdk.integrations.asyncio import AsyncioIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -20,6 +21,46 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from api.routes import example, feedback, health, jobs, predict, providers, uniprot, upload
 from config import settings
 from services.logger import get_logger, log_error, log_info, set_trace_id
+
+# ---------------------------------------------------------------------------
+# Sentry before_send filter (V6-1)
+# ---------------------------------------------------------------------------
+# Module-level so tests can exercise the filter without needing a real DSN.
+# Drops the noisy 4xx classes that aren't real errors:
+#   - 422 — request-contract validation failures (Wave B made these LOUD on
+#           purpose; they're user input bugs, not server bugs).
+#   - 404 — expected "not found" (e.g. polling a job that's been cleaned up).
+# Keeps 400/401/403 (real-ish client errors) and 5xx (genuine server errors).
+# Also drops asyncio.CancelledError / KeyboardInterrupt (client disconnect /
+# Ctrl-C — see UNIPROT_TIMEOUT_INVESTIGATION.md).
+_NOISY_HTTP_STATUSES = frozenset({404, 422})
+
+
+def _sentry_before_send(event, hint):
+    """Filter out expected noise from Sentry events.
+
+    Returns ``None`` to drop the event, otherwise returns it unchanged.
+    """
+    exc_info = hint.get("exc_info") if hint else None
+    if exc_info:
+        exc_type, exc_value, _tb = exc_info
+
+        # Cancellation / shutdown — never an error.
+        if exc_type is not None and issubclass(
+            exc_type, (asyncio.CancelledError, KeyboardInterrupt)
+        ):
+            return None
+
+        # 4xx HTTPException noise.
+        if isinstance(exc_value, HTTPException):
+            status_code = getattr(exc_value, "status_code", None)
+            if status_code in _NOISY_HTTP_STATUSES:
+                return None
+
+    return event
+
+
+# ---------------------------------------------------------------------------
 
 # Initialize Sentry before FastAPI app creation
 # Skip Sentry during test runs — test-triggered errors (invalid sort, missing columns,
@@ -51,27 +92,18 @@ if settings.SENTRY_DSN and not _running_under_pytest:
         traces_rate = 0.1 if is_production else 1.0
         profiles_rate = 0.1 if is_production else 1.0
 
-        def _before_send(event, hint):
-            """Filter out expected noise from Sentry."""
-            exc_info = hint.get("exc_info")
-            if exc_info:
-                exc_type = exc_info[0]
-                # CancelledError is expected on client disconnect / server shutdown
-                if exc_type and issubclass(exc_type, (asyncio.CancelledError, KeyboardInterrupt)):
-                    return None
-            return event
-
         sentry_sdk.init(
             dsn=settings.SENTRY_DSN,
             integrations=[
                 FastApiIntegration(),
+                AsyncioIntegration(),
                 LoggingIntegration(
                     level=logging.WARNING,
                     event_level=logging.ERROR,
                 ),
             ],
             send_default_pii=False,
-            before_send=_before_send,
+            before_send=_sentry_before_send,
             traces_sample_rate=traces_rate,
             profiles_sample_rate=profiles_rate,
             environment=settings.ENVIRONMENT,
@@ -99,11 +131,12 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     """
     Capture HTTPExceptions to Sentry.
     By default, FastApiIntegration only captures 5xx errors.
-    This handler captures important 4xx errors too.
+    This handler captures the *interesting* 4xx errors too — but skips 404
+    and 422, which are filtered as noise by ``_sentry_before_send`` (V6-1).
     """
     if exc.status_code >= 500:
         sentry_sdk.capture_exception(exc, level="error")
-    elif exc.status_code in [400, 401, 403, 404, 422]:
+    elif exc.status_code in (400, 401, 403):
         sentry_sdk.capture_exception(exc, level="warning")
 
     return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
@@ -127,6 +160,11 @@ class TraceIdMiddleware(BaseHTTPMiddleware):
         trace_id = request.headers.get("X-Trace-Id") or str(uuid.uuid4())
         set_trace_id(trace_id)
         request.state.trace_id = trace_id
+
+        # V6-1: tag the current Sentry scope so any event captured during this
+        # request correlates with the same trace_id used by the frontend SDK
+        # and by structured logs. No-op when Sentry is not initialised.
+        sentry_sdk.set_tag("trace_id", trace_id)
 
         log_info(
             "request_start",

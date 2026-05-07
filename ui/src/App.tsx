@@ -12,6 +12,10 @@ import { AppSidebar } from "@/components/AppSidebar";
 import { TopNav } from "@/components/TopNav";
 import { PageTransition } from "@/components/PageTransition";
 import { useJobStore } from "@/stores/jobStore";
+import { useDemoMode } from "@/hooks/useDemoMode";
+import { DemoModeChip } from "@/components/DemoModeChip";
+import { FirstVisitModal } from "@/components/FirstVisitModal";
+import { initSentrySession, setPVLSentryContext } from "@/lib/sentryContext";
 
 // Lazy-loaded pages (Index kept direct for instant first load)
 const Upload = React.lazy(() => import("./pages/Upload"));
@@ -32,6 +36,7 @@ function AppLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const isLanding = location.pathname === "/";
+  const demoMode = useDemoMode();
 
   // Set global navigate for job store polling callbacks
   useEffect(() => {
@@ -44,6 +49,19 @@ function AppLayout() {
   // Resume polling for any persisted active jobs on mount
   useEffect(() => {
     useJobStore.getState().resumePolling();
+  }, []);
+
+  // V6-1: initialize Sentry user + initial viewport/theme context once on mount.
+  useEffect(() => {
+    initSentrySession();
+    const viewport =
+      window.innerWidth < 640
+        ? "mobile"
+        : window.innerWidth < 1024
+          ? "tablet"
+          : "desktop";
+    const theme = document.documentElement.classList.contains("dark") ? "dark" : "light";
+    setPVLSentryContext({ viewport, theme });
   }, []);
 
   return (
@@ -165,6 +183,20 @@ function AppLayout() {
           </main>
         </div>
       )}
+
+      {/* V5-1: Demo Mode chip + first-visit modal — root-level, outside Routes
+          so they persist across navigation and never collide with page layouts. */}
+      <DemoModeChip
+        isDemo={demoMode.isDemo}
+        isDemoLoading={demoMode.isDemoLoading}
+        isChipDismissed={demoMode.isChipDismissed}
+        clearDemo={demoMode.clearDemo}
+        dismissChip={demoMode.dismissChip}
+      />
+      <FirstVisitModal
+        open={demoMode.showFirstVisit}
+        onDismiss={demoMode.dismissFirstVisit}
+      />
     </>
   );
 }

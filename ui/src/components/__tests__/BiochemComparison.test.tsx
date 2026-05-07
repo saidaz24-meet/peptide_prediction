@@ -1,6 +1,6 @@
 /// <reference types="@testing-library/jest-dom" />
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent } from "@testing-library/react";
 import {
   BiochemComparison,
   DEFAULT_PVL_METRICS,
@@ -258,6 +258,33 @@ describe("BiochemComparison", () => {
       expect(container.textContent).not.toContain(
         "Compare with a database — upload a CSV or run a UniProt query."
       );
+    });
+  });
+
+  // ── Radar hover tooltip (B.4: Said 2026-05-07) ────────────────────────
+  describe("radar vertex tooltip", () => {
+    it("shows metric name + peptide value + database mean on hover", () => {
+      render(
+        <BiochemComparison
+          peptide={PEPTIDES[2]}
+          allPeptides={PEPTIDES}
+          stats={STATS}
+          metrics={DEFAULT_PVL_METRICS}
+        />
+      );
+
+      // No tooltip until a vertex is hovered.
+      expect(screen.queryByTestId("biochem-radar-tooltip")).not.toBeInTheDocument();
+
+      // Hover the first vertex.
+      const firstVertex = screen.getByTestId("biochem-radar-vertex-0");
+      fireEvent.mouseEnter(firstVertex);
+
+      const tooltip = screen.getByTestId("biochem-radar-tooltip");
+      expect(tooltip).toBeInTheDocument();
+      // Metric label, "Peptide:", and "Database mean:" should all be present.
+      expect(tooltip.textContent).toMatch(/Peptide:/);
+      expect(tooltip.textContent).toMatch(/Database mean:/);
     });
   });
 });

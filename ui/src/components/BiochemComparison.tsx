@@ -12,7 +12,7 @@
  * @see docs/active/PELEG_FEEDBACK_INSTRUCTIONS.md FIX-016
  */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import {
   Tooltip as UITooltip,
@@ -297,6 +297,10 @@ function RadarComparisonSVG({
   const maxR = size * 0.38;
   const n = metrics.length;
 
+  // B.4: hover-vertex tooltip — restores the "hover a point, see metric +
+  // peptide value + database mean" behavior Said reported as missing.
+  const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
+
   if (n < 3) return null;
 
   // Normalize values to 0-1 using percentile
@@ -327,9 +331,19 @@ function RadarComparisonSVG({
   const meanPath =
     meanPoints.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ") + " Z";
 
+  const hovered = hoveredIdx != null ? metrics[hoveredIdx] : null;
+  const hoveredPoint = hoveredIdx != null ? peptidePoints[hoveredIdx] : null;
+  const fmt = (v: number | null | undefined) =>
+    typeof v === "number" && Number.isFinite(v) ? v.toFixed(2) : "—";
+
   return (
     <div className="flex justify-center">
-      <svg viewBox={`0 0 ${size} ${size}`} className="w-full max-w-[240px] h-auto">
+      <div className="relative w-full max-w-[240px]" data-testid="biochem-radar">
+      <svg
+        viewBox={`0 0 ${size} ${size}`}
+        className="w-full h-auto"
+        onMouseLeave={() => setHoveredIdx(null)}
+      >
         {/* Grid circles */}
         {[0.25, 0.5, 0.75, 1].map((frac) => (
           <circle
@@ -380,9 +394,27 @@ function RadarComparisonSVG({
           strokeWidth={2}
         />
 
-        {/* Data points */}
+        {/* Data points — hover surface includes a larger transparent target
+            so even tiny dots are easy to hit on touch + mouse devices. */}
         {peptidePoints.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={3} fill="hsl(var(--primary))" />
+          <g
+            key={i}
+            onMouseEnter={() => setHoveredIdx(i)}
+            onFocus={() => setHoveredIdx(i)}
+            tabIndex={0}
+            data-testid={`biochem-radar-vertex-${i}`}
+            style={{ cursor: "pointer" }}
+          >
+            <circle cx={p.x} cy={p.y} r={9} fill="transparent" />
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={hoveredIdx === i ? 4 : 3}
+              fill="hsl(var(--primary))"
+              stroke={hoveredIdx === i ? "hsl(var(--primary-foreground))" : "none"}
+              strokeWidth={hoveredIdx === i ? 1.5 : 0}
+            />
+          </g>
         ))}
 
         {/* Labels */}
@@ -400,6 +432,34 @@ function RadarComparisonSVG({
           </text>
         ))}
       </svg>
+
+      {/* B.4: vertex tooltip — metric name, peptide value, database mean.
+          Positioned in viewBox-relative coordinates over the svg. */}
+      {hovered && hoveredPoint && (
+        <div
+          className="pointer-events-none absolute z-10 rounded-md border border-border bg-background/95 backdrop-blur-sm px-2.5 py-1.5 text-[11px] shadow-md whitespace-nowrap"
+          style={{
+            left: `${(hoveredPoint.x / size) * 100}%`,
+            top: `${(hoveredPoint.y / size) * 100}%`,
+            transform: "translate(-50%, calc(-100% - 8px))",
+          }}
+          role="tooltip"
+          data-testid="biochem-radar-tooltip"
+        >
+          <p className="font-semibold mb-0.5">{hovered.metric.label}</p>
+          <p className="text-muted-foreground">
+            <span className="text-primary">●</span> Peptide:{" "}
+            <span className="font-mono text-foreground">{fmt(hovered.value)}</span>
+            {hovered.metric.unit ? ` ${hovered.metric.unit}` : ""}
+          </p>
+          <p className="text-muted-foreground">
+            <span className="text-muted-foreground">○</span> Database mean:{" "}
+            <span className="font-mono text-foreground">{fmt(hovered.mean)}</span>
+            {hovered.metric.unit ? ` ${hovered.metric.unit}` : ""}
+          </p>
+        </div>
+      )}
+      </div>
     </div>
   );
 }

@@ -18,6 +18,9 @@ import { AlgorithmShowcase } from "@/components/AlgorithmShowcase";
 import { TrustSection } from "@/components/TrustSection";
 import { PipelineDiagram } from "@/components/PipelineDiagram";
 import { ShowcaseGallery } from "@/components/ShowcaseGallery";
+import { HowItWorks } from "@/components/HowItWorks";
+import { CitingSection } from "@/components/CitingSection";
+import { Footer } from "@/components/Footer";
 import { AnimateIn, AnimateInChild } from "@/components/AnimateIn";
 import { smoothEase } from "@/lib/animations";
 
@@ -237,6 +240,16 @@ const Index = () => {
       </section>
 
       {/* ═══════════════════════════════════════════
+          SECTION 1.5: HOW IT WORKS (V5-2)
+          Said: 3-step walkthrough lives here, between hero and FeatureShowcase.
+          ═══════════════════════════════════════════ */}
+      <section className="relative z-10 py-16 sm:py-24 px-4 sm:px-6 bg-transparent">
+        <AnimateIn className="max-w-5xl mx-auto">
+          <HowItWorks />
+        </AnimateIn>
+      </section>
+
+      {/* ═══════════════════════════════════════════
           SECTION 2: FEATURE SHOWCASE
           ═══════════════════════════════════════════ */}
       <section className="relative z-10 py-16 sm:py-24 px-4 sm:px-6 bg-[hsl(var(--surface-1)/0.85)] dark:bg-[hsl(var(--surface-1)/0.7)]">
@@ -337,13 +350,23 @@ const Index = () => {
               <span>Cite PVL in your research</span>
             </div>
           </AnimateInChild>
-          <AnimateInChild>
-            <p className="mt-8 text-xs text-[hsl(var(--faint))]">
-              Said Azaizah &middot; Peleg Ragonis-Bachar &middot; Alexander Golubev &middot; &copy; 2026
-            </p>
-          </AnimateInChild>
         </AnimateIn>
       </section>
+
+      {/* ═══════════════════════════════════════════
+          SECTION 8: CITATION (V5-2)
+          Trust container — BibTeX, DOI placeholder, attribution.
+          ═══════════════════════════════════════════ */}
+      <section className="relative z-10 py-16 sm:py-20 px-4 sm:px-6 bg-[hsl(var(--surface-1)/0.85)] dark:bg-[hsl(var(--surface-1)/0.7)]">
+        <AnimateIn className="max-w-5xl mx-auto">
+          <CitingSection />
+        </AnimateIn>
+      </section>
+
+      {/* ═══════════════════════════════════════════
+          FOOTER (V5-2) — replaces inline copyright row.
+          ═══════════════════════════════════════════ */}
+      <Footer />
     </div>
   );
 };

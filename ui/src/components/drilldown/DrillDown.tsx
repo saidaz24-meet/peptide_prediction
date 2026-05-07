@@ -96,18 +96,24 @@ export function DrillDown() {
           </div>
         </SheetHeader>
 
-        {/* ---- Content ---- */}
-        <div className="flex-1 overflow-y-auto px-6 py-5">
-          {mode === "metric" && metricId && (
-            <MetricInspector metricId={metricId} peptideId={peptideId} />
-          )}
-          {mode === "peptide" && peptideId && (
-            <PeptideInspector peptideId={peptideId} />
-          )}
-          {mode === "chart" && metricId && (
+        {/* ---- Content ----
+            Chart mode owns its own scroll/layout (chart fills view, table
+            peeks from bottom — Said B.3); other modes use the standard
+            padded scroll container. */}
+        {mode === "chart" && metricId ? (
+          <div className="flex-1 min-h-0">
             <ChartInspector metricId={metricId} />
-          )}
-        </div>
+          </div>
+        ) : (
+          <div className="flex-1 overflow-y-auto px-6 py-5">
+            {mode === "metric" && metricId && (
+              <MetricInspector metricId={metricId} peptideId={peptideId} />
+            )}
+            {mode === "peptide" && peptideId && (
+              <PeptideInspector peptideId={peptideId} />
+            )}
+          </div>
+        )}
 
         {/* ---- Footer ---- */}
         <div className="border-t border-border px-6 py-3 flex items-center gap-2">

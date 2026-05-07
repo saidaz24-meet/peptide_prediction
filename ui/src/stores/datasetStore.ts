@@ -6,6 +6,8 @@ import { mapApiRowToPeptide } from "@/lib/peptideMapper";
 import { uploadCSV, predictOne as apiPredictOne } from "@/lib/api";
 import type { Peptide, ThresholdConfig } from "@/types/peptide";
 import type { ResolvedThresholds } from "@/lib/thresholds";
+import { setPVLSentryContext } from "@/lib/sentryContext";
+import { useThresholdStore } from "@/stores/thresholdStore";
 
 // --- RANKING STORE v2 (proportional weights, direction toggles) ---
 import {
@@ -235,6 +237,26 @@ export const useDatasetStore = create<DatasetState>()(
 
         set({ peptides: mapped, meta: meta || null });
         get().calculateStats();
+
+        // V6-1: enrich Sentry context with the active dataset.
+        try {
+          const providers: string[] = [];
+          if (meta?.provider_status?.tango?.status === "AVAILABLE") providers.push("tango");
+          if (meta?.provider_status?.s4pred?.status === "AVAILABLE") providers.push("s4pred");
+          const dataSource: "demo" | "uniprot" | "csv" = meta?.isDemo
+            ? "demo"
+            : meta?.source === "uniprot_api"
+              ? "uniprot"
+              : "csv";
+          setPVLSentryContext({
+            peptideCount: mapped.length,
+            dataSource,
+            predictors: providers,
+            thresholdPreset: useThresholdStore.getState().preset,
+          });
+        } catch {
+          // Sentry context is non-critical; never block ingestion on it.
+        }
       },
 
       setColumnMapping: (mapping) => set({ columnMapping: mapping }),

@@ -184,32 +184,56 @@ describe("WindowProfileChart", () => {
     expect(label.className).not.toContain("line-through");
   });
 
-  // ── Zoom ──────────────────────────────────────────────────────────────
+  // ── Zoom (B.1: discrete buttons replace drag-to-zoom) ─────────────────
 
-  it("shows 'Drag to zoom' hint when not zoomed", () => {
+  it("never renders the 'Drag to zoom' hint (B.1: removed)", () => {
     render(
       <WindowProfileChart
         peptide={makePeptide()}
         channels={LINE_ONLY_CHANNELS}
       />,
     );
-    expect(screen.getByText("Drag to zoom")).toBeInTheDocument();
-    expect(screen.queryByTestId("reset-zoom")).not.toBeInTheDocument();
+    expect(screen.queryByText("Drag to zoom")).not.toBeInTheDocument();
   });
 
-  it("shows reset zoom button after zoom is applied via mouse events", () => {
+  it("renders zoom-in / zoom-out / reset icon buttons", () => {
     render(
       <WindowProfileChart
         peptide={makePeptide()}
         channels={LINE_ONLY_CHANNELS}
       />,
     );
+    expect(screen.getByTestId("zoom-controls")).toBeInTheDocument();
+    expect(screen.getByTestId("zoom-in")).toBeInTheDocument();
+    expect(screen.getByTestId("zoom-out")).toBeInTheDocument();
+    expect(screen.getByTestId("reset-zoom")).toBeInTheDocument();
+  });
 
-    // We can't easily simulate Recharts mouse events on the ComposedChart
-    // (it wraps SVG). Instead, verify the Reset Zoom button appears by
-    // checking the initial state (no button), which covers the render path.
-    // Full integration zoom would require a headless browser.
-    expect(screen.queryByTestId("reset-zoom")).not.toBeInTheDocument();
+  it("disables zoom-out and reset at full domain, enables them after zoom-in", () => {
+    render(
+      <WindowProfileChart
+        peptide={makePeptide()}
+        channels={LINE_ONLY_CHANNELS}
+      />,
+    );
+    const zoomIn = screen.getByTestId("zoom-in") as HTMLButtonElement;
+    const zoomOut = screen.getByTestId("zoom-out") as HTMLButtonElement;
+    const reset = screen.getByTestId("reset-zoom") as HTMLButtonElement;
+
+    // Default = full sequence; nothing to zoom out from / reset to.
+    expect(zoomOut.disabled).toBe(true);
+    expect(reset.disabled).toBe(true);
+    expect(zoomIn.disabled).toBe(false);
+
+    // Zoom in once → reset + zoom-out should now be available.
+    fireEvent.click(zoomIn);
+    expect(reset.disabled).toBe(false);
+    expect(zoomOut.disabled).toBe(false);
+
+    // Reset goes back to full domain.
+    fireEvent.click(reset);
+    expect(reset.disabled).toBe(true);
+    expect(zoomOut.disabled).toBe(true);
   });
 
   // ── Default channels ──────────────────────────────────────────────────

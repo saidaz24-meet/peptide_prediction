@@ -26,7 +26,7 @@
  *   TANGO peaks:    red dots at positions > threshold
  */
 
-import { useMemo, useState, useCallback, useRef } from "react";
+import { useMemo, useState, useCallback, useEffect } from "react";
 import {
   ComposedChart,
   Line,
@@ -38,11 +38,11 @@ import {
   ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
-  Legend as RechartsLegend,
 } from "recharts";
-import { RotateCcw, ZoomIn } from "lucide-react";
+import { RotateCcw, ZoomIn, ZoomOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { buildProfilePoints, helixRanges } from "@/lib/profile";
+import { useThresholdStore } from "@/stores/thresholdStore";
 import type { Peptide } from "@/types/peptide";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -167,11 +167,25 @@ export function WindowProfileChart({
 }: WindowProfileChartProps) {
   const [hiddenChannels, setHiddenChannels] = useState<Set<string>>(new Set());
 
-  // Brush zoom state
-  const [zoomDomain, setZoomDomain] = useState<[number, number] | null>(null);
-  const [refAreaLeft, setRefAreaLeft] = useState<number | null>(null);
-  const [refAreaRight, setRefAreaRight] = useState<number | null>(null);
-  const isDragging = useRef(false);
+  // Live aggregation threshold from the threshold store. Drives both the
+  // reference line position and the agg-peak scatter cutoff so the chart
+  // stays in sync with whatever preset / custom value the user picks.
+  const tangoAggregationThreshold = useThresholdStore(
+    (s) => s.active.tangoAggregationThreshold,
+  );
+
+  // Discrete zoom: domain on the residue axis. Default = full sequence.
+  // (B.1: drag-to-zoom was removed per Said's request — discrete in/out/reset
+  // buttons replace it. The "Drag to zoom a region" copy and ReferenceArea
+  // selection rectangle no longer exist.)
+  const seqMin = 1;
+  const seqMax = Math.max(peptide.length, 1);
+  const [xDomain, setXDomain] = useState<[number, number]>(() => [seqMin, seqMax]);
+
+  // Reset zoom whenever the peptide changes (sequence length differs).
+  useEffect(() => {
+    setXDomain([seqMin, seqMax]);
+  }, [seqMin, seqMax]);
 
   // Build profile data
   const profilePoints = useMemo(
@@ -186,17 +200,15 @@ export function WindowProfileChart({
     const half = Math.floor(windowSize / 2);
     return profilePoints.map((pt) => {
       const residueIdx = pt.x - 1 + half;
+      const aggVal = residueIdx < tangoAgg.length ? tangoAgg[residueIdx] : undefined;
       return {
         ...pt,
-        agg: residueIdx < tangoAgg.length ? tangoAgg[residueIdx] : undefined,
-        // For scatter markers
+        agg: aggVal,
         aggPeak:
-          residueIdx < tangoAgg.length && tangoAgg[residueIdx] > 5
-            ? tangoAgg[residueIdx]
-            : undefined,
+          aggVal !== undefined && aggVal > tangoAggregationThreshold ? aggVal : undefined,
       };
     });
-  }, [profilePoints, tangoAgg, windowSize]);
+  }, [profilePoints, tangoAgg, windowSize, tangoAggregationThreshold]);
 
   // Segment bands
   const segmentBands = useMemo(() => {
@@ -239,42 +251,53 @@ export function WindowProfileChart({
     });
   }, []);
 
-  // Zoom handlers
-  const onMouseDown = useCallback((e: any) => {
-    if (e?.activeLabel != null) {
-      setRefAreaLeft(Number(e.activeLabel));
-      setRefAreaRight(null);
-      isDragging.current = true;
-    }
-  }, []);
+  // Discrete zoom: 25% step in/out around the current center, reset to full.
+  // Min span is 5 residues so we never zoom past readability.
+  const ZOOM_STEP = 0.25;
+  const MIN_SPAN = 5;
 
-  const onMouseMove = useCallback((e: any) => {
-    if (isDragging.current && e?.activeLabel != null) {
-      setRefAreaRight(Number(e.activeLabel));
-    }
-  }, []);
+  const zoomIn = useCallback(() => {
+    setXDomain(([lo, hi]) => {
+      const span = hi - lo;
+      const newSpan = Math.max(MIN_SPAN, Math.round(span * (1 - ZOOM_STEP)));
+      if (newSpan === span) return [lo, hi];
+      const center = (lo + hi) / 2;
+      const half = newSpan / 2;
+      const newLo = Math.max(seqMin, Math.round(center - half));
+      const newHi = Math.min(seqMax, newLo + newSpan);
+      return [newLo, newHi];
+    });
+  }, [seqMin, seqMax]);
 
-  const onMouseUp = useCallback(() => {
-    if (!isDragging.current) return;
-    isDragging.current = false;
-    if (refAreaLeft != null && refAreaRight != null) {
-      const left = Math.min(refAreaLeft, refAreaRight);
-      const right = Math.max(refAreaLeft, refAreaRight);
-      if (right - left >= 5) {
-        setZoomDomain([left, right]);
+  const zoomOut = useCallback(() => {
+    setXDomain(([lo, hi]) => {
+      const span = hi - lo;
+      const fullSpan = seqMax - seqMin;
+      const newSpan = Math.min(fullSpan, Math.round(span * (1 + ZOOM_STEP)));
+      if (newSpan === span) return [lo, hi];
+      const center = (lo + hi) / 2;
+      const half = newSpan / 2;
+      let newLo = Math.round(center - half);
+      let newHi = newLo + newSpan;
+      if (newLo < seqMin) {
+        newLo = seqMin;
+        newHi = newLo + newSpan;
       }
-    }
-    setRefAreaLeft(null);
-    setRefAreaRight(null);
-  }, [refAreaLeft, refAreaRight]);
+      if (newHi > seqMax) {
+        newHi = seqMax;
+        newLo = Math.max(seqMin, newHi - newSpan);
+      }
+      return [newLo, newHi];
+    });
+  }, [seqMin, seqMax]);
 
   const resetZoom = useCallback(() => {
-    setZoomDomain(null);
-    setRefAreaLeft(null);
-    setRefAreaRight(null);
-  }, []);
+    setXDomain([seqMin, seqMax]);
+  }, [seqMin, seqMax]);
 
-  const isZoomed = zoomDomain !== null;
+  const isZoomed = xDomain[0] !== seqMin || xDomain[1] !== seqMax;
+  const canZoomIn = xDomain[1] - xDomain[0] > MIN_SPAN;
+  const canZoomOut = isZoomed;
 
   // Map metric → dataKey
   const metricToDataKey = (metric: string) => {
@@ -347,26 +370,41 @@ export function WindowProfileChart({
           );
         })}
 
-        {/* Zoom controls */}
-        <div className="ml-auto flex items-center gap-1">
-          {!isZoomed && (
-            <span className="text-[10px] text-muted-foreground/50 flex items-center gap-1">
-              <ZoomIn className="h-3 w-3" />
-              Drag to zoom
-            </span>
-          )}
-          {isZoomed && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-6 text-[10px] gap-1 px-2"
-              onClick={resetZoom}
-              data-testid="reset-zoom"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Reset Zoom
-            </Button>
-          )}
+        {/* Zoom controls — three icon-only buttons (B.1: drag-to-zoom removed) */}
+        <div className="ml-auto flex items-center gap-1" data-testid="zoom-controls">
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-6 w-6"
+            onClick={zoomOut}
+            disabled={!canZoomOut}
+            aria-label="Zoom out"
+            data-testid="zoom-out"
+          >
+            <ZoomOut className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-6 w-6"
+            onClick={zoomIn}
+            disabled={!canZoomIn}
+            aria-label="Zoom in"
+            data-testid="zoom-in"
+          >
+            <ZoomIn className="h-3 w-3" />
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-6 w-6"
+            onClick={resetZoom}
+            disabled={!isZoomed}
+            aria-label="Reset zoom"
+            data-testid="reset-zoom"
+          >
+            <RotateCcw className="h-3 w-3" />
+          </Button>
         </div>
       </div>
 
@@ -375,9 +413,6 @@ export function WindowProfileChart({
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart
             data={enrichedData}
-            onMouseDown={onMouseDown}
-            onMouseMove={onMouseMove}
-            onMouseUp={onMouseUp}
             margin={{ top: 5, right: hasRightAxis ? 50 : 15, bottom: 5, left: 5 }}
           >
             <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} />
@@ -385,7 +420,7 @@ export function WindowProfileChart({
             <XAxis
               dataKey="x"
               type="number"
-              domain={zoomDomain ?? ["auto", "auto"]}
+              domain={xDomain}
               allowDataOverflow
               tickCount={10}
               tick={{ fontSize: 10 }}
@@ -433,38 +468,46 @@ export function WindowProfileChart({
               labelFormatter={(label: number) => `Position ${label}`}
             />
 
-            {/* Segment bands */}
+            {/* Segment bands — B.2: skip empty/zero-width ranges so we never
+                render an invisible band that confuses the legend toggle. */}
             {channels.map((ch) => {
               if (ch.type !== "segment-band" || hiddenChannels.has(ch.id)) return null;
               const ranges = segmentBands[ch.id] ?? [];
-              return ranges.map((r, i) => (
-                <ReferenceArea
-                  key={`${ch.id}-${i}`}
-                  x1={r.x1}
-                  x2={r.x2}
-                  fill={ch.color}
-                  fillOpacity={ch.opacity}
-                  yAxisId="left"
-                  ifOverflow="extendDomain"
-                />
-              ));
+              return ranges
+                .filter((r) => Number.isFinite(r.x1) && Number.isFinite(r.x2) && r.x2 > r.x1)
+                .map((r, i) => (
+                  <ReferenceArea
+                    key={`${ch.id}-${i}`}
+                    x1={r.x1}
+                    x2={r.x2}
+                    fill={ch.color}
+                    fillOpacity={ch.opacity}
+                    yAxisId="left"
+                    ifOverflow="extendDomain"
+                  />
+                ));
             })}
 
-            {/* Reference lines */}
+            {/* Reference lines — B.2: bumped strokeWidth + opacity so the
+                TANGO threshold line is actually readable; the threshold value
+                comes live from the threshold store (so it follows preset). */}
             {referenceLines.map((rl, i) => {
               if (rl.yAxis === "right" && (!hasRightAxis || !hasTangoData)) return null;
+              const isAggLine = rl.yAxis === "right";
+              const value = isAggLine ? tangoAggregationThreshold : rl.value;
               return (
                 <ReferenceLine
                   key={i}
-                  y={rl.value}
+                  y={value}
                   yAxisId={rl.yAxis}
                   stroke={rl.color}
                   strokeDasharray={rl.dash ?? "4 2"}
-                  strokeOpacity={0.5}
+                  strokeWidth={isAggLine ? 2 : 1}
+                  strokeOpacity={isAggLine ? 0.6 : 0.5}
                   label={{
-                    value: rl.label,
+                    value: isAggLine ? `${value}%` : rl.label,
                     position: "right",
-                    style: { fontSize: 9, fill: rl.color, opacity: 0.7 },
+                    style: { fontSize: 10, fill: rl.color, opacity: 0.85, fontWeight: 500 },
                   }}
                 />
               );
@@ -506,18 +549,6 @@ export function WindowProfileChart({
               );
             })}
 
-            {/* Brush selection overlay */}
-            {refAreaLeft != null && refAreaRight != null && (
-              <ReferenceArea
-                x1={refAreaLeft}
-                x2={refAreaRight}
-                fill="#3b82f6"
-                fillOpacity={0.15}
-                stroke="#3b82f6"
-                strokeOpacity={0.3}
-                yAxisId="left"
-              />
-            )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>

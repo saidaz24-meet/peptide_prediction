@@ -2,6 +2,10 @@ import * as Sentry from "@sentry/react";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { buildSentryRelease } from "@/lib/sentryContext";
+
+declare const __APP_VERSION__: string;
+declare const __BUILD_SHA__: string;
 
 // Initialize Sentry as early as possible in the application lifecycle
 // DSN must be provided via VITE_SENTRY_DSN environment variable
@@ -25,6 +29,7 @@ if (SENTRY_DSN) {
   try {
     Sentry.init({
       dsn: SENTRY_DSN,
+      release: buildSentryRelease(__APP_VERSION__, __BUILD_SHA__),
       // Setting this option to true will send default PII data to Sentry
       // For example, automatic IP address collection on events
       sendDefaultPii: true,

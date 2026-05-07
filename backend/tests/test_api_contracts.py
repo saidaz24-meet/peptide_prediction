@@ -852,3 +852,88 @@ class TestHealthEndpoints:
             assert value is None or (isinstance(value, str) and value), (
                 f"{k} must be a non-empty string or None; got {value!r}"
             )
+
+
+class TestSentryIntegration:
+    """
+    V6-1 Sentry integration contract tests.
+
+    Two surfaces are pinned:
+
+    1. ``_sentry_before_send`` drops the noisy 4xx classes (404, 422) and
+       cancellation, but lets 5xx and unrelated exceptions through. Tested at
+       the function level so we don't need a real DSN.
+
+    2. The ``TraceIdMiddleware`` calls ``sentry_sdk.set_tag("trace_id", ...)``
+       on every request so Sentry events correlate with the trace_id used by
+       the frontend SDK and structured logs.
+    """
+
+    def test_before_send_drops_422_http_exception(self):
+        """422 (contract validation noise) must be filtered."""
+        from fastapi import HTTPException
+
+        from api.main import _sentry_before_send
+
+        hint = {"exc_info": (HTTPException, HTTPException(status_code=422, detail="bad"), None)}
+        assert _sentry_before_send({"any": "event"}, hint) is None
+
+    def test_before_send_drops_404_http_exception(self):
+        """404 (expected not-found, e.g. polled job already cleaned up) must be filtered."""
+        from fastapi import HTTPException
+
+        from api.main import _sentry_before_send
+
+        hint = {"exc_info": (HTTPException, HTTPException(status_code=404, detail="nope"), None)}
+        assert _sentry_before_send({"any": "event"}, hint) is None
+
+    def test_before_send_keeps_500_http_exception(self):
+        """5xx must still be reported — they are real server errors."""
+        from fastapi import HTTPException
+
+        from api.main import _sentry_before_send
+
+        sentinel = {"sentinel": True}
+        hint = {"exc_info": (HTTPException, HTTPException(status_code=500, detail="oops"), None)}
+        assert _sentry_before_send(sentinel, hint) is sentinel
+
+    def test_before_send_drops_cancelled_error(self):
+        """CancelledError = client disconnect / shutdown — never an error."""
+        import asyncio
+
+        from api.main import _sentry_before_send
+
+        hint = {"exc_info": (asyncio.CancelledError, asyncio.CancelledError(), None)}
+        assert _sentry_before_send({"any": "event"}, hint) is None
+
+    def test_middleware_sets_sentry_trace_id_tag(self, monkeypatch):
+        """
+        TraceIdMiddleware must call sentry_sdk.set_tag('trace_id', <uuid>) so
+        Sentry events captured during the request carry the same trace_id the
+        frontend SDK used. The test does NOT require Sentry to be initialised:
+        we monkeypatch the SDK call and assert the middleware invokes it with
+        the same value the response echoes back via X-Trace-Id.
+        """
+        import api.main as main_mod
+
+        recorded: list[tuple[str, str]] = []
+
+        def _spy_set_tag(key, value):
+            recorded.append((key, value))
+
+        monkeypatch.setattr(main_mod.sentry_sdk, "set_tag", _spy_set_tag)
+
+        response = client.get("/api/health")
+        assert response.status_code == 200
+
+        trace_id = response.headers.get("X-Trace-Id")
+        assert trace_id, "middleware must set X-Trace-Id header"
+
+        trace_tags = [v for (k, v) in recorded if k == "trace_id"]
+        assert trace_tags, (
+            f"middleware must call sentry_sdk.set_tag('trace_id', ...); recorded={recorded}"
+        )
+        assert trace_id in trace_tags, (
+            f"set_tag trace_id values must include the request's trace_id "
+            f"({trace_id!r}); got {trace_tags!r}"
+        )
