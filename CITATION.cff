@@ -2,18 +2,31 @@ cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "Peptide Visual Lab (PVL)"
 type: software
-version: "1.0.0"
-date-released: "2026-02-12"
+version: "0.1.0"
+date-released: "2026-05-15"
 abstract: >-
-  A web-based tool for comprehensive peptide analysis combining
-  aggregation propensity (TANGO), secondary structure prediction (S4PRED),
-  fibril-forming helix detection (FF-Helix), and secondary structure switch
-  (SSW) prediction with interactive visualizations.
+  An all-in-one peptide aggregation + structure prediction dashboard.
+  Combines aggregation propensity (TANGO), secondary structure prediction
+  (S4PRED), fibril-forming helix detection (FF-Helix), secondary structure
+  switch (SSW) prediction, and live AlphaFold 3D structure overlay with
+  reproducibility-as-permalink and hover-everywhere drill-down. Designed
+  as a multi-surface AI-platform-ready research instrument (web + Python
+  package + CLI + planned MCP server).
 authors:
   - family-names: "Azaizah"
     given-names: "Said"
-    affiliation: "DESY (Deutsches Elektronen-Synchrotron)"
-repository-code: "https://github.com/peptide-visual-lab/pvl"
+    email: "az.said2007@gmail.com"
+    orcid: "https://orcid.org/0009-0002-3596-5358"
+    affiliation: "Technion — Israel Institute of Technology + DESY"
+  - family-names: "Ragonis-Bachar"
+    given-names: "Peleg"
+    affiliation: "Technion — Israel Institute of Technology"
+    # ORCID pending — Peleg to provide; will be added in v0.1.1
+  - family-names: "Golubev"
+    given-names: "Aleksandr"
+    affiliation: "DESY (Deutsches Elektronen-Synchrotron) + Technion"
+    # ORCID pending — Alex to provide; will be added in v0.1.1
+repository-code: "https://github.com/saidaz24-meet/peptide_prediction"
 license: MIT
 keywords:
   - peptide
@@ -24,5 +37,14 @@ keywords:
   - fibril
   - S4PRED
   - TANGO
+  - AlphaFold
+  - Mol*
   - visualization
-  - web tool
+  - research instrument
+  - reproducibility
+  - MCP
+identifiers:
+  # Zenodo DOI auto-archives on GitHub release; placeholder until v0.1.0 ships
+  - description: "Zenodo archive DOI (assigned on release)"
+    type: doi
+    value: "10.5281/zenodo.PENDING"
