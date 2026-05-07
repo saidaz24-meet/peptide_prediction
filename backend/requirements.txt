@@ -14,7 +14,7 @@ httpx>=0.28.1,<1.0
 python-dotenv>=1.2.2,<2.0
 
 # Observability
-sentry-sdk[fastapi]>=2.49,<3.0
+sentry-sdk[fastapi]>=2.59.0,<3.0
 
 # Result caching
 duckdb>=1.5.2,<2.0
