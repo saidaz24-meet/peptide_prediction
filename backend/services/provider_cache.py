@@ -227,7 +227,7 @@ def bulk_get_provider_cache(
 
     try:
         # Deduplicate
-        unique_seqs = list(set(s.strip().upper() for s in sequences if s))
+        unique_seqs = list({s.strip().upper() for s in sequences if s})
         if not unique_seqs:
             return {}
 
@@ -332,7 +332,7 @@ def split_cached_uncached(
     hit_indices = []
     miss_indices = []
 
-    for i, (idx, h) in enumerate(zip(df.index, hashes)):
+    for _i, (idx, h) in enumerate(zip(df.index, hashes)):
         entry = cache_map.get(h)
         if entry is None:
             miss_indices.append(idx)

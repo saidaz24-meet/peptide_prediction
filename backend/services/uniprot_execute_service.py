@@ -1012,9 +1012,9 @@ async def execute_uniprot_query(
 
         try:
             result = await analysis_task
-        except CancelledError:
+        except CancelledError as exc:
             log_info("uniprot_analysis_cancelled", "Analysis cancelled by client disconnect")
-            raise HTTPException(499, detail="Client disconnected, analysis cancelled")
+            raise HTTPException(499, detail="Client disconnected, analysis cancelled") from exc
 
         log_info(
             "uniprot_analysis_complete",

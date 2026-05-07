@@ -732,7 +732,6 @@ class TestWriteComputedToCache:
 
     def test_nan_float_serialised_as_null(self):
         """NaN in a numeric column must round-trip as None, not as a string."""
-        import math
 
         from services.provider_cache import (
             bulk_get_provider_cache,

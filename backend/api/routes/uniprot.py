@@ -4,11 +4,9 @@ UniProt query endpoints.
 
 import asyncio
 import threading
-from typing import Dict
+from typing import Dict, Optional
 
-from typing import Optional
-
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Query
 
 from schemas.api_models import RowsResponse
 from schemas.uniprot_query import (
