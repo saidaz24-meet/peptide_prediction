@@ -93,7 +93,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Generate artifact attestation (backend)
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/backend
           subject-digest: ${{ steps.meta-backend.outputs.digest }}
@@ -101,7 +101,7 @@ jobs:
         continue-on-error: true
 
       - name: Generate artifact attestation (frontend)
-        uses: actions/attest-build-provenance@v1
+        uses: actions/attest-build-provenance@v4
         with:
           subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}/frontend
           subject-digest: ${{ steps.meta-frontend.outputs.digest }}
