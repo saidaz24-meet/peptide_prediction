@@ -217,18 +217,17 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
           })}
         </div>
 
-        {/* Additional Context */}
-        <div className="mt-6 p-4 bg-muted/20 rounded-lg">
-          <h4 className="font-medium text-sm mb-2">Interpretation Notes</h4>
-          <div className="space-y-1 text-xs text-muted-foreground">
-            <p>• Higher hydrophobicity suggests stronger membrane affinity</p>
-            <p>• Positive charge can enhance membrane interaction</p>
-            <p>• Helical structure often correlates with biological activity</p>
-            {peptide.muH !== undefined && (
-              <p>• μH &gt; 0.5 indicates strong amphipathic character</p>
-            )}
-          </div>
-        </div>
+        {/* PELEG-FIX-015 (2026-05-07): auto-generated interpretation bullets
+            replaced with a muted disclaimer. Peleg flagged the previous text
+            as scientifically risky and asked for a live decision-tree review
+            (slide 24) before any interpretive claims are shipped. */}
+        <p className="mt-6 text-xs text-muted-foreground">
+          Biological interpretation requires expert review. See the{" "}
+          <a href="/help" className="underline hover:text-foreground">
+            Help page
+          </a>{" "}
+          for metric definitions.
+        </p>
       </CardContent>
     </Card>
   );

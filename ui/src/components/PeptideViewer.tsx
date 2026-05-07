@@ -164,25 +164,19 @@ export function PeptideViewer({ peptide: p }: PeptideViewerProps) {
       {/* ── AlphaFold Viewer ── */}
       <AlphaFoldViewer peptideId={p.id} />
 
-      {/* ── Interpretation guidance ── */}
+      {/* ── Interpretation guidance ──
+          PELEG-FIX-015 (2026-05-07): auto-generated interpretive bullets
+          replaced with a muted disclaimer. Peleg requested a live decision-
+          tree review (slide 24) before the tool ships any interpretive
+          claims. */}
       <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Interpretation Notes</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-2 text-sm text-muted-foreground">
-          <p>
-            <strong className="text-foreground">Charge</strong> and{" "}
-            <strong className="text-foreground">hydrophobicity</strong> help screen antimicrobial
-            and amyloid-prone candidates. Higher hydrophobicity with positive charge can suggest
-            membrane activity.
-          </p>
-          <p>
-            <strong className="text-foreground">Hydrophobic moment</strong> measures amphipathicity
-            — the asymmetry of hydrophobic residue distribution around a helix axis.
-          </p>
-          <p>
-            TANGO and S4PRED predictions show "N/A" if those tools are not installed on the server.
-            Biochemical properties (charge, hydrophobicity, hydrophobic moment) are always computed.
+        <CardContent className="pt-6">
+          <p className="text-xs text-muted-foreground">
+            Biological interpretation requires expert review. See the{" "}
+            <a href="/help" className="underline hover:text-foreground">
+              Help page
+            </a>{" "}
+            for metric definitions.
           </p>
         </CardContent>
       </Card>

@@ -84,57 +84,29 @@
 
 ---
 
-## Detailed notes (PARTIAL / TODO items only)
+## Detailed notes (PARTIAL / TODO only)
 
-**FIX-003** — User-visible text scrubbed of "cohort" / "Pipeline" (test `BiochemComparison.test.tsx:94` enforces). Code identifiers (`cohortStats` prop, `cohortA/cohortB` palette keys in `chartConfig.ts:68-70`) intentionally retained per Peleg's "do NOT rename code variables" rule. Confirm acceptable.
-
-**FIX-010** — `PeptideDetail.tsx` renders the sequence with mixed colors and no legend explaining the scheme. ~30-line addition. No commit.
-
-**FIX-012** — Subtitle/footer fixed (no more "amyloid"); `ResultsCharts.tsx:266` still labels Y as "Peak TANGO aggregation (%)" — drop the `%`. Threshold "5%" wording: Q-FIX-012 awaiting Peleg sign-off on citation or removal.
-
-**FIX-015** — Auto-generated interpretation notes still render in `PeptideViewer.tsx:170` and `EvidencePanel.tsx:222`. Peleg flagged as "needs deep discussion before shipping". Recommendation: replace with disclaimer pointing to Help. Decision pending live meeting.
-
-**FIX-018** — Axes labeled (FIX-019 work added them). Whether the FF-Helix vs Agg-Max scatter should remain — given Peleg's aggregation/fibril-formation conflation concern — is unanswered.
-
-**FIX-022** — `ClassificationComparison.tsx:90` documents Q-FIX-022 (signed vs absolute charge). Still missing: Helix-based duplicate of the cohort comparison chart, FF-SSW as a third group, charge-sign decision. All three blocked on Peleg call.
-
-**FIX-031** — One-line warning shipped at `Upload.tsx:646`. Citation for "<15aa unreliable" still missing — Peleg asked for the source; Q-FIX-031 in Wave C email.
-
-**P7 (Hamodrakas)** — Research integrated into `consensus.py:5` and surfaced in `AlgorithmShowcase.tsx:151`. The "high-confidence switch zone" copy itself was removed with the Consensus tier (FIX-013). If we want to bring back a Hamodrakas-grounded zone callout it's a fresh task.
-
-**P8** — SSW track has an up/down "switch diagram" in PeptideDetail; helix has the wheel + Mol3D + WindowProfile but no analogous up/down diagram. Alex specifically requested parity.
-
-**CH1/CH3/CH4/CH5** — Phase D2.8 visualization redesign work, not in v0.1 scope.
-
-**CH7** — "Helic West" not in any source file. Need Peleg to spell the exact name.
-
-**CQ4** — `393232e` adds nav guard + abort on unmount; long-running job reconnection (CQ6 sidebar) not built. CQ7-CQ9 (queue arch / Celery+Redis / 6000-entry timing) parked until 10+ concurrent users.
-
-**T11 / OP1-OP4** — Citations for threshold defaults (T11), DESY email activation (OP1-OP2), free domain (OP4). Sentry (OP3) shipped in `50e096a`.
+- **FIX-003** — user-visible text scrubbed of "cohort"/"Pipeline" (test `BiochemComparison.test.tsx:94` enforces). Code identifiers (`cohortStats` prop, `cohortA/B` keys in `chartConfig.ts:68-70`) intentionally kept per Peleg's "do NOT rename code variables" rule.
+- **FIX-010** — sequence in `PeptideDetail.tsx` has mixed colors with no legend. ~30 LOC fix.
+- **FIX-012** — subtitle/footer fixed; `ResultsCharts.tsx:266` Y-axis still "(%)". 5% threshold wording: Q-FIX-012.
+- **FIX-015** — auto-generated notes still in `PeptideViewer.tsx:170` and `EvidencePanel.tsx:222`. Replace with disclaimer until Peleg sign-off.
+- **FIX-018** — axes labeled; remove-or-keep decision on the FF-Helix vs Agg scatter still pending.
+- **FIX-022** — Helix-version duplicate, FF-SSW group, signed-charge: all blocked on Peleg.
+- **FIX-031** — one-line warning shipped; 15aa citation pending (Q-FIX-031).
+- **P7** — `consensus.py:5` and `AlgorithmShowcase.tsx:151` cite Hamodrakas 2007; the dedicated "high-confidence switch zone" callout was dropped with FIX-013.
+- **P8** — SSW has up/down switch diagram; helix has wheel/Mol3D/WindowProfile but no parallel up/down diagram.
+- **CH1/CH3/CH4/CH5** — Phase D2.8 visualization redesign work; not v0.1 scope.
+- **CH7** — "Helic West" not in source; need exact name from Peleg.
+- **CQ4** — nav guard + abort done (393232e); job reconnection (CQ6 sidebar) not built.
+- **T11 / OP1-OP4** — threshold citations (T11), DESY email (OP1-OP2), free domain (OP4) outstanding. Sentry (OP3) done in 50e096a.
 
 ---
 
 ## Items needing Peleg / Alex confirmation
 
-Already resolved offline 2026-05-06:
-- **Q1** (drop Chou-Fasman from UI) → option A confirmed.
-- **Q5** (Aggregation per-residue %) → removed.
-- **Q6** (% of length cutoff) → removed.
-- **Q7** (Consensus tier system) → removed.
-
-Pending in Wave C email draft:
-- **Q2** drop `s4predSswHelixPercent` from API.
-- **Q3** TANGO `sswHelixPercentage` field name (rename or doc-only).
-- **Q4** legend null handling (hide vs em-dash).
-- **Q-FIX-012** TANGO 5% threshold citation.
-- **Q-FIX-022** signed vs absolute charge.
-- **Q-FIX-023** correlation missing-value handling.
-- **Q-FIX-025** Min SSW residues fate.
-- **Q-FIX-031** S4PRED 15aa cutoff citation.
-- **CH7** Helic West exact name.
-
-Needs live meeting:
-- **Q-FIX-015** interpretation-notes decision tree.
+- **Resolved offline 2026-05-06**: Q1 (drop Chou-Fasman → option A), Q5 (per-residue %), Q6 (% of length), Q7 (Consensus tier).
+- **Wave C email draft**: Q2 (drop `s4predSswHelixPercent`), Q3 (TANGO `sswHelixPercentage` rename or doc), Q4 (legend null handling), Q-FIX-012 (TANGO 5% citation), Q-FIX-022 (signed vs abs charge), Q-FIX-023 (correlation missing values), Q-FIX-025 (Min SSW residues), Q-FIX-031 (15aa citation), CH7 (Helic West name).
+- **Live meeting**: Q-FIX-015 interpretation-notes decision tree.
 
 ---
 

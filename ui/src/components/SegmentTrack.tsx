@@ -9,16 +9,55 @@ interface Segment {
   score?: number;
 }
 
+// P8 (2026-05-07): SegmentTrack now accepts a `kind` discriminator so it can
+// render either the helix or SSW (structural-switch) up/down diagram. The
+// historical `helixFragments` prop is kept for backwards compatibility — if
+// `fragments` is omitted it falls back to that.
+type SegmentKind = "helix" | "ssw";
+
 interface SegmentTrackProps {
   sequence: string;
+  /** Generic input — preferred. */
+  fragments?: Array<[number, number]> | Segment[];
+  /** Legacy helix-only input. Used only when `fragments` is undefined. */
   helixFragments?: Array<[number, number]> | Segment[];
+  /** Which structural feature this track represents. Defaults to "helix". */
+  kind?: SegmentKind;
 }
 
-export function SegmentTrack({ sequence, helixFragments }: SegmentTrackProps) {
+const KIND_PRESETS: Record<
+  SegmentKind,
+  { title: string; segmentLabel: string; legendLabel: string; barClass: string; swatchClass: string }
+> = {
+  helix: {
+    title: "Secondary Structure Track",
+    segmentLabel: "Helix Segment",
+    legendLabel: "Helix",
+    barClass: "bg-helix hover:bg-helix/80",
+    swatchClass: "bg-helix",
+  },
+  ssw: {
+    title: "Structural Switch (SSW) Track",
+    segmentLabel: "SSW Segment",
+    legendLabel: "SSW",
+    barClass: "bg-[#0072B2] hover:bg-[#0072B2]/80",
+    swatchClass: "bg-[#0072B2]",
+  },
+};
+
+export function SegmentTrack({
+  sequence,
+  fragments,
+  helixFragments,
+  kind = "helix",
+}: SegmentTrackProps) {
   const sequenceLength = sequence.length;
-  
-  // Normalize helix fragments to consistent format
-  const normalizedFragments: Segment[] = helixFragments?.map(fragment => {
+  const preset = KIND_PRESETS[kind];
+
+  // Normalize fragments to consistent format. Prefer the generic prop;
+  // fall back to the legacy `helixFragments` (only meaningful for kind="helix").
+  const source = fragments ?? helixFragments;
+  const normalizedFragments: Segment[] = source?.map(fragment => {
     if (Array.isArray(fragment)) {
       return { start: fragment[0], end: fragment[1] };
     }
@@ -34,11 +73,11 @@ export function SegmentTrack({ sequence, helixFragments }: SegmentTrackProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h4 className="font-medium">Secondary Structure Track</h4>
+        <h4 className="font-medium">{preset.title}</h4>
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-2">
-            <div className="w-3 h-3 rounded bg-helix"></div>
-            <span className="text-sm text-muted-foreground">Helix</span>
+            <div className={`w-3 h-3 rounded ${preset.swatchClass}`}></div>
+            <span className="text-sm text-muted-foreground">{preset.legendLabel}</span>
           </div>
           <Badge variant="outline" className="text-xs">
             {normalizedFragments.length} segments
@@ -77,7 +116,7 @@ export function SegmentTrack({ sequence, helixFragments }: SegmentTrackProps) {
                             initial={{ scaleX: 0 }}
                             animate={{ scaleX: 1 }}
                             transition={{ delay: index * 0.1 }}
-                            className="absolute h-full bg-helix hover:bg-helix/80 transition-colors cursor-pointer"
+                            className={`absolute h-full transition-colors cursor-pointer ${preset.barClass}`}
                             style={{
                               left: `${startPercent}%`,
                               width: `${widthPercent}%`,
@@ -86,7 +125,7 @@ export function SegmentTrack({ sequence, helixFragments }: SegmentTrackProps) {
                         </TooltipTrigger>
                         <TooltipContent>
                           <div className="text-center">
-                            <p className="font-medium">Helix Segment</p>
+                            <p className="font-medium">{preset.segmentLabel}</p>
                             <p className="text-sm">
                               Positions {fragment.start}-{fragment.end}
                             </p>
@@ -125,7 +164,7 @@ export function SegmentTrack({ sequence, helixFragments }: SegmentTrackProps) {
               {normalizedFragments.length > 0 && (
                 <div className="text-sm text-muted-foreground">
                   <p>
-                    Total helix coverage: {' '}
+                    Total {preset.legendLabel.toLowerCase()} coverage: {' '}
                     {normalizedFragments
                       .reduce((sum, frag) => sum + (frag.end - frag.start + 1), 0)} aa
                     {' '}

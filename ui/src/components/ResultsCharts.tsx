@@ -263,7 +263,7 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
                 id: "tangoAggMax",
                 label: "Peak TANGO aggregation",
                 unit: "%",
-                axisX: "Peak TANGO aggregation (%)",
+                axisX: "Peak TANGO aggregation",
                 axisY: "Count",
               }}
               style="lollipop"

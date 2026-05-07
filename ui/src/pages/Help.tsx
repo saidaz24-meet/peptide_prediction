@@ -365,6 +365,27 @@ export default function Help() {
                   potential for structural switching.
                 </p>
               </div>
+              <Separator />
+              {/* T11 / Q-FIX-031 (2026-05-07): citation block — reference values
+                  pending Peleg sign-off. The placeholders unblock the v0.1 push
+                  without overstating provenance; the Wave-C email asks Peleg to
+                  confirm the exact source publications. */}
+              <div className="space-y-2">
+                <h4 className="font-medium">References &amp; thresholds</h4>
+                <p className="text-sm text-muted-foreground">
+                  Default threshold values (FF-Helix μH cutoff, FF-SSW hydrophobicity cutoff, TANGO
+                  per-residue 5% aggregation cutoff) are taken from{" "}
+                  <strong className="text-foreground">
+                    Ragonis-Bachar et al., in preparation (2026)
+                  </strong>
+                  . The minimum continuous-residue threshold for an S4PRED helix segment
+                  (default &ge;15&nbsp;aa) follows{" "}
+                  <em className="text-foreground">[citation pending — Peleg]</em>. Both references
+                  will be replaced with full bibliographic entries once the source publications are
+                  finalized; the values themselves are stable and documented here for
+                  reproducibility.
+                </p>
+              </div>
             </CardContent>
           </Card>
         </motion.div>

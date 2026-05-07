@@ -70,3 +70,37 @@ export function categoryLabel(cat: AminoAcidCategory): string {
       return "Special";
   }
 }
+
+// ---------------------------------------------------------------------------
+// Category color map — used by ResidueCategoryLegend (FIX-010, 2026-05-07)
+// to render a small chip row alongside the sequence display. The palette
+// matches the BackboneViewer side-chain coloring (acidic = red, basic = blue,
+// polar = green, hydrophobic = neutral, special = yellow/purple) collapsed
+// to the 5-category model used by aminoAcids.ts.
+// ---------------------------------------------------------------------------
+
+export const CATEGORY_COLORS: Record<AminoAcidCategory, string> = {
+  hydrophobic: "#94a3b8", // slate-400 — neutral / non-polar
+  "charged+": "#3b82f6", // blue-500
+  "charged-": "#ef4444", // red-500
+  polar: "#22c55e", // green-500
+  special: "#a855f7", // purple-500
+};
+
+/** Members of each category, ordered alphabetically. */
+export const CATEGORY_MEMBERS: Record<AminoAcidCategory, string[]> = (() => {
+  const out: Record<AminoAcidCategory, string[]> = {
+    hydrophobic: [],
+    "charged+": [],
+    "charged-": [],
+    polar: [],
+    special: [],
+  };
+  for (const info of Object.values(AA_MAP)) {
+    out[info.category].push(info.letter);
+  }
+  for (const k of Object.keys(out) as AminoAcidCategory[]) {
+    out[k].sort();
+  }
+  return out;
+})();

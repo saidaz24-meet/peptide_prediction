@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { SegmentTrack } from "@/components/SegmentTrack";
 import { DualStructureTrack } from "@/components/DualStructureTrack";
+import { ResidueCategoryLegend } from "@/components/ResidueCategoryLegend";
 import { EvidencePanel } from "@/components/EvidencePanel";
 // Peleg FIX-016: PeptideRadarChart + PositionBars + standalone stat tiles consolidated
 // into BiochemComparison (single source of truth for the biochem comparison panel).
@@ -396,11 +397,55 @@ export default function PeptideDetail() {
               {/* Sequence with S4PRED coloring */}
               <SequenceTrack peptide={peptide} />
 
-              {/* Segment track (helix bar) */}
+              {/* PELEG-FIX-010 (2026-05-07): explicit residue-coloring legend.
+                  Sequence text uses S4PRED secondary-structure colors.
+                  SequenceTrack already shows the per-class percentages on the
+                  right; this row makes the color↔meaning link explicit so a
+                  biologist new to the page understands the coloring at a glance. */}
+              <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                <span className="font-medium text-foreground">Residue colors:</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded-sm bg-helix" />
+                  Helix
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded-sm bg-beta" />
+                  Beta strand
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="inline-block w-3 h-3 rounded-sm bg-muted-foreground/40" />
+                  Coil / disordered
+                </span>
+                <span className="ml-2">Predicted by S4PRED.</span>
+              </div>
+
+              {/* FIX-010 (2026-05-07): amino-acid category legend so the
+                  biochemical meaning of each residue (hydrophobic, polar,
+                  charged, special) is decodable at a glance — complements the
+                  S4PRED secondary-structure colors above. */}
+              <ResidueCategoryLegend />
+
+              {/* Segment tracks — P8 (2026-05-07): SegmentTrack now takes a
+                  `kind` prop so we can render the helix and SSW (structural-
+                  switch) up/down diagrams side-by-side. Both fall back
+                  silently when no fragments exist. */}
               {peptide.s4pred?.helixSegments?.length ? (
                 <SegmentTrack
                   sequence={peptide.sequence}
-                  helixFragments={peptide.s4pred.helixSegments}
+                  fragments={peptide.s4pred.helixSegments}
+                  kind="helix"
+                />
+              ) : null}
+              {(peptide.s4predSswFragments?.length ||
+                peptide.s4pred?.betaSegments?.length) ? (
+                <SegmentTrack
+                  sequence={peptide.sequence}
+                  fragments={
+                    peptide.s4predSswFragments?.length
+                      ? (peptide.s4predSswFragments as Array<[number, number]>)
+                      : (peptide.s4pred!.betaSegments as Array<[number, number]>)
+                  }
+                  kind="ssw"
                 />
               ) : null}
 
