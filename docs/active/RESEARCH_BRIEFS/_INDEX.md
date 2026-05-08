@@ -12,7 +12,8 @@ Living index of all research briefs produced by T-RES (research terminal). Each 
 
 | ID | Date | Topic | Status | Recommendation | Affects |
 |---|---|---|---|---|---|
-| _none yet — T-RES will populate as missions complete_ | | | | | |
+| [RB-001](RB-001_researcher-needs.md) | 2026-05-08 | What researchers actually need from a peptide prediction platform (M-007) | DRAFT — awaiting Said review of 5 open questions in §11 | Top 5: (1) BibTeX export, (2) metadata-in-CSV, (3) FASTA bulk upload, (4) disagreement score + accuracy badge, (5) Jupyter notebook export | ROADMAP Phase A/B/H; ADR-013, ADR-014 PROPOSED |
+| [RB-COWORK-AUDIT](RB-COWORK-AUDIT.md) | 2026-05-08 | PRE-FLIGHT compliance audit V5-V9 | COMPLETE | Keep PRE-FLIGHT in PROMPT 0; add v2 environmental-friction rule | COWORK_PROMPTS_PELEG.md, M-006 |
 
 ---
 
