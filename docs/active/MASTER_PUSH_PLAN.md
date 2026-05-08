@@ -346,22 +346,39 @@ These get written into `T2-INSTRUCTIONS.md` / `T3-INSTRUCTIONS.md` / `COWORK_PRO
 
 ### 3.4 — Wave 2 success criteria
 
-**Status as of 2026-05-08 (local branch `wave-2-ai-platform`, 7 commits ahead of main, NOT pushed):**
+**Status as of 2026-05-08 PM (local branch `wave-2-ai-platform`, 14 commits ahead of main, NOT pushed):**
 
-- [x] **MCP server scaffold** — `mcp_server/` with 7 tools, 33 tests passing. ADR-009 ACCEPTED. Commit `80a514f`.
-- [x] **Auto-PDF report renderer** — 6 panels (cover/summary/biochem/interpretation/methods/refs), 42 tests passing. Commit `18b8e49`.
-- [x] **First-visit demo modal + coachmark walkthrough** — Stripe-style modal with 3 features, 5-step react-joyride tour anchored on real DOM targets, framer-motion loading skeleton. Commits `1028891` + V8-1 refactors.
-- [x] **SimilarPeptidesInspector frontend** — drill-down view with loading/empty/error/results states, distance bars, classification pills, click-to-switch. Commit `4bca7e9`. Backend route still pending (Section D).
+- [x] **MCP server scaffold** — `mcp_server/` with 7 tools, 33 tests. ADR-009 ACCEPTED. Commit `80a514f`.
+- [x] **Auto-PDF report renderer** — 6 panels, 42 tests. Commit `18b8e49`. **Wired in toolbar** `707426b`.
+- [x] **First-visit demo modal + coachmark walkthrough** — V8-1 refactor in place. Commits `1028891` + `707426b`.
+- [x] **SimilarPeptidesInspector frontend + button** — Commits `4bca7e9` + `707426b`. Backend route pending (Section D).
+- [x] **BibTeX export (RB-001 #1, ADR-013)** — `7cf6ee9`. 10 tests.
+- [x] **Peleg cleared Staphylococcus 2023 dataset for public display** — ADR-014 fully ACCEPTED `6225810`. Accuracy badge feature unblocked.
 - [ ] `claude` running locally with PVL MCP server can answer: "find me top 5 amyloid candidates from S.aureus length 10-50" — **manual test pending** (Said local box, see `MCP_RUNBOOK.md` §2.3)
-- [ ] `pip install pvl-py` works from test PyPI; quickstart notebook runs — **Section B not started**
-- [ ] `pvl analyze test.fasta` outputs results — **Section C not started**
-- [ ] "Find similar peptides" returns 5+ semantically similar entries for melittin — **frontend ready; backend `POST /api/peptides/similar` not started**
-- [ ] Auto-PDF report for melittin renders all 6 sections, embeds permalink, Peleg-reviews and approves — **renderer ready; integration with PeptideDetail toolbar pending**
-- [x] **All prior tests still pass** — 992/992 passing (463 backend + 33 MCP + 496 frontend; up from 887 baseline)
+- [ ] `pip install pvl-py` works from test PyPI; quickstart notebook runs — **T2 §B in queue**
+- [ ] `pvl analyze test.fasta` outputs results — **T2 §C in queue**
+- [ ] "Find similar peptides" returns 5+ semantically similar entries — **T2 §D priority #1, blocked on RB-002 vector store brief (T-RES running)**
+- [ ] FASTA bulk upload (RB-001 #3, ADR-013) — **T2 §H + T3 §F**
+- [ ] `run_metadata` in CSV/JSON exports (RB-001 #2, ADR-013) — **T2 §G + T3 §I**
+- [ ] About page Peleg credit + Staphylococcus 2023 dataset card (ADR-014) — **T3 §E priority #1**
+- [ ] Gold-standard accuracy badge (RB-001 #4b, ADR-014) — **T2 produces threshold-curve JSON, T3 §H**
+- [x] **All prior tests still pass** — 1002/1002 passing (463 backend + 33 MCP + 506 frontend; +115 from baseline 887)
 - [ ] Sentry has zero new error fingerprints attributed to Wave 2 work — **measured after deploy**
 - [ ] Wave C email goes out with Wave 2 demo links — **after push**
 
-**Remaining work**: T2 picks B (pvl-py) OR D (vector backend) next. T3 wires the auto-PDF export button onto PeptideDetail and the "Find similar" CTA. Then push.
+**Predictor disagreement score (RB-001 #4a)**: SKIPPED per Said directive 2026-05-08 — Peleg killed `ConsensusCard`/`ConsensusTier` in FIX-013 (2026-05-06) for unjustified tier math. Said: skip entirely, move on.
+
+### 3.5 — Current dispatch state (2026-05-08 PM)
+
+T1 has dispatched all sub-terminals; T1 is now in orchestration mode (per `feedback_t1_role_ceo.md`):
+
+| Terminal | Status | Working on |
+|---|---|---|
+| **T2 (backend)** | DISPATCHED | Pick D (similar backend) → G (run_metadata) → H (FASTA bulk) → I (MCP route gaps) → B (pvl-py) → C (pvl-cli). See updated `T2-INSTRUCTIONS.md`. |
+| **T3 (frontend)** | DISPATCHED | Pick E (About page Peleg credit + dataset card) first — pure-frontend, ready now. Then F/G/H/I as T2 unblocks them. See updated `T3-INSTRUCTIONS.md`. |
+| **T-RES (research)** | RUNNING | M-003 vector store evaluation (RB-002). Brief informs T2 §D. Background async. |
+| **Cowork** | IDLE | Wait for T1 next round (likely V10 polish or content prompts after Wave 2 ships). |
+| **T-PEL** | IDLE | Wait for next batch of Peleg feedback to process. |
 
 ---
 
