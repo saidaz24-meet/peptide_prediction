@@ -1,5 +1,8 @@
 # 🔁 PYTHON
 backend/.venv/
+mcp_server/.venv/
+pvl-cli/.venv/
+pvl-py/.venv/
 __pycache__/
 *.pyc
 
@@ -75,10 +78,13 @@ Thumbs.db
 .coverage
 htmlcov/
 .pytest_cache/
+.ruff_cache/
 *.cover
 .hypothesis/
 
 # 🎯 TERMINAL ORCHESTRATION (temporary coordination files)
+# T-INSTRUCTIONS files are local terminal-specific guides; not committed.
+# T-RES-INSTRUCTIONS.md is the only one that's session-priming, not work-in-progress.
 T*-INSTRUCTIONS.md
 PLAN.md
 RECOVERY_PROMPT.md

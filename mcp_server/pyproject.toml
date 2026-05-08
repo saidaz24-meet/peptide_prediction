@@ -1,0 +1,64 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pvl-mcp"
+version = "0.0.1"
+description = "MCP server exposing the Peptide Visual Lab (PVL) REST API as tools for any MCP-aware LLM client (Claude Desktop, Cursor, Continue, Cline, Windsurf)."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Said Azaizah", email = "az.said2007@gmail.com" }]
+keywords = ["mcp", "peptide", "bioinformatics", "claude", "llm-tools", "pvl"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+]
+dependencies = [
+    "mcp>=1.0.0",
+    "httpx>=0.25",
+    "pydantic>=2.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4",
+    "pytest-asyncio>=0.23",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+pvl-mcp = "pvl_mcp.server:main"
+
+[project.urls]
+Homepage = "https://github.com/saidaz24-meet/peptide_prediction"
+Documentation = "https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/MCP_RUNBOOK.md"
+Issues = "https://github.com/saidaz24-meet/peptide_prediction/issues"
+
+[tool.setuptools.packages.find]
+include = ["pvl_mcp*"]
+exclude = ["tests*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+# E501: line length governed by formatter, not linter.
+# UP006/UP007/UP035/UP045: PVL convention is `Optional[T]` and `Dict[str, Any]`
+# (see backend/CLAUDE.md "Type Hints"). The MCP server matches that convention.
+ignore = ["E501", "UP006", "UP007", "UP035", "UP045"]

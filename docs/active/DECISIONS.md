@@ -94,14 +94,14 @@ See also: `TECH_PLATFORM_VISION.md` for the longer-form platform thesis and tech
 
 ---
 
-## ADR-009 — MCP server as the AI-platform front door (proposed)
+## ADR-009 — MCP server as the AI-platform front door
 
-**Date**: 2026-05-07 · **Status**: PROPOSED (target v0.2 summer 2026)
+**Date**: 2026-05-07 · **Accepted**: 2026-05-08 · **Status**: ACCEPTED (Wave 2 §A) · **Merge SHA**: TBD by T1 on merge
 **Context**: Anthropic's MCP (Model Context Protocol) is being adopted by Claude Desktop, Cursor, Windsurf, Continue, and other major LLM clients. The protocol defines how an LLM agent calls external tools. PVL has a REST API that maps cleanly to MCP tools.
 **Decision**: when AI agent integration matures (Phase G1), expose PVL as an MCP server, NOT as a custom chat UI built into the web app. Researchers already use Claude Desktop / Cursor / their own agents — they don't need another chatbot, they need a tool their existing agent can call.
 **Reasoning**: standardize on the protocol the ecosystem converges on. Don't build a chatbot when the user already has one. Future-proof: MCP becoming the cross-vendor standard means PVL is automatically available to whichever LLM the researcher prefers.
-**Implication**: every PVL REST endpoint should map cleanly to an MCP tool. Endpoints designed with this in mind from now on (clean inputs, structured outputs, no UI-specific fields). The MCP server lives in a new `mcp_server/` directory at repo root.
-**Evidence**: roadmap Phase G1, `TECH_PLATFORM_VISION.md` §4.
+**Implication**: every PVL REST endpoint should map cleanly to an MCP tool. Endpoints designed with this in mind from now on (clean inputs, structured outputs, no UI-specific fields). The MCP server lives in `mcp_server/` at repo root and ships seven tools: `search_uniprot`, `analyze_sequences`, `get_peptide_detail`, `rank_candidates`, `compare_cohorts`, `find_similar_peptides`, `get_pvl_version`. Three are LIVE today (`search_uniprot`, `analyze_sequences`, `get_pvl_version`); the remaining four wrap documented backend paths that ship in subsequent waves.
+**Evidence**: `mcp_server/`, `docs/active/MCP_RUNBOOK.md`, roadmap Phase G1, `TECH_PLATFORM_VISION.md` §4.
 
 ---
 

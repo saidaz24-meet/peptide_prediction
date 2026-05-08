@@ -118,6 +118,50 @@ Without S4PRED or TANGO, PVL still computes FF-Helix %, charge, hydrophobicity, 
 
 ---
 
+## Use PVL from Claude Desktop
+
+PVL exposes an MCP server so any MCP-aware LLM client (Claude Desktop, Cursor, Continue, Cline, Windsurf) can call PVL natively — paste a UniProt accession, ask for amyloid candidates, and get back a structured analysis with a permalink you can cite.
+
+### Setup (Claude Desktop)
+
+1. Install `pvl-mcp`. Until the PyPI release ships, install from source:
+
+   ```bash
+   # from a clone of this repo
+   cd mcp_server && pip install -e .
+   # (post-PyPI: pip install pvl-mcp)
+   ```
+
+2. Add to your Claude Desktop config (`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS, `%APPDATA%\Claude\claude_desktop_config.json` on Windows):
+
+   ```json
+   {
+     "mcpServers": {
+       "pvl": {
+         "command": "python",
+         "args": ["-m", "pvl_mcp"],
+         "env": { "PVL_API_URL": "http://localhost:8000" }
+       }
+     }
+   }
+   ```
+
+   Point `PVL_API_URL` at your own PVL backend (a hosted instance, your VPS, or a local `uvicorn api.main:app --port 8000`).
+
+3. Restart Claude Desktop. Try these prompts:
+
+   > "Use PVL to look up its version."
+   >
+   > "Use PVL to analyze the sequence GIGAVLKVLTTGLPALISWIKRKRQQ and tell me whether it is FF-Helix."
+   >
+   > "Use PVL to search UniProt for amyloid peptides from S. aureus, length 10–50, then rank the top 5 by FF-Helix score."
+
+The MCP server exposes the same prediction pipeline used by the web UI — every result comes back with PVL's exact category definitions (Helix / FF-Helix / SSW / FF-SSW) so the LLM can't hallucinate a Chou-Fasman propensity or confuse aggregation with fibril formation.
+
+See [`docs/active/MCP_RUNBOOK.md`](docs/active/MCP_RUNBOOK.md) for full configuration, the tool reference, Cursor / Continue setup, and troubleshooting.
+
+---
+
 ## Tech stack
 
 <table>
