@@ -5,6 +5,7 @@ import { Separator } from "@/components/ui/separator";
 import { HelpCircle, BarChart3, Zap, Waves, Target, Layers, BookOpen, Info } from "lucide-react";
 import { BgNotebook } from "@/components/BgNotebook";
 import AppFooter from "@/components/AppFooter";
+import { DatasetCreditCard } from "@/components/DatasetCreditCard";
 
 /**
  * Peleg-verbatim metric definitions (FIX-026 / FIX-027).
@@ -385,6 +386,13 @@ export default function Help() {
                   finalized; the values themselves are stable and documented here for
                   reproducibility.
                 </p>
+              </div>
+              <Separator />
+              {/* Dataset attribution — referenced by the upcoming gold-standard
+                  accuracy badges (T2 §H). Released 2026-05-08 per ADR-014. */}
+              <div className="space-y-2">
+                <h4 className="font-medium">Benchmark dataset</h4>
+                <DatasetCreditCard variant="compact" />
               </div>
             </CardContent>
           </Card>

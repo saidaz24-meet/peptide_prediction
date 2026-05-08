@@ -8,6 +8,7 @@ import { motion, cubicBezier } from "framer-motion";
 import * as Sentry from "@sentry/react";
 import { BgNotebook } from "@/components/BgNotebook";
 import AppFooter from "@/components/AppFooter";
+import { DatasetCreditCard } from "@/components/DatasetCreditCard";
 
 /** ---------- ScreenTransition (local, no extra files) ---------- */
 type Phase = "idle" | "enter" | "exit";
@@ -125,23 +126,71 @@ export default function About() {
             </CardContent>
           </Card>
 
-          {/* Acknowledgements */}
-          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
+          {/* Credits — extended with Peleg per ADR-014 (2026-05-08). */}
+          <Card
+            className="shadow-soft border-[hsl(var(--border))] rounded-xl"
+            data-testid="about-credits"
+          >
             <CardHeader>
-              <CardTitle>Acknowledgements</CardTitle>
+              <CardTitle>Credits</CardTitle>
+              <CardDescription>
+                People behind the platform, the algorithms, and the science.
+              </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <p>
-                <b>Frontend design & implementation:</b> Said Azaizah
-              </p>
-              <p>
-                <b>Algorithmic approach & backend code:</b> provided by <b>Dr. Aleksandr Golubev</b>
-              </p>
-              <p>
-                <b>TANGO / S4PRED predictions:</b> courtesy of the lab's existing pipelines
+            <CardContent className="space-y-4 text-sm">
+              <div data-testid="credit-said">
+                <p className="font-semibold text-foreground">Said Azaizah</p>
+                <p className="text-muted-foreground">
+                  Founder · full-stack architect · all platform code, design, and deployment.
+                </p>
+                <p className="mt-1">
+                  <a
+                    href="https://orcid.org/0009-0002-3596-5358"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    aria-label="Said Azaizah ORCID profile"
+                    data-testid="said-orcid"
+                  >
+                    ORCID 0009-0002-3596-5358
+                  </a>
+                </p>
+              </div>
+
+              <div data-testid="credit-peleg">
+                <p className="font-semibold text-foreground">Dr. Peleg Ragonis-Bachar</p>
+                <p className="text-xs text-muted-foreground/80">Technion</p>
+                <p className="text-muted-foreground">
+                  Scientific algorithms — FF-Helix, FF-SSW classification, threshold definitions,
+                  and the Staphylococcus 2023 benchmark dataset.
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground/70">
+                  ORCID — pending
+                </p>
+              </div>
+
+              <div data-testid="credit-alex">
+                <p className="font-semibold text-foreground">Dr. Aleksandr Golubev</p>
+                <p className="text-xs text-muted-foreground/80">DESY</p>
+                <p className="text-muted-foreground">
+                  Scientific advisor · project management · research direction and lab adoption.
+                </p>
+                <p className="mt-1 text-xs text-muted-foreground/70">
+                  ORCID — pending
+                </p>
+              </div>
+
+              <p className="pt-2 text-xs text-muted-foreground/80 border-t border-border/40">
+                <b>Predictor providers:</b> TANGO (Fernandez-Escamilla et al., 2004) and
+                S4PRED (Moffat et al., 2022). See the README's Acknowledgements block for the
+                full reference list.
               </p>
             </CardContent>
           </Card>
+
+          {/* Dataset attribution — Staphylococcus 2023 benchmark (ADR-014) */}
+          <DatasetCreditCard />
+
 
           {/* Key Features */}
           <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
