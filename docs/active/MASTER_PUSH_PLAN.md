@@ -95,7 +95,7 @@ Each wave is sized 1-3 months wall-clock (parallel agents make many items concur
 1. **MCP server (Phase G1)** — FastMCP wrapping every PVL endpoint, Claude Desktop tested
 2. **`pvl-py` real package** — Jupyter-native, used in 1+ test notebook
 3. **`pvl-cli` real package** — `pvl analyze` + `pvl rank` + `pvl export` working
-4. **Vector embedding similarity search** — Chroma local, "find peptides like this one"
+4. **Vector embedding similarity search** — LanceDB embedded (per ADR-016 / RB-002), "find peptides like this one"
 5. **Galagos-style auto-PDF** — multi-page scientific report per peptide via jsPDF + LLM-templated copy
 6. **Demo mode polish** — first-visit modal active, dataset auto-loaded, conversion measured via Sentry tag
 
@@ -139,7 +139,7 @@ Each wave is sized 1-3 months wall-clock (parallel agents make many items concur
 
 **Headline deliverables**:
 1. **PubMed integration** — query API, fetch abstracts
-2. **Vector embedding store** — Chroma or pgvector for paper abstracts (extends Wave 2 vector store)
+2. **Vector embedding store** — LanceDB embedded for paper abstracts (extends Wave 2 vector store; migrates to pgvector at D2 trigger per ADR-016)
 3. **Domain axiom library** — structured definitions of amyloid / SSW / FF-Helix / aggregation (Peleg-reviewed)
 4. **Citation verification** — never hallucinate DOIs; only cite papers PubMed returned
 5. **Per-peptide interpretation** — "P02743 (Serum amyloid P-component) shows 78% FF-Helix and high TANGO. Consistent with Pepys et al., Nature 2006…" with verified citation
@@ -247,7 +247,7 @@ Each wave is sized 1-3 months wall-clock (parallel agents make many items concur
 | **P0** | MCP server (Phase G1) | Differentiator. Makes PVL discoverable in every Claude Desktop / Cursor instance globally. |
 | **P0** | `pvl-py` real (B18) | Researchers in Jupyter notebooks don't switch to a browser. Critical for adoption. |
 | **P1** | `pvl-cli` real (B17) | Pipeline integration for batch labs. |
-| **P1** | Vector similarity search | "Find peptides like this one" is the #1 ask researchers have. Chroma local; small infra. |
+| **P1** | Vector similarity search | "Find peptides like this one" is the #1 ask researchers have. LanceDB embedded per ADR-016; zero infra. |
 | **P2** | Auto-PDF report (G5) | Galagos-style scientific PDF. High wow-factor for paper reviewers + bio.tools curators. |
 | **P2** | Demo mode polish + first-visit modal active | Conversion. v0.1.0 release-readiness. |
 
@@ -289,13 +289,13 @@ Each wave is sized 1-3 months wall-clock (parallel agents make many items concur
 - B17.7 Smoke tests
 - B17.8 Publish to test PyPI under `pvl-cli`
 
-#### VEC vector similarity search (~12-16h)
-- VEC.1 Pick: Chroma local (zero infra) — start here
-- VEC.2 Embedding model: Anthropic / OpenAI API for v0.x; later swap for local sentence-transformers
-- VEC.3 On peptide ingestion, compute embeddings for sequence + metadata; store in Chroma
-- VEC.4 New API endpoint `POST /api/peptides/similar` — `{accession, k}` → list of similar peptides with scores
-- VEC.5 UI surface: "Find similar peptides" button on PeptideDetail → opens drill-down with results
-- VEC.6 MCP tool `find_similar_peptides` (already in G1.2 list)
+#### VEC vector similarity search (~4-6h, was 12-16h — LanceDB embedded eliminates infra setup)
+- VEC.1 **LanceDB embedded** per ADR-016 / RB-002 (was Chroma; superseded for production reliability)
+- VEC.2 Embedding model: 384-dim all-MiniLM via sentence-transformers (default), swap-in for Anthropic embeddings (1024-dim) configurable. Final pick from M-004 brief.
+- VEC.3 On peptide ingestion, compute embeddings for sequence + metadata; store in Lance table at `./data/lance/peptides.lance`
+- VEC.4 New API endpoint `POST /api/peptides/similar` — `{reference_id, k?, dataset_id?}` → list of similar peptides with cosine distance scores. Frontend already wired (commit `4bca7e9`).
+- VEC.5 UI: "Find similar peptides" button on PeptideDetail (commit `707426b`, button shipped, awaits backend)
+- VEC.6 MCP tool `find_similar_peptides` (in G1.2 list — wires automatically once route is live)
 - VEC.7 Document in `docs/active/VECTOR_SEARCH_SPEC.md`
 
 #### G5 Auto-PDF report (~16-24h)

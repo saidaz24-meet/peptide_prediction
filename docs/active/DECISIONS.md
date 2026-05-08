@@ -162,6 +162,17 @@ See also: `TECH_PLATFORM_VISION.md` for the longer-form platform thesis and tech
 
 ---
 
+## ADR-016 — Vector store: LanceDB embedded (supersedes provisional Chroma)
+
+**Date**: 2026-05-08 · **Status**: ACCEPTED · **Authors**: Said + T-RES + T1
+**Context**: Wave 2 §D implements `POST /api/peptides/similar`. MASTER_PUSH_PLAN.md §3 chose Chroma local provisionally without comparative research. RB-002 (T-RES, M-003) evaluated 8 candidates against PVL's binding constraints: MIT-compatible OSS (ADR-011), solo-maintainer ops burden (~2h/month after Sept 2026), no paid services, Hetzner CX33 VPS (8 GB RAM), <500 ms latency for k=10 at <1 M peptides, future portability to DESY K8s.
+**Decision**: Adopt LanceDB (Apache 2.0) in embedded mode as the vector store for PVL v0.x and v1.x. Store Lance files at `./data/lance` (volume-mounted in Docker). Migrate to pgvector when Postgres is introduced per MASTER_DEV_DOC D2 (multi-user auth phase — RB-002 estimates 2-4h migration effort).
+**Reasoning**: LanceDB is the only candidate satisfying all three binding constraints — zero-infra embedded mode, MIT-compatible OSS, crash-safe columnar persistence. Chroma has a documented HNSW index-growth bug (index never shrinks after deletes), known memory leaks under sustained load, and no crash-safe persistence — exactly the failure modes that kill a solo-maintained tool on a shared VPS. Qdrant/Weaviate/Milvus require a separate server process the solo maintainer cannot reliably operate. pgvector is the correct long-term answer but premature — adding Postgres solely for vector search violates D2. At <1 M peptides and 384-dim embeddings, LanceDB exceeds the <500 ms latency target by ~100x.
+**Implication**: T2 implements §D using `lancedb` Python package — single new backend dependency. Chroma never enters the codebase. New files: `backend/services/vector_store.py`, `backend/migrations/init_lance.py`. Modified: `backend/api/routes/peptides.py` (POST /api/peptides/similar route), `backend/config.py` (LANCE_DB_PATH setting, default `./data/lance`), `docker-compose.yml` (volume mount). Lance files are plain on-disk artifacts — VPS rsync/snapshot backup covers them automatically. Tech radar: LanceDB moves untracked → "adopt now". DESY K8s migration: volume mount maps to ReadWriteOnce PVC.
+**Evidence**: `docs/active/RESEARCH_BRIEFS/RB-002_vector-store-evaluation.md`, AltexSoft Chroma audit, TigerData pgvector vs Qdrant benchmark, LanceDB embedded docs.
+
+---
+
 ## ADR-015 — Jupyter notebook export targets public REST API (not pvl-py local install)
 
 **Date**: 2026-05-08 · **Status**: ACCEPTED · **Authors**: Said + T-RES + T1
