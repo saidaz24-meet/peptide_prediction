@@ -151,14 +151,14 @@ See also: `TECH_PLATFORM_VISION.md` for the longer-form platform thesis and tech
 
 ## ADR-014 — Predictor disagreement + gold-standard accuracy in UI
 
-**Date**: 2026-05-08 · **Status**: ACCEPTED (with caveat) · **Authors**: Said + T-RES + T1
-**Context**: Researchers cannot tell from any existing peptide prediction tool whether to trust a prediction. The 2021 Briefings in Bioinformatics benchmark (Table 1) showed wide accuracy variance across 9 tools (CIs 68–87.6%). PVL's consensus module already computes multi-predictor agreement; the Staphylococcus 2023 dataset (N=2916, 66 validated) is available internally.
+**Date**: 2026-05-08 · **Status**: ACCEPTED · **Authors**: Said + Peleg + T-RES + T1 · **Peleg cleared dataset**: 2026-05-08
+**Context**: Researchers cannot tell from any existing peptide prediction tool whether to trust a prediction. The 2021 Briefings in Bioinformatics benchmark (Table 1) showed wide accuracy variance across 9 tools (CIs 68–87.6%). PVL's consensus module already computes multi-predictor agreement; the Staphylococcus 2023 dataset (N=2916, 66 validated) is owned by Peleg.
 **Decision**: Results dashboard SHALL display:
-  (a) **Consensus confidence indicator** showing how many predictors agree on each classification (e.g. "2 of 3 algorithms agree — moderate confidence"). UI-only change, ships immediately.
-  (b) **Gold-standard accuracy badge** showing PVL's sensitivity on a benchmark dataset at current threshold settings — **GATED on Peleg explicit clearance**. Until Peleg confirms the Staphylococcus 2023 dataset can be displayed publicly without scooping her paper, this feature is parked. If Peleg embargoes, T1 will use a smaller public benchmark (TANGO original validation set, AGGRESCAN public test set) instead.
-**Reasoning**: Strongest trust signal in the aggregation prediction space. Competitor gap (no tool surfaces predictor disagreement or accuracy in-UI). Disagreement score is uncoupled from any embargoed dataset and can ship freely.
-**Implication**: Disagreement score: 8h, Wave 2, files `ui/src/components/ResultsKpis.tsx` + `ui/src/lib/consensus.ts`. Accuracy badge: 12h, BLOCKED until Peleg green-lights public dataset display. T1 must email Peleg with the question before Wave 2 ships. Static precomputation keeps runtime cost zero. Threshold-curve JSON is a build-time artifact, not runtime computation.
-**Evidence**: `docs/active/RESEARCH_BRIEFS/RB-001_researcher-needs.md` §3 category F, §5 feature 4. Memory: `project_peleg_columns.md` (Peleg owns Staphylococcus dataset).
+  (a) **Consensus confidence indicator** showing how many predictors agree on each classification (e.g. "2 of 3 algorithms agree — moderate confidence"). UI-only change, ships in this wave.
+  (b) **Gold-standard accuracy badge** showing PVL's sensitivity on the Staphylococcus 2023 benchmark (N=66 validated) at current threshold settings. **Peleg cleared 2026-05-08** — dataset can be displayed publicly with attribution to Peleg (Technion). Citation in About page + accuracy card.
+**Reasoning**: Strongest trust signal in the aggregation prediction space. Competitor gap (no tool surfaces predictor disagreement or accuracy in-UI).
+**Implication**: Disagreement score: 8h, Wave 2, files `ui/src/components/ResultsKpis.tsx` + `ui/src/lib/consensus.ts`, new `ui/src/components/TrustSignalCard.tsx`. Accuracy badge: 12h, also Wave 2, requires precomputed accuracy curves per threshold combination as static JSON (build-time artifact, runtime cost zero). Peleg credited in About page + dataset README.
+**Evidence**: `docs/active/RESEARCH_BRIEFS/RB-001_researcher-needs.md` §3 category F, §5 feature 4. Memory: `project_peleg_columns.md`.
 
 ---
 
