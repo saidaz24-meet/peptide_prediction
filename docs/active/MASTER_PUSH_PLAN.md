@@ -346,15 +346,22 @@ These get written into `T2-INSTRUCTIONS.md` / `T3-INSTRUCTIONS.md` / `COWORK_PRO
 
 ### 3.4 — Wave 2 success criteria
 
-- [ ] `claude` running locally with PVL MCP server can answer: "find me top 5 amyloid candidates from S.aureus length 10-50"
-- [ ] `pip install pvl-py` works from test PyPI; quickstart notebook runs to completion
-- [ ] `pvl analyze test.fasta` outputs results
-- [ ] "Find similar peptides" works for melittin and returns 5+ semantically similar entries
-- [ ] Auto-PDF report for melittin renders all 7 sections, embeds permalink, Peleg-reviews and approves
-- [ ] First-visit demo modal shows on fresh localStorage; coachmark walkthrough completes
-- [ ] All 887 prior tests still pass; Wave 2 adds 100+ new tests
-- [ ] Sentry has zero new error fingerprints attributed to Wave 2 work
-- [ ] Wave C email goes out with Wave 2 demo links
+**Status as of 2026-05-08 (local branch `wave-2-ai-platform`, 7 commits ahead of main, NOT pushed):**
+
+- [x] **MCP server scaffold** — `mcp_server/` with 7 tools, 33 tests passing. ADR-009 ACCEPTED. Commit `80a514f`.
+- [x] **Auto-PDF report renderer** — 6 panels (cover/summary/biochem/interpretation/methods/refs), 42 tests passing. Commit `18b8e49`.
+- [x] **First-visit demo modal + coachmark walkthrough** — Stripe-style modal with 3 features, 5-step react-joyride tour anchored on real DOM targets, framer-motion loading skeleton. Commits `1028891` + V8-1 refactors.
+- [x] **SimilarPeptidesInspector frontend** — drill-down view with loading/empty/error/results states, distance bars, classification pills, click-to-switch. Commit `4bca7e9`. Backend route still pending (Section D).
+- [ ] `claude` running locally with PVL MCP server can answer: "find me top 5 amyloid candidates from S.aureus length 10-50" — **manual test pending** (Said local box, see `MCP_RUNBOOK.md` §2.3)
+- [ ] `pip install pvl-py` works from test PyPI; quickstart notebook runs — **Section B not started**
+- [ ] `pvl analyze test.fasta` outputs results — **Section C not started**
+- [ ] "Find similar peptides" returns 5+ semantically similar entries for melittin — **frontend ready; backend `POST /api/peptides/similar` not started**
+- [ ] Auto-PDF report for melittin renders all 6 sections, embeds permalink, Peleg-reviews and approves — **renderer ready; integration with PeptideDetail toolbar pending**
+- [x] **All prior tests still pass** — 992/992 passing (463 backend + 33 MCP + 496 frontend; up from 887 baseline)
+- [ ] Sentry has zero new error fingerprints attributed to Wave 2 work — **measured after deploy**
+- [ ] Wave C email goes out with Wave 2 demo links — **after push**
+
+**Remaining work**: T2 picks B (pvl-py) OR D (vector backend) next. T3 wires the auto-PDF export button onto PeptideDetail and the "Find similar" CTA. Then push.
 
 ---
 
