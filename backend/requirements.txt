@@ -21,7 +21,7 @@ duckdb>=1.5.2,<2.0
 filelock>=3.29.0,<4.0
 
 # Task queue & caching
-celery[redis]>=5.6,<6.0
+celery[redis]>=5.6.3,<6.0
 redis>=5.0,<6.0
 
 # Monitoring (optional — used by Flower dashboard)
