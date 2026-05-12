@@ -19,9 +19,20 @@ Living index of all research briefs produced by T-RES (research terminal). Each 
 
 ---
 
-## Pending mission queue (T-RES picks one at a time)
+## Pending mission queue
 
-These are the first 5 missions Said + T1 set for T-RES on 2026-05-08. T-RES picks one, completes it, indexes it here, then moves to the next.
+T5 is the always-on strategic research engine (`feedback_t5_continuous_research.md`). T1 must keep T5 dispatched — idle T5 is a project loss. After each brief, T5 names the next mission; T1 commits the brief and re-dispatches without prompting.
+
+**Completed**: RB-001 (M-007 researcher needs), RB-002 (M-003 vector store), RB-003 (M-004 embeddings), RB-COWORK-AUDIT.
+
+**Active**: M-006 (AI workflow infrastructure) — dispatched 2026-05-12.
+
+**Next in queue** (priority order):
+1. **M-001** — MCP alternatives + competitive landscape (validates ADR-009; should we be on LangGraph / OpenAI Tool Calling / etc instead?)
+2. **M-002** — Hosting platforms (Modal vs Replicate vs Fly.io vs DESY K8s vs Hetzner. MCP server needs a hosting story beyond `localhost:8765`.)
+3. **M-005** — Adoption playbook for scientific OSS tools (cellxgene / BioPython / Mol* / Galaxy actionable tactics for citation accumulation and lab partnerships)
+4. **M-WEEKLY** — first weekly competitive scan (sets cadence)
+5. **M-QUARTERLY** — first tech radar review (auditing the 17 ADRs)
 
 ### M-001 — MCP alternatives + competitive landscape
 - **Question**: Is Anthropic's MCP genuinely the best AI-tool-calling protocol for PVL, or are there better options (LangGraph state machines, OpenAI Tool Calling, Cohere agents, IBM Granite, emerging open standards)?
