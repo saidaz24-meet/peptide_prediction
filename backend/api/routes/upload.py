@@ -140,13 +140,28 @@ async def upload_csv(
             while not cancel_event.is_set():
                 if await request.is_disconnected():
                     cancel_event.set()
-                    log_info("upload_client_disconnect", "Client disconnected, cancelling upload analysis")
+                    log_info(
+                        "upload_client_disconnect",
+                        "Client disconnected, cancelling upload analysis",
+                    )
                     break
                 await asyncio.sleep(0.5)
         except Exception:
             pass
 
     disconnect_task = asyncio.create_task(_detect_disconnect())
+
+    # Wave 2 §H — when the uploaded file is FASTA, the pipeline still goes
+    # through the same code path but the run_metadata.sequenceSource stamp
+    # must reflect the real input format so peer reviewers can distinguish
+    # a CSV upload from a FASTA bulk upload. The parser was already
+    # detecting FASTA at the read_any_table layer; this is the missing
+    # plumbing into the metadata service.
+    _fname_lower = (file.filename or "").lower()
+    _is_fasta_filename = _fname_lower.endswith((".fasta", ".fa")) or (
+        _fname_lower.endswith(".txt") and raw.lstrip(b"\xef\xbb\xbf").lstrip().startswith(b">")
+    )
+    _sequence_source = "fasta" if _is_fasta_filename else "csv"
 
     try:
         result = await asyncio.to_thread(
@@ -157,6 +172,7 @@ async def upload_csv(
             trace_entry=trace_entry,
             sentry_initialized=SENTRY_INITIALIZED,
             cancel_event=cancel_event,
+            sequence_source=_sequence_source,
         )
         if cancel_event.is_set():
             raise asyncio.CancelledError()

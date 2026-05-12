@@ -82,3 +82,62 @@ class TestReadAnyTableFasta:
         df = read_any_table(raw, "input.txt")
         assert "Entry" in df.columns
         assert df.iloc[0]["Sequence"] == "ACDE"
+
+
+class TestParseFastaEdgeCases:
+    """Wave 2 §H edge cases — non-standard AA, duplicate IDs, stress."""
+
+    def test_non_standard_aa_letters_preserved(self):
+        """B, J, O, U, X, Z are valid IUPAC ambiguity / pyrrolysine /
+        selenocysteine codes. The parser keeps them as-is so downstream
+        annotation can flag them in ``sequenceNotes`` — it does NOT silently
+        rewrite them to A or drop the row."""
+        raw = b">amb1\nACDEFGHIBJOUXZ\n>amb2\nXYZ\n"
+        df = parse_fasta(raw, "edge.fasta")
+        assert df.iloc[0]["Sequence"] == "ACDEFGHIBJOUXZ"
+        assert df.iloc[1]["Sequence"] == "XYZ"
+
+    def test_duplicate_ids_kept_not_deduped(self):
+        """If a FASTA contains two entries with the same id, BOTH are kept.
+        The pipeline tracks them as separate rows; the UI surfaces the
+        repetition. Silent dedup would lose data the researcher provided."""
+        raw = b">dup\nAAAA\n>dup\nBBBB\n>other\nCCCC\n"
+        df = parse_fasta(raw, "dup.fasta")
+        assert len(df) == 3
+        assert list(df["Entry"]) == ["dup", "dup", "other"]
+        # Both 'dup' entries keep their original distinct sequences.
+        assert df.iloc[0]["Sequence"] == "AAAA"
+        assert df.iloc[1]["Sequence"] == "BBBB"
+
+    def test_100_entry_stress_parse(self):
+        """100-entry FASTA parses cleanly and quickly — sanity check that
+        the parser doesn't accidentally O(n^2)."""
+        body = b"\n".join(
+            f">peptide_{i:03d}\nACDE{i:04d}".encode() for i in range(100)
+        )
+        df = parse_fasta(body, "stress.fasta")
+        assert len(df) == 100
+        assert df.iloc[0]["Entry"] == "peptide_000"
+        assert df.iloc[99]["Entry"] == "peptide_099"
+
+    def test_wrapped_sequence_80_char_lines(self):
+        """FASTA convention wraps sequences at 80 chars. The parser
+        concatenates wrapped lines into a single Sequence column entry."""
+        wrapped = b">long\n" + b"A" * 80 + b"\n" + b"C" * 80 + b"\n" + b"GT\n"
+        df = parse_fasta(wrapped, "wrap.fasta")
+        assert df.iloc[0]["Sequence"] == "A" * 80 + "C" * 80 + "GT"
+        assert df.iloc[0]["Length"] == 162
+
+    def test_example_fasta_fixture_parses(self, tmp_path):
+        """The shipped fixture used by the dispatch's curl example must
+        parse cleanly so manual verification matches automated runs."""
+        from pathlib import Path
+
+        fixture = Path(__file__).parent / "fixtures" / "example.fasta"
+        df = parse_fasta(fixture.read_bytes(), "example.fasta")
+        assert len(df) == 5
+        assert "amyloid_beta_1_42" in list(df["Entry"])
+        assert "magainin_2" in list(df["Entry"])
+        # Spot-check one sequence to catch any silent corruption.
+        ab42_seq = df[df["Entry"] == "amyloid_beta_1_42"].iloc[0]["Sequence"]
+        assert ab42_seq.startswith("DAEFRHDSGYEVHHQKLVFFAED")
