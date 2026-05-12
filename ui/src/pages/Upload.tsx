@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 // ColumnMapper removed - columns are auto-detected by backend
 import { DataPreview } from "@/components/DataPreview";
+import { FastaPreview, type FastaEntry } from "@/components/FastaPreview";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { uploadCSV } from "@/lib/api";
 import { submitUploadJob, cancelSyncJob } from "@/lib/jobApi";
@@ -602,6 +603,39 @@ export default function Upload() {
                           {rawData.rowCount ?? rawData.rows?.length ?? 0} rows
                         </Badge>
                       </div>
+
+                      {/* §F: focused FASTA preview when the dropped file is .fasta/.fa.
+                          The generic DataPreview still renders below for column-level
+                          verification, but the FASTA-specific card gives an at-a-glance
+                          "N sequences detected" confirmation. */}
+                      {(() => {
+                        const lname = (localFile?.name || rawData.fileName || "")
+                          .toLowerCase();
+                        if (!lname.endsWith(".fasta") && !lname.endsWith(".fa"))
+                          return null;
+                        const entries: FastaEntry[] = (rawData.rows ?? []).map(
+                          (r: Record<string, unknown>) => ({
+                            id: String(
+                              r.Entry ?? r.entry ?? r.id ?? r.ID ?? ""
+                            ).trim(),
+                            sequence: String(
+                              r.Sequence ?? r.sequence ?? r.seq ?? ""
+                            ).trim(),
+                          })
+                        );
+                        // `rawData.rows` is capped at 200 by the FASTA parser
+                        // — pass the true `rowCount` separately so the summary
+                        // line still reports the real total.
+                        return (
+                          <FastaPreview
+                            fileName={
+                              localFile?.name || rawData.fileName || "file.fasta"
+                            }
+                            entries={entries}
+                            totalCount={rawData.rowCount ?? entries.length}
+                          />
+                        );
+                      })()}
 
                       <DataPreview data={rawData} />
 
