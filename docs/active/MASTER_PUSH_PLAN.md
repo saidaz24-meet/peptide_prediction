@@ -368,19 +368,19 @@ These get written into `T2-INSTRUCTIONS.md` / `T3-INSTRUCTIONS.md` / `COWORK_PRO
 
 **Predictor disagreement score (RB-001 #4a)**: SKIPPED per Said directive 2026-05-08 — Peleg killed `ConsensusCard`/`ConsensusTier` in FIX-013 (2026-05-06) for unjustified tier math. Said: skip entirely, move on.
 
-### 3.5 — Current dispatch state (2026-05-08 evening — second cycle)
+### 3.5 — Current dispatch state (2026-05-12 — fourth cycle, with priority interrupt)
 
-T1 has reviewed + committed two more terminal deliveries. SimilarPeptidesInspector is now end-to-end (frontend wire pending T3 §G).
+T-RES delivered RB-003 → ADR-017 ACCEPTED. **Priority interrupt**: T2 must fix the embedding model before progressing — RB-003 found `all-MiniLM-L6-v2` is biologically meaningless on amino acids (English text model). Swap to ESM-2 8M is a correctness fix.
 
 | Terminal | Last delivery | Next chunk |
 |---|---|---|
-| **T2 (backend)** | ✅ §D LanceDB backend (commit `8e907fc`, 21 new tests) | §G (run_metadata in CSV/JSON, 4h) — see updated `T2-INSTRUCTIONS.md`. Then H/I/B/C. |
-| **T3 (frontend)** | ✅ §E About page Peleg credit + DatasetCreditCard (commit `f3dfd13`, 19 new tests) | §G (wire SimilarPeptidesInspector → real backend, 3h) — NEWLY UNBLOCKED by T2 §D. Then H/I as backend ships them. |
-| **T-RES (research)** | ✅ RB-002 LanceDB recommendation (ADR-016 ACCEPTED, commit `fb46b1c`) | M-004 embedding model evaluation — informs Section D embedding default (currently all-MiniLM provisional). |
-| **Cowork** | Idle since V9 | Wait for T1 — likely V10 polish round after Wave 2 ships end-to-end. |
+| **T2 (backend)** | ✅ §D LanceDB backend (`8e907fc`) — but embedding model is wrong | **D-fix (priority interrupt, 3-5h)**: swap to ESM-2 8M per ADR-017; LanceDB dim 384→320; reindex. Then §G. See `T2-INSTRUCTIONS.md` D-fix section. |
+| **T3 (frontend)** | ✅ §E About page Peleg credit (`f3dfd13`) | §G wire SimilarPeptidesInspector → backend (3h, UNBLOCKED by §D). Embedding model swap doesn't change the API contract — T3 work proceeds in parallel with T2 D-fix. |
+| **T-RES (research)** | ✅ RB-002 LanceDB (`fb46b1c`), ✅ RB-003 ESM-2 (this commit) | Idle. Next mission queue: M-001 (MCP alternatives), M-005 (OSS adoption), M-006 (AI workflow). Pick when T1 needs strategic input. |
+| **Cowork** | Idle since V9 | Wait for V10 polish round after Wave 2 ships end-to-end. |
 | **T-PEL** | Idle | Wait for next Peleg feedback batch. |
 
-**Current test totals**: 1043/1043 passing (484 backend + 34 MCP + 525 frontend). Up from 887 baseline = +156 net new tests for Wave 2.
+**Current test totals**: 1043/1043 passing. D-fix will require updating ~2 vector_store tests; net should remain >1040.
 
 ---
 

@@ -162,6 +162,17 @@ See also: `TECH_PLATFORM_VISION.md` for the longer-form platform thesis and tech
 
 ---
 
+## ADR-017 — Embedding model: ESM-2 8M (supersedes provisional all-MiniLM-L6-v2)
+
+**Date**: 2026-05-12 · **Status**: ACCEPTED · **Authors**: Said + T-RES + T1
+**Context**: ADR-016 locked LanceDB as the vector store but left the embedding model open. T2 Section D shipped (commit `8e907fc`) using provisional `sentence-transformers/all-MiniLM-L6-v2` (384-dim). RB-003 found this is a **correctness failure**, not a tradeoff — MiniLM is trained on 1B English sentence pairs with no amino acid vocabulary; embeddings of peptide sequences capture letter-frequency patterns, not biological signal. Any nearest-neighbor result is biologically meaningless.
+**Decision**: Replace all-MiniLM-L6-v2 with **ESM-2 8M** (`facebook/esm2_t6_8M_UR50D`, MIT license) as the production embedding model. Output: 320-dim sequence embedding via mean-pooled residue embeddings. Compute: CPU-only (no GPU). Model loaded lazily at first embed call (~150–250 MB RAM, ~30 MB disk). One-time LanceDB table drop + recreate to switch schema dim 384 → 320. Reindex of all existing peptides via `python -m backend.scripts.reindex_lance`.
+**Reasoning**: ESM-2 (Lin et al., *Science* 2023, doi:10.1126/science.ade2574) is the smallest peer-reviewed protein language model trained on 250M UniRef50 sequences with biologically grounded representations of evolutionary conservation, structural context, and biochemical properties. 8M variant fits CX33 RAM budget with ~3 GB headroom; CPU inference ~10–50 ms for 5–100 AA peptides. PepBERT (peptide-specific, April 2025) would be marginally better scientifically but has no stable HuggingFace release and is too immature for solo-maintained production. Paid API embeddings violate ADR-011's offline-first requirement.
+**Implication**: T2 must (1) replace SentenceTransformer call in `backend/services/vector_store.py` with `transformers.AutoModel` + `AutoTokenizer` for `facebook/esm2_t6_8M_UR50D`; (2) change LanceDB schema embedding dim 384 → 320; (3) implement lazy-load pattern (avoid FastAPI cold-start health check timeout); (4) run one-time reindex script. `transformers` is already transitively available via `sentence-transformers`. Future upgrade path: PepBERT if it stabilizes, or ESM-2 35M if latency degrades at >500k peptides. **Priority interrupt**: this work happens BEFORE T2 §G — every peptide currently being indexed produces biologically invalid vectors.
+**Evidence**: `docs/active/RESEARCH_BRIEFS/RB-003_embedding-model-evaluation.md`, Lin et al. Science 2023, PepBERT bioRxiv 2025.
+
+---
+
 ## ADR-016 — Vector store: LanceDB embedded (supersedes provisional Chroma)
 
 **Date**: 2026-05-08 · **Status**: ACCEPTED · **Authors**: Said + T-RES + T1

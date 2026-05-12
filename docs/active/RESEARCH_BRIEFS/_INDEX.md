@@ -12,7 +12,8 @@ Living index of all research briefs produced by T-RES (research terminal). Each 
 
 | ID | Date | Topic | Status | Recommendation | Affects |
 |---|---|---|---|---|---|
-| [RB-002](RB-002_vector-store-evaluation.md) | 2026-05-08 | Vector store evaluation for `POST /api/peptides/similar` — Chroma vs LanceDB vs pgvector vs 5 others (M-003) | DRAFT — awaiting Said + T1 review | **Adopt LanceDB embedded** (supersedes provisional Chroma); migrate to pgvector at D2 Postgres trigger | MASTER_PUSH_PLAN §3+§D; ADR-016 PROPOSED; MASTER_DEV_DOC D2 |
+| [RB-003](RB-003_embedding-model-evaluation.md) | 2026-05-12 | Embedding model — all-MiniLM vs ESM-2 vs ProtBert vs PepBERT vs paid APIs (M-004) | ACCEPTED — ADR-017 codified | **Adopt ESM-2 8M** (correctness fix — current MiniLM is biologically meaningless on amino acids); reindex LanceDB 384→320 dim | ADR-017 ACCEPTED; ADR-016 dim update; Wave 2 §D |
+| [RB-002](RB-002_vector-store-evaluation.md) | 2026-05-08 | Vector store — Chroma vs LanceDB vs pgvector vs 5 others (M-003) | ACCEPTED — ADR-016 codified | **Adopt LanceDB embedded**; migrate to pgvector at D2 Postgres trigger | ADR-016 ACCEPTED |
 | [RB-001](RB-001_researcher-needs.md) | 2026-05-08 | What researchers actually need from a peptide prediction platform (M-007) | RESOLVED — 5 decisions baked as ADR-013/014/015 | Top 5: (1) BibTeX export, (2) metadata-in-CSV, (3) FASTA bulk upload, (4) disagreement score + accuracy badge, (5) Jupyter notebook export | ROADMAP Phase A/B/H; ADR-013/014/015 ACCEPTED |
 | [RB-COWORK-AUDIT](RB-COWORK-AUDIT.md) | 2026-05-08 | PRE-FLIGHT compliance audit V5-V9 | COMPLETE | Keep PRE-FLIGHT in PROMPT 0; add v2 environmental-friction rule | COWORK_PROMPTS_PELEG.md, M-006 |
 
