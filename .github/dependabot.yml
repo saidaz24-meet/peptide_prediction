@@ -28,6 +28,12 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "react-dom"
         update-types: ["version-update:semver-major"]
+      # Hold lucide-react major bumps — v1.0 reorganized brand icons (Github
+      # icon was removed). Major bumps for icon libraries trigger import
+      # refactors across many components; do these manually in summer
+      # release windows, not as auto-PRs.
+      - dependency-name: "lucide-react"
+        update-types: ["version-update:semver-major"]
 
   # Backend Python packages
   - package-ecosystem: "pip"
@@ -46,6 +52,23 @@ updates:
         update-types:
           - "minor"
           - "patch"
+    ignore:
+      # pandas 3.0 changed NaN handling — breaks 3+ pipeline tests.
+      # Bump manually in a summer release window after explicit review.
+      - dependency-name: "pandas"
+        update-types: ["version-update:semver-major"]
+      # redis 7 incompatible with our pinned celery 5.6 (celery[redis] dep
+      # conflict). Need to bump celery first; revisit when celery 6 releases.
+      - dependency-name: "redis"
+        update-types: ["version-update:semver-major"]
+      # PyTorch major bumps trigger CPU-only build updates + S4PRED retest.
+      # Hold for manual summer review.
+      - dependency-name: "torch"
+        update-types: ["version-update:semver-major"]
+      # Pydantic major bumps — Pydantic 3.0 will rewrite our request schemas
+      # which use ConfigDict(extra="forbid") + AliasChoices. Manual only.
+      - dependency-name: "pydantic"
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions workflow versions
   - package-ecosystem: "github-actions"
