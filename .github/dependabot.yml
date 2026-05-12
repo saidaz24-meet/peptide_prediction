@@ -34,6 +34,11 @@ updates:
       # release windows, not as auto-PRs.
       - dependency-name: "lucide-react"
         update-types: ["version-update:semver-major"]
+      # Hold date-fns major bumps — v4 dropped APIs we use (PR #39 closed
+      # 2026-05-12 after CI confirmed breaking changes). Revisit when we
+      # have time for the migration; minor/patch still flow.
+      - dependency-name: "date-fns"
+        update-types: ["version-update:semver-major"]
 
   # Backend Python packages
   - package-ecosystem: "pip"
