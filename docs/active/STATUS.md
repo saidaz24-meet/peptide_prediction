@@ -1,6 +1,6 @@
 # PVL — Where We Are Standing (2026-05-12)
 
-**Branch**: `wave-2-ai-platform` · **Local commits ahead of main**: 31 · **Tests**: 1119/1119 passing · **NOT pushed**
+**Branch**: `wave-2-ai-platform` · **Local commits ahead of main**: 36 · **Tests**: 1089/1089 passing (509 backend + 34 MCP + 546 frontend) · **NOT pushed**
 
 This doc answers "where are we, what's next, what blocks us, when is this done." It is canonical and updated after every dispatch cycle. Other docs (ROADMAP, MASTER_PUSH_PLAN, DECISIONS) are the detailed plans. THIS doc is the dashboard.
 
@@ -14,12 +14,12 @@ This doc answers "where are we, what's next, what blocks us, when is this done."
 
 ## §1 — DOING NOW (terminals already dispatched, work in progress or just landed)
 
-| Terminal | Last delivery | Live test for Said |
+| Terminal | Last delivery | What needs your eyes |
 |---|---|---|
-| **T2** | ✅ D-fix ESM-2 swap (`81e77cc`, +7 tests) | `cd backend && python -m scripts.reindex_lance` → expect "reindexed N peptides" log. Then `curl -X POST localhost:8000/api/peptides/similar -H 'Content-Type: application/json' -d '{"reference_id":"<any-id-from-current-dataset>","k":5}'` → expect 5 results with distance scores. |
-| **T3** | ✅ §G wire SimilarPeptidesInspector (`ba2c15d`, +36 tests) | Open `localhost:5173`, demo mode auto-loads. Click any peptide row → `/peptides/<id>` → click "Find Similar" button → drill-down opens with 10 results within 2s. Click any result row → navigates to that peptide. Click "Export CSV" → file downloads with `# PVL similarity export` header. |
-| **T-RES (T5 background)** | ✅ RB-004 AI workflow (Tier 1 baseline) | N/A — research output, not user-testable. |
-| **Cowork** | Idle (last delivery V9-1) | N/A |
+| **T2** | ✅ §G run_metadata in CSV/JSON exports (`ad7e0b5`, +18 tests, ADR-013) | None — backend-only chunk. T1 verified all tests + schema strictness. |
+| **T3** | ✅ §I CsvExportDialog with run_metadata preview (`931ad2d`, +21 tests) | 🎨 60s browser test below |
+| **T5 (manual)** | ✅ RB-005 deep brief + ADR-020 PROPOSED (`8704723`) | 1-min skim of RB-005 §1 TL;DR + §6 recommendations |
+| **Cowork** | Idle since V9 | N/A |
 | **T-PEL** | Idle | N/A |
 
 ---
