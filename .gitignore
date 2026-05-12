@@ -91,6 +91,7 @@ htmlcov/
 # T-INSTRUCTIONS files are local terminal-specific guides; not committed.
 # T-RES-INSTRUCTIONS.md is the only one that's session-priming, not work-in-progress.
 T*-INSTRUCTIONS.md
+T*_DISPATCH_*.md
 PLAN.md
 RECOVERY_PROMPT.md
 TERMINAL_SETUP.md
