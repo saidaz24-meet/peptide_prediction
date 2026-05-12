@@ -368,7 +368,21 @@ These get written into `T2-INSTRUCTIONS.md` / `T3-INSTRUCTIONS.md` / `COWORK_PRO
 
 **Predictor disagreement score (RB-001 #4a)**: SKIPPED per Said directive 2026-05-08 — Peleg killed `ConsensusCard`/`ConsensusTier` in FIX-013 (2026-05-06) for unjustified tier math. Said: skip entirely, move on.
 
-### 3.5 — Current dispatch state (2026-05-12 — fourth cycle, with priority interrupt)
+### 3.5 — Current dispatch state (2026-05-12 evening — fifth cycle)
+
+T2 D-fix + T3 §G + T5 M-006 all delivered. Wave 2 §D is now end-to-end scientifically valid.
+
+| Terminal | Last delivery | Next chunk |
+|---|---|---|
+| **T2 (backend)** | ✅ D-fix ESM-2 swap (`81e77cc`, +7 tests) | §G run_metadata in CSV/JSON (4h, ADR-013), then §H FASTA bulk (8h), §I MCP routes (8h), §B pvl-py (12h), §C pvl-cli (8h). |
+| **T3 (frontend)** | ✅ §G wire SimilarPeptidesInspector → backend (`ba2c15d`, +36 tests). PVL "Find Similar" is now end-to-end. | §I run-metadata CSV preview (2h, blocked on T2 §G). Then §F FASTA UI (3h, blocked on T2 §H). Then §H accuracy badge (6h, blocked on T2 threshold-curve JSON). |
+| **T-RES (T5)** | ✅ RB-004 AI workflow infra (`9d0e8b5`, Tier 1 baseline). | Tier 2 deep-dive on M-002 hosting platforms when Said opens manual terminal. Background-agent missions reserved for Tier 1 quick scans only. |
+| **Cowork** | Idle since V9 | Wait for V10 polish round after Wave 2 ships end-to-end. |
+| **T-PEL** | Idle | Wait for next Peleg feedback batch. |
+
+**Current test totals**: 1119/1119 passing (491 backend + 34 MCP + 561 frontend + 33 mcp). Up from 887 baseline = +232 net new tests for Wave 2.
+
+### Earlier dispatch state (2026-05-12 — fourth cycle, priority interrupt) — superseded
 
 T-RES delivered RB-003 → ADR-017 ACCEPTED. **Priority interrupt**: T2 must fix the embedding model before progressing — RB-003 found `all-MiniLM-L6-v2` is biologically meaningless on amino acids (English text model). Swap to ESM-2 8M is a correctness fix.
 
