@@ -116,6 +116,7 @@ PVL is developed by Said Azaizah using a multi-terminal AI-orchestration pattern
 
 1. **One file per session start**: every terminal reads its instructions doc + AGENTS.md first.
 2. **One concrete live test per chunk** (per `feedback_simplicity_and_testability.md`): every commit T1 makes ends with a `🧪 Manual test` block. If a chunk can't be tested live, that's a planning failure.
+2b. **Global-provider integration check**: when a page or component introduces a `useXxx()` context hook (e.g., `useDrillDown`), confirm the matching `<XxxProvider>` is mounted in `ui/src/App.tsx` BEFORE committing. Unit tests wrap providers manually, so a missing app-shell mount passes tests but crashes the live page. Reference: the `useDrillDown` regression caught only via Said's browser test 2026-05-12.
 3. **Bias to simplest implementation**: solutions Said can audit beat solutions that look clever.
 4. **T1 proposes workflow upgrades proactively**: hooks, skills, slash commands, memory files — ship inline, opt-out model.
 5. **PRE-FLIGHT before any new file**: search for existing equivalents, decide extend / refactor / replace / leave alone, justify before writing.

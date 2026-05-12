@@ -17,6 +17,7 @@ import { useDemoMode } from "@/hooks/useDemoMode";
 import { DemoModeChip } from "@/components/DemoModeChip";
 import { FirstVisitModal } from "@/components/FirstVisitModal";
 import { DemoCoachmark } from "@/components/DemoCoachmark";
+import { DrillDownProvider, DrillDown } from "@/components/drilldown";
 import { initSentrySession, setPVLSentryContext } from "@/lib/sentryContext";
 
 // Lazy-loaded pages (Index kept direct for instant first load)
@@ -73,11 +74,7 @@ function AppLayout() {
   useEffect(() => {
     initSentrySession();
     const viewport =
-      window.innerWidth < 640
-        ? "mobile"
-        : window.innerWidth < 1024
-          ? "tablet"
-          : "desktop";
+      window.innerWidth < 640 ? "mobile" : window.innerWidth < 1024 ? "tablet" : "desktop";
     const theme = document.documentElement.classList.contains("dark") ? "dark" : "light";
     setPVLSentryContext({ viewport, theme });
   }, []);
@@ -216,10 +213,7 @@ function AppLayout() {
         onDismiss={demoMode.dismissFirstVisit}
         onTour={startTour}
       />
-      <DemoCoachmark
-        run={tourActive}
-        onComplete={() => setTourActive(false)}
-      />
+      <DemoCoachmark run={tourActive} onComplete={() => setTourActive(false)} />
     </>
   );
 }
@@ -230,7 +224,10 @@ const App = () => (
       <Sonner />
       <ValidationBanner />
       <BrowserRouter>
-        <AppLayout />
+        <DrillDownProvider>
+          <AppLayout />
+          <DrillDown />
+        </DrillDownProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
