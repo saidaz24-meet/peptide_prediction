@@ -14,8 +14,11 @@ vi.mock("framer-motion", () => ({
   cubicBezier: () => () => 0,
 }));
 
-vi.mock("@/components/BgNotebook", () => ({
-  BgNotebook: () => null,
+// V10-1: About now uses WaveBackground instead of BgDotGrid
+vi.mock("@/components/WaveBackground", () => ({
+  WaveBackground: (props: any) => (
+    <div data-testid="wave-background" {...props} />
+  ),
 }));
 
 vi.mock("@/components/AppFooter", () => ({
@@ -92,5 +95,30 @@ describe("About page — credits & dataset card", () => {
     expect(card).toBeInTheDocument();
     expect(card).toHaveTextContent(/Staphylococcus 2023 benchmark/i);
     expect(card).toHaveTextContent(/2,916 peptides/);
+  });
+});
+
+describe("About page — V10-1 layout redesign", () => {
+  it("does NOT render a back button", () => {
+    renderAbout();
+    // Back button was removed per V10-1 — sidebar handles navigation
+    expect(screen.queryByText(/^Back$/)).not.toBeInTheDocument();
+  });
+
+  it("renders WaveBackground component", () => {
+    renderAbout();
+    expect(screen.getByTestId("wave-background")).toBeInTheDocument();
+  });
+
+  it("renders hero-scale Peptide Visual Lab title", () => {
+    renderAbout();
+    const heading = screen.getByRole("heading", { level: 1 });
+    expect(heading).toHaveTextContent("Peptide Visual Lab");
+  });
+
+  it("shows DESY · Landau Group subtitle", () => {
+    renderAbout();
+    // Use a combined regex to avoid matching "DESY" in the credits section
+    expect(screen.getByText(/DESY .* Landau Group/)).toBeInTheDocument();
   });
 });

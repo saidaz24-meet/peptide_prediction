@@ -1,12 +1,11 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Bug } from "lucide-react";
+import { Bug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { motion, cubicBezier } from "framer-motion";
 import * as Sentry from "@sentry/react";
-import { BgDotGrid } from "@/components/BgDotGrid";
+import { WaveBackground } from "@/components/WaveBackground";
 import AppFooter from "@/components/AppFooter";
 import { DatasetCreditCard } from "@/components/DatasetCreditCard";
 
@@ -61,9 +60,10 @@ function ScreenTransition({
 export default function About() {
   const navigate = useNavigate();
 
-  // NEW: transition state
+  // Transition state (preserved from previous implementation)
   const [phase, setPhase] = useState<Phase>("idle");
   const [clickPos, setClickPos] = useState({ x: window.innerWidth / 2, y: window.innerHeight / 2 });
+  // navigate, clickPos, setPhase used by ScreenTransition below
 
   return (
     <>
@@ -82,38 +82,28 @@ export default function About() {
         onDone={() => setPhase("idle")}
       />
 
-      {/* Full-viewport dot grid background (per Said directive 2026-05-12):
-          spans the entire screen, not the centered content column. */}
-      <div className="min-h-screen bg-background relative">
-        <BgDotGrid />
+      {/* Full-viewport wave background with hero-scale layout */}
+      <div className="min-h-screen bg-background relative overflow-hidden">
+        <WaveBackground className="absolute inset-0 z-0" />
+
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, ease: cubicBezier(0.22, 1, 0.36, 1) }}
-          className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10"
+          className="relative z-10"
         >
-          <div className="max-w-4xl mx-auto py-10 space-y-8">
-            {/* Back button */}
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-9 btn-press"
-              onClick={(e) => {
-                const rect = e.currentTarget.getBoundingClientRect();
-                setClickPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-                setPhase("enter");
-              }}
-            >
-              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-              Back
-            </Button>
+          {/* Hero — full viewport width, wave fully visible behind */}
+          <section className="min-h-[60vh] max-w-7xl mx-auto px-6 sm:px-12 py-20 flex flex-col justify-end">
+            <h1 className="text-5xl sm:text-7xl font-bold tracking-tight text-foreground">
+              Peptide Visual Lab
+            </h1>
+            <p className="mt-3 text-lg text-muted-foreground">
+              DESY &middot; Landau Group
+            </p>
+          </section>
 
-            {/* Title */}
-            <div>
-              <h1 className="text-h1 text-foreground page-header-title">Peptide Visual Lab</h1>
-              <p className="text-body text-muted-foreground mt-1">DESY &middot; Landau Group</p>
-            </div>
-
+          {/* Content sections — wider container (max-w-5xl, was max-w-4xl) */}
+          <div className="max-w-5xl mx-auto px-6 sm:px-12 pb-20 space-y-8">
             {/* Purpose */}
             <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardHeader>
@@ -289,6 +279,7 @@ export default function About() {
               </Card>
             )}
           </div>
+
           <AppFooter />
         </motion.div>
       </div>
