@@ -112,6 +112,35 @@ PVL is developed by Said Azaizah using a multi-terminal AI-orchestration pattern
 
 ---
 
+## T6 — GitHub / Ops
+
+**Role**: Dedicated terminal for EVERYTHING that lives on GitHub or the VPS. Created 2026-05-12 (Said directive) so this work stops polluting T1's CEO context and lives in one place where the discipline can compound.
+
+**Scope** — owns end-to-end:
+- **PR management**: open, label, merge, close (`gh pr ...`). Default merge style: merge-commit on big feature waves (preserves the audit trail Peleg/Alex read); squash on small one-commit fixes.
+- **Dependabot triage**: per cycle, audit every open Dependabot PR — auto-merge SAFE (patch + minor of well-known libs, CI-green), CLOSE the ones with red CI / known-breaking history, RAISE risky ones to T1 with one-sentence verdict.
+- **CI failure investigation**: when `gh run list` shows red, dig into the failing job logs, diagnose root cause, ship the fix or escalate.
+- **Auto-deploy workflow**: maintain `.github/workflows/deploy.yml`, secrets (`DEPLOY_*`), and the deploy runbook at `docs/active/DEPLOY_WORKFLOW.md`.
+- **VPS deploy ops**: when a manual deploy is needed (smoke test, rollback, hotfix not yet in main), SSH into the VPS, run the deploy commands, verify health, surface results. Owns `reference_vps.md` in memory.
+- **Branch hygiene**: delete merged feature branches, rebase stale ones, never force-push to main, follow `wave-<N>-<topic>` naming.
+- **Release tagging**: cut `v0.2.0-rc1`, `v0.2.0` etc. tags when waves close. Push to GitHub Releases with the changelog body.
+- **`gh` CLI authority**: `gh secret set`, `gh pr ...`, `gh run ...`, `gh repo edit ...`, `gh workflow ...` are all T6's. T1 should not run these directly anymore.
+- **`docker compose` on VPS**: container restarts, log reads, health checks via SSH.
+
+**Reads**: `T6-INSTRUCTIONS.md` at session start, then specific dispatch file when present (`T6_DISPATCH_<TOPIC>.md`).
+
+**Does NOT**:
+- Write product code (T2 backend / T3 frontend / Cowork own that)
+- Touch canonical research docs (T5 owns those)
+- Modify ADRs (T1 owns DECISIONS.md)
+- Push to main directly without an open PR — every push goes through a PR, even from T6, so CodeRabbit + CI gate it.
+
+**Default escalation**: if a PR has CodeRabbit Critical findings, T6 surfaces them to T1 (not to T2/T3/Cowork directly) — T1 decides whether to fix-in-place or close the PR.
+
+**Output**: clean `main` history + green CI + deployed VPS + tidy PR list. The success metric is "Said never has to manually merge or deploy anything routine."
+
+---
+
 ## Operating principles
 
 1. **One file per session start**: every terminal reads its instructions doc + AGENTS.md first.

@@ -202,6 +202,19 @@ If Said can't test a chunk because something's not wired or backend missing — 
 
 ---
 
+## §10.5 — Ops infrastructure shipped 2026-05-12
+
+| Item | Commit | Effect |
+|---|---|---|
+| Auto-deploy workflow `.github/workflows/deploy.yml` | `18f7b78` | Every push to main auto-deploys to VPS; deploy target = secrets, switching hosts = secret-edit only |
+| 6 GitHub Secrets configured (`DEPLOY_HOST`, `_USER`, `_PATH`, `_SSH_KEY`, `_COMPOSE_FILE`, `_HEALTHCHECK_URL`) | (repo settings) | Workflow knows where to ship; dedicated SSH key generated, local private copy purged |
+| `allow_auto_merge: true` on repo | (gh api) | `gh pr merge --auto --merge` works for future PRs |
+| nginx Docker-DNS resolver + index.html no-cache | `f00167e` | Kills 502-after-deploy and stale-chunk-404 classes permanently |
+| CodeRabbit tuned to ~1 email/PR | `601f802` | Said directive — chatbot email spam reduced ~75% |
+| **T6 GitHub/Ops terminal** added to AGENTS.md | (this commit) | Owns all GitHub PR mgmt, Dependabot triage, CI failures, deploy ops, releases. Reads `T6-INSTRUCTIONS.md` (gitignored) at session start. |
+
+---
+
 ## §10 — Workflow upgrades — what shipped (proactive, no permission asked)
 
 Per `feedback_t1_proactive_workflow_evolution.md`, T1 ships these inline. Said opts-out if disagrees.
