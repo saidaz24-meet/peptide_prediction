@@ -32,10 +32,13 @@ flower>=2.0,<3.0
 # (see Dockerfile.backend for details)
 torch>=2.10,<3.0
 
-# Vector similarity search — Wave 2 §D (ADR-016: LanceDB embedded supersedes Chroma)
+# Vector similarity search — Wave 2 §D (ADR-016: LanceDB embedded) + §D-fix (ADR-017: ESM-2 8M)
 # - lancedb: in-process columnar vector store at ./data/lance (no daemon, no port, no Docker sidecar)
-# - sentence-transformers: local 384-dim all-MiniLM embeddings (CPU-fast, ~80MB model)
+# - transformers: ESM-2 protein language model (facebook/esm2_t6_8M_UR50D, 320-dim, ~30MB disk, ~150-250MB RAM)
 # - pyarrow: required by lancedb for columnar reads
+# Torch is already pinned above (S4PRED also depends on it).
+# sentence-transformers was the all-MiniLM embedder dep (rejected per ADR-017 — generic English LM
+# produces biologically invalid embeddings for amino acid sequences).
 lancedb>=0.6,<1.0
-sentence-transformers>=2.2,<6.0
+transformers>=4.30,<5.0
 pyarrow>=15.0,<22.0

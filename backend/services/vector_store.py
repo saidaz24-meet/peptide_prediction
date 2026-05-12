@@ -16,10 +16,13 @@ Storage: Apache 2.0 LanceDB embedded — no separate process, no port, no Docker
 sidecar. Lance files live under ``settings.LANCE_DB_PATH`` (default
 ``<repo_root>/data/lance``) and survive container restarts via volume mount.
 
-Embedding: ``sentence-transformers`` local model (default all-MiniLM-L6-v2,
-384-dim, CPU). The model is loaded lazily and cached as a module-level
-singleton. Tests should call ``set_embedder(...)`` to inject a deterministic
-fake embedder so they don't download HuggingFace weights at CI time.
+Embedding: ESM-2 8M via HuggingFace ``transformers`` (default
+``facebook/esm2_t6_8M_UR50D``, 320-dim, CPU). The model is loaded lazily on
+the first ``index_peptide`` / ``find_similar`` call and cached as a
+module-level singleton (~150-250 MB RAM, ~30 MB on disk after first download).
+Tests should call ``set_embedder(...)`` to inject a deterministic fake
+embedder so they don't download HuggingFace weights at CI time. See ADR-017
+and RB-003 for the rationale behind the protein-LM choice.
 """
 
 from __future__ import annotations
@@ -212,7 +215,7 @@ def find_similar(
                 {"accession": str, "sequence": str, "distance": float, "metadata": {...}},
                 ...
             ],
-            "method": str,                # e.g. "lancedb+all-minilm-l6-v2"
+            "method": str,                # e.g. "lancedb+local-esm2-8m"
             "elapsed_ms": int,
             "disabled_reason": str | None,
         }
@@ -368,12 +371,12 @@ def _ensure_embedder() -> Optional[Callable[[str], List[float]]]:
             return _EMBEDDER
         provider = settings.EMBEDDING_PROVIDER
         try:
-            if provider == "local-minilm":
-                _EMBEDDER = _build_local_minilm_embedder()
+            if provider in ("local-esm2-8m", "local-esm2"):
+                _EMBEDDER = _build_local_esm2_embedder()
             else:
                 raise ValueError(
                     f"Unsupported EMBEDDING_PROVIDER: {provider!r}. "
-                    "Currently supported: 'local-minilm'."
+                    "Currently supported: 'local-esm2-8m' (ADR-017)."
                 )
         except Exception as exc:
             _DISABLED_REASON = f"embedder_init_failed: {exc}"
@@ -386,22 +389,50 @@ def _ensure_embedder() -> Optional[Callable[[str], List[float]]]:
         return _EMBEDDER
 
 
-def _build_local_minilm_embedder() -> Callable[[str], List[float]]:
-    """Lazy-load sentence-transformers and wrap it in a stateless encode fn."""
-    from sentence_transformers import SentenceTransformer  # type: ignore
+def _build_local_esm2_embedder() -> Callable[[str], List[float]]:
+    """Lazy-load ESM-2 from HuggingFace transformers (ADR-017).
+
+    Default model is ``facebook/esm2_t6_8M_UR50D`` — Meta AI's smallest ESM-2
+    checkpoint (Lin et al., Science 2023), 320-dim residue embeddings, ~30 MB
+    on disk, ~150-250 MB RAM loaded, CPU inference ~10-50 ms per 5-100 AA
+    peptide. Sequence embedding is the mean over residue embeddings excluding
+    the special ``<cls>`` / ``<eos>`` tokens; the result is L2-normalized so
+    Lance's default L2 vector index behaves like cosine similarity.
+
+    Loaded once and cached as a module-level singleton (the ``_EMBEDDER`` slot
+    in ``_ensure_embedder``); first call pays the ~1-2 s model-load cost,
+    subsequent calls reuse the in-memory model.
+    """
+    import torch  # type: ignore
+    from transformers import AutoModel, AutoTokenizer  # type: ignore
 
     model_name = settings.EMBEDDING_MODEL_NAME
     log_info("vector_embedder_load_start", f"Loading {model_name}", model=model_name)
-    model = SentenceTransformer(model_name)
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModel.from_pretrained(model_name)
+    model.eval()
     log_info("vector_embedder_load_ok", f"{model_name} ready", model=model_name)
 
     def _encode(text: str) -> List[float]:
-        # ``convert_to_numpy=True`` then tolist() gives us a plain Python list
-        # which Lance can store. ``normalize_embeddings=True`` makes cosine
-        # distance equivalent to L2 on the unit sphere — Lance's default
-        # vector index uses L2.
-        vec = model.encode(text, normalize_embeddings=True, convert_to_numpy=True)
-        return vec.tolist()
+        # ESM-2 expects raw single-letter AA sequences. ``add_special_tokens``
+        # wraps with <cls> at index 0 and <eos> at the last position; we strip
+        # both before mean-pooling so the embedding represents only the
+        # peptide residues. ``torch.no_grad`` skips autograd bookkeeping for
+        # CPU-only inference speed.
+        inputs = tokenizer(text, return_tensors="pt", add_special_tokens=True)
+        with torch.no_grad():
+            outputs = model(**inputs)
+        hidden = outputs.last_hidden_state[0]  # [seq_len, hidden_dim]
+        # ``hidden[1:-1]`` drops <cls> and <eos>. For a single-residue peptide
+        # this slice would be empty — extremely rare in PVL (min peptide
+        # length is 2) but guard anyway by falling back to the full hidden.
+        residue_hidden = hidden[1:-1] if hidden.shape[0] > 2 else hidden
+        mean_embedding = residue_hidden.mean(dim=0)
+        # Normalize so cosine ≡ L2 on the unit sphere (Lance default index).
+        norm = mean_embedding.norm(p=2)
+        if norm > 0:
+            mean_embedding = mean_embedding / norm
+        return mean_embedding.cpu().tolist()
 
     return _encode
 

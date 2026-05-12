@@ -286,20 +286,21 @@ class Settings:
     """Filesystem path for the LanceDB Lance files. Default: <repo_root>/data/lance/.
     Volume-mount this directory in Docker so embeddings survive container restarts."""
 
-    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "local-minilm").strip().lower()
-    """Embedding provider for vector search. Currently supported: 'local-minilm'
-    (sentence-transformers all-MiniLM-L6-v2, 384-dim, CPU-fast). Future: 'anthropic'
-    (1024-dim API embeddings) — pending M-004 brief."""
+    EMBEDDING_PROVIDER: str = os.getenv("EMBEDDING_PROVIDER", "local-esm2-8m").strip().lower()
+    """Embedding provider for vector search. Currently supported: 'local-esm2-8m'
+    (ESM-2 8M protein LM, 320-dim, CPU-fast). ADR-017 supersedes the provisional
+    'local-minilm' choice (RB-003 showed generic English LMs produce biologically
+    invalid embeddings for peptide sequences)."""
 
-    EMBEDDING_MODEL_NAME: str = os.getenv(
-        "EMBEDDING_MODEL_NAME", "sentence-transformers/all-MiniLM-L6-v2"
-    )
-    """HuggingFace model id for the local embedding provider. Override only if
-    you have a domain-specific model already cached on disk."""
+    EMBEDDING_MODEL_NAME: str = os.getenv("EMBEDDING_MODEL_NAME", "facebook/esm2_t6_8M_UR50D")
+    """HuggingFace model id for the local embedding provider. Default is
+    Meta AI's ESM-2 8M (Lin et al., Science 2023). Override only if you have
+    a domain-specific protein LM already cached on disk."""
 
-    VECTOR_DIM: int = int(os.getenv("VECTOR_DIM", "384"))
-    """Embedding vector dimension. Must match the provider; all-MiniLM-L6-v2 = 384.
-    Changing this requires reindexing — Lance schema is dimension-locked."""
+    VECTOR_DIM: int = int(os.getenv("VECTOR_DIM", "320"))
+    """Embedding vector dimension. Must match the provider; ESM-2 8M = 320.
+    Changing this requires reindexing — Lance schema is dimension-locked.
+    Use ``python -m backend.scripts.reindex_lance`` to migrate after swap."""
 
     # ============================================================================
     # Default Threshold Values (for threshold resolution service)
