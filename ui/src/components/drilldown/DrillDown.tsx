@@ -9,16 +9,19 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { X, Share2, Download } from "lucide-react";
+import { Share2, Download } from "lucide-react";
 import { toast } from "sonner";
 import { getMetric } from "@/lib/metricRegistry";
 import { useDatasetStore } from "@/stores/datasetStore";
-import {
-  findSimilarPeptides,
-  type SimilarPeptideHit,
-} from "@/lib/api";
+import { findSimilarPeptides, type SimilarPeptideHit } from "@/lib/api";
 import { useDrillDown } from "./DrillDownProvider";
 import { MetricInspector } from "./MetricInspector";
 import { PeptideInspector } from "./PeptideInspector";
@@ -32,7 +35,7 @@ import { SimilarPeptidesInspector } from "./SimilarPeptidesInspector";
 function resolveTitle(
   mode: "metric" | "chart" | "peptide" | "similar" | null,
   metricId: string | null,
-  peptideId: string | null,
+  peptideId: string | null
 ): string {
   if (mode === "metric" && metricId) {
     return getMetric(metricId)?.name ?? metricId;
@@ -58,51 +61,45 @@ export function DrillDown() {
   const navigate = useNavigate();
   const { isOpen, mode, metricId, peptideId } = state;
   const referencePeptide = useDatasetStore((s) =>
-    peptideId ? s.getPeptideById(peptideId) : undefined,
+    peptideId ? s.getPeptideById(peptideId) : undefined
   );
 
   // ── Similar-peptides API call (G.3) ────────────────────────────
   // Local to the drill-down so closing the panel cancels in-flight requests
   // and re-opening a fresh reference re-fires the search.
-  const [similarHits, setSimilarHits] = useState<SimilarPeptideHit[] | null>(
-    null,
-  );
+  const [similarHits, setSimilarHits] = useState<SimilarPeptideHit[] | null>(null);
   const [similarLoading, setSimilarLoading] = useState(false);
   const [similarError, setSimilarError] = useState<string | null>(null);
   const similarMethodRef = useRef<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const runSimilarSearch = useCallback(
-    (refId: string) => {
-      // Cancel any prior request before kicking off a new one.
-      abortRef.current?.abort();
-      const ctrl = new AbortController();
-      abortRef.current = ctrl;
+  const runSimilarSearch = useCallback((refId: string) => {
+    // Cancel any prior request before kicking off a new one.
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
 
-      setSimilarLoading(true);
-      setSimilarError(null);
-      setSimilarHits(null);
-      similarMethodRef.current = null;
+    setSimilarLoading(true);
+    setSimilarError(null);
+    setSimilarHits(null);
+    similarMethodRef.current = null;
 
-      findSimilarPeptides(refId, 10, undefined, ctrl.signal)
-        .then((res) => {
-          if (ctrl.signal.aborted) return;
-          similarMethodRef.current = res.method;
-          setSimilarHits(res.results);
-        })
-        .catch((err) => {
-          if (ctrl.signal.aborted) return;
-          const message =
-            err instanceof Error ? err.message : "Failed to find similar peptides";
-          setSimilarError(message);
-        })
-        .finally(() => {
-          if (ctrl.signal.aborted) return;
-          setSimilarLoading(false);
-        });
-    },
-    [],
-  );
+    findSimilarPeptides(refId, 10, undefined, ctrl.signal)
+      .then((res) => {
+        if (ctrl.signal.aborted) return;
+        similarMethodRef.current = res.method;
+        setSimilarHits(res.results);
+      })
+      .catch((err) => {
+        if (ctrl.signal.aborted) return;
+        const message = err instanceof Error ? err.message : "Failed to find similar peptides";
+        setSimilarError(message);
+      })
+      .finally(() => {
+        if (ctrl.signal.aborted) return;
+        setSimilarLoading(false);
+      });
+  }, []);
 
   useEffect(() => {
     if (mode === "similar" && peptideId) {
@@ -127,7 +124,7 @@ export function DrillDown() {
       navigate(`/peptides/${encodeURIComponent(id)}`);
       close();
     },
-    [navigate, close],
+    [navigate, close]
   );
 
   // ── Compare → /compare?ids=ref,r1,r2,... ──────────────────────
@@ -138,7 +135,7 @@ export function DrillDown() {
       navigate(`/compare?ids=${ids.map(encodeURIComponent).join(",")}`);
       close();
     },
-    [navigate, close, peptideId],
+    [navigate, close, peptideId]
   );
 
   // ── Export CSV of similarity result set ───────────────────────
@@ -227,9 +224,7 @@ export function DrillDown() {
         {/* ---- Header ---- */}
         <SheetHeader className="flex flex-row items-center justify-between border-b border-border px-6 py-4 space-y-0">
           <div className="flex-1 min-w-0">
-            <SheetTitle className="text-base font-semibold truncate">
-              {title}
-            </SheetTitle>
+            <SheetTitle className="text-base font-semibold truncate">{title}</SheetTitle>
             <SheetDescription className="sr-only">
               Deep inspection panel for {title}
             </SheetDescription>
@@ -245,15 +240,8 @@ export function DrillDown() {
             >
               <Share2 className="h-4 w-4" />
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={close}
-              aria-label="Close inspector"
-              className="h-8 w-8"
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            {/* Note: SheetContent renders a built-in close X in the top-right
+                corner — do not add a second close button here. */}
           </div>
         </SheetHeader>
 
@@ -270,9 +258,7 @@ export function DrillDown() {
             {mode === "metric" && metricId && (
               <MetricInspector metricId={metricId} peptideId={peptideId} />
             )}
-            {mode === "peptide" && peptideId && (
-              <PeptideInspector peptideId={peptideId} />
-            )}
+            {mode === "peptide" && peptideId && <PeptideInspector peptideId={peptideId} />}
             {mode === "similar" && peptideId && referencePeptide && (
               <SimilarPeptidesInspector
                 reference={referencePeptide}

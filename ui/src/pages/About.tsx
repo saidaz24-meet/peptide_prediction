@@ -141,7 +141,7 @@ export default function About() {
               <div data-testid="credit-said">
                 <p className="font-semibold text-foreground">Said Azaizah</p>
                 <p className="text-muted-foreground">
-                  Founder · full-stack architect · all platform code, design, and deployment.
+                  Lead developer · full-stack architect · all platform code, design, and deployment.
                 </p>
                 <p className="mt-1">
                   <a

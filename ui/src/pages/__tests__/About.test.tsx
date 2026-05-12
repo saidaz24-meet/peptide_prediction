@@ -48,12 +48,14 @@ describe("About page — credits & dataset card", () => {
     expect(screen.getByTestId("about-credits")).toBeInTheDocument();
   });
 
-  it("credits Said Azaizah with founder/full-stack role", () => {
+  it("credits Said Azaizah with lead-developer / full-stack role (never 'Founder' — feedback_said_credit_phrasing.md)", () => {
     renderAbout();
     const block = screen.getByTestId("credit-said");
     expect(block).toHaveTextContent("Said Azaizah");
-    expect(block).toHaveTextContent(/Founder/);
+    expect(block).toHaveTextContent(/Lead developer/);
     expect(block).toHaveTextContent(/full-stack/);
+    // Guard: 'Founder' must NEVER appear in Said's credit block.
+    expect(block.textContent ?? "").not.toMatch(/\bFounder\b/);
   });
 
   it("credits Dr. Peleg Ragonis-Bachar (Technion) for algorithms", () => {
