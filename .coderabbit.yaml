@@ -11,14 +11,20 @@ reviews:
   request_changes_workflow: false
   high_level_summary: true
   poem: false  # disable the rhyming summary; we want signal not entertainment
-  review_status: true
-  collapse_walkthrough: false
+  review_status: false  # 2026-05-12 — stop the redundant "Review status" comment per PR; one email per PR is enough (Said directive)
+  collapse_walkthrough: true  # collapse the long file-by-file walkthrough into a collapsed details block — keeps it accessible but doesn't spam email
   auto_review:
     enabled: true
     drafts: false
     base_branches:
       - "main"
       - "planning/.*"
+  # On bot-authored PRs (Dependabot, Renovate), only run the high-level summary
+  # — skip the per-file walkthrough + inline comments. Dependabot PRs are
+  # auto-generated; deep code-review is wasted token spend.
+  auto_review_dependent_prs: false
+  finishing_touches:
+    enabled: false  # disable the per-PR "Finishing Touches" tip block (Slack Agent etc.) — pure email noise
   path_filters:
     - "!ui/dist/**"
     - "!ui/node_modules/**"
@@ -45,7 +51,10 @@ reviews:
         scientific definitions that drift from PELEG_FEEDBACK_INSTRUCTIONS.md.
 
 chat:
-  auto_reply: true
+  # auto_reply was true — flipped 2026-05-12 because every Said push generated
+  # a "CodeRabbit replied" email even when he didn't @-mention the bot. Said
+  # can still trigger reviews on demand by commenting @coderabbitai.
+  auto_reply: false
 
 # Tone for PR comments — peer-to-peer, not condescending
 tone_instructions: |
