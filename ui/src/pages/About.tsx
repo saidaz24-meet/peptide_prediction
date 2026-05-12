@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { motion, cubicBezier } from "framer-motion";
 import * as Sentry from "@sentry/react";
-import { BgNotebook } from "@/components/BgNotebook";
+import { BgDotGrid } from "@/components/BgDotGrid";
 import AppFooter from "@/components/AppFooter";
 import { DatasetCreditCard } from "@/components/DatasetCreditCard";
 
@@ -82,215 +82,216 @@ export default function About() {
         onDone={() => setPhase("idle")}
       />
 
-      <motion.div
-        initial={{ opacity: 0, y: 12 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: cubicBezier(0.22, 1, 0.36, 1) }}
-        className="max-w-4xl mx-auto px-4 sm:px-6 relative"
-      >
-        <BgNotebook />
-        <div className="max-w-4xl mx-auto py-10 space-y-8 relative z-10">
-          {/* Back button */}
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-9 btn-press"
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              setClickPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
-              setPhase("enter");
-            }}
-          >
-            <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
-            Back
-          </Button>
+      {/* Full-viewport dot grid background (per Said directive 2026-05-12):
+          spans the entire screen, not the centered content column. */}
+      <div className="min-h-screen bg-background relative">
+        <BgDotGrid />
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: cubicBezier(0.22, 1, 0.36, 1) }}
+          className="max-w-4xl mx-auto px-4 sm:px-6 relative z-10"
+        >
+          <div className="max-w-4xl mx-auto py-10 space-y-8">
+            {/* Back button */}
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-9 btn-press"
+              onClick={(e) => {
+                const rect = e.currentTarget.getBoundingClientRect();
+                setClickPos({ x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 });
+                setPhase("enter");
+              }}
+            >
+              <ArrowLeft className="w-3.5 h-3.5 mr-1.5" />
+              Back
+            </Button>
 
-          {/* Title */}
-          <div>
-            <h1 className="text-h1 text-foreground page-header-title">Peptide Visual Lab</h1>
-            <p className="text-body text-muted-foreground mt-1">DESY &middot; Landau Group</p>
-          </div>
+            {/* Title */}
+            <div>
+              <h1 className="text-h1 text-foreground page-header-title">Peptide Visual Lab</h1>
+              <p className="text-body text-muted-foreground mt-1">DESY &middot; Landau Group</p>
+            </div>
 
-          {/* Purpose */}
-          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
-            <CardHeader>
-              <CardTitle>Purpose</CardTitle>
-              <CardDescription>Internal, non-public application</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm text-muted-foreground">
-              <p>
-                Explore peptide properties and fibril-forming predictions. Upload UniProt exports
-                (TSV/CSV/XLSX), compute hydrophobicity, charge, μH, and visualize TANGO/S4PRED
-                outputs when available.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Credits — extended with Peleg per ADR-014 (2026-05-08). */}
-          <Card
-            className="shadow-soft border-[hsl(var(--border))] rounded-xl"
-            data-testid="about-credits"
-          >
-            <CardHeader>
-              <CardTitle>Credits</CardTitle>
-              <CardDescription>
-                People behind the platform, the algorithms, and the science.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-              <div data-testid="credit-said">
-                <p className="font-semibold text-foreground">Said Azaizah</p>
-                <p className="text-muted-foreground">
-                  Lead developer · full-stack architect · all platform code, design, and deployment.
-                </p>
-                <p className="mt-1">
-                  <a
-                    href="https://orcid.org/0009-0002-3596-5358"
-                    target="_blank"
-                    rel="noreferrer noopener"
-                    className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                    aria-label="Said Azaizah ORCID profile"
-                    data-testid="said-orcid"
-                  >
-                    ORCID 0009-0002-3596-5358
-                  </a>
-                </p>
-              </div>
-
-              <div data-testid="credit-peleg">
-                <p className="font-semibold text-foreground">Dr. Peleg Ragonis-Bachar</p>
-                <p className="text-xs text-muted-foreground/80">Technion</p>
-                <p className="text-muted-foreground">
-                  Scientific algorithms — FF-Helix, FF-SSW classification, threshold definitions,
-                  and the Staphylococcus 2023 benchmark dataset.
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground/70">
-                  ORCID — pending
-                </p>
-              </div>
-
-              <div data-testid="credit-alex">
-                <p className="font-semibold text-foreground">Dr. Aleksandr Golubev</p>
-                <p className="text-xs text-muted-foreground/80">DESY</p>
-                <p className="text-muted-foreground">
-                  Scientific advisor · project management · research direction and lab adoption.
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground/70">
-                  ORCID — pending
-                </p>
-              </div>
-
-              <p className="pt-2 text-xs text-muted-foreground/80 border-t border-border/40">
-                <b>Predictor providers:</b> TANGO (Fernandez-Escamilla et al., 2004) and
-                S4PRED (Moffat et al., 2022). See the README's Acknowledgements block for the
-                full reference list.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Dataset attribution — Staphylococcus 2023 benchmark (ADR-014) */}
-          <DatasetCreditCard />
-
-
-          {/* Key Features */}
-          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
-            <CardHeader>
-              <CardTitle>Key Features</CardTitle>
-            </CardHeader>
-            <CardContent className="grid md:grid-cols-2 gap-3 text-sm">
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Flexible upload with QC (+ rejected rows export)</li>
-                <li>Hydrophobicity, Charge, μH; SSW & Helix prediction</li>
-                <li>Database visualizations + correlation matrix</li>
-                <li>Sliding-window profiles with helix overlays</li>
-                <li>Helical wheel projection (HeliQuest colors)</li>
-              </ul>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>Smart ranking & Top-N shortlist</li>
-                <li>CSV, PDF, and FASTA export (single + bulk)</li>
-                <li>UniProt & AlphaFold quick links</li>
-                <li>Per-residue S4PRED coloring & probability curves</li>
-                <li>Citable via CITATION.cff (CFF 1.2.0)</li>
-              </ul>
-            </CardContent>
-          </Card>
-
-          {/* TANGO / S4PRED Providers */}
-          <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
-            <CardHeader>
-              <CardTitle>TANGO / S4PRED Providers</CardTitle>
-            </CardHeader>
-            <CardContent className="text-sm text-muted-foreground">
-              <p>
-                Prediction providers are controlled via environment variables in{" "}
-                <code>backend/.env</code>: <code>USE_TANGO=1</code> enables TANGO aggregation
-                prediction, <code>USE_S4PRED=1</code> enables S4PRED secondary structure prediction.
-                Without these providers enabled, related metrics display <em>Not available</em>.
-              </p>
-            </CardContent>
-          </Card>
-
-          {/* Sentry Test (Development Only) */}
-          {import.meta.env.MODE === "development" && (
-            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl border-orange-200">
+            {/* Purpose */}
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bug className="w-5 h-5" />
-                  Sentry Test
-                </CardTitle>
-                <CardDescription>Test Sentry error tracking (development only)</CardDescription>
+                <CardTitle>Purpose</CardTitle>
+                <CardDescription>Internal, non-public application</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex gap-2 flex-wrap">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      Sentry.captureMessage("Test message from About page", "info");
-                      alert("Test message sent! Check Sentry dashboard.");
-                    }}
-                  >
-                    Send Test Message
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      Sentry.captureException(new Error("Test exception from About page"));
-                      alert("Test exception sent! Check Sentry dashboard.");
-                    }}
-                  >
-                    Send Test Exception
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      Sentry.captureMessage("Test breadcrumb from About page", "warning");
-                      alert("Warning-level message sent! Check Sentry dashboard.");
-                    }}
-                  >
-                    Send Test Warning
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={() => {
-                      throw new Error("Test React error from About page");
-                    }}
-                  >
-                    Throw React Error
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Use browser console (F12) and run <code>testSentry()</code> for more tests.
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <p>
+                  Explore peptide properties and fibril-forming predictions. Upload UniProt exports
+                  (TSV/CSV/XLSX), compute hydrophobicity, charge, μH, and visualize TANGO/S4PRED
+                  outputs when available.
                 </p>
               </CardContent>
             </Card>
-          )}
-        </div>
-        <AppFooter />
-      </motion.div>
+
+            {/* Credits — extended with Peleg per ADR-014 (2026-05-08). */}
+            <Card
+              className="shadow-soft border-[hsl(var(--border))] rounded-xl"
+              data-testid="about-credits"
+            >
+              <CardHeader>
+                <CardTitle>Credits</CardTitle>
+                <CardDescription>
+                  People behind the platform, the algorithms, and the science.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <div data-testid="credit-said">
+                  <p className="font-semibold text-foreground">Said Azaizah</p>
+                  <p className="text-muted-foreground">
+                    Lead developer · full-stack architect · all platform code, design, and
+                    deployment.
+                  </p>
+                  <p className="mt-1">
+                    <a
+                      href="https://orcid.org/0009-0002-3596-5358"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      aria-label="Said Azaizah ORCID profile"
+                      data-testid="said-orcid"
+                    >
+                      ORCID 0009-0002-3596-5358
+                    </a>
+                  </p>
+                </div>
+
+                <div data-testid="credit-peleg">
+                  <p className="font-semibold text-foreground">Dr. Peleg Ragonis-Bachar</p>
+                  <p className="text-xs text-muted-foreground/80">Technion</p>
+                  <p className="text-muted-foreground">
+                    Scientific algorithms — FF-Helix, FF-SSW classification, threshold definitions,
+                    and the Staphylococcus 2023 benchmark dataset.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground/70">ORCID — pending</p>
+                </div>
+
+                <div data-testid="credit-alex">
+                  <p className="font-semibold text-foreground">Dr. Aleksandr Golubev</p>
+                  <p className="text-xs text-muted-foreground/80">DESY</p>
+                  <p className="text-muted-foreground">
+                    Scientific advisor · project management · research direction and lab adoption.
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground/70">ORCID — pending</p>
+                </div>
+
+                <p className="pt-2 text-xs text-muted-foreground/80 border-t border-border/40">
+                  <b>Predictor providers:</b> TANGO (Fernandez-Escamilla et al., 2004) and S4PRED
+                  (Moffat et al., 2022). See the README's Acknowledgements block for the full
+                  reference list.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Dataset attribution — Staphylococcus 2023 benchmark (ADR-014) */}
+            <DatasetCreditCard />
+
+            {/* Key Features */}
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
+              <CardHeader>
+                <CardTitle>Key Features</CardTitle>
+              </CardHeader>
+              <CardContent className="grid md:grid-cols-2 gap-3 text-sm">
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Flexible upload with QC (+ rejected rows export)</li>
+                  <li>Hydrophobicity, Charge, μH; SSW & Helix prediction</li>
+                  <li>Database visualizations + correlation matrix</li>
+                  <li>Sliding-window profiles with helix overlays</li>
+                  <li>Helical wheel projection (HeliQuest colors)</li>
+                </ul>
+                <ul className="list-disc pl-5 space-y-1">
+                  <li>Smart ranking & Top-N shortlist</li>
+                  <li>CSV, PDF, and FASTA export (single + bulk)</li>
+                  <li>UniProt & AlphaFold quick links</li>
+                  <li>Per-residue S4PRED coloring & probability curves</li>
+                  <li>Citable via CITATION.cff (CFF 1.2.0)</li>
+                </ul>
+              </CardContent>
+            </Card>
+
+            {/* TANGO / S4PRED Providers */}
+            <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
+              <CardHeader>
+                <CardTitle>TANGO / S4PRED Providers</CardTitle>
+              </CardHeader>
+              <CardContent className="text-sm text-muted-foreground">
+                <p>
+                  Prediction providers are controlled via environment variables in{" "}
+                  <code>backend/.env</code>: <code>USE_TANGO=1</code> enables TANGO aggregation
+                  prediction, <code>USE_S4PRED=1</code> enables S4PRED secondary structure
+                  prediction. Without these providers enabled, related metrics display{" "}
+                  <em>Not available</em>.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Sentry Test (Development Only) */}
+            {import.meta.env.MODE === "development" && (
+              <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl border-orange-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bug className="w-5 h-5" />
+                    Sentry Test
+                  </CardTitle>
+                  <CardDescription>Test Sentry error tracking (development only)</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="flex gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        Sentry.captureMessage("Test message from About page", "info");
+                        alert("Test message sent! Check Sentry dashboard.");
+                      }}
+                    >
+                      Send Test Message
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        Sentry.captureException(new Error("Test exception from About page"));
+                        alert("Test exception sent! Check Sentry dashboard.");
+                      }}
+                    >
+                      Send Test Exception
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        Sentry.captureMessage("Test breadcrumb from About page", "warning");
+                        alert("Warning-level message sent! Check Sentry dashboard.");
+                      }}
+                    >
+                      Send Test Warning
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => {
+                        throw new Error("Test React error from About page");
+                      }}
+                    >
+                      Throw React Error
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Use browser console (F12) and run <code>testSentry()</code> for more tests.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+          <AppFooter />
+        </motion.div>
+      </div>
     </>
   );
 }

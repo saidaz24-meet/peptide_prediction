@@ -17,7 +17,7 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Share2, Download } from "lucide-react";
+import { Share2, Download, X } from "lucide-react";
 import { toast } from "sonner";
 import { getMetric } from "@/lib/metricRegistry";
 import { useDatasetStore } from "@/stores/datasetStore";
@@ -219,6 +219,7 @@ export function DrillDown() {
     <Sheet open={isOpen} onOpenChange={(open) => !open && close()}>
       <SheetContent
         side="right"
+        hideClose
         className="w-full sm:w-[560px] sm:max-w-[560px] flex flex-col p-0 gap-0"
       >
         {/* ---- Header ---- */}
@@ -240,8 +241,15 @@ export function DrillDown() {
             >
               <Share2 className="h-4 w-4" />
             </Button>
-            {/* Note: SheetContent renders a built-in close X in the top-right
-                corner — do not add a second close button here. */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={close}
+              aria-label="Close inspector"
+              className="h-8 w-8"
+            >
+              <X className="h-4 w-4" />
+            </Button>
           </div>
         </SheetHeader>
 
