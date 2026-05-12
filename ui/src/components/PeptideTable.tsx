@@ -60,6 +60,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { TangoBadge } from "@/components/TangoBadge";
 import { S4PredBadge } from "@/components/S4PredBadge";
 import { useChartSelection } from "@/stores/chartSelectionStore";
+import { CsvExportDialog } from "@/components/CsvExportDialog";
 
 /**
  * Compute mean per-residue S4PRED probabilities for hover preview.
@@ -175,6 +176,8 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
   const isMobile = useIsMobile();
   const [globalFilter, setGlobalFilter] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+  // §I: which export dialog (if any) is currently open. null = closed.
+  const [csvDialog, setCsvDialog] = useState<"filtered" | "full" | null>(null);
   const [columnFilters, setColumnFilters] = useState<ColumnFilters>(EMPTY_FILTERS);
   // Peleg FIX-006: default column visibility must be identical regardless of
   // data source (CSV upload, Quick Analyze, UniProt query). Gene name and
@@ -763,18 +766,27 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
     URL.revokeObjectURL(url);
   };
 
-  const exportToCSV = () => {
+  // §I: route both export buttons through CsvExportDialog so the user sees a
+  // metadata preview (predictor versions, thresholds, run timestamp) before
+  // the download fires. The dialog calls `onConfirm` which runs the original
+  // download path; cancelling does nothing.
+  const performExportFiltered = () => {
     const filteredData = table.getFilteredRowModel().rows.map((row) => row.original);
     const filename = `peptide_data_${new Date().toISOString().split("T")[0]}.csv`;
     downloadCSV(buildCSV(filteredData), filename);
     toast.success(`Exported ${filteredData.length} peptides to CSV`);
   };
 
-  const exportFullCSV = () => {
+  const performExportFull = () => {
     const filename = `peptide_data_full_${new Date().toISOString().split("T")[0]}.csv`;
     downloadCSV(buildCSV(peptides), filename);
     toast.success(`Exported all ${peptides.length} peptides to CSV`);
   };
+
+  const filteredCount = table.getFilteredRowModel().rows.length;
+  const todayStamp = new Date().toISOString().split("T")[0];
+  const filteredFilename = `peptide_data_${todayStamp}.csv`;
+  const fullFilename = `peptide_data_full_${todayStamp}.csv`;
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
@@ -865,15 +877,21 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             </DropdownMenuContent>
           </DropdownMenu>
           <Button
-            onClick={exportToCSV}
+            onClick={() => setCsvDialog("filtered")}
             size="sm"
             variant="outline"
             title="Export filtered rows as CSV"
+            data-testid="peptide-table-export-filtered"
           >
             <Download className="w-4 h-4 sm:mr-2" />
             <span className="hidden sm:inline">Export Filtered</span>
           </Button>
-          <Button onClick={exportFullCSV} size="sm" title="Export all rows as CSV">
+          <Button
+            onClick={() => setCsvDialog("full")}
+            size="sm"
+            title="Export all rows as CSV"
+            data-testid="peptide-table-export-full"
+          >
             <Download className="w-4 h-4 sm:mr-2" />
             <span className="hidden sm:inline">Export All</span>
           </Button>
@@ -1244,6 +1262,22 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           </Button>
         </div>
       </div>
+
+      {/* §I: pre-export confirmation dialogs — one per export variant. */}
+      <CsvExportDialog
+        open={csvDialog === "filtered"}
+        onOpenChange={(open) => setCsvDialog(open ? "filtered" : null)}
+        filename={filteredFilename}
+        peptideCount={filteredCount}
+        onConfirm={performExportFiltered}
+      />
+      <CsvExportDialog
+        open={csvDialog === "full"}
+        onOpenChange={(open) => setCsvDialog(open ? "full" : null)}
+        filename={fullFilename}
+        peptideCount={peptides.length}
+        onConfirm={performExportFull}
+      />
     </motion.div>
   );
 }
