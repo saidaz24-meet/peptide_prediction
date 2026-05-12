@@ -9,7 +9,7 @@ All models use strict validation - extra fields are collected into extras dict.
 
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field, model_validator
 
 from .provider_status import PeptideProviderStatus
 
@@ -325,6 +325,77 @@ class ProviderStatusSummary(BaseModel):
     )
 
 
+class RunMetadata(BaseModel):
+    """FAIR provenance stamp for a PVL analysis run (ADR-013, Wave 2 §G).
+
+    Embedded into every analysis response under ``Meta.runMetadata`` so peer
+    reviewers can re-run an analysis identically: which PVL version produced
+    it, against which predictor versions, with which thresholds, from which
+    sequence source, on which date. The same dict is also serialized as a
+    ``# PVL ...`` comment header at the top of CSV exports — pandas / R /
+    Excel skip ``#``-prefixed lines by default, so downstream parsers are
+    unaffected.
+
+    Strict (``extra="forbid"``) so a typo in the producer fails loudly at
+    response-validation time instead of being silently dropped on the way
+    out. New fields go here as additive NEW NULLABLE additions — never
+    rename or repurpose an existing one.
+
+    See: ADR-013, ``docs/active/RESEARCH_BRIEFS/RB-001_researcher-needs.md`` §5.
+    """
+
+    model_config = ConfigDict(extra="forbid", populate_by_name=True)
+
+    pvlVersion: str = Field(
+        ...,
+        validation_alias=AliasChoices("pvlVersion", "pvl_version"),
+        description="PVL software version (e.g. '0.1.0'). Sourced from settings.VERSION.",
+    )
+    runTimestamp: str = Field(
+        ...,
+        validation_alias=AliasChoices("runTimestamp", "run_timestamp"),
+        description="ISO 8601 UTC timestamp of when the run was executed.",
+    )
+    sequenceSource: Literal["fasta", "csv", "uniprot", "manual", "demo"] = Field(
+        ...,
+        validation_alias=AliasChoices("sequenceSource", "sequence_source"),
+        description="Where the input sequences came from. Drives downstream "
+        "trust signals — `manual` and `demo` are not citable as published "
+        "datasets, `uniprot` and `fasta` are.",
+    )
+    predictorsUsed: List[str] = Field(
+        ...,
+        validation_alias=AliasChoices("predictorsUsed", "predictors_used"),
+        description="Predictors that actually ran during this analysis "
+        "(e.g. ['tango', 's4pred', 'ff_helix', 'ff_ssw']). FF helpers are "
+        "always present; tango / s4pred reflect the live USE_* flags.",
+    )
+    predictorVersions: Dict[str, str] = Field(
+        ...,
+        validation_alias=AliasChoices("predictorVersions", "predictor_versions"),
+        description="Per-predictor version identifier "
+        "(e.g. {'tango': '2.3', 's4pred': '1.2.4', 'ff_helix': 'hamodrakas2007'}).",
+    )
+    thresholds: Dict[str, float] = Field(
+        ...,
+        description="Resolved threshold values used at run time. Mirrors "
+        "``Meta.thresholds`` but flattened to numeric values so it can be "
+        "embedded in a CSV header line without nested structures.",
+    )
+    datasetId: Optional[str] = Field(
+        None,
+        validation_alias=AliasChoices("datasetId", "dataset_id"),
+        description="Server-side dataset identifier (typically the inputs "
+        "hash) for batch runs. None for single-sequence runs.",
+    )
+    permalink: Optional[str] = Field(
+        None,
+        description="Optional permalink to the reproducibility ribbon's URL "
+        "form of this exact state. Populated by callers that have a "
+        "permalink in hand (the frontend ReproducibilityRibbon).",
+    )
+
+
 class Meta(BaseModel):
     """
     Metadata included in all responses that return peptide rows.
@@ -372,6 +443,15 @@ class Meta(BaseModel):
         ..., description="Resolved threshold configuration"
     )
     thresholds: Dict[str, Any] = Field(..., description="Resolved thresholds for FF flags")
+
+    # Wave 2 §G / ADR-013 — FAIR provenance stamp for every analysis run.
+    # Optional + nullable so existing API consumers keep working unchanged;
+    # populated by the upload / predict / uniprot service layers.
+    runMetadata: Optional[RunMetadata] = Field(
+        None,
+        description="Provenance metadata (version, predictors, thresholds, "
+        "source) for reproducible CSV/JSON exports. See ADR-013.",
+    )
 
     # UniProt-specific fields (only present in /api/uniprot/execute responses)
     source: Optional[Literal["uniprot_api"]] = Field(

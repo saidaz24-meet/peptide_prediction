@@ -652,6 +652,20 @@ def _build_response(
     # Thresholds (UniProt uses defaults)
     resolved_thresholds = resolve_thresholds(None, df)
 
+    # Wave 2 §G / ADR-013 — FAIR provenance stamp. UniProt requests
+    # explicitly opt into TANGO / S4PRED per-request, so the helper sees
+    # the request's flags, not the global settings.
+    from services.run_metadata import build_run_metadata as _build_run_metadata
+
+    _run_metadata = _build_run_metadata(
+        sequence_source="uniprot",
+        thresholds=resolved_thresholds,
+        use_tango=bool(request.run_tango),
+        use_s4pred=bool(request.run_s4pred),
+        dataset_id=inputs_hash,
+        permalink=None,
+    )
+
     meta = ensure_trace_id_in_meta(
         {
             "source": "uniprot_api",
@@ -678,6 +692,8 @@ def _build_response(
             "thresholdConfigRequested": None,
             "thresholdConfigResolved": {"mode": "default", "version": "1.0.0"},
             "thresholds": resolved_thresholds,
+            # Wave 2 §G — provenance for reproducible CSV/JSON exports.
+            "runMetadata": _run_metadata,
         }
     )
 

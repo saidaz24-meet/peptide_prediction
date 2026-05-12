@@ -793,6 +793,8 @@ def process_upload_dataframe(
     sentry_initialized: bool = False,
     progress_callback: Optional[Callable[[str, int], None]] = None,
     cancel_event: Optional[Any] = None,
+    sequence_source: str = "csv",
+    permalink: Optional[str] = None,
 ) -> Dict[str, Any]:
     """
     Process an uploaded DataFrame through the full pipeline.
@@ -1184,6 +1186,21 @@ def process_upload_dataframe(
         s4pred_provider_status=s4pred_provider_status,
     )
 
+    # Wave 2 §G / ADR-013 — FAIR provenance stamp. Built from the same
+    # resolved thresholds and live predictor flags we already computed
+    # above; the helper handles fallbacks + normalization.
+    from services.run_metadata import build_run_metadata as _build_run_metadata
+
+    _merged_thresholds = {**resolved_thresholds, **ff_thresholds_used}
+    _run_metadata = _build_run_metadata(
+        sequence_source=sequence_source,
+        thresholds=_merged_thresholds,
+        use_tango=settings.USE_TANGO,
+        use_s4pred=settings.USE_S4PRED,
+        dataset_id=inputs_hash,
+        permalink=permalink,
+    )
+
     # Build meta dict (ISSUE-018: schema enforcement)
     meta_dict = ensure_trace_id_in_meta(
         {
@@ -1203,7 +1220,9 @@ def process_upload_dataframe(
             # Threshold configuration
             "thresholdConfigRequested": threshold_config_requested,
             "thresholdConfigResolved": threshold_config_resolved,
-            "thresholds": {**resolved_thresholds, **ff_thresholds_used},
+            "thresholds": _merged_thresholds,
+            # Wave 2 §G — provenance for reproducible CSV/JSON exports.
+            "runMetadata": _run_metadata,
         }
     )
 
