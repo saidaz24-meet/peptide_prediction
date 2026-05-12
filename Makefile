@@ -1,5 +1,6 @@
 .PHONY: test test-unit lint typecheck fmt ci help smoke-tango contract-check \
-        docker-build docker-up docker-down docker-smoke docker-logs docker-clean
+        docker-build docker-up docker-down docker-smoke docker-logs docker-clean \
+        changelog-peleg
 
 # Default target
 help:
@@ -67,6 +68,27 @@ fmt:
 # CI pipeline
 ci: lint typecheck test
 	@echo "✅ CI checks passed"
+
+# Generate a 2-week changelog for Peleg + Alex (per ADR-018 / COLLAB.md).
+# Writes to docs/active/CHANGELOG_PELEG.md. T1 adds one plain-language
+# paragraph at the top after running this, then Said shares the link.
+changelog-peleg:
+	@echo "# PVL — Changelog for Peleg + Alex" > docs/active/CHANGELOG_PELEG.md
+	@echo "" >> docs/active/CHANGELOG_PELEG.md
+	@echo "**Window**: last 14 days · **Generated**: $$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> docs/active/CHANGELOG_PELEG.md
+	@echo "" >> docs/active/CHANGELOG_PELEG.md
+	@echo "_T1 (Said) — replace this line with one paragraph of plain-language commentary on what shipped and why it matters._" >> docs/active/CHANGELOG_PELEG.md
+	@echo "" >> docs/active/CHANGELOG_PELEG.md
+	@echo "## Commits" >> docs/active/CHANGELOG_PELEG.md
+	@echo "" >> docs/active/CHANGELOG_PELEG.md
+	@git log --since="2 weeks ago" --pretty="- **%ad** %s" --date=short >> docs/active/CHANGELOG_PELEG.md
+	@echo "" >> docs/active/CHANGELOG_PELEG.md
+	@echo "## Stats" >> docs/active/CHANGELOG_PELEG.md
+	@echo "" >> docs/active/CHANGELOG_PELEG.md
+	@echo "- Commits in window: $$(git log --since='2 weeks ago' --oneline | wc -l | tr -d ' ')" >> docs/active/CHANGELOG_PELEG.md
+	@echo "- Files changed: $$(git log --since='2 weeks ago' --name-only --pretty=format: | sort -u | grep -v '^$$' | wc -l | tr -d ' ')" >> docs/active/CHANGELOG_PELEG.md
+	@echo "" >> docs/active/CHANGELOG_PELEG.md
+	@echo "→ Wrote docs/active/CHANGELOG_PELEG.md ($$(git log --since='2 weeks ago' --oneline | wc -l | tr -d ' ') commits)"
 
 # TANGO smoke test - verifies TANGO binary works end-to-end
 # Uses venv if available, otherwise system python
