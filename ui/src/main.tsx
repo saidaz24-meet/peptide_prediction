@@ -3,6 +3,16 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 import { buildSentryRelease } from "@/lib/sentryContext";
+import {
+  installChunkErrorRecovery,
+  isChunkLoadError,
+  reloadForChunkError,
+} from "@/lib/chunkErrorRecovery";
+
+// Install BEFORE Sentry so chunk-load errors auto-reload before reaching
+// the Sentry error boundary (avoids the "Something went wrong" dead-end
+// when a user's tab predates a deploy).
+installChunkErrorRecovery();
 
 declare const __APP_VERSION__: string;
 declare const __BUILD_SHA__: string;
@@ -102,16 +112,31 @@ window.addEventListener("error", (event) => {
 const container = document.getElementById("root")!;
 const root = createRoot(container);
 
-// Wrap app in ErrorBoundary to catch React render errors
+// Wrap app in ErrorBoundary to catch React render errors.
+//
+// Special case: if the error is a chunk-load failure (stale tab during a
+// deploy), bypass the dialog entirely and reload — the global handlers in
+// chunkErrorRecovery should already have caught it, but this is the last
+// line of defence inside the React render tree.
 root.render(
   <Sentry.ErrorBoundary
-    fallback={({ error, resetError }) => (
-      <div style={{ padding: "2rem", textAlign: "center" }}>
-        <h1>Something went wrong</h1>
-        <p>{error instanceof Error ? error.message : String(error)}</p>
-        <button onClick={resetError}>Try again</button>
-      </div>
-    )}
+    fallback={({ error, resetError }) => {
+      if (isChunkLoadError(error)) {
+        reloadForChunkError();
+        return (
+          <div style={{ padding: "2rem", textAlign: "center" }}>
+            <p>Updating the app…</p>
+          </div>
+        );
+      }
+      return (
+        <div style={{ padding: "2rem", textAlign: "center" }}>
+          <h1>Something went wrong</h1>
+          <p>{error instanceof Error ? error.message : String(error)}</p>
+          <button onClick={resetError}>Try again</button>
+        </div>
+      );
+    }}
     showDialog
   >
     <App />
