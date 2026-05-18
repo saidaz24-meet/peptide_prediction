@@ -30,7 +30,7 @@ flower>=2.0.1,<3.0
 # S4PRED neural network inference
 # Note: In Docker, use CPU-only torch via --extra-index-url
 # (see Dockerfile.backend for details)
-torch>=2.11.0,<3.0
+torch>=2.12.0,<3.0
 
 # Vector similarity search — Wave 2 §D (ADR-016: LanceDB embedded) + §D-fix (ADR-017: ESM-2 8M)
 # - lancedb: in-process columnar vector store at ./data/lance (no daemon, no port, no Docker sidecar)
