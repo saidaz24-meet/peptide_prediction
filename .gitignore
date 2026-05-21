@@ -116,3 +116,9 @@ docs/**/*.cache.*
 # Keep fixtures and active docs, but ignore generated content
 !backend/tests/fixtures/**
 !docs/active/**
+
+# Vitest/Vite cache (was accidentally tracked — see commit history)
+node_modules/.vite/
+
+# Local-only conflict backups (preserved for human reconciliation; not for commit)
+*.wave-2-5-local-backup
