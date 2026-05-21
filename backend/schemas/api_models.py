@@ -73,7 +73,23 @@ class PeptideRow(BaseModel):
     # Produced by: backend/tango.py:process_tango_output() and filter_by_avg_diff()
     sswPrediction: Optional[int] = Field(
         None,
-        description="SSW prediction (-1/0/1) (from 'ssw_prediction' field, alias: 'SSW prediction')",
+        description=(
+            "Unified SSW prediction (-1/0/1) per Peleg canonical definition: "
+            "1 if TANGO OR S4PRED predicts a structure switch. Derives from "
+            "the 'SSW prediction (unified)' DataFrame column written by "
+            "apply_ff_flags; falls back to raw 'SSW prediction' on legacy paths."
+        ),
+    )
+    tangoSswPrediction: Optional[int] = Field(
+        None,
+        description=(
+            "TANGO's raw per-predictor SSW verdict (-1/0/1), preserved verbatim "
+            "for the per-predictor breakdown in the UI. Distinct from "
+            "sswPrediction (which is the unified TANGO ∪ S4PRED mask). "
+            "Added 2026-05-20 to fix scientific-integrity bug where the "
+            "EvidencePanel 'TANGO: ...' line was showing the unified value "
+            "instead of what TANGO actually computed."
+        ),
     )
     sswScore: Optional[float] = Field(
         None, description="SSW score (from 'ssw_score' field, alias: 'SSW score')"
@@ -248,6 +264,7 @@ class PeptideRow(BaseModel):
             "charge",
             "muH",
             "sswPrediction",
+            "tangoSswPrediction",
             "sswScore",
             "sswDiff",
             "sswHelixPercentage",
@@ -396,6 +413,48 @@ class RunMetadata(BaseModel):
     )
 
 
+class MetaWarning(BaseModel):
+    """One non-fatal warning surfaced in ``Meta.warnings`` (Wave 2.5 LD2).
+
+    Used to flag soft-disables (TANGO auto-disabled on large datasets),
+    truncations (dataset capped at MAX_PEPTIDES_PER_RUN_WITHOUT_TANGO),
+    per-row predictor failures, and similar conditions where the response
+    is still valid but the user should know something happened.
+
+    Distinct from a Python ``warnings.warn`` or an HTTP error — those exist
+    at different layers. ``MetaWarning`` is the *user-visible* signal the
+    frontend renders as a toast or banner.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    level: Literal["info", "warning", "error"] = Field(
+        "warning",
+        description="Severity. 'info' for advisory messages; 'warning' for "
+        "soft-disables that affect the result shape; 'error' is reserved "
+        "for partial-failure paths where the run completed but some rows "
+        "didn't.",
+    )
+    code: str = Field(
+        ...,
+        max_length=64,
+        description="Machine-readable identifier (e.g. 'tango_auto_disabled', "
+        "'dataset_truncated', 'tango_per_peptide_timeout'). Stable across "
+        "PVL versions so the UI can switch on it.",
+    )
+    message: str = Field(
+        ...,
+        max_length=512,
+        description="Human-readable explanation. Surfaced verbatim in the UI.",
+    )
+    count: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Optional count of affected rows (e.g. how many were "
+        "truncated, how many timed out).",
+    )
+
+
 class Meta(BaseModel):
     """
     Metadata included in all responses that return peptide rows.
@@ -443,6 +502,15 @@ class Meta(BaseModel):
         ..., description="Resolved threshold configuration"
     )
     thresholds: Dict[str, Any] = Field(..., description="Resolved thresholds for FF flags")
+
+    # Wave 2.5 §LD2 — non-fatal warnings surfaced to the UI (TANGO auto-
+    # disabled on large datasets, dataset truncations, per-row predictor
+    # failures). Optional + nullable so existing clients keep working.
+    warnings: Optional[List[MetaWarning]] = Field(
+        None,
+        description="Non-fatal warnings for the UI to surface as banners/"
+        "toasts. None when the run was uneventful.",
+    )
 
     # Wave 2 §G / ADR-013 — FAIR provenance stamp for every analysis run.
     # Optional + nullable so existing API consumers keep working unchanged;

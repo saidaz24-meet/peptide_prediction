@@ -442,6 +442,7 @@ def _sanitize_for_json(obj, field_name: str = None):
         # All other -1 values are fake defaults and should be None
         prediction_fields = {
             "sswPrediction",
+            "tangoSswPrediction",  # TANGO's raw per-predictor verdict; -1 is valid semantic value
             "s4predSswPrediction",
             "s4predHelixPrediction",
             "ffHelixFlag",
@@ -483,6 +484,49 @@ def _sanitize_for_json(obj, field_name: str = None):
     return obj
 
 
+def _enforce_ff_axioms(normalized: dict, entry_id: str) -> dict:
+    """
+    Defense-in-depth: at the API serialization boundary, guarantee that no row
+    is emitted violating the canonical FF axioms.
+
+    Axioms (per ADR-003 + Peleg canonical spec):
+      ffSswFlag == 1   ⇒ sswPrediction == 1
+      ffHelixFlag == 1 ⇒ s4predHelixPrediction == 1
+
+    If a violation is detected (which means the upstream pipeline has a bug),
+    log a structured warning and zero out the offending FF flag (set to -1).
+    The API contract is honored even when upstream code is broken — researchers
+    never see "candidate FF-SSW" on a peptide the data says is not SSW.
+    """
+    ff_ssw = normalized.get("ffSswFlag")
+    ssw = normalized.get("sswPrediction")
+    if ff_ssw == 1 and ssw != 1:
+        log_warning(
+            "ff_ssw_axiom_violation",
+            f"ffSswFlag=1 but sswPrediction={ssw} for entry={entry_id}; "
+            f"forcing ffSswFlag to -1 to honor axiom",
+            entry=entry_id,
+            ffSswFlag=ff_ssw,
+            sswPrediction=ssw,
+        )
+        normalized["ffSswFlag"] = -1
+
+    ff_helix = normalized.get("ffHelixFlag")
+    helix = normalized.get("s4predHelixPrediction")
+    if ff_helix == 1 and helix != 1:
+        log_warning(
+            "ff_helix_axiom_violation",
+            f"ffHelixFlag=1 but s4predHelixPrediction={helix} for entry={entry_id}; "
+            f"forcing ffHelixFlag to -1 to honor axiom",
+            entry=entry_id,
+            ffHelixFlag=ff_helix,
+            s4predHelixPrediction=helix,
+        )
+        normalized["ffHelixFlag"] = -1
+
+    return normalized
+
+
 def normalize_rows_for_ui(
     df: pd.DataFrame,
     is_single_row: bool = False,
@@ -519,6 +563,7 @@ def normalize_rows_for_ui(
             # Sanitize SSW-related fields: convert NaN/inf to None before Pydantic validation
             ssw_fields = [
                 "SSW prediction",
+                "SSW prediction (unified)",
                 "SSW score",
                 "SSW diff",
                 "SSW helix percentage",
@@ -535,9 +580,9 @@ def normalize_rows_for_ui(
             normalized = peptide_obj.to_camel_dict()
 
             # Add provider status (Principle B: mandatory provider status)
-            # Determine status based on data presence in DataFrame row
-            # Note: SSW prediction can be -1 (no switch), 0 (uncertain), or 1 (switch predicted)
-            # All three are valid prediction values. None means TANGO didn't run or no data available.
+            # Determine status based on data presence in DataFrame row.
+            # NOTE: this reads the raw TANGO column on purpose — provider_status
+            # tracks "did TANGO actually run", not the unified classification.
             ssw_pred = row.get("SSW prediction", None)
             tango_output_available = ssw_pred is not None and not pd.isna(ssw_pred)
             s4pred_helix_pred = row.get("Helix prediction (S4PRED)", None)
@@ -615,7 +660,10 @@ def normalize_rows_for_ui(
                 "muH": row.get("Full length uH"),
                 "ffHelixPercent": ff_helix_val,  # Use converted value (None if invalid, not -1)
                 "ffHelixFragments": row.get("FF Helix fragments", []),
-                "sswPrediction": none_if_nan(row.get("SSW prediction", None)),
+                # ISSUE-032: prefer unified SSW column; fall back to TANGO column
+                "sswPrediction": none_if_nan(
+                    row.get("SSW prediction (unified)", row.get("SSW prediction", None))
+                ),
                 "sswScore": none_if_nan(row.get("SSW score", None)),
                 "sswDiff": none_if_nan(row.get("SSW diff", None)),
                 "sswHelixPercentage": none_if_nan(row.get("SSW helix percentage", None)),
@@ -645,7 +693,9 @@ def normalize_rows_for_ui(
         # Single row normalization (for /api/predict)
         # Use same normalization path as multi-row to ensure canonical camelCase format
         row = df.iloc[0]
-        return normalize_single_row(row)
+        result = normalize_single_row(row)
+        entry_id = str(row.get("Entry", "unknown"))
+        return _enforce_ff_axioms(result, entry_id)
     else:
         # Multiple rows normalization (for /api/upload-csv, /api/example)
         # OPTIMIZATION: Use to_dict('records') instead of iterrows() - much faster
@@ -684,6 +734,7 @@ def normalize_rows_for_ui(
                 # Sanitize SSW-related fields: convert NaN/inf to None before Pydantic validation
                 ssw_fields = [
                     "SSW prediction",
+                    "SSW prediction (unified)",
                     "SSW score",
                     "SSW diff",
                     "SSW helix percentage",
@@ -785,7 +836,13 @@ def normalize_rows_for_ui(
                     "muH": row_dict.get("Full length uH"),
                     "ffHelixPercent": ff_helix_val,
                     "ffHelixFragments": row_dict.get("FF Helix fragments", []),
-                    "sswPrediction": none_if_nan(row_dict.get("SSW prediction", None)),
+                    # ISSUE-032: prefer unified SSW column; fall back to TANGO column
+                    "sswPrediction": none_if_nan(
+                        row_dict.get(
+                            "SSW prediction (unified)",
+                            row_dict.get("SSW prediction", None),
+                        )
+                    ),
                     "sswScore": none_if_nan(row_dict.get("SSW score", None)),
                     "sswDiff": none_if_nan(row_dict.get("SSW diff", None)),
                     "sswHelixPercentage": none_if_nan(row_dict.get("SSW helix percentage", None)),
@@ -905,6 +962,7 @@ def normalize_rows_for_ui(
                             },
                         )
 
-            rows_out.append(normalized)
+            row_entry_id = str(row_dict.get("Entry", "unknown"))
+            rows_out.append(_enforce_ff_axioms(normalized, row_entry_id))
 
         return rows_out

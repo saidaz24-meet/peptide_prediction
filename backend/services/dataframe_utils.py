@@ -193,6 +193,14 @@ def apply_ff_flags(
         flags_arr = np.where(is_candidate, 1, np.where(ssw_data_mask, -1, None))
         ff_ssw_flags = [int(v) if v is not None else None for v in flags_arr]
 
+        # Unified SSW classification (Peleg canonical: SSW = TANGO OR S4PRED).
+        # This is the SAME mask that drives FF-SSW above, so by construction the
+        # axiom FF-SSW=1 ⇒ SSW=1 holds. The raw "SSW prediction" column is left
+        # untouched (TANGO-only audit trail); the API serializes this unified
+        # column as sswPrediction. See ADR-003 + ISSUE-032.
+        unified_arr = np.where(ssw_pos_mask, 1, np.where(ssw_data_mask, -1, None))
+        df["SSW prediction (unified)"] = [int(v) if v is not None else None for v in unified_arr]
+
         # PELEG-Q-FIX-013: SSW score retained from TANGO formula
         # (Hydrophobicity + Beta_uH + Full_length_uH + TANGO SSW flag).
         # Peleg flagged the SSW score itself as questionable in FIX-013;
@@ -208,16 +216,10 @@ def apply_ff_flags(
             else pd.Series(float("nan"), index=df.index)
         )
         score_basis = tango_series  # TANGO ssw flag drives the score formula
-        all_valid = (
-            score_basis.notna()
-            & hydro_series.notna()
-            & beta_uh.notna()
-            & full_uh.notna()
-        )
+        all_valid = score_basis.notna() & hydro_series.notna() & beta_uh.notna() & full_uh.notna()
         raw_scores = hydro_series + beta_uh + full_uh + score_basis
         ff_ssw_scores = [
-            float(raw_scores.iloc[i]) if all_valid.iloc[i] else None
-            for i in range(len(df))
+            float(raw_scores.iloc[i]) if all_valid.iloc[i] else None for i in range(len(df))
         ]
 
         df["FF-Secondary structure switch"] = ff_ssw_flags
@@ -225,6 +227,7 @@ def apply_ff_flags(
     else:
         df["FF-Secondary structure switch"] = None
         df["FF-SSW score"] = None
+        df["SSW prediction (unified)"] = None
 
     # --- FF-Helix flag and score ---
     # Prefer S4PRED helix data; fall back to Jpred columns if present.
@@ -277,6 +280,7 @@ def apply_ff_flags(
             & (uh_series >= helix_uH_threshold)
         )
         import numpy as np
+
         flags_arr = np.where(is_helix_candidate, 1, np.where(has_helix_data, -1, None))
         ff_helix_flags = [int(v) if v is not None else None for v in flags_arr]
 
@@ -286,7 +290,9 @@ def apply_ff_flags(
             score_series = pd.to_numeric(df[helix_score_col], errors="coerce")
             both_valid = uh_series.notna() & score_series.notna()
             raw_scores = uh_series + score_series
-            ff_helix_scores = [float(raw_scores.iloc[i]) if both_valid.iloc[i] else None for i in range(len(df))]
+            ff_helix_scores = [
+                float(raw_scores.iloc[i]) if both_valid.iloc[i] else None for i in range(len(df))
+            ]
 
         df["FF-Helix (Jpred)"] = ff_helix_flags
         df["FF-Helix score"] = ff_helix_scores
@@ -374,10 +380,19 @@ def fill_percent_from_tango_if_missing(df: pd.DataFrame) -> None:
 
 
 def ssw_positive_percent(df: pd.DataFrame) -> float:
-    """Percent of rows that are SSW-positive (SSW prediction == 1)."""
-    if "SSW prediction" not in df.columns or len(df) == 0:
+    """Percent of rows that are SSW-positive under the canonical definition
+    (TANGO ∪ S4PRED). Prefers the unified column written by apply_ff_flags
+    and falls back to the raw TANGO column for DataFrames that pre-date the
+    unified-SSW fix. See ISSUE-032."""
+    if len(df) == 0:
         return 0.0
-    pos = int((df["SSW prediction"] == 1).sum())
+    if "SSW prediction (unified)" in df.columns:
+        col = "SSW prediction (unified)"
+    elif "SSW prediction" in df.columns:
+        col = "SSW prediction"
+    else:
+        return 0.0
+    pos = int((df[col] == 1).sum())
     return round(100.0 * pos / len(df), 1)
 
 

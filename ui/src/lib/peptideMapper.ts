@@ -148,18 +148,23 @@ export function mapApiRowToPeptide(
   const charge = num(row.charge ?? row.Charge, true);
   const muH = num(row.muH ?? row["Full length uH"] ?? row.uH, true);
 
-  // SSW (Secondary Structure Switch) - canonical field: sswPrediction
-  // IMPORTANT: null from backend means "no prediction available" (TANGO didn't run)
+  // SSW (Secondary Structure Switch) - canonical field: sswPrediction (unified
+  // TANGO ∪ S4PRED mask). tangoSswPrediction preserves TANGO's raw verdict for
+  // the per-predictor breakdown (EvidencePanel "TANGO: ..." line).
+  // IMPORTANT: null from backend means "no prediction available" (predictor didn't run)
   // -1 from backend means "predicted NOT to switch" (valid prediction)
   // Do NOT convert null to -1!
-  const sswPredictionRaw = row.sswPrediction;
-  let sswPrediction: SSWPrediction;
-  if (sswPredictionRaw === null || sswPredictionRaw === undefined) {
-    sswPrediction = null; // Preserve null = no prediction available
-  } else {
-    const numVal = Number(sswPredictionRaw);
-    sswPrediction = numVal === -1 || numVal === 0 || numVal === 1 ? (numVal as -1 | 0 | 1) : null; // Invalid value → treat as no prediction
-  }
+  const normalizeSsw = (raw: unknown): SSWPrediction => {
+    if (raw === null || raw === undefined) return null;
+    const n = Number(raw);
+    return n === -1 || n === 0 || n === 1 ? (n as -1 | 0 | 1) : null;
+  };
+  const sswPrediction: SSWPrediction = normalizeSsw(row.sswPrediction);
+  // Backend serializes as "TANGO SSW prediction" (per schema serialization_alias).
+  // Fall back to camelCase tangoSswPrediction if a consumer sent normalized JSON.
+  const tangoSswPrediction: SSWPrediction = normalizeSsw(
+    row.tangoSswPrediction ?? row["TANGO SSW prediction"]
+  );
 
   // SSW scores and percentages - preserve null for missing data
   const sswScore = num(row.sswScore ?? row["SSW score"], true);
@@ -303,6 +308,7 @@ export function mapApiRowToPeptide(
     // SSW (Secondary Structure Switch)
     // sswPrediction: null = no prediction, -1/0/1 = valid predictions
     sswPrediction,
+    tangoSswPrediction,
     sswScore,
     sswDiff,
     sswHelixPct,

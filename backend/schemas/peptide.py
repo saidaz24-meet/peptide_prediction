@@ -2,7 +2,7 @@ import math
 from typing import Any, List, Optional
 
 import pandas as pd
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from .provider_status import PeptideProviderStatus
 
@@ -57,6 +57,7 @@ class PeptideSchema(BaseModel):
             # Sanitize SSW-related fields: convert NaN/inf to None
             ssw_fields = [
                 "SSW prediction",
+                "SSW prediction (unified)",
                 "SSW score",
                 "SSW diff",
                 "SSW helix percentage",
@@ -84,7 +85,30 @@ class PeptideSchema(BaseModel):
     mu_h: Optional[float] = Field(None, alias="Full length uH")
 
     # SSW (Secondary Structure Switch) - exact CSV headers
-    ssw_prediction: Optional[int] = Field(None, alias="SSW prediction")
+    # ISSUE-032 fix: canonical SSW is the unified TANGO ∪ S4PRED mask
+    # (written by dataframe_utils.apply_ff_flags). Falls back to the raw TANGO
+    # column "SSW prediction" when the unified column is absent (e.g. CSV
+    # ingestion paths that never ran apply_ff_flags). This guarantees the API
+    # axiom: ffSswFlag=1 ⇒ sswPrediction=1, because both fields now derive
+    # from the same mask.
+    ssw_prediction: Optional[int] = Field(
+        None,
+        validation_alias=AliasChoices("SSW prediction (unified)", "SSW prediction"),
+        serialization_alias="SSW prediction",
+    )
+    # Scientific integrity (Said directive 2026-05-20): the TANGO-side SSW
+    # verdict must be exposed verbatim, without unification rewriting it. The
+    # UI's per-predictor breakdown ("TANGO: ...") was reading sswPrediction
+    # after the ISSUE-032 unification — which made TANGO appear to agree with
+    # S4PRED even when TANGO's own output said the opposite. This field
+    # ALWAYS reads the raw "SSW prediction" column (TANGO-only), so the UI
+    # can show the disagreement honestly while the canonical summary stays
+    # on the unified mask.
+    tango_ssw_prediction: Optional[int] = Field(
+        None,
+        alias="SSW prediction",
+        serialization_alias="TANGO SSW prediction",
+    )
     ssw_score: Optional[float] = Field(None, alias="SSW score")
     ssw_diff: Optional[float] = Field(None, alias="SSW diff")
     ssw_helix_percentage: Optional[float] = Field(None, alias="SSW helix percentage")

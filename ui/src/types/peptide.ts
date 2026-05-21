@@ -75,8 +75,13 @@ export type Peptide = {
   charge: number | null;
 
   // Tango / SSW (Secondary Structure Switch)
-  // sswPrediction can be -1/0/1 (valid predictions) or null (no prediction available)
-  sswPrediction: SSWPrediction; // from "SSW prediction"
+  // sswPrediction = unified TANGO ∪ S4PRED mask (canonical per Peleg slide 27).
+  // tangoSswPrediction = TANGO's raw verdict, preserved verbatim. Used by
+  // EvidencePanel to show the per-predictor breakdown honestly when TANGO and
+  // S4PRED disagree. Display-only; the axiom (ffSswFlag → sswPrediction) is
+  // enforced against the unified field, not the TANGO-side one.
+  sswPrediction: SSWPrediction; // unified — from "SSW prediction (unified)" with fallback to "SSW prediction"
+  tangoSswPrediction?: SSWPrediction; // TANGO-only — from "SSW prediction" raw column, never rewritten
   sswScore?: number | null; // "SSW score" - null if TANGO unavailable
   sswDiff?: number | null; // "SSW diff" - null if TANGO unavailable
   sswHelixPct?: number | null; // "SSW helix percentage" - null if TANGO unavailable

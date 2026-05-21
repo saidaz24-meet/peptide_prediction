@@ -22,7 +22,7 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
     evidenceItems.push({
       property: "Hydrophobicity",
       value: peptide.hydrophobicity.toFixed(2),
-      comparison: `${isHigher ? "Higher" : "Lower"} than cohort mean (${cohortStats.meanHydrophobicity.toFixed(2)})`,
+      comparison: `${isHigher ? "Higher" : "Lower"} than database mean (${cohortStats.meanHydrophobicity.toFixed(2)})`,
       difference: `${isHigher ? "+" : ""}${hydrophobicityDiff.toFixed(2)}`,
       icon: Icon,
       color: isHigher ? "text-green-600" : "text-blue-600",
@@ -38,7 +38,7 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
     evidenceItems.push({
       property: "Charge",
       value: `${peptide.charge > 0 ? "+" : ""}${peptide.charge.toFixed(1)}`,
-      comparison: `${chargeIsHigher ? "More positive" : "More negative"} than cohort mean (${cohortStats.meanCharge > 0 ? "+" : ""}${cohortStats.meanCharge.toFixed(1)})`,
+      comparison: `${chargeIsHigher ? "More positive" : "More negative"} than database mean (${cohortStats.meanCharge > 0 ? "+" : ""}${cohortStats.meanCharge.toFixed(1)})`,
       difference: `${chargeIsHigher ? "+" : ""}${chargeDiff.toFixed(1)}`,
       icon: ChargeIcon,
       color: chargeIsHigher ? "text-green-600" : "text-blue-600",
@@ -61,7 +61,7 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
     evidenceItems.push({
       property: "S4PRED Helix",
       value: `${peptide.s4predHelixPercent.toFixed(1)}%`,
-      comparison: `${s4IsHigher ? "More" : "Less"} helical than cohort mean (${cohortStats.meanS4predHelixPercent.toFixed(1)}%)`,
+      comparison: `${s4IsHigher ? "More" : "Less"} helical than database mean (${cohortStats.meanS4predHelixPercent.toFixed(1)}%)`,
       difference: `${s4IsHigher ? "+" : ""}${s4Diff.toFixed(1)}%`,
       icon: S4Icon,
       color: s4IsHigher ? "text-green-600" : "text-blue-600",
@@ -79,7 +79,7 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
 
     evidenceItems.push({
       property: "Aggregation Propensity",
-      value: `TANGO peak: ${peptide.tangoAggMax.toFixed(1)}%`,
+      value: `TANGO peak: ${peptide.tangoAggMax.toFixed(1)}`,
       comparison: aboveThreshold
         ? "Peak is above the configured TANGO threshold (5)."
         : "Peak is at or below the configured TANGO threshold (5).",
@@ -102,10 +102,20 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
     });
   }
 
-  // SSW (Secondary Structure Switch) prediction evidence
-  // Show BOTH TANGO and S4PRED SSW
-  const tangoSSW = peptide.sswPrediction;
+  // SSW (Secondary Structure Switch) prediction evidence — show BOTH
+  // predictors verbatim plus the unified canonical headline.
+  //
+  // Scientific integrity (Said directive 2026-05-20): the "TANGO:" line must
+  // reflect TANGO's actual subprocess verdict, NOT the unified OR mask.
+  // Reading peptide.sswPrediction here (which is unified post ISSUE-032)
+  // was making TANGO appear to flip from Negative to Positive whenever
+  // S4PRED disagreed — a misrepresentation of what TANGO actually computed.
+  // peptide.tangoSswPrediction reads the raw "SSW prediction" column,
+  // preserved verbatim through schema + mapper.
+  const tangoSSW = peptide.tangoSswPrediction ?? null;
   const s4predSSW = peptide.s4predSswPrediction;
+  // Unified headline is the canonical "SSW" per Peleg slide 27 (TANGO ∪ S4PRED).
+  const unifiedSSW = peptide.sswPrediction;
   const tangoAvailable = peptide.providerStatus?.tango?.status === "AVAILABLE";
   const s4predAvailable = peptide.providerStatus?.s4pred?.status === "AVAILABLE";
   const hasTangoSSW = tangoAvailable && tangoSSW !== null && tangoSSW !== undefined;
@@ -126,8 +136,11 @@ export function EvidencePanel({ peptide, cohortStats }: EvidencePanelProps) {
         ? "Negative"
         : "N/A";
 
-  // Pick the "headline" SSW — prefer TANGO since it's the aggregation-specific predictor
-  const headlineSSW = hasTangoSSW ? tangoSSW : hasS4predSSW ? s4predSSW : null;
+  // Headline = canonical unified SSW (TANGO ∪ S4PRED) per Peleg slide 27. If
+  // the unified field is unavailable (no providers ran), fall back through
+  // per-predictor values just to render *something* rather than blank.
+  const headlineSSW =
+    unifiedSSW != null ? unifiedSSW : hasTangoSSW ? tangoSSW : hasS4predSSW ? s4predSSW : null;
   const sswEvidence = {
     property: "SSW Prediction",
     value: headlineSSW === 1 ? "Positive" : headlineSSW === -1 ? "Negative" : "N/A",
