@@ -816,6 +816,64 @@ def process_upload_dataframe(
     Raises:
         UploadProcessingError: For processing errors that should be returned as HTTP errors
     """
+    # Wave 2.5 §LD2 — large-dataset resilience. Two budgets gate the work:
+    #
+    #   1. Hard cap: anything past MAX_PEPTIDES_PER_RUN_WITHOUT_TANGO is
+    #      truncated. Better than a silent OOM on a 50k-row paste.
+    #   2. TANGO budget: when len(df) > MAX_PEPTIDES_PER_RUN_WITH_TANGO,
+    #      TANGO is auto-disabled for this run. S4PRED + FF-Helix still
+    #      run; the response surfaces a ``tango_auto_disabled`` warning.
+    #
+    # Both decisions are recorded in ``warnings`` and piped into
+    # ``meta.warnings`` so the UI can render a banner without re-doing the
+    # math client-side.
+    warnings_collected: List[Dict[str, Any]] = []
+    original_row_count = len(df)
+    hard_cap = settings.MAX_PEPTIDES_PER_RUN_WITHOUT_TANGO
+    if original_row_count > hard_cap:
+        truncated = original_row_count - hard_cap
+        warnings_collected.append(
+            {
+                "level": "warning",
+                "code": "dataset_truncated",
+                "message": (
+                    f"Dataset truncated to {hard_cap} rows ({truncated} dropped). "
+                    f"Submit smaller batches or raise MAX_PEPTIDES_PER_RUN_WITHOUT_TANGO if your host has the headroom."
+                ),
+                "count": truncated,
+            }
+        )
+        log_warning(
+            "dataset_truncated",
+            f"Truncating upload from {original_row_count} → {hard_cap} rows (LD2 hard cap)",
+            original=original_row_count,
+            kept=hard_cap,
+            dropped=truncated,
+        )
+        df = df.iloc[:hard_cap].copy()
+
+    tango_budget = settings.MAX_PEPTIDES_PER_RUN_WITH_TANGO
+    auto_disable_tango = len(df) > tango_budget
+    if auto_disable_tango:
+        warnings_collected.append(
+            {
+                "level": "warning",
+                "code": "tango_auto_disabled",
+                "message": (
+                    f"TANGO auto-disabled — {len(df)} peptides exceeds the "
+                    f"{tango_budget} budget. S4PRED + FF-Helix results returned; "
+                    f"submit a smaller batch to include TANGO aggregation predictions."
+                ),
+                "count": len(df),
+            }
+        )
+        log_warning(
+            "tango_auto_disabled_large_dataset",
+            f"Disabling TANGO for this run — {len(df)} > MAX_PEPTIDES_PER_RUN_WITH_TANGO ({tango_budget})",
+            row_count=len(df),
+            budget=tango_budget,
+        )
+
     # ISSUE-024: Track non-standard AA substitutions for user transparency
     _notes_list = []
     _orig_list = []
@@ -875,12 +933,22 @@ def process_upload_dataframe(
     tango_ran = False
     run_dir: Optional[str] = None
 
-    if not df.empty:
+    # Wave 2.5 §LD2 — when the budget check above flipped ``auto_disable_tango``,
+    # we skip the TANGO subprocess entirely and surface a distinctive
+    # ``DISABLED_LARGE_DATASET`` provider status so the UI's status pill can
+    # render the soft-disable instead of misreporting "AVAILABLE / 0 hits".
+    if auto_disable_tango:
+        tango_provider_status = "DISABLED_LARGE_DATASET"
+        tango_provider_reason = (
+            f"Dataset size ({len(df)}) exceeds MAX_PEPTIDES_PER_RUN_WITH_TANGO "
+            f"({tango_budget}). TANGO skipped for this run."
+        )
+    elif not df.empty:
         tango_stats, tango_provider_status, tango_provider_reason, tango_ran, run_dir = (
             run_tango_processing(df, trace_entry, sentry_initialized, cancel_event=cancel_event)
         )
-    tango_enabled_flag = settings.USE_TANGO
-    tango_requested_flag = True
+    tango_enabled_flag = settings.USE_TANGO and not auto_disable_tango
+    tango_requested_flag = not auto_disable_tango
     if progress_callback:
         progress_callback("tango", 60)
 
@@ -1221,6 +1289,9 @@ def process_upload_dataframe(
             "thresholdConfigRequested": threshold_config_requested,
             "thresholdConfigResolved": threshold_config_resolved,
             "thresholds": _merged_thresholds,
+            # Wave 2.5 §LD2 — non-fatal warnings (TANGO auto-disabled, truncation).
+            # None when the run was uneventful — the UI hides the banner.
+            "warnings": warnings_collected or None,
             # Wave 2 §G — provenance for reproducible CSV/JSON exports.
             "runMetadata": _run_metadata,
         }

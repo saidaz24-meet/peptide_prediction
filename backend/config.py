@@ -211,6 +211,42 @@ class Settings:
     S4PRED_MAX_LENGTH: int = int(os.getenv("S4PRED_MAX_LENGTH", "100"))
     """Maximum sequence length S4PRED will run on (Wave B default: 100 aa). Sequences exceeding this are skipped with a `s4pred_skipped_long_seq` warning and the row's S4PRED fields stay null."""
 
+    # ============================================================================
+    # Wave 2.5 §LD2 — Large-dataset resilience
+    # ============================================================================
+    # Two budgets gate the upload pipeline against unbounded TANGO costs:
+    #
+    # - MAX_PEPTIDES_PER_RUN_WITH_TANGO: when ``len(df) > this``, TANGO is
+    #   auto-disabled for this run and a ``tango_auto_disabled`` warning is
+    #   appended to ``meta.warnings``. S4PRED + FF-Helix still run.
+    # - MAX_PEPTIDES_PER_RUN_WITHOUT_TANGO: a hard cap — when exceeded, the
+    #   input DataFrame is truncated and a ``dataset_truncated`` warning is
+    #   surfaced. Better than a silent OOM on a 50k-row paste.
+    #
+    # Both defaults come from Alex's concurrency-feedback backlog (LD2). Raise
+    # via env var if your VPS has the headroom; lower it on shared hardware.
+
+    MAX_PEPTIDES_PER_RUN_WITH_TANGO: int = int(
+        os.getenv("MAX_PEPTIDES_PER_RUN_WITH_TANGO", "500")
+    )
+    """Budget for TANGO inclusion in a single upload run (default: 500).
+    Above this, TANGO is auto-disabled and a ``tango_auto_disabled`` warning
+    is surfaced — S4PRED + FF-Helix still run."""
+
+    MAX_PEPTIDES_PER_RUN_WITHOUT_TANGO: int = int(
+        os.getenv("MAX_PEPTIDES_PER_RUN_WITHOUT_TANGO", "5000")
+    )
+    """Hard cap on the total rows processed in a single upload run (default:
+    5000). Above this, the input is truncated and a ``dataset_truncated``
+    warning is surfaced. Tune downward on shared / low-memory hosts."""
+
+    TANGO_PER_PEPTIDE_TIMEOUT_S: float = float(
+        os.getenv("TANGO_PER_PEPTIDE_TIMEOUT_S", "60.0")
+    )
+    """Per-peptide TANGO wall-clock budget (default: 60 s). Effective only as
+    a per-row guard inside the batch wrapper — the existing batch-level
+    timeout (``tango_timeout`` in ``tango.py``) still applies."""
+
     # Group 2: Helical thresholds
     MIN_HELIX_PERCENT_CONTENT: float = float(os.getenv("MIN_HELIX_PERCENT_CONTENT", "0"))
     """Minimum % helix content (residues predicted helical) for helix classification (Peleg default: 0, range 0-100)"""

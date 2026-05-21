@@ -324,14 +324,19 @@ def process_single_sequence(
     log_info("cache_store", f"Cached result for {entry_id}", sequence_len=len(seq))
 
     # Wave 2 §D: best-effort vector indexing of the analyzed peptide. Failures
-    # are swallowed by vector_store.index_peptide so the predict response is
-    # never affected. Cache hits skip this path because the row was indexed on
-    # its first analysis.
+    # are swallowed by vector_store so the predict response is never affected.
+    # Cache hits skip this path because the row was indexed on its first
+    # analysis.
+    #
+    # 2026-05-19 (perf): submit to a background executor instead of running
+    # inline. ESM-2 8M CPU forward pass adds 3-5s per peptide; for a 12-peptide
+    # batch this dominated the predict latency. The indexing is observability
+    # infrastructure (see vector_store module docstring), not part of the API
+    # contract, so it belongs off the hot path.
     try:
         from services import vector_store
 
-        if vector_store.is_enabled():
-            vector_store.index_peptide(row_data)
+        vector_store.submit_index_background(row_data)
     except Exception as _exc:  # pragma: no cover — defensive
         log_warning("vector_index_predict_swallow", f"Indexing swallowed: {_exc}")
 

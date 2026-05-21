@@ -4,9 +4,15 @@ This module is the only seam between PVL and the embedding/vector tooling. The
 rest of the codebase calls three functions:
 
 - ``index_peptide(row)`` — best-effort upsert of a peptide row's embedding.
-  Called from the analysis pipeline after a row has been classified. Failures
-  here NEVER raise to the caller — the API contract is "analysis succeeded";
-  the index is observability infrastructure, not a critical path.
+  Synchronous; use only from offline scripts (e.g. ``reindex_lance.py``) or
+  background tasks. Failures here NEVER raise to the caller — the API
+  contract is "analysis succeeded"; the index is observability infrastructure,
+  not a critical path.
+- ``submit_index_background(row)`` — fire-and-forget submit of
+  ``index_peptide`` on a daemon-thread executor. **Use this from request-path
+  code** (predict / batch upload). ESM-2 forward passes are CPU-bound and add
+  3-5s per peptide; running them inline blocked the predict response (Alex
+  flag 2026-05-19 — 12 peptides ≈ 1 min, most of it embedding overhead).
 - ``find_similar(reference_id, k, dataset_id=None)`` — return the k peptides
   most similar to the reference, ordered by cosine distance ascending.
 - ``is_enabled()`` — quick check for routes/tests that need to know whether
@@ -29,10 +35,26 @@ from __future__ import annotations
 
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Callable, Dict, List, Optional
 
 from config import settings
 from services.logger import log_error, log_info, log_warning
+
+# ISSUE-perf 2026-05-19: indexing was inline-synchronous after every predict,
+# blocking the response by 3-5s per peptide (ESM-2 CPU forward pass). For a
+# 12-peptide batch this added 30-60s on top of TANGO + S4PRED. Indexing is
+# best-effort observability infrastructure (see module docstring), so the
+# response should never wait on it. ``submit_index_background`` enqueues the
+# work on a daemon-thread executor; failures are logged and never propagate.
+#
+# max_workers=1 — ESM-2 on CPU saturates a torch thread pool internally, so
+# parallel workers would thrash rather than help. Sequential is the right
+# trade for a single-process uvicorn / Celery worker.
+_INDEX_EXECUTOR: ThreadPoolExecutor = ThreadPoolExecutor(
+    max_workers=1,
+    thread_name_prefix="pvl-vector-index",
+)
 
 # ---------------------------------------------------------------------------
 # Internal state — guarded by a single lock so concurrent FastAPI requests
@@ -634,6 +656,39 @@ def _ensure_table(seed_record: Optional[Dict[str, Any]] = None) -> Optional[Any]
             return None
 
 
+def submit_index_background(row: Dict[str, Any], dataset_id: Optional[str] = None) -> None:
+    """Enqueue an ``index_peptide`` call on the background executor.
+
+    Returns immediately. Errors inside the task are logged but never raised —
+    indexing is best-effort observability infrastructure, not part of the
+    analysis contract. Use this in hot paths (predict / batch upload) where
+    the predict response must not block on the ESM forward pass.
+
+    Synchronous callers (background scripts, reindex jobs, tests) should keep
+    using ``index_peptide`` directly so they can observe the return value.
+    """
+    if not is_enabled():
+        return
+
+    def _task() -> None:
+        try:
+            index_peptide(row, dataset_id=dataset_id)
+        except Exception as exc:  # pragma: no cover — defensive
+            log_warning(
+                "vector_index_background_swallow",
+                f"Background indexing failed: {exc}",
+            )
+
+    try:
+        _INDEX_EXECUTOR.submit(_task)
+    except RuntimeError as exc:
+        # Executor has been shut down (e.g. process exit). Best-effort: drop.
+        log_warning(
+            "vector_index_background_executor_closed",
+            f"Cannot submit background index task: {exc}",
+        )
+
+
 __all__ = [
     "disabled_reason",
     "find_similar",
@@ -645,4 +700,5 @@ __all__ = [
     "reset_for_tests",
     "set_embedder",
     "stats",
+    "submit_index_background",
 ]

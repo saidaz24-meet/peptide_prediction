@@ -213,3 +213,41 @@ def test_stats_reports_row_count_when_enabled(isolated_index):
     assert s["disabled_reason"] is None
     assert s["row_count"] == 2
     assert s["method"] == "lancedb+test-fake"
+
+
+def test_submit_index_background_returns_immediately_and_indexes(isolated_index):
+    """``submit_index_background`` must not block the caller, and must still
+    eventually upsert the row through the same code path as ``index_peptide``.
+
+    Perf regression context (2026-05-19): the predict pipeline used to call
+    ``index_peptide`` inline; for a 12-peptide batch the ESM forward passes
+    added 30-60s to the response. This test pins the new fire-and-forget
+    contract that the predict pipeline now relies on.
+    """
+    import time
+
+    submit_start = time.monotonic()
+    vector_store.submit_index_background({"id": "BG-1", "sequence": "AILVM"})
+    submit_elapsed = time.monotonic() - submit_start
+
+    # Submit must be near-instant. Even a heavy embedder shouldn't run on
+    # the calling thread, so the upper bound here is generous; if it ever
+    # exceeds this we are back to inline indexing.
+    assert submit_elapsed < 0.5, (
+        f"submit_index_background blocked for {submit_elapsed:.3f}s — likely "
+        "running inline. Should fire-and-forget on the background executor."
+    )
+
+    # Wait for the background task to finish before asserting state.
+    vector_store._INDEX_EXECUTOR.submit(lambda: None).result(timeout=5)
+    assert vector_store.stats()["row_count"] == 1
+
+
+def test_submit_index_background_swallows_disabled_state(isolated_index, monkeypatch):
+    """When the index is disabled, submit returns without raising and without
+    enqueueing work. Mirrors the safety guarantees of ``index_peptide``."""
+    monkeypatch.setattr(settings, "VECTOR_INDEX_ENABLED", False)
+    # Should be a no-op — no exception, no row added.
+    vector_store.submit_index_background({"id": "OFF-1", "sequence": "AAAA"})
+    # Re-enable so cleanup teardown can still inspect stats if it wants to.
+    monkeypatch.setattr(settings, "VECTOR_INDEX_ENABLED", True)

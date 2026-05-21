@@ -97,23 +97,34 @@ def load_example_data(recalc: int = 0) -> dict:
     ff_flags(df)
 
     # build meta so the UI can show provenance pills
-    ssw_rows = int((df.get("SSW prediction", pd.Series([-1]*len(df))) != -1).sum())
-    meta = ensure_trace_id_in_meta({
-        "use_tango": settings.USE_TANGO or already_has_tango,
-        "use_s4pred": settings.USE_S4PRED,
-        "ssw_rows": ssw_rows,
-        "valid_seq_rows": int(df["Sequence"].notna().sum()),
-        "provider_status": {},
-        "runId": str(uuid.uuid4()),
-        "traceId": get_trace_id_for_response(),
-        "inputsHash": "",
-        "configHash": "",
-        "providerStatusSummary": {"tango": None, "s4pred": None},
-        "thresholdConfigRequested": None,
-        "thresholdConfigResolved": {"mode": "default", "version": "1.0.0"},
-        "thresholds": {},
-    })
-    log_info("example_loaded", f"rows={len(df)} • Tango rows={ssw_rows} • recalc={recalc}", stage="example")
+    # AUDIT-5 (T-DEBUG audit, 2026-05): this variable counts rows where TANGO
+    # parsed *any* SSW prediction (including -1 / negative) — i.e. it's the
+    # TANGO data-coverage count, NOT a positive-SSW count. The Meta API
+    # field name ``ssw_rows`` stays for back-compat, but the local name
+    # now matches what the code actually computes.
+    tango_coverage_rows = int((df.get("SSW prediction", pd.Series([-1] * len(df))) != -1).sum())
+    meta = ensure_trace_id_in_meta(
+        {
+            "use_tango": settings.USE_TANGO or already_has_tango,
+            "use_s4pred": settings.USE_S4PRED,
+            "ssw_rows": tango_coverage_rows,
+            "valid_seq_rows": int(df["Sequence"].notna().sum()),
+            "provider_status": {},
+            "runId": str(uuid.uuid4()),
+            "traceId": get_trace_id_for_response(),
+            "inputsHash": "",
+            "configHash": "",
+            "providerStatusSummary": {"tango": None, "s4pred": None},
+            "thresholdConfigRequested": None,
+            "thresholdConfigResolved": {"mode": "default", "version": "1.0.0"},
+            "thresholds": {},
+        }
+    )
+    log_info(
+        "example_loaded",
+        f"rows={len(df)} • Tango rows={tango_coverage_rows} • recalc={recalc}",
+        stage="example",
+    )
 
     # Normalize to canonical camelCase using PeptideSchema (with provider status - Principle B)
     rows_out = normalize_rows_for_ui(

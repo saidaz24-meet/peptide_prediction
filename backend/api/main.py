@@ -30,7 +30,7 @@ from api.routes import (
     upload,
 )
 from config import settings
-from services.logger import get_logger, log_error, log_info, set_trace_id
+from services.logger import get_logger, log_error, log_info, log_warning, set_trace_id
 
 # ---------------------------------------------------------------------------
 # Sentry before_send filter (V6-1)
@@ -265,6 +265,92 @@ def _check_redis():
     except Exception as e:
         log_info("redis_fail", f"Redis unavailable: {e} — falling back to sync mode")
         settings.CELERY_ENABLED = False
+
+
+@app.on_event("startup")
+async def _warmup_s4pred():
+    """Wave 2.5 B4a — eliminate the S4PRED cold-load latency hit on
+    the first Quick Analyze.
+
+    The S4PRED 5-model BiLSTM ensemble is module-globally cached in
+    ``tools.s4pred.model._predictor`` and lazy-loaded on first inference
+    (~10-30 s per worker). The first user request inherits that cost
+    even though every subsequent request is fast. This hook kicks off
+    the load as soon as FastAPI starts.
+
+    Critically: the warm-up runs in the default thread pool (not on the
+    event loop) so a 30 s model load does NOT block FastAPI's readiness
+    probe. If the warm-up fails, log and move on — analyses still work,
+    they're just cold-loaded on first hit.
+
+    Gated by ``settings.USE_S4PRED``. Skipped during pytest runs to keep
+    the test suite fast.
+    """
+    if not settings.USE_S4PRED:
+        log_info("s4pred_warmup_skip", "USE_S4PRED=0, skipping warm-up")
+        return
+    if _running_under_pytest:
+        log_info("s4pred_warmup_skip", "pytest detected, skipping warm-up")
+        return
+
+    async def _do_warmup() -> None:
+        await asyncio.to_thread(_warmup_s4pred_sync)
+
+    # Fire-and-forget: schedule the warm-up but don't await it. FastAPI
+    # finishes startup immediately and accepts requests; the first request
+    # that needs S4PRED will either find a warm model (likely) or trigger
+    # the cold load itself (worst case — no regression vs the prior behaviour).
+    try:
+        asyncio.create_task(_do_warmup())
+    except Exception as exc:
+        log_warning("s4pred_warmup_schedule_failed", f"Could not schedule warm-up: {exc}")
+
+
+def _warmup_s4pred_sync() -> None:
+    """Synchronous warm-up: load the model + run one tiny inference.
+
+    Runs in the FastAPI default thread pool via ``asyncio.to_thread``.
+    Errors are swallowed (logged at warning level) — a failed warm-up
+    must NEVER take the API down.
+    """
+    import time
+
+    started = time.perf_counter()
+    try:
+        from s4pred import get_s4pred_weights_path
+        from tools.s4pred import get_predictor
+
+        weights_path = get_s4pred_weights_path()
+        if not weights_path or not os.path.isdir(weights_path):
+            log_info(
+                "s4pred_warmup_skip",
+                f"weights not available at {weights_path!r}; warm-up skipped",
+                weights_path=weights_path,
+            )
+            return
+
+        log_info(
+            "s4pred_warmup_started",
+            f"Loading S4PRED 5-model ensemble from {weights_path}",
+            weights_path=weights_path,
+        )
+        predictor = get_predictor(weights_path)
+        # Single 5-residue inference: the cheapest tensor pass that still
+        # exercises every layer of every model in the ensemble. Cleared
+        # immediately — we only care about the side effect (cached weights).
+        predictor.predict_from_sequence("warmup", "ACDEF")
+        elapsed_ms = int((time.perf_counter() - started) * 1000)
+        log_info(
+            "s4pred_warmup_complete",
+            f"S4PRED warm-up done in {elapsed_ms} ms",
+            elapsed_ms=elapsed_ms,
+        )
+    except Exception as exc:
+        log_warning(
+            "s4pred_warmup_failed",
+            f"S4PRED warm-up failed (best-effort): {exc}. First inference will pay the cold-load cost.",
+            error=str(exc),
+        )
 
 
 @app.on_event("shutdown")
