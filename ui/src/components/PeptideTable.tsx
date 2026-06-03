@@ -327,7 +327,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             Helix
-            <HeaderTip tip="S4PRED helix detection. Helix = segments found with ≥5 consecutive residues at P(Helix) ≥ 0.5." />
+            <HeaderTip tip="α-helix prediction from S4PRED. Positive when one or more segments of ≥5 consecutive residues at P(Helix) ≥ 0.5 are detected. Base class for FF-Helix." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -355,7 +355,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             SSW
-            <HeaderTip tip="Secondary Structure Switch — overlapping helix/beta regions detected via TANGO aggregation analysis, suggesting conformational switching potential." />
+            <HeaderTip tip="Secondary Structure Switch — positive when TANGO OR S4PRED detects conformational switching potential (helix/β indecision). Base class for FF-SSW. The per-predictor breakdown is visible in the peptide detail page." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -391,7 +391,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             FF-Helix
-            <HeaderTip tip="Fibril-forming helix candidate. Based on S4PRED helix μH ≥ database average — helix detected with amphipathic character above threshold." />
+            <HeaderTip tip="Fibril-forming-helix candidate. Triggered when S4PRED predicts helical structure AND the hydrophobic moment μH exceeds the database threshold. Thresholds derive from Ragonis-Bachar and Rayan (see Help for citation)." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -418,7 +418,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             FF-SSW
-            <HeaderTip tip="Fibril-forming SSW candidate. Requires SSW prediction AND hydrophobicity ≥ database average — structural switch with hydrophobic core." />
+            <HeaderTip tip="Fibril-forming-SSW candidate. Requires SSW prediction (TANGO or S4PRED) AND hydrophobicity ≥ database threshold. Note: AMPs and membrane-active peptides also satisfy these criteria — the flag is broader than confirmed amyloid (see Help)." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -447,7 +447,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             Helix %
-            <HeaderTip tip="S4PRED helix content (context-dependent). Percentage of residues predicted as helical." />
+            <HeaderTip tip="S4PRED helix content — percentage of residues part of detected helix segments (≥5 consecutive residues at P(Helix) ≥ 0.5 / total length)." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -466,7 +466,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             Charge
-            <HeaderTip tip="Net charge at pH 7.0. Positive charge enhances electrostatic interaction with negatively charged membranes." />
+            <HeaderTip tip="Net charge at pH 7.4. Positive charge enhances electrostatic interaction with negatively charged membranes." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -491,7 +491,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             H
-            <HeaderTip tip="Hydrophobicity. Higher values = greater preference for non-polar environments, correlating with membrane affinity." />
+            <HeaderTip tip="Mean hydrophobicity (Fauchère-Pliska scale). Higher values = greater preference for non-polar environments; correlates with membrane affinity. Range −1.01 to 2.25." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
@@ -510,7 +510,7 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
             className="h-8 p-0 font-medium"
           >
             μH
-            <HeaderTip tip="Hydrophobic moment — measures amphipathic character. Values > 0.5 suggest strong hydrophobic/hydrophilic face separation." />
+            <HeaderTip tip="Hydrophobic moment μH (Fauchère-Pliska, full sequence). Quantifies amphipathic character — vector sum of per-residue hydrophobicity around an α-helix axis. Range 0 to 3.26." />
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),

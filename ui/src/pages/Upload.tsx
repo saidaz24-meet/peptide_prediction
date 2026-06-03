@@ -651,18 +651,12 @@ export default function Upload() {
                           verification, but the FASTA-specific card gives an at-a-glance
                           "N sequences detected" confirmation. */}
                       {(() => {
-                        const lname = (localFile?.name || rawData.fileName || "")
-                          .toLowerCase();
-                        if (!lname.endsWith(".fasta") && !lname.endsWith(".fa"))
-                          return null;
+                        const lname = (localFile?.name || rawData.fileName || "").toLowerCase();
+                        if (!lname.endsWith(".fasta") && !lname.endsWith(".fa")) return null;
                         const entries: FastaEntry[] = (rawData.rows ?? []).map(
                           (r: Record<string, unknown>) => ({
-                            id: String(
-                              r.Entry ?? r.entry ?? r.id ?? r.ID ?? ""
-                            ).trim(),
-                            sequence: String(
-                              r.Sequence ?? r.sequence ?? r.seq ?? ""
-                            ).trim(),
+                            id: String(r.Entry ?? r.entry ?? r.id ?? r.ID ?? "").trim(),
+                            sequence: String(r.Sequence ?? r.sequence ?? r.seq ?? "").trim(),
                           })
                         );
                         // `rawData.rows` is capped at 200 by the FASTA parser
@@ -670,9 +664,7 @@ export default function Upload() {
                         // line still reports the real total.
                         return (
                           <FastaPreview
-                            fileName={
-                              localFile?.name || rawData.fileName || "file.fasta"
-                            }
+                            fileName={localFile?.name || rawData.fileName || "file.fasta"}
                             entries={entries}
                             totalCount={rawData.rowCount ?? entries.length}
                           />
@@ -719,10 +711,11 @@ export default function Upload() {
                         return null;
                       })()}
 
-                      {/* Peleg F9 (2026-05-19): single-line warning per short/long
-                          bucket. Drops the second "optimal range" info line and softens
-                          the rationale tail to "S4PRED works best on sequences ≥15 aa"
-                          (Q1 citation pending — see PELEG_REVIEW_TASKS.md). */}
+                      {/* Wave 2.6 (2026-06-03, Peleg Drive answer): the pipeline-
+                          appropriate maximum is 40 aa. Above 40, the secondary-
+                          structure prediction becomes a surface problem and the
+                          FF-Helix / SSW logic loses meaning. Warning copy now states
+                          that those rows will be skipped, not "reduced accuracy". */}
                       {rawData.rows &&
                         rawData.rows.length > 0 &&
                         (() => {
@@ -732,7 +725,7 @@ export default function Upload() {
                             .map((r) => String(pickSeq(r)).length)
                             .filter((l) => l > 0);
                           const short = lengths.filter((l) => l < 15).length;
-                          const long = lengths.filter((l) => l > 100).length;
+                          const long = lengths.filter((l) => l > 40).length;
                           const total = lengths.length;
                           const hasWarnings = short > 0 || long > 0;
                           if (!hasWarnings) return null;
@@ -743,12 +736,16 @@ export default function Upload() {
                                 <div className="text-sm space-y-1">
                                   {short > 0 && (
                                     <p title="The minimum-length floor is an empirical default; citation pending.">
-                                      {short}/{total} sequences too short (&lt;15 aa) — S4PRED works best on sequences ≥15 aa.
+                                      {short}/{total} sequences too short (&lt;15 aa) — S4PRED works
+                                      best on sequences ≥15 aa.
                                     </p>
                                   )}
                                   {long > 0 && (
                                     <p>
-                                      {long}/{total} sequences too long (&gt;100 aa) — TANGO accuracy is reduced.
+                                      {long}/{total} sequences exceed the 40-aa pipeline limit —
+                                      above 40 aa the secondary-structure prediction becomes a
+                                      surface-vs-structure problem and the FF-Helix / SSW logic
+                                      loses meaning. Those rows will be skipped.
                                     </p>
                                   )}
                                 </div>

@@ -416,11 +416,13 @@ export default function PeptideDetail() {
             <div className="border-b border-[hsl(var(--border))]" />
           </div>
 
-          {/* Sequence & Structure Card */}
+          {/* AlphaFold-predicted structure card. Renamed 2026-06-03 per
+              Peleg's Drive comment 17: title should make the "predicted, not
+              experimental" nature visible up front, not buried in a footnote. */}
           <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl overflow-hidden">
             <CardHeader className="pb-2">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <CardTitle className="text-h3">Sequence & Structure</CardTitle>
+                <CardTitle className="text-h3">AlphaFold-predicted structure</CardTitle>
                 {/* F10 (Said decided 2026-05-21, Peleg slide 18): drop the
                     Beta % and Coil % numerical subcards. The S4PRED
                     probability curves still render in <S4PredChart/> below —
@@ -637,9 +639,9 @@ export default function PeptideDetail() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[280px]">
+                  <div className="h-[320px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <ScatterChart margin={{ top: 20, right: 30, bottom: 25, left: 40 }}>
+                      <ScatterChart margin={{ top: 20, right: 30, bottom: 55, left: 55 }}>
                         <CartesianGrid strokeDasharray="3 3" />
                         <XAxis
                           type="number"
@@ -647,8 +649,27 @@ export default function PeptideDetail() {
                           name="FF-Helix %"
                           tickFormatter={(v) => `${v}%`}
                           domain={[0, 100]}
+                          label={{
+                            value: "FF-Helix % (helix content × μH threshold)",
+                            position: "insideBottom",
+                            offset: -10,
+                            fontSize: 12,
+                            fill: "hsl(var(--muted-foreground))",
+                          }}
                         />
-                        <YAxis type="number" dataKey="y" name="Agg Max" />
+                        <YAxis
+                          type="number"
+                          dataKey="y"
+                          name="Aggregation Max"
+                          label={{
+                            value: "Peak TANGO aggregation score",
+                            angle: -90,
+                            position: "insideLeft",
+                            offset: -5,
+                            fontSize: 12,
+                            fill: "hsl(var(--muted-foreground))",
+                          }}
+                        />
                         <Tooltip
                           content={({ payload }) => {
                             const item = payload?.[0]?.payload;
@@ -657,7 +678,7 @@ export default function PeptideDetail() {
                               <div className="bg-background border border-border rounded p-2 text-xs">
                                 <p className="font-medium">{item.id}</p>
                                 <p>FF-Helix: {Number(item.x).toFixed(1)}%</p>
-                                <p>Agg Max: {Number(item.y).toFixed(1)}%</p>
+                                <p>Aggregation Max: {Number(item.y).toFixed(2)}</p>
                               </div>
                             );
                           }}
@@ -699,6 +720,24 @@ export default function PeptideDetail() {
                         </Scatter>
                       </ScatterChart>
                     </ResponsiveContainer>
+                  </div>
+                  <div className="flex justify-center gap-6 mt-2 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        aria-hidden
+                        className="inline-block h-2.5 w-2.5 rounded-full"
+                        style={{ background: "#D55E00" }}
+                      />
+                      Current peptide
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span
+                        aria-hidden
+                        className="inline-block h-2.5 w-2.5 rounded-full"
+                        style={{ background: "#CCCCCC" }}
+                      />
+                      Database
+                    </span>
                   </div>
                 </CardContent>
               </Card>

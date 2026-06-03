@@ -383,12 +383,13 @@ export default function QuickAnalyze() {
                   </AlertDescription>
                 </Alert>
               )}
-              {sequence.trim().length > 100 && (
-                <Alert>
+              {sequence.trim().length > 40 && (
+                <Alert variant="destructive">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertDescription>
-                    {sequence.trim().length} aa — reduced TANGO accuracy above 100 aa. S4PRED
-                    remains reliable.
+                    {sequence.trim().length} aa — exceeds the 40-aa pipeline limit. Above 40 aa the
+                    secondary-structure prediction becomes a surface-vs-structure problem and the
+                    FF-Helix / SSW classification loses meaning. S4PRED will be skipped.
                   </AlertDescription>
                 </Alert>
               )}

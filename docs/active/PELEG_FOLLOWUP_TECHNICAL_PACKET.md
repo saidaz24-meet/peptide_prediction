@@ -147,21 +147,22 @@ Three optional paths, all queued for Peleg's input:
 
 ### 11.7 — Proposed UI disclosure paragraph (Help.tsx + FF-SSW tooltip)
 
-> **FF-SSW (Fibril-Forming Secondary Structure Switch) — known limitation**
+**Rewritten 2026-06-03 per Peleg's Drive Comments 2-4 (2026-05-22)** — the original "false-positive" framing was wrong. PVL's FF-SSW positive class is, by design, the broader set that captures the shared biophysics between amyloid-forming and membrane-active peptides. Peleg's lab specifically targeted AMPs as fibril candidates because of this shared feature space. The disclosure paragraph reflects that framing:
+
+> **FF-SSW (Fibril-Forming Secondary Structure Switch)**
 >
-> PVL classifies a peptide as FF-SSW if it satisfies two sequence-derived criteria: (1) at least one predictor (TANGO or S4PRED) sees structural switching potential between α-helix and β-sheet, and (2) hydrophobicity is above the cohort or default threshold. This criterion is met by both **amyloid-forming peptides** (the intended positive class) AND by **membrane-disrupting amphipathic peptides** such as antimicrobial peptides (AMPs), signal peptides, and pore-formers. Distinguishing these two classes from sequence alone is an open scientific problem — on our Staphylococcus 2023 validation benchmark (n=66), 17 of 18 false positives are PSM-α2 (an AMP). If your peptide is annotated as an AMP in UniProt or shows a signal-peptide cleavage site, treat the FF-SSW flag as suggesting "amphipathic conformational switch candidate" rather than "confirmed amyloid candidate." See our validation report for benchmark-derived false-positive rates per peptide class.
+> PVL classifies a peptide as FF-SSW positive when two sequence-derived criteria are met: (1) at least one predictor (TANGO or S4PRED) sees structural switching potential between α-helix and β-sheet, and (2) hydrophobicity is above the database threshold. The same biophysics — amphipathicity and structural-switching potential — drives both amyloid formation and antimicrobial activity, so the FF-SSW class is intentionally the broader set that captures both. Membrane-disrupting amphipathic peptides such as antimicrobial peptides (AMPs), signal peptides, and pore-formers will also be flagged. On our Staphylococcus 2023 validation benchmark (n=66), 17 of 18 broader-candidate calls are PSM-α2, an amphipathic AMP. If your peptide is annotated as an AMP in UniProt or shows a signal-peptide cleavage site, treat the FF-SSW flag as indicating shared fibril-forming biophysics rather than a confirmation of amyloid behavior in vivo. Distinguishing the two functional outcomes from sequence alone is an open scientific problem — and is the reason we keep the flag broad rather than narrowing it.
 
-**Question for Peleg**: Is this framing acceptable, or do you want stronger / softer language? Specific items:
+**Status**: framing approved by Peleg in Comments 2-3 ("it is perfectly fine that we report or call name for fibril formation potential only, it is fine if other biological functionalities might also happen"). Comment 13 says the membrane-active detail belongs in the longer Help.tsx text, not the compact tooltip — so the tooltip stays short (one sentence) and the Help.tsx page carries the long version above.
 
-- "amphipathic conformational switch candidate" — does this read well as the alternative interpretation?
-- We avoided naming specific competitors (AGGRESCAN, etc.) since we haven't benchmarked against them yet. OK?
-- The 97% AMP positive rate is striking. Do you want it stated explicitly in the UI tooltip, or only in the longer Help.tsx text?
+### 11.8 — Q5 axiom and the rest of the email (REVISED 2026-06-03)
 
-### 11.8 — Where this changes the rest of the email
+**Q5 was NOT a subset axiom.** Per Peleg's Drive Comment 15 (2026-05-22): she meant *symmetric treatment* — wherever the UI/code surfaces SSW/FF-SSW, it should also surface Helix/FF-Helix in the same way. The 4-class Venn stays as 4 sibling circles. The earlier "SSW ⊆ Helix subset axiom" interpretation was a misread of her slide 1 line 5 and is dropped.
 
-- **§3 D-items**: D3 (Tier 1 / 80% certainty) becomes more important — recommend dropping the heuristic certainty bar entirely. The validation says we don't have the discrimination power to assign confidence scores meaningfully.
-- **§4 Q-items**: Q4 (modern alternative to Chou-Fasman) is partially answered — the validation shows that no propensity-scale alternative is going to fix this. The discrimination problem is in feature space, not scale choice.
-- **§3 D2** (4-class labeling): the validation strongly supports the verbose-label option ("Alpha-helix secondary structure" / "Fibril-forming alpha helix") — the longer names make it harder to interpret a positive flag as "confirmed amyloid."
+**Other Wave 2.5 → Wave 2.6 framing shifts** (all confirmed by Peleg in Drive):
+- **D3** (Tier 1 / 80% certainty): drop the certainty bar entirely. The validation says we don't have the discrimination power to assign confidence scores meaningfully — and Peleg's framing on AMP overlap supports this (you can't meaningfully claim confidence on a positive call that's intentionally broad).
+- **Q4** (modern alternative to Chou-Fasman): directly answered by Peleg in Drive Comment 27 — *"We should just use the basic predetermined thresholds, not from Eisenberg, but from Ragonis-Bachar and Rayan."* Awaiting her DOI for the citation.
+- **D2** (4-class labeling): verbose labels stay strongly preferred — "FF-SSW: candidate fibril-forming peptide (broad)" reads safer than just "FF-SSW" in a column header where a clinical reader might over-read it as confirmed amyloid.
 
 ---
 

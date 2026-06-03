@@ -109,11 +109,11 @@ LanceDB-backed embedding store. ESM-2 8M (Lin et al., Science 2023) generates a 
 
 These matter for the paper because external reviewers will ask "is this maintained, tested, and scientifically auditable?"
 
-- **1149 tests passing** as of 2026-05-21:
-  - 542 backend (pytest, deterministic, no network, USE_TANGO=0 USE_S4PRED=0 friendly for CI speed)
-  - 613 frontend (Vitest + jsdom)
-  - 13 new canary peptide tests pinning predictions against literature
-  - 9 axiom invariant tests
+- **1214 tests passing** as of 2026-06-03:
+  - 606 backend (pytest, deterministic, no network, USE_TANGO=0 USE_S4PRED=0 friendly for CI speed)
+  - 608 frontend (Vitest + jsdom)
+  - 14 canary peptide tests pinning predictions against literature (incl. KLVFFAE / Aβ16-22 added Wave 2.6)
+  - 13 axiom invariant tests
 - **`npx tsc --noEmit`** clean across all of `ui/src`
 - **CI green on every PR** for the entire history since the redesign
 - **CodeRabbit AI review** on every PR — second opinion before merge
@@ -121,7 +121,7 @@ These matter for the paper because external reviewers will ask "is this maintain
 - **Open-source MIT** as of 2026-05-20 — citation-ready, JOSS-eligible, Zenodo DOI path queued
 - **CONTRIBUTING.md + AGENTS.md** govern multi-terminal contribution model (T1 orchestrator, T2 backend, T3 frontend, T5 research, T6 ops, T-PEL Peleg-feedback processor, plus Cowork for visuals)
 
-For a paper supplement, the relevant claim is: "PVL is open-source, MIT-licensed, has 1149 deterministic tests covering the prediction contract, and is built with formal axioms enforced at the API boundary that make scientific regressions impossible to ship silently." Reviewers can clone the repo and audit any prediction line-by-line.
+For a paper supplement, the relevant claim is: "PVL is open-source, MIT-licensed, has 1214 deterministic tests covering the prediction contract, and is built with formal axioms enforced at the API boundary that make scientific regressions impossible to ship silently." Reviewers can clone the repo and audit any prediction line-by-line.
 
 ---
 
@@ -165,9 +165,9 @@ We weighed seven realistic options:
 
 **Why we picked this**: it's the single move with the highest leverage on adoption. A researcher running Claude Desktop with the PVL MCP server installed can say, in plain English, "screen these 50 sequences for amyloid candidates" and Claude orchestrates the calls, formats the results, and lets them iterate. We don't have to build the chat UI — Claude / Cursor / etc. already did. We just expose the science.
 
-**Where we landed**: **Phase G1 shipped** — MCP backend routes (`get_peptide_detail`, `rank_candidates`, `compare_cohorts`) merged in Wave 2 §I. The MCP server scaffolding is in `mcp_server/pvl_mcp/`. Live in the AI ecosystem for any researcher who configures their assistant.
+**Where we landed**: **Shipped and live as of 2026-05-12**. The MCP server is at `mcp_server/pvl_mcp/`, pip-installable (`cd mcp_server && pip install -e .`), with two transports (stdio for desktop assistants, SSE for web/remote clients). README documents config for Claude Desktop, Cursor, Continue, Cline, and Windsurf. Any researcher who installs and configures it gets PVL as a natural-language-callable tool in their assistant today — no waiting on roadmap, no future timeline. This is Peleg's Drive Comment 23 confirmation: "So.. if I am understanding correctly this is something you already implemented?" — yes.
 
-**Tradeoff**: requires the researcher to set up the MCP server config in their AI assistant — a one-time install step. We accept this friction because the alternative (no AI integration) is worse.
+**Tradeoff**: requires the researcher to do a one-time install + assistant config. We accept this friction because the alternative (no AI integration) is worse, and the install is a single `pip install` plus a JSON config block.
 
 ### Option E — Standalone AI chat app
 
@@ -219,16 +219,16 @@ The validation evidence is hard:
 
 Peleg can push back at the margins — for example, "are you sure you tested cutoffs at 1.7 and 2.0?" — and we'll rerun the sweep. But the position "the current threshold rules can be tuned to discriminate AMPs from amyloid formers" is one we'll defend hard, with the brief's data.
 
-### Part B — 60-70% open: there are other angles she might want
+### Part B — Peleg's resolved positions (2026-05-22 Drive comments)
 
-We're genuinely open to her suggesting:
+**Updated 2026-06-03** — Peleg replied to all four exploratory items above. Their status:
 
-1. **Feature engineering** — add UniProt keyword annotations (Antimicrobial, Defensin, Signal, etc.) as a downweight signal in the candidate ranker. Doesn't change classification flags; changes ranking order. ~6 h backend work. Listed as open follow-up in Packet 1 §11.6.
-2. **Different scoring rule entirely** — instead of "SSW positive AND hydrophobicity > threshold," use a multi-feature linear (or learned) combination. This would need labeled training data and is honestly a different paper.
-3. **Splitting the positive class** — instead of one "FF-SSW" flag, output two flags: "amphipathic-switch candidate" (current behavior, broad recall) and "amyloid-switch candidate" (narrower, would need an AMP-discriminator). The user picks which they want.
-4. **Different validation set** — Staphylococcus 2023 is one dataset. If Peleg has access to another labeled set (her lab's, or one she trusts), we'd rerun.
+1. **Feature engineering** (UniProt keyword surfacing) — **APPROVED with a caveat**. Drive Comment 8: keyword chips on each peptide row are valuable. AMP-downweight in the ranker should be opt-in (toggle off by default) — she does not want this auto-applied. Wave 2.6 backend work scheduled.
+2. **Different scoring rule entirely** — **REJECTED by Peleg in Drive Comment 9**: *"at this point this is really not feasible. in order to test a new set of features we need much much more examples than what we have."* Dropping this path; PVL stays with the current sequence-derived heuristic + threshold approach.
+3. **Splitting the positive class** — **REJECTED in Drive Comment 10**: *"Not sure how it is different than what we already have. we already provide a secondary structure switch flag, and an fibril forming secondary structure switch flag."* PVL already has the broader SSW and narrower FF-SSW pair — we were proposing to duplicate existing structure. Dropping.
+4. **Different validation set** — **NOT AVAILABLE** per Drive Comment 11. Peleg's two reasons: (a) most published work doesn't try to characterize multi-state SSW behavior, so there's no second labeled dataset she trusts; (b) fibril formation is conditional on environmental conditions, so any "did not form fibrils" call is provisional. Staphylococcus 2023 is what we use. The paper limitations section will state this explicitly.
 
-Any of these is on the table. None are commitments yet — they all require her input on which is worth doing in what order.
+So of the four exploratory items, only the first (UniProt keyword chip + opt-in downweight) survives. Wave 2.6 ships that.
 
 ### The framing question
 

@@ -12,15 +12,7 @@
  */
 
 import { useMemo } from "react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell } from "recharts";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import { CHART_COLORS } from "@/lib/chartConfig";
 import type { Peptide } from "@/types/peptide";
@@ -54,6 +46,16 @@ export interface ClassificationComparisonProps {
 
 // ── Pre-built classification configs ──
 
+// Color scheme: positive findings (SSW / Helix / FF-*) get green; negative
+// (No SSW / No Helix) gets brown-orange. Per Peleg Drive comment on the
+// Cohort Comparison slide (2026-06-03): "SSW should be green, since this is
+// a more positive color to match the positive results."
+const POS_NEG_COLORS = {
+  noFinding: "hsl(25 85% 50%)", // brown-orange
+  finding: "hsl(142 60% 50%)", // medium green
+  ffFinding: "hsl(142 58% 36%)", // darker green
+};
+
 export const SSW_CLASSIFICATION: ClassificationScheme = {
   id: "ssw",
   label: "SSW Status",
@@ -64,9 +66,9 @@ export const SSW_CLASSIFICATION: ClassificationScheme = {
   },
   groupOrder: ["No SSW", "SSW", "FF-SSW"],
   colors: {
-    "No SSW": "hsl(var(--muted-foreground))",
-    SSW: "hsl(var(--ssw))",
-    "FF-SSW": "hsl(var(--ff-ssw))",
+    "No SSW": POS_NEG_COLORS.noFinding,
+    SSW: POS_NEG_COLORS.finding,
+    "FF-SSW": POS_NEG_COLORS.ffFinding,
   },
 };
 
@@ -81,9 +83,9 @@ export const HELIX_CLASSIFICATION: ClassificationScheme = {
   },
   groupOrder: ["No Helix", "Helix", "FF-Helix"],
   colors: {
-    "No Helix": "hsl(var(--muted-foreground))",
-    Helix: "hsl(var(--helix))",
-    "FF-Helix": "hsl(var(--ff-helix))",
+    "No Helix": POS_NEG_COLORS.noFinding,
+    Helix: POS_NEG_COLORS.finding,
+    "FF-Helix": POS_NEG_COLORS.ffFinding,
   },
 };
 
@@ -110,9 +112,7 @@ function computeMedian(values: number[]): number {
   if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 !== 0
-    ? sorted[mid]
-    : (sorted[mid - 1] + sorted[mid]) / 2;
+  return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
 interface GroupData {
@@ -202,8 +202,7 @@ export function ClassificationComparison({
     const colors: Record<string, string> = {};
     groupNames.forEach((name, i) => {
       colors[name] =
-        classification.colors?.[name] ??
-        DEFAULT_GROUP_COLORS[i % DEFAULT_GROUP_COLORS.length];
+        classification.colors?.[name] ?? DEFAULT_GROUP_COLORS[i % DEFAULT_GROUP_COLORS.length];
     });
     return colors;
   }, [groupNames, classification.colors]);
@@ -227,17 +226,13 @@ export function ClassificationComparison({
 
   return (
     <div>
-      <ChartContainer
-        config={chartConfig}
-        className={`h-[${height}px]`}
-        style={{ height }}
-      >
+      <ChartContainer config={chartConfig} className={`h-[${height}px]`} style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={chartData}
             margin={{ top: 20, right: 30, bottom: 35, left: 40 }}
             barGap={2}
-            barCategoryGap="20%"
+            barCategoryGap="35%"
           >
             <CartesianGrid strokeOpacity={0.3} />
             <XAxis

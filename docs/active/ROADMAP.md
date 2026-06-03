@@ -416,6 +416,45 @@ In Sentry dashboard (manual setup, document in `docs/active/SENTRY_RUNBOOK.md`):
 
 ---
 
+## Phase D6: Round-3 Design Parity — every page to home-page quality (NEW 2026-05-22)
+
+**Goal**: Phase D1 brought the home page + sidebar to Stripe-quality light-first design. Round 2 (Peleg PPT polish + V10-1/V10-3) tightened individual components. Round 3 = bring **every secondary surface** to the same design quality as the home page, with Peleg's confusion patterns (from her Drive comments on the submitted docs) used as the redesign brief.
+
+**Trigger**: Said directive 2026-05-22. Co-driven by Peleg's Drive-comments confusion map (produced by Claude Code) + Cowork's design execution.
+
+**Scope (in priority order)**:
+
+| ID | Surface | Why it needs Round 3 | Owner | Effort |
+|---|---|---|---|---|
+| D6.1 | **About page** | Said called this out specifically — current Cowork V10-1 hero is good but the rest of the page is below home-page quality. | Cowork V11-1 | 12-16h |
+| D6.2 | **Help / Documentation pages** | Where Peleg's biggest confusion landed — definitions, methods, FF-Helix/FF-SSW explanations. Round 3 makes them clearer in addition to prettier. | Cowork V11-2 + T3 wire | 16-20h |
+| D6.3 | **Compare (cohort comparison)** | Currently functional but visually thin. Should match home-page calm + spacing. | Cowork V11-3 | 8-12h |
+| D6.4 | **QuickAnalyze** | Single-peptide flow improvements (per B3 + the AlphaFold and biochem cards) + design parity. | Cowork V11-4 + T3 wire | 8-12h |
+| D6.5 | **PeptideDetail** | Already redesigned (open layout per feedback_design_peptidedetail.md), but individual cards need parity polish. | Cowork V11-5 | 12-16h |
+| D6.6 | **Upload** | Already good post-V10. Targeted polish only — drag-drop affordance, progress block, threshold-tuner integration. | Cowork V11-6 | 4-8h |
+| D6.7 | **Results dashboard** | Tab system + KPI strip + chart frames. Component-level polish, not a full redesign. | Cowork V11-7 | 8-12h |
+
+**Total estimated effort**: 70-100h Cowork + ~30-40h T3 wiring.
+
+**Process** (refined from V10-1 / V10-3 success):
+1. Claude Code reads Peleg's Drive comments + produces a `PELEG_DRIVE_COMMENTS_CONFUSION_MAP.md` mapping each comment to (page, component, suggested redesign).
+2. Cowork takes confusion map + designs each surface, one at a time, presenting visual options.
+3. Said gives taste-level feedback per surface.
+4. T3 wires the accepted design into the repo.
+5. Said posts comment-replies in Drive after each surface lands ("we redesigned X based on your feedback — check it on the live URL").
+
+**Out of scope for D6**:
+- Mobile responsiveness deep work (lives in D2)
+- New scientific features (lives in Phase A / Phase B)
+- New chart types (lives in D3 parked, B3 Plotly)
+- Backend changes (none expected for design parity)
+
+**Dependencies**:
+- Claude Code must finish reading Drive docs first (otherwise Cowork designs blind to Peleg's questions)
+- Peleg replies on the Wave 2.5 email (her D-items + Q-items may add scope)
+
+---
+
 ## Phase D5: V4 Transformative Differentiators (Wave V4)
 
 The "first of its kind" round. Three additions no peptide tool has, that make PVL genuinely transformative.
@@ -896,20 +935,53 @@ CEO terminal (T1) plans waves; sub-terminals (T2/T3/T-PEL/Cowork) execute. T1 co
 | **J** | MCP server (G1) | T2 | Natural-language queries |
 | **T-PEL** | Peleg scientific REVIEWER role (not implementer) — reviews diffs from P0-P5 against PELEG_FEEDBACK_INSTRUCTIONS.md | T-PEL | All Peleg items verified before T1 commits |
 
-### Wave 2.5 (post-Wave-2, pre-Wave-3) — Peleg PPT response
+### Wave 2.6 (post-Wave-2.5) — Peleg Drive comments + new authoritative answers — IN PROGRESS 2026-06-03
 
-**ISSUE-032 — FF-SSW axiom violation** (T-DEBUG, P0, BLOCKS rest of Wave 2.5)
-Surfaced by Peleg 2026-05-19. Repro: P85089, P0C005 render `SSW=false` + `FF-SSW=true`. `compute_4category_flags` enforces axiom but data path bypasses it. See `T_DEBUG_DISPATCH_FFSSW_AXIOM.md` for 3-phase root-cause dispatch (UNDERSTAND → SPECULATE → FIX). Also adds API-boundary invariant assertion + axiom-violation tests. Mirror-check `FF-Helix → Helix`.
+Triggered by Peleg's 27 inline Drive comments on the v1 follow-up doc (2026-05-22) plus a second batch of authoritative answers (2026-06-03). Lands as one bundled push before tomorrow's Zoom (2026-06-04).
 
-**Wave 2.5 fix-pack** (T3 + Cowork, P1, dispatched AFTER ISSUE-032 closes)
-11 confirmed misses from Peleg PPT audit (see `docs/active/PELEG_REVIEW_TASKS.md` §2 and `docs/active/RESPONSES/peleg_2026_05_18_response.md` §2). Includes F1 cohort→database sweep, F2 Cutoff suffix drop, F3-F11 axis labels / histogram styling / color collisions / sequence-length warning / Beta% threshold / ranking labels. ETA 5-7 days.
+**Round 1 (shipping in T6 push tonight)**:
+- ✅ AlphaFold-predicted structure title rename + 7 column tooltip rewrites (incl. AMP / membrane-active framing on FF-SSW)
+- ✅ KLVFFAE (Aβ16-22) added to canary suite as the pipeline-appropriate amyloid control; Aβ42 kept with explicit "past pipeline length" note
+- ✅ RB-VALIDATION + Packet 1 §11.7-§11.8 + Packet 2 §4-§5 rewritten with "shared fibril-forming biophysics" framing (not "false-positive class")
+- ✅ Q5 reinterpreted as **symmetry-of-treatment** (not SSW ⊆ Helix axiom)
+- ✅ 40-aa pipeline cap encoded as default — `PEPTIDE_LENGTH_HARD_MAX/USER_OVERRIDE_MIN/MAX` in `config.py`, `S4PRED_MAX_LENGTH` default 100→40, Upload + QuickAnalyze warning copy rewritten ("surface-vs-structure problem")
+- ✅ Cohort Comparison chart: colour swap (No SSW = brown-orange, SSW = green, FF-SSW = darker green) + widened feature spacing; applied symmetrically to Helix grouping
+- ✅ FF-Helix vs Aggregation Max scatter: axis labels + static legend (Current / Database) below the chart
+- ✅ `PELEG_FOLLOWUP_DOC_V2.md` folded in Peleg's latest authoritative answers; Q1 (length cap), Q4 (TANGO stretch), Q5 (black-G), Q6 (DOI) restructured
 
-**Co-design items** (Said + Peleg + optionally Alex, scheduled via Zoom)
-- D1: Interpretation Notes decision tree
-- D2: 4-class labeling and ordering sign-off
-- D3: Tier 1 / 80% certainty derivation
-- D4: Smart Ranking preset weights
-- D5: SSW Score in ranking metrics — drop entirely?
+**Round 2 (Wave 2.7, post-Zoom)**:
+- Hard-reject route enforcement for >40-aa sequences (currently only default-skipped via S4PRED cap)
+- Help.tsx rewritten with Peleg's exact 4 sections (Helix / FF-Helix / SSW / FF-SSW)
+- "FF-Helix %" → "Helix %" full label audit (column header, ranking slider, badges)
+- Black-G residue colouring derived from fragment columns (Helix-S4PRED, SSW-TANGO, SSW-S4PRED) with gap-≤-3 smoothing
+- TANGO aggregation stretch method (needs Peleg's code reference; see V2 doc Q4)
+- 5-surface ecosystem docs (CLI / pvl-py / MCP / Docker / Web)
+- Signed-charge handling on Cohort Comparison (PELEG-Q-FIX-022)
+
+### Wave 2.5 (post-Wave-2, pre-Wave-3) — Peleg PPT response — ✅ LOCKED 2026-05-21
+
+PR #64 (merge commit `fc19747`) shipped. Deploy run 26241797795 success in 2m54s. FF-axiom canary smoke green on live VPS. Plan + retrospective at `docs/active/WAVE_2_5_LOCK_IN_PLAN.md`. Three external follow-up packets (`PELEG_FOLLOWUP_TECHNICAL_PACKET.md`, `PELEG_FOLLOWUP_PACKET_2_FULL_UPDATE.md`, `PELEG_FOLLOWUP_PACKET_3_DIRECT_QA.md`) emailed to Peleg + Alex 2026-05-21.
+
+**Shipped in this wave**:
+- ✅ **ISSUE-032** — FF-SSW axiom violation root-fixed at 3 backend layers + 9 invariant tests
+- ✅ **ISSUE-033** — ESM-2 inline indexing perf regression → background executor
+- ✅ **TANGO per-predictor verdict preservation** (4-layer fix + 4 new regression tests)
+- ✅ **F1-F11 cosmetic sweep** — cohort→database (where applied), Cutoff suffix drop, axis labels, histogram styling, color collisions, sequence-length warning, Beta% subcards removed, ranking % labels
+- ✅ **B1 tab persistence + B2 permalink-decode** — `/results` state restores from URL
+- ✅ **B3 Quick Analyze symmetry** — Helix/SSW/FF-Helix/FF-SSW visible, default-thresholds pill
+- ✅ **B4a S4PRED warm-up at startup** + **LD2 large-dataset budget + auto-disable**
+- ✅ **AUDIT-2** — KPI tangoUnavailable gating removed (canonical OR definition)
+- ✅ **A6 paper figure pack** wired into Results Export dropdown with permalink in methods panel
+- ✅ **Validation suite** — Staphylococcus 2023 benchmark + 13-canary suite (5 known-FP AMPs documented)
+- ✅ **22 jobStore test failures** → 0 (Node 25 localStorage shadowing fix)
+- ✅ **UniProtQueryInput** fully migrated to V10-3 sync-job pattern
+- ✅ **LICENSE → MIT**
+
+**Awaiting Peleg reply** (4 Q-items): S4PRED <15aa citation, dual helix % labels, ranking %% meaning, modern alternative to Chou-Fasman.
+
+**Awaiting Peleg co-design** (6 D-items): D1 Interpretation Notes, D2 4-class labels, D3 Tier 1 derivation, D4 ranking weights, D5 SSW Score scope, D6 charge handling (signed vs |abs|).
+
+**Wave 2.6 candidates** (filed but unscheduled — assemble after Peleg replies): F12-F21 — sliding-window clarity, hydrophobic metric dedup, percentile note, BiochemComparison parent grouping, sequence color tooltip, overlay rename, TANGO 5% threshold rationale, FF-Helix scatter labels, missing-value tooltip, threshold source-of-value label.
 
 **Absorbed waves**:
 - ~~Wave D (chart leftovers CH1, CH3, CH4, CH5, CH7, P7, P8)~~ → absorbed into P1+P2+P3 (most overlap with Peleg's fixes)
