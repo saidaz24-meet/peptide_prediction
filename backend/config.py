@@ -208,8 +208,13 @@ class Settings:
     # Source: docs/active/UNIPROT_TIMEOUT_INVESTIGATION.md — APP (770 aa) on the
     # 5-model BiLSTM ensemble takes ~2 minutes alone; PVL is a peptide tool, so
     # any sequence longer than this is skipped with a warning surfaced via meta.
-    S4PRED_MAX_LENGTH: int = int(os.getenv("S4PRED_MAX_LENGTH", "100"))
-    """Maximum sequence length S4PRED will run on (Wave B default: 100 aa). Sequences exceeding this are skipped with a `s4pred_skipped_long_seq` warning and the row's S4PRED fields stay null."""
+    #
+    # Wave 2.6 (2026-06-03): Peleg confirmed via Drive that the pipeline's
+    # appropriate maximum is 40 aa — above that the secondary-structure prediction
+    # becomes a surface-vs-structure problem and the FF-Helix / SSW logic loses
+    # meaning. Default dropped 100 → 40 to align with the peptide-tool framing.
+    S4PRED_MAX_LENGTH: int = int(os.getenv("S4PRED_MAX_LENGTH", "40"))
+    """Maximum sequence length S4PRED will run on (Wave 2.6 default: 40 aa, per Peleg). Sequences exceeding this are skipped with a `s4pred_skipped_long_seq` warning and the row's S4PRED fields stay null."""
 
     # ============================================================================
     # Wave 2.5 §LD2 — Large-dataset resilience
@@ -226,9 +231,7 @@ class Settings:
     # Both defaults come from Alex's concurrency-feedback backlog (LD2). Raise
     # via env var if your VPS has the headroom; lower it on shared hardware.
 
-    MAX_PEPTIDES_PER_RUN_WITH_TANGO: int = int(
-        os.getenv("MAX_PEPTIDES_PER_RUN_WITH_TANGO", "500")
-    )
+    MAX_PEPTIDES_PER_RUN_WITH_TANGO: int = int(os.getenv("MAX_PEPTIDES_PER_RUN_WITH_TANGO", "500"))
     """Budget for TANGO inclusion in a single upload run (default: 500).
     Above this, TANGO is auto-disabled and a ``tango_auto_disabled`` warning
     is surfaced — S4PRED + FF-Helix still run."""
@@ -240,9 +243,7 @@ class Settings:
     5000). Above this, the input is truncated and a ``dataset_truncated``
     warning is surfaced. Tune downward on shared / low-memory hosts."""
 
-    TANGO_PER_PEPTIDE_TIMEOUT_S: float = float(
-        os.getenv("TANGO_PER_PEPTIDE_TIMEOUT_S", "60.0")
-    )
+    TANGO_PER_PEPTIDE_TIMEOUT_S: float = float(os.getenv("TANGO_PER_PEPTIDE_TIMEOUT_S", "60.0"))
     """Per-peptide TANGO wall-clock budget (default: 60 s). Effective only as
     a per-row guard inside the batch wrapper — the existing batch-level
     timeout (``tango_timeout`` in ``tango.py``) still applies."""
@@ -269,14 +270,27 @@ class Settings:
     PEPTIDE_LENGTH_WARN_MIN: int = 15
     """S4PRED unreliable below this length"""
 
-    PEPTIDE_LENGTH_WARN_MAX: int = 100
-    """TANGO accuracy degrades above this length"""
+    PEPTIDE_LENGTH_WARN_MAX: int = 40
+    """TANGO accuracy degrades above this length. Wave 2.6 (2026-06-03): dropped 100 → 40 per Peleg — above 40 aa the calculation becomes a surface problem and the FF-Helix / SSW logic loses meaning."""
 
     PEPTIDE_LENGTH_OPTIMAL: int = 40
-    """S4PRED supervised training minimum"""
+    """S4PRED supervised training minimum / pipeline upper bound (Peleg-confirmed 2026-06-03)."""
 
     PEPTIDE_LENGTH_TANGO_MIN: int = 5
     """TANGO absolute minimum sequence length"""
+
+    # Wave 2.6 (2026-06-03): pipeline-appropriate sequence-length window per
+    # Peleg's Drive answer. Hard upper bound = 40 aa (above this the secondary
+    # structure prediction becomes a surface problem; FF-Helix / SSW logic loses
+    # meaning). User-customisable override allowed only within [10, 40].
+    PEPTIDE_LENGTH_HARD_MAX: int = int(os.getenv("PEPTIDE_LENGTH_HARD_MAX", "40"))
+    """Hard upper bound on a single peptide sequence length (default: 40 aa, Peleg-set)."""
+
+    PEPTIDE_LENGTH_USER_OVERRIDE_MIN: int = 10
+    """Lowest value the user is allowed to set as their own length cap."""
+
+    PEPTIDE_LENGTH_USER_OVERRIDE_MAX: int = 40
+    """Highest value the user is allowed to set as their own length cap."""
 
     # ============================================================================
     # Celery / Redis Configuration

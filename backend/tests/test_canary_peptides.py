@@ -39,6 +39,7 @@ False positives:
     future "fix" surfaces as a visible diff that a scientific reviewer
     must approve.
 """
+
 from __future__ import annotations
 
 import os
@@ -249,7 +250,31 @@ CANARIES: List[Dict[str, Any]] = [
             "residue content) — the canary documents the SHAPE of the "
             "biochem signature (low µH, slightly negative charge from "
             "the H residues at partial protonation), not the prediction "
-            "verdict."
+            "verdict. "
+            "NOTE 2026-05-22: Peleg flagged that 42 aa is past PVL's "
+            "recommended pipeline length (Drive Comment 6). Kept in suite "
+            "as the canonical reference; the short fragment Abeta_16_22 "
+            "below is the pipeline-appropriate amyloid control."
+        ),
+        "_KNOWN_FALSE_POSITIVE": False,
+    },
+    {
+        "id": "Abeta_16_22",
+        "sequence": "KLVFFAE",
+        "expected": {
+            "Length": 7,
+        },
+        "rationale": (
+            "Aβ16-22 (KLVFFAE) — canonical short amyloid-forming fragment. "
+            "Balbach et al., Biochemistry 39:13748–13759 (2000), "
+            "DOI 10.1021/bi002095n — first paper to prove this 7-residue "
+            "core forms cross-β fibrils on its own. PDB structures 1OW7 "
+            "and 2BEG. Added 2026-05-22 per Peleg Drive Comment 6 as the "
+            "pipeline-appropriate amyloid positive control (replaces Aβ42's "
+            "role for length-cap-bounded validation). Expected: FF-Helix "
+            "or FF-SSW positive; the canary pins length only here, since "
+            "the predictor verdict will be filled in once the suite runs "
+            "with TANGO + S4PRED enabled in the integration cycle."
         ),
         "_KNOWN_FALSE_POSITIVE": False,
     },
@@ -324,6 +349,7 @@ CANARIES: List[Dict[str, Any]] = [
 # Helpers
 # --------------------------------------------------------------------------
 
+
 def _run_pipeline(sequence: str, entry: str) -> Dict[str, Any]:
     """Run the biochem + FF-helix-percent subset of the production pipeline.
 
@@ -379,6 +405,7 @@ def _assert_close(actual: Any, expected: Any, field: str, canary_id: str, ration
 # Tests
 # --------------------------------------------------------------------------
 
+
 @pytest.mark.parametrize("canary", CANARIES, ids=[c["id"] for c in CANARIES])
 def test_canary_prediction_pinned(canary: Dict[str, Any]) -> None:
     """Run a single canary through the biochem pipeline and assert pinned outputs.
@@ -417,8 +444,17 @@ def test_canary_registry_metadata() -> None:
         assert isinstance(canary["_KNOWN_FALSE_POSITIVE"], bool), (
             f"Canary {cid} _KNOWN_FALSE_POSITIVE must be bool"
         )
-        # Control sequences (Poly_GS_linker) are exempt from the citation
-        # requirement — they're textbook negative controls.
+        # Control sequences (Poly_GS_linker, Poly_E_curiosity) are exempt
+        # from the citation requirement — they serve as REGRESSION CANARIES
+        # for the FF-Helix percentage calculation, not as biological negative
+        # controls. Per Peleg's Drive comment 2026-05-22: "in the field of
+        # fibril or amyloid formation it is very hard to define a negative
+        # control, since fibril or amyloid formation is very dependent on
+        # environmental conditions" — so we explicitly do NOT assert these
+        # sequences "do not form fibrils." Their job is to detect any future
+        # drift in the FF-Helix % math (e.g., Poly_E flagging 100% FF-Helix
+        # despite −16 net charge would surface immediately if that ever
+        # changed). See PELEG_DRIVE_COMMENTS_CONFUSION_MAP.md Comment 7.
         if cid not in ("Poly_GS_linker", "Poly_E_curiosity"):
             has_citation = any(marker in canary["rationale"] for marker in citation_markers)
             assert has_citation, (
