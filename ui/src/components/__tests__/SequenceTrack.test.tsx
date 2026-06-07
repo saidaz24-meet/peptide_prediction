@@ -66,6 +66,51 @@ describe("SequenceTrack legend", () => {
     expect(container.textContent).not.toContain("(0%)");
   });
 
+  // 2026-06-07 regression — black-G bug. A residue that S4PRED's per-residue
+  // argmax calls "C" (coil) but that sits INSIDE a helix fragment range
+  // (Peleg's gap-smoothed `Helix fragments (S4PRED)`) MUST render as helix.
+  // Driver: residue colour ought to derive from fragment ranges first, raw
+  // per-residue argmax only as a fallback for residues outside any fragment.
+  it("residue inside a helix fragment renders helix even when ssPrediction says coil", () => {
+    // Sequence GIGAVLKVLT — 10 aa, S4PRED says C for the G at index 5 (1-indexed:6)
+    // but Peleg's gap-smoothed helix fragment spans 1-10 covering it.
+    const p = makePeptide({
+      sequence: "GIGAVLKVLT",
+      length: 10,
+      s4predHelixPercent: 90,
+      betaPercent: 0,
+      s4pred: {
+        ssPrediction: ["H", "H", "H", "H", "H", "C", "H", "H", "H", "H"],
+        helixSegments: [[1, 10]],
+      },
+    });
+    const { container } = render(<SequenceTrack peptide={p} />);
+    // All 10 residue spans should have the helix colour applied. We check via
+    // the inline style — helix uses `hsl(var(--helix))`.
+    const residueSpans = container.querySelectorAll("span[style*='helix']");
+    expect(residueSpans.length).toBeGreaterThanOrEqual(10);
+  });
+
+  it("residue outside any fragment falls back to per-residue argmax", () => {
+    // Helix fragment covers 1-5 only. Residue at 1-indexed:8 has ssPrediction "E"
+    // and no fragment owns it — should render beta colour from the fallback path.
+    const p = makePeptide({
+      sequence: "AAAAAAEEEE",
+      length: 10,
+      s4predHelixPercent: 50,
+      betaPercent: 40,
+      s4pred: {
+        ssPrediction: ["H", "H", "H", "H", "H", "C", "C", "E", "E", "E"],
+        helixSegments: [[1, 5]],
+      },
+    });
+    const { container } = render(<SequenceTrack peptide={p} />);
+    // Beta colour uses `hsl(var(--beta))` via the style attribute — at least
+    // one residue should pick this up via the fallback path.
+    const betaSpans = container.querySelectorAll("span[style*='beta']");
+    expect(betaSpans.length).toBeGreaterThanOrEqual(1);
+  });
+
   // Q.2 — parity test against the canonical s4predHelixPercent.
   // Said's screenshot showed Amyloid-β(25-35) "AIKKYEEKNKKSSRLFIFRK"
   // with Helix (30%). Lock that the rendered legend % equals
