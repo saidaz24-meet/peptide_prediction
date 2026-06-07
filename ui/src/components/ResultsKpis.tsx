@@ -160,12 +160,8 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
     return {
       lengths: allPeptides.map((p) => p.length ?? 0).filter((v) => v > 0),
       muH: allPeptides.map((p) => p.muH ?? 0).filter((v) => v !== 0),
-      s4predHelix: allPeptides
-        .map((p) => p.s4predHelixPercent ?? 0)
-        .filter((v) => v !== 0),
-      hydro: allPeptides
-        .map((p) => p.hydrophobicity ?? 0)
-        .filter((v) => v !== 0),
+      s4predHelix: allPeptides.map((p) => p.s4predHelixPercent ?? 0).filter((v) => v !== 0),
+      hydro: allPeptides.map((p) => p.hydrophobicity ?? 0).filter((v) => v !== 0),
     };
   }, [allPeptides]);
 
@@ -196,27 +192,40 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
     return `${value.toFixed(decimals)}%`;
   };
 
-  // FIX-004: Reorder per Peleg — Total → % FF-Helix → % SSW → % FF-SSW
-  // Subtitles use Peleg's 4-category definitions with proper Greek μ
+  // 2026-06-07 (Peleg symmetry-of-treatment rule, Drive comment Q5):
+  // Replace the "Total Peptides" card with a "% Helix" card so the 4-card
+  // row treats every class symmetrically — Helix↔SSW and FF-Helix↔FF-SSW.
+  // Total Peptides moves to a sub-header line rendered above this grid.
+  // Order: %Helix → %FF-Helix → %SSW → %FF-SSW (base classes first, then FF).
   const kpis = [
     {
-      titleKey: "total",
-      title: "Total Peptides",
-      value: stats.totalPeptides.toLocaleString(),
-      icon: PeptideChainIcon,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-      accentColor: undefined as string | undefined,
-      sparklineValues: distributions.lengths,
-      sparklineColor: "hsl(var(--primary))",
+      titleKey: "helix",
+      title: (
+        <>
+          % <Abbr title="α-Helix prediction">Helix</Abbr>
+        </>
+      ),
+      value: formatPercent(stats.helixPositivePercent),
+      icon: HelixToFibrilIcon,
+      color: "text-[hsl(var(--helix))]",
+      bgColor: "bg-[hsl(var(--helix))]/10",
+      accentColor: "hsl(var(--helix))",
+      sparklineValues: distributions.s4predHelix,
+      sparklineColor: "hsl(var(--helix))",
       animationType: "none" as const,
       metricId: null as MetricId | null,
       onClick: () => {
-        setTableFilter(null);
+        setTableFilter({
+          label: "Helix Positive",
+          field: "s4predHelixPrediction",
+          value: 1,
+        });
         setActiveTab("data");
       },
       clickable: true,
-      subtitle: undefined as string | undefined,
+      subtitle: "S4PRED-predicted helix segment detected",
+      tooltip:
+        "Percentage of peptides with at least one detected S4PRED helix segment (Helix prediction = 1 in Peleg's algorithm). Base class for FF-Helix.",
     },
     {
       titleKey: "ff-helix",
@@ -298,89 +307,98 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-      {kpis.map((kpi, index) => {
-        const Icon = kpi.icon;
-        const hasAccent = !!kpi.accentColor;
+    <div className="space-y-3">
+      {/* Total Peptides moved out of the card row per Peleg symmetry rule —
+          rendered here as a small sub-header so the 4-card grid below is
+          purely classification-symmetric (Helix / FF-Helix / SSW / FF-SSW). */}
+      <p className="text-sm text-muted-foreground tabular-nums">
+        {stats.totalPeptides.toLocaleString()} peptide
+        {stats.totalPeptides === 1 ? "" : "s"} analysed
+      </p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {kpis.map((kpi, index) => {
+          const Icon = kpi.icon;
+          const hasAccent = !!kpi.accentColor;
 
-        // Determine animated icon wrapper
-        const renderIcon = () => {
-          const iconClass = `${kpi.color}`;
-          if (kpi.animationType === "pulse") {
-            return <PulseIcon icon={Icon} className={iconClass} disabled={!!shouldReduceMotion} />;
-          }
-          if (kpi.animationType === "sway") {
-            return <SwayIcon icon={Icon} className={iconClass} disabled={!!shouldReduceMotion} />;
-          }
-          return <Icon className={iconClass} size={20} />;
-        };
+          // Determine animated icon wrapper
+          const renderIcon = () => {
+            const iconClass = `${kpi.color}`;
+            if (kpi.animationType === "pulse") {
+              return (
+                <PulseIcon icon={Icon} className={iconClass} disabled={!!shouldReduceMotion} />
+              );
+            }
+            if (kpi.animationType === "sway") {
+              return <SwayIcon icon={Icon} className={iconClass} disabled={!!shouldReduceMotion} />;
+            }
+            return <Icon className={iconClass} size={20} />;
+          };
 
-        return (
-          <motion.div
-            key={kpi.titleKey}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.08, duration: 0.5, ease: smoothEase }}
-          >
-            <Card
-              className="rounded-xl border-[hsl(var(--border))] shadow-soft cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-[hsl(var(--border-hover))] active:scale-[0.98] group overflow-hidden"
-              onClick={kpi.onClick}
+          return (
+            <motion.div
+              key={kpi.titleKey}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.08, duration: 0.5, ease: smoothEase }}
             >
-              <CardContent className="p-0">
-                <div
-                  className="flex h-full"
-                  style={hasAccent ? { borderLeft: `3px solid ${kpi.accentColor}` } : undefined}
-                >
-                  <div className="flex-1 p-5">
-                    <div className="flex items-start justify-between">
-                      {/* Left: metric content */}
-                      <div className="space-y-0.5 min-w-0">
-                        <p className="text-sm font-medium text-foreground">{kpi.title}</p>
-                        <motion.p
-                          className="text-3xl font-bold tracking-tight text-foreground"
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{
-                            delay: index * 0.08 + 0.2,
-                            type: "spring",
-                            stiffness: 200,
-                          }}
+              <Card
+                className="rounded-xl border-[hsl(var(--border))] shadow-soft cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-[hsl(var(--border-hover))] active:scale-[0.98] group overflow-hidden"
+                onClick={kpi.onClick}
+              >
+                <CardContent className="p-0">
+                  <div
+                    className="flex h-full"
+                    style={hasAccent ? { borderLeft: `3px solid ${kpi.accentColor}` } : undefined}
+                  >
+                    <div className="flex-1 p-5">
+                      <div className="flex items-start justify-between">
+                        {/* Left: metric content */}
+                        <div className="space-y-0.5 min-w-0">
+                          <p className="text-sm font-medium text-foreground">{kpi.title}</p>
+                          <motion.p
+                            className="text-3xl font-bold tracking-tight text-foreground"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{
+                              delay: index * 0.08 + 0.2,
+                              type: "spring",
+                              stiffness: 200,
+                            }}
+                          >
+                            {kpi.value}
+                          </motion.p>
+
+                          {/* Mini sparkline */}
+                          {kpi.sparklineValues.length > 0 && (
+                            <MiniSparkline
+                              values={kpi.sparklineValues}
+                              color={kpi.sparklineColor}
+                            />
+                          )}
+
+                          {/* Density bar for Total Peptides */}
+                          {kpi.titleKey === "total" && <DensityBar count={stats.totalPeptides} />}
+
+                          {kpi.subtitle && (
+                            <p className="text-xs text-muted-foreground mt-1.5">{kpi.subtitle}</p>
+                          )}
+                        </div>
+
+                        {/* Right: icon container */}
+                        <div
+                          className={`w-11 h-11 rounded-xl ${kpi.bgColor} flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 ml-3`}
                         >
-                          {kpi.value}
-                        </motion.p>
-
-                        {/* Mini sparkline */}
-                        {kpi.sparklineValues.length > 0 && (
-                          <MiniSparkline
-                            values={kpi.sparklineValues}
-                            color={kpi.sparklineColor}
-                          />
-                        )}
-
-                        {/* Density bar for Total Peptides */}
-                        {kpi.titleKey === "total" && (
-                          <DensityBar count={stats.totalPeptides} />
-                        )}
-
-                        {kpi.subtitle && (
-                          <p className="text-xs text-muted-foreground mt-1.5">{kpi.subtitle}</p>
-                        )}
-                      </div>
-
-                      {/* Right: icon container */}
-                      <div
-                        className={`w-11 h-11 rounded-xl ${kpi.bgColor} flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 ml-3`}
-                      >
-                        {renderIcon()}
+                          {renderIcon()}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        );
-      })}
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -198,6 +198,11 @@ export type DatasetStats = {
 
   meanS4predHelixPercent: number | null; // null when no S4PRED data available
 
+  // Helix positive percentage — symmetric to sswPositivePercent per Peleg's
+  // symmetry-of-treatment rule (Drive comment 2026-05-22 Q5). Counts peptides
+  // with detected S4PRED helix segments (s4predHelixPrediction === 1).
+  helixPositivePercent?: number | null;
+
   // FF candidate percentages
   ffHelixCandidatePercent?: number | null; // % of peptides with ffHelixFlag === 1
   ffSswCandidatePercent?: number | null; // % of peptides with ffSswFlag === 1 (gated on TANGO)

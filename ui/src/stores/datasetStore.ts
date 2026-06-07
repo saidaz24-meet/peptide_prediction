@@ -303,6 +303,20 @@ export const useDatasetStore = create<DatasetState>()(
         const sswPositivePercent =
           sswValidPeptides.length > 0 ? (sswPositive / sswValidPeptides.length) * 100 : null;
 
+        // Helix positive — symmetric to sswPositive per Peleg's symmetry rule.
+        // Counts peptides where S4PRED detected at least one helix segment
+        // (s4predHelixPrediction === 1 in Peleg's main.py:219-220 framing).
+        const helixValidPeptides = peptides.filter((p) => {
+          const v = p.s4predHelixPrediction;
+          if (v === null || v === undefined) return false;
+          return typeof v === "number" && !isNaN(v) && isFinite(v);
+        });
+        const helixPositive = helixValidPeptides.filter(
+          (p) => p.s4predHelixPrediction === 1
+        ).length;
+        const helixPositivePercent =
+          helixValidPeptides.length > 0 ? (helixPositive / helixValidPeptides.length) * 100 : null;
+
         // Helper for means (returns null if no valid values)
         const mean = (arr: number[]): number | null => {
           if (arr.length === 0) return null;
@@ -398,6 +412,7 @@ export const useDatasetStore = create<DatasetState>()(
         const stats: DatasetStats = {
           totalPeptides,
           sswPositivePercent,
+          helixPositivePercent,
           meanHydrophobicity,
           meanCharge,
           meanMuH,
