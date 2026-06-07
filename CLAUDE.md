@@ -23,20 +23,45 @@
 
 **STRICT**: Default read only `CLAUDE.md` + `docs/active/*`. These are the ONLY authoritative documentation files.
 
-**Active Context Pack** (docs/active/):
+**Three-bucket doc system** (clean-push policy, see `docs/internal/CLEAN_PUSH_POLICY_2026_06_07.md` for details):
+
+**`docs/active/`** — publishable architecture + scientific reference. ALWAYS readable.
 - **ACTIVE_CONTEXT.md** — Architecture overview, entrypoints, data flow, key modules
 - **TESTING_GUIDE.md** — Test commands, local setup, known failures
 - **CONTRACTS.md** — API endpoints, request/response shapes, UI requirements
 - **KNOWN_ISSUES.md** — Known bugs, limitations, workarounds
-- **PELEG_REVIEW_TASKS.md** — Holistic review task chunks (current priority)
 - **MASTER_DEV_DOC.md** — Consolidated architecture + decisions reference
 - **DEPLOYMENT.md** — VM specs, step-by-step deployment, K8s plan
 - **ROADMAP.md** — Strategic position, Phase A/B/C tasks, completed history
 - **DEVELOPER_REFERENCE.md** — Pipeline internals, null semantics, debugging
+- **DECISIONS.md** — ADR log
 - **SPECIALS.md** — Special handling rules
+- **CHANGELOG_PELEG.md** — Scientific changelog reviewed by Peleg
+- **MCP_RUNBOOK.md** — MCP server install + usage
+- **MOL3D_OVERLAY_SPEC.md** — Mol* overlay technical spec
+- **UNIPROT_ENRICHMENT_SPEC.md** — UniProt integration spec
+- **VECTOR_SEARCH_SPEC.md** — LanceDB + ESM-2 architecture
+- **SENTRY_RUNBOOK.md** — Sentry deployment runbook
+- **DESIGN_SYSTEM.md** — Tailwind + shadcn conventions
+- **ECOSYSTEM_GUIDE.md** — 5-surface reference
+- **A4_BIO_TOOLS_SUBMISSION.md** — bio.tools submission packet
+- **A5_ZENODO_RELEASE.md** — Zenodo release procedure
+- **PELEG_FOLLOWUP_DOC_V2.md** — current draft going to Peleg
+- **RESEARCH_BRIEFS/** — Scientific brief artifacts
+- **RESPONSES/** — Peleg / Alex response log
+- **cowork-dispatches/** — paste-ready Cowork prompts (V10-7, V10-8, V10-9)
+
+**`docs/internal/`** — development process artifacts. ASK before reading.
+Process docs (CLEAN_PUSH_POLICY, MASTER_PUSH_PLAN, TOP_CEO_RECOMMENDATIONS, COWORK_V10_DESIGN_QUEUE, ALEX_BACKLOG, PELEG_REVIEW_TASKS, STATUS, etc.) and dated one-shots (T2_T3_RESTART_2026_06_07, COMPACT_PUBLISH_LIST_2026_06_07, etc.). These are how-we-work docs, not what-we-ship.
+
+**`docs/archive/<date>/`** — frozen historical artifacts. READ ONLY for the why-trail.
+Sent packets (PELEG_FOLLOWUP_PACKET_*), completed audits (HELIX_PERCENTAGE_AUDIT, COVERAGE_AUDIT), pre-Zoom prep docs, superseded plans. Don't act on as current state.
 
 **DO NOT READ** unless explicitly requested:
-- Any markdown files outside `docs/active/`
+- `docs/internal/*` — process docs, ask first
+- `docs/archive/*` — historical, treat as frozen
+- Markdown files outside these three trees
+- `_external/` — Peleg's repo + paper copy, DO NOT redistribute
 
 **Before opening new files outside docs/active/**:
 1. Propose top 3 files you want to read

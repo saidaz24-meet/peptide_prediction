@@ -122,3 +122,19 @@ node_modules/.vite/
 
 # Local-only conflict backups (preserved for human reconciliation; not for commit)
 *.wave-2-5-local-backup
+
+# Clean-push policy 2026-06-08 — local-only working files
+docs/active/SESSION_LOG.md
+docs/active/*_DAILY_*.md
+docs/internal/*_DAILY_*.md
+_drafts/
+_external/
+.cursor/
+.vscode/
+# Terminal-dispatch one-shots (T1-T6 instruction docs, paste-once prompts)
+/T*-INSTRUCTIONS.md
+/T*_DISPATCH_*.md
+/T-PEL*.md
+/T_*.md
+/COWORK_*.md
+/README_EXPLAINER.md
