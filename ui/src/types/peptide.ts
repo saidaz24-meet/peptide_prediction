@@ -198,6 +198,9 @@ export type DatasetStats = {
 
   meanS4predHelixPercent: number | null; // null when no S4PRED data available
 
+  // Class-positive percentages — fraction of peptides classified into each class.
+  // Mirrors the SSW/FF-SSW pair so the KPI row is symmetric (Peleg 2026-06-07).
+  helixPositivePercent?: number | null; // % of peptides with s4predHelixPrediction === 1
   // FF candidate percentages
   ffHelixCandidatePercent?: number | null; // % of peptides with ffHelixFlag === 1
   ffSswCandidatePercent?: number | null; // % of peptides with ffSswFlag === 1 (gated on TANGO)

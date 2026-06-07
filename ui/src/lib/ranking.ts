@@ -68,7 +68,9 @@ export const ALL_METRICS: RankingMetric[] = [...DEFAULT_METRICS, ...OPTIONAL_MET
 export const METRIC_LABELS: Record<RankingMetric, string> = {
   tangoAggMax: "TANGO Aggregation Max",
   s4predHelixPercent: "S4PRED Helix %",
-  ffHelixPercent: "FF-Helix %",
+  // Peleg 2026-06-07: % is a feature, not a class — label as a raw score.
+  // Data field name (ffHelixPercent) retained for back-compat.
+  ffHelixPercent: "FF-Helix score",
   muH: "uH",
   sswScore: "SSW Score",
   hydrophobicity: "Hydrophobicity",

@@ -400,11 +400,9 @@ export default function PeptideDetail() {
                   FF-SSW: No
                 </Badge>
               ) : null}
-              {peptide.ffHelixPercent != null && (
-                <Badge variant="outline" className="text-xs text-muted-foreground">
-                  FF-Helix {peptide.ffHelixPercent.toFixed(0)}%
-                </Badge>
-              )}
+              {/* Peleg 2026-06-07 — classification row is for class flags only.
+                  FF-Helix % is a feature, not a class — its raw score lives in
+                  the scatter / table, not as a pill alongside class badges. */}
             </div>
 
             {/* Protein function — collapsible, 3 lines by default */}
@@ -646,11 +644,10 @@ export default function PeptideDetail() {
                         <XAxis
                           type="number"
                           dataKey="x"
-                          name="FF-Helix %"
-                          tickFormatter={(v) => `${v}%`}
+                          name="FF-Helix score"
                           domain={[0, 100]}
                           label={{
-                            value: "FF-Helix % (helix content × μH threshold)",
+                            value: "FF-Helix score",
                             position: "insideBottom",
                             offset: -10,
                             fontSize: 12,

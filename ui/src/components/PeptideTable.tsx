@@ -183,10 +183,14 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
   // data source (CSV upload, Quick Analyze, UniProt query). Gene name and
   // Protein function are kept off by default; users enable via Columns dropdown.
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
+    sequence: false, // Long string — column-toggle for power users
     species: false, // Secondary info — available via detail view
     geneName: false, // Optional: toggle via Columns dropdown
     proteinFunction: false, // Optional: toggle via Columns dropdown
     s4predSswPrediction: false, // S4PRED SSW is secondary to TANGO SSW
+    // Peleg 2026-06-07 — % is a feature, not a class. Hide Helix % by default;
+    // power users can re-enable via the Columns dropdown.
+    s4predHelixPercent: false,
     // PELEG-Q1-RESOLVED: ffHelixPercent column removed entirely.
     tangoSswResidues: false, // TANGO SSW residue overlap count — advanced
   });
@@ -302,19 +306,35 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         },
       }),
 
-      // 2. Length
-      columnHelper.accessor("length", {
+      // 2. Sequence (hidden by default; toggle via Columns dropdown)
+      columnHelper.accessor("sequence", {
         header: ({ column }) => (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="h-8 p-0 font-medium"
           >
-            Length
+            Sequence
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: (info) => <span className="font-mono">{info.getValue()}</span>,
+        cell: (info) => {
+          const seq = info.getValue() as string;
+          if (!seq) return <span className="text-muted-foreground">-</span>;
+          const shown = seq.length > 24 ? `${seq.slice(0, 24)}…` : seq;
+          return (
+            <TooltipProvider delayDuration={200}>
+              <UITooltip>
+                <TooltipTrigger asChild>
+                  <span className="font-mono text-xs">{shown}</span>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-[480px] break-all font-mono text-xs">
+                  {seq}
+                </TooltipContent>
+              </UITooltip>
+            </TooltipProvider>
+          );
+        },
       }),
 
       // 3. Helix (yes/no binary from S4PRED)
@@ -347,6 +367,34 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
       }),
 
       // 4. SSW (badge)
+      columnHelper.accessor("ffHelixFlag", {
+        // 4. FF-Helix (badge) — order Helix → FF-Helix → SSW → FF-SSW per Peleg 2026-06-07
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            FF-Helix
+            <HeaderTip tip="Fibril-forming-helix candidate. Triggered when S4PRED predicts helical structure AND the hydrophobic moment μH exceeds the database threshold. Thresholds derive from Ragonis-Bachar and Rayan (see Help for citation)." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        // Peleg FIX-005: feature-name text + --ff-helix token. Negative/null → em dash.
+        cell: (info) => {
+          const value = info.getValue();
+          if (value == null) return <span className="text-muted-foreground/50 text-xs">—</span>;
+          return value === 1 ? (
+            <Badge className="bg-ff-helix text-ff-helix-foreground hover:bg-ff-helix/90 text-xs">
+              FF-Helix
+            </Badge>
+          ) : (
+            <span className="text-muted-foreground text-xs">—</span>
+          );
+        },
+      }),
+
+      // 5. SSW (badge)
       columnHelper.accessor("sswPrediction", {
         header: ({ column }) => (
           <Button
@@ -382,33 +430,6 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         },
       }),
 
-      // 5. FF-Helix (badge)
-      columnHelper.accessor("ffHelixFlag", {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 p-0 font-medium"
-          >
-            FF-Helix
-            <HeaderTip tip="Fibril-forming-helix candidate. Triggered when S4PRED predicts helical structure AND the hydrophobic moment μH exceeds the database threshold. Thresholds derive from Ragonis-Bachar and Rayan (see Help for citation)." />
-            <ArrowUpDown className="ml-2 h-4 w-4" />
-          </Button>
-        ),
-        // Peleg FIX-005: feature-name text + --ff-helix token. Negative/null → em dash.
-        cell: (info) => {
-          const value = info.getValue();
-          if (value == null) return <span className="text-muted-foreground/50 text-xs">—</span>;
-          return value === 1 ? (
-            <Badge className="bg-ff-helix text-ff-helix-foreground hover:bg-ff-helix/90 text-xs">
-              FF-Helix
-            </Badge>
-          ) : (
-            <span className="text-muted-foreground text-xs">—</span>
-          );
-        },
-      }),
-
       // 6. FF-SSW (badge)
       columnHelper.accessor("ffSswFlag", {
         header: ({ column }) => (
@@ -436,25 +457,21 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
         },
       }),
 
-      /* ── Right side: bio calculations ── */
+      /* ── BioFeatures: length, charge, hydrophobicity, μH (Peleg 2026-06-07) ── */
 
-      // 7. Helix %
-      columnHelper.accessor("s4predHelixPercent", {
+      // 7. Length (moved out of Identity)
+      columnHelper.accessor("length", {
         header: ({ column }) => (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
             className="h-8 p-0 font-medium"
           >
-            Helix %
-            <HeaderTip tip="S4PRED helix content — percentage of residues part of detected helix segments (≥5 consecutive residues at P(Helix) ≥ 0.5 / total length)." />
+            Length
             <ArrowUpDown className="ml-2 h-4 w-4" />
           </Button>
         ),
-        cell: (info) => {
-          const value = info.getValue();
-          return <span className="font-mono">{value != null ? `${value.toFixed(1)}%` : "-"}</span>;
-        },
+        cell: (info) => <span className="font-mono">{info.getValue()}</span>,
       }),
 
       // 8. Charge
@@ -515,6 +532,65 @@ export function PeptideTable({ peptides }: PeptideTableProps) {
           </Button>
         ),
         cell: (info) => <span className="font-mono">{info.getValue()?.toFixed(2) || "-"}</span>,
+      }),
+
+      /* ── Predictor outputs: raw scores (Peleg 2026-06-07) ── */
+
+      // 11. TANGO aggregation max
+      columnHelper.accessor("tangoAggMax", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            TANGO max
+            <HeaderTip tip="Peak per-residue aggregation propensity from TANGO across the sequence. Higher = more aggregation-prone." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const v = info.getValue();
+          return <span className="font-mono">{v != null ? (v as number).toFixed(1) : "-"}</span>;
+        },
+      }),
+
+      // 12. S4PRED helix score (raw mean P(helix), not %)
+      columnHelper.accessor("s4predHelixScore", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            S4PRED score
+            <HeaderTip tip="Mean S4PRED helix probability across the sequence (raw score, not %). Distinct from the classification flag; useful for fine-grained ranking." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const v = info.getValue();
+          return <span className="font-mono">{v != null ? (v as number).toFixed(2) : "-"}</span>;
+        },
+      }),
+
+      // 13. Helix % (hidden by default — % is a feature, not a class)
+      columnHelper.accessor("s4predHelixPercent", {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
+            className="h-8 p-0 font-medium"
+          >
+            Helix %
+            <HeaderTip tip="S4PRED helix content — percentage of residues part of detected helix segments. Hidden by default; toggle via Columns." />
+            <ArrowUpDown className="ml-2 h-4 w-4" />
+          </Button>
+        ),
+        cell: (info) => {
+          const value = info.getValue();
+          return <span className="font-mono">{value != null ? `${value.toFixed(1)}%` : "-"}</span>;
+        },
       }),
 
       // PELEG-Q1-RESOLVED: FF-Helix % column removed from table (Chou-Fasman

@@ -379,6 +379,12 @@ export const useDatasetStore = create<DatasetState>()(
         const aggHotspotPercent =
           tangoDataPeptides.length > 0 ? (aggHotspots / tangoDataPeptides.length) * 100 : null;
 
+        // Helix class-positive count: s4predHelixPrediction === 1 (canonical
+        // class flag from S4PRED). Symmetric counterpart to sswPositivePercent.
+        const helixPositives = peptides.filter((p) => p.s4predHelixPrediction === 1).length;
+        const helixPositivePercent =
+          totalPeptides > 0 ? (helixPositives / totalPeptides) * 100 : null;
+
         // FF-Helix candidate count: ffHelixFlag === 1
         const ffHelixCandidates = peptides.filter((p) => p.ffHelixFlag === 1).length;
         const ffHelixCandidatePercent =
@@ -399,6 +405,7 @@ export const useDatasetStore = create<DatasetState>()(
           meanFFHelixPercent,
           meanS4predHelixPercent,
           meanLength,
+          helixPositivePercent,
           ffHelixCandidatePercent,
           ffSswCandidatePercent,
           // Add these for better UI display

@@ -20,7 +20,7 @@ import { Abbr } from "@/components/Abbr";
 import { useChartSelection } from "@/stores/chartSelectionStore";
 import { smoothEase } from "@/lib/animations";
 import {
-  PeptideChainIcon,
+  HelixIcon,
   HelixToFibrilIcon,
   StructuralSwitchIcon,
   SwitchToFibrilIcon,
@@ -78,23 +78,6 @@ function MiniSparkline({
         );
       })}
     </svg>
-  );
-}
-
-// ── Density Bar (Total Peptides) ────────────────────────────────────────────
-
-function DensityBar({ count, maxRef = 500 }: { count: number; maxRef?: number }) {
-  // Log-scale fill: 1 peptide = ~0%, maxRef = 100%
-  const fill = count <= 0 ? 0 : Math.min(Math.log10(count + 1) / Math.log10(maxRef + 1), 1);
-  return (
-    <div className="w-full h-1 rounded-full bg-primary/10 mt-2 overflow-hidden">
-      <motion.div
-        className="h-full rounded-full bg-primary"
-        initial={{ width: 0 }}
-        animate={{ width: `${fill * 100}%` }}
-        transition={{ duration: 0.8, ease: smoothEase }}
-      />
-    </div>
   );
 }
 
@@ -160,12 +143,8 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
     return {
       lengths: allPeptides.map((p) => p.length ?? 0).filter((v) => v > 0),
       muH: allPeptides.map((p) => p.muH ?? 0).filter((v) => v !== 0),
-      s4predHelix: allPeptides
-        .map((p) => p.s4predHelixPercent ?? 0)
-        .filter((v) => v !== 0),
-      hydro: allPeptides
-        .map((p) => p.hydrophobicity ?? 0)
-        .filter((v) => v !== 0),
+      s4predHelix: allPeptides.map((p) => p.s4predHelixPercent ?? 0).filter((v) => v !== 0),
+      hydro: allPeptides.map((p) => p.hydrophobicity ?? 0).filter((v) => v !== 0),
     };
   }, [allPeptides]);
 
@@ -196,27 +175,29 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
     return `${value.toFixed(decimals)}%`;
   };
 
-  // FIX-004: Reorder per Peleg — Total → % FF-Helix → % SSW → % FF-SSW
-  // Subtitles use Peleg's 4-category definitions with proper Greek μ
+  // Peleg 2026-06-07 — symmetry of treatment: every place SSW appears, Helix
+  // appears too. Order: % Helix → % FF-Helix → % SSW → % FF-SSW.
+  // Total Peptides is lifted out of the card row into a sub-header line below.
   const kpis = [
     {
-      titleKey: "total",
-      title: "Total Peptides",
-      value: stats.totalPeptides.toLocaleString(),
-      icon: PeptideChainIcon,
-      color: "text-primary",
-      bgColor: "bg-primary/10",
-      accentColor: undefined as string | undefined,
-      sparklineValues: distributions.lengths,
-      sparklineColor: "hsl(var(--primary))",
-      animationType: "none" as const,
+      titleKey: "helix",
+      title: <>% Helix</>,
+      value: formatPercent(stats.helixPositivePercent),
+      icon: HelixIcon,
+      color: "text-[hsl(var(--helix))]",
+      bgColor: "bg-[hsl(var(--helix))]/10",
+      accentColor: "hsl(var(--helix))",
+      sparklineValues: distributions.s4predHelix,
+      sparklineColor: "hsl(var(--helix))",
+      animationType: "pulse" as const,
       metricId: null as MetricId | null,
       onClick: () => {
-        setTableFilter(null);
+        setTableFilter({ label: "Helix Positive", field: "s4predHelixPrediction", value: 1 });
         setActiveTab("data");
       },
       clickable: true,
-      subtitle: undefined as string | undefined,
+      subtitle: "Peptides predicted as α-helical",
+      tooltip: "Percentage of peptides predicted helix by S4PRED",
     },
     {
       titleKey: "ff-helix",
@@ -239,9 +220,8 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
         setActiveTab("data");
       },
       clickable: true,
-      subtitle: "Helical + μH above threshold",
-      tooltip:
-        "Percentage of peptides predicted as fibril-forming α-helical (helix + μH above database threshold)",
+      subtitle: "Helix + μH above threshold",
+      tooltip: "Percentage of peptides predicted as fibril-forming α-helical",
     },
     {
       titleKey: "ssw",
@@ -298,89 +278,95 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
   ];
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-      {kpis.map((kpi, index) => {
-        const Icon = kpi.icon;
-        const hasAccent = !!kpi.accentColor;
+    <div className="space-y-3">
+      {/* Total Peptides — sub-header, NOT a card (Peleg 2026-06-07: KPI row is
+          for class-positive percentages; total count is context, not a metric). */}
+      <p className="text-xs text-muted-foreground" data-testid="kpi-total-subheader">
+        {stats.totalPeptides.toLocaleString()} peptide
+        {stats.totalPeptides === 1 ? "" : "s"} analysed
+      </p>
 
-        // Determine animated icon wrapper
-        const renderIcon = () => {
-          const iconClass = `${kpi.color}`;
-          if (kpi.animationType === "pulse") {
-            return <PulseIcon icon={Icon} className={iconClass} disabled={!!shouldReduceMotion} />;
-          }
-          if (kpi.animationType === "sway") {
-            return <SwayIcon icon={Icon} className={iconClass} disabled={!!shouldReduceMotion} />;
-          }
-          return <Icon className={iconClass} size={20} />;
-        };
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
+        {kpis.map((kpi, index) => {
+          const Icon = kpi.icon;
+          const hasAccent = !!kpi.accentColor;
 
-        return (
-          <motion.div
-            key={kpi.titleKey}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.08, duration: 0.5, ease: smoothEase }}
-          >
-            <Card
-              className="rounded-xl border-[hsl(var(--border))] shadow-soft cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-[hsl(var(--border-hover))] active:scale-[0.98] group overflow-hidden"
-              onClick={kpi.onClick}
+          // Determine animated icon wrapper
+          const renderIcon = () => {
+            const iconClass = `${kpi.color}`;
+            if (kpi.animationType === "pulse") {
+              return (
+                <PulseIcon icon={Icon} className={iconClass} disabled={!!shouldReduceMotion} />
+              );
+            }
+            if (kpi.animationType === "sway") {
+              return <SwayIcon icon={Icon} className={iconClass} disabled={!!shouldReduceMotion} />;
+            }
+            return <Icon className={iconClass} size={20} />;
+          };
+
+          return (
+            <motion.div
+              key={kpi.titleKey}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.08, duration: 0.5, ease: smoothEase }}
             >
-              <CardContent className="p-0">
-                <div
-                  className="flex h-full"
-                  style={hasAccent ? { borderLeft: `3px solid ${kpi.accentColor}` } : undefined}
-                >
-                  <div className="flex-1 p-5">
-                    <div className="flex items-start justify-between">
-                      {/* Left: metric content */}
-                      <div className="space-y-0.5 min-w-0">
-                        <p className="text-sm font-medium text-foreground">{kpi.title}</p>
-                        <motion.p
-                          className="text-3xl font-bold tracking-tight text-foreground"
-                          initial={{ opacity: 0, scale: 0.8 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          transition={{
-                            delay: index * 0.08 + 0.2,
-                            type: "spring",
-                            stiffness: 200,
-                          }}
+              <Card
+                className="rounded-xl border-[hsl(var(--border))] shadow-soft cursor-pointer transition-all duration-300 hover:shadow-lg hover:-translate-y-1 hover:border-[hsl(var(--border-hover))] active:scale-[0.98] group overflow-hidden"
+                onClick={kpi.onClick}
+              >
+                <CardContent className="p-0">
+                  <div
+                    className="flex h-full"
+                    style={hasAccent ? { borderLeft: `3px solid ${kpi.accentColor}` } : undefined}
+                  >
+                    <div className="flex-1 p-5">
+                      <div className="flex items-start justify-between">
+                        {/* Left: metric content */}
+                        <div className="space-y-0.5 min-w-0">
+                          <p className="text-sm font-medium text-foreground">{kpi.title}</p>
+                          <motion.p
+                            className="text-3xl font-bold tracking-tight text-foreground"
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            transition={{
+                              delay: index * 0.08 + 0.2,
+                              type: "spring",
+                              stiffness: 200,
+                            }}
+                          >
+                            {kpi.value}
+                          </motion.p>
+
+                          {/* Mini sparkline */}
+                          {kpi.sparklineValues.length > 0 && (
+                            <MiniSparkline
+                              values={kpi.sparklineValues}
+                              color={kpi.sparklineColor}
+                            />
+                          )}
+
+                          {kpi.subtitle && (
+                            <p className="text-xs text-muted-foreground mt-1.5">{kpi.subtitle}</p>
+                          )}
+                        </div>
+
+                        {/* Right: icon container */}
+                        <div
+                          className={`w-11 h-11 rounded-xl ${kpi.bgColor} flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 ml-3`}
                         >
-                          {kpi.value}
-                        </motion.p>
-
-                        {/* Mini sparkline */}
-                        {kpi.sparklineValues.length > 0 && (
-                          <MiniSparkline
-                            values={kpi.sparklineValues}
-                            color={kpi.sparklineColor}
-                          />
-                        )}
-
-                        {/* Density bar for Total Peptides */}
-                        {kpi.titleKey === "total" && (
-                          <DensityBar count={stats.totalPeptides} />
-                        )}
-
-                        {kpi.subtitle && (
-                          <p className="text-xs text-muted-foreground mt-1.5">{kpi.subtitle}</p>
-                        )}
-                      </div>
-
-                      {/* Right: icon container */}
-                      <div
-                        className={`w-11 h-11 rounded-xl ${kpi.bgColor} flex items-center justify-center shrink-0 transition-transform duration-300 group-hover:scale-110 ml-3`}
-                      >
-                        {renderIcon()}
+                          {renderIcon()}
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        );
-      })}
+                </CardContent>
+              </Card>
+            </motion.div>
+          );
+        })}
+      </div>
     </div>
   );
 }
