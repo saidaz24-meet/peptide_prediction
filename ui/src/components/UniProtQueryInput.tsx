@@ -120,8 +120,15 @@ export function UniProtQueryInput({ onQueryExecuted, onLoadingChange }: UniProtQ
     includeIsoforms: false,
     size: 500,
 
-    runTango: false,
-    runS4pred: false,
+    // 2026-06-07 (Peleg confusion fix): default both predictors ON so the user
+    // gets a complete analysis without needing to discover the toggles.
+    // Peleg's 2026-06-07 Slack report ("TANGO: OFF S4PRED: OFF") came from a
+    // UniProt single-entry select where the toggles defaulted to false — she
+    // saw a Results page with no predictions and asked what the badges meant.
+    // The toggles still exist for users who explicitly want metadata-only
+    // browsing without burning compute on predictions.
+    runTango: true,
+    runS4pred: true,
     searchIn: "all" as SearchField,
   });
 
