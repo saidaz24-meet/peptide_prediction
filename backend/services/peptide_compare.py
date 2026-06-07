@@ -35,7 +35,7 @@ PVL flag conventions (from ``backend/schemas/api_models.py``):
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 # Camel-cased PeptideRow field names for each PVL class flag.
 _CLASS_FIELDS: Dict[str, str] = {
@@ -202,17 +202,26 @@ def _direction(delta: Optional[float]) -> str:
     return "a>b" if delta > 0 else "b>a"
 
 
-def _cohort_stats(cohort: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """Build the flat per-cohort stat dict matching ``CohortFlatStats``."""
-    classes = {
-        name: _tally_class(cohort, field) for name, field in _CLASS_FIELDS.items()
-    }
+def _cohort_stats(
+    cohort: List[Dict[str, Any]],
+) -> Tuple[Dict[str, Any], Dict[str, Dict[str, int]]]:
+    """Build the flat per-cohort stat dict matching ``CohortFlatStats``.
+
+    Returns
+    -------
+    Tuple of (flat_stats, classes_breakdown). The flat_stats dict matches the
+    ``CohortFlatStats`` API shape; classes_breakdown carries per-class
+    {positive, observed, total} tallies used by the chi-squared comparisons in
+    ``compare_cohorts``. 2026-06-07 mypy fix: return type was previously declared
+    as ``Dict[str, Any]`` even though this function always returns a 2-tuple —
+    mypy in CI flagged every downstream indexing as `str` when it was actually
+    `float | int`. Annotation now matches reality.
+    """
+    classes = {name: _tally_class(cohort, field) for name, field in _CLASS_FIELDS.items()}
     return {
         "n": len(cohort),
         "helix_pct": _fraction(classes["helix"]["positive"], classes["helix"]["observed"]),
-        "ff_helix_pct": _fraction(
-            classes["ff_helix"]["positive"], classes["ff_helix"]["observed"]
-        ),
+        "ff_helix_pct": _fraction(classes["ff_helix"]["positive"], classes["ff_helix"]["observed"]),
         "ssw_pct": _fraction(classes["ssw"]["positive"], classes["ssw"]["observed"]),
         "ff_ssw_pct": _fraction(classes["ff_ssw"]["positive"], classes["ff_ssw"]["observed"]),
         "mean_length": _mean(cohort, _BIOCHEM_FIELDS["length"]),
