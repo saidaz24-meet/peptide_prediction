@@ -85,15 +85,22 @@ describe("SequenceTrack legend", () => {
       },
     });
     const { container } = render(<SequenceTrack peptide={p} />);
-    // All 10 residue spans should have the helix colour applied. We check via
-    // the inline style — helix uses `hsl(var(--helix))`.
-    const residueSpans = container.querySelectorAll("span[style*='helix']");
-    expect(residueSpans.length).toBeGreaterThanOrEqual(10);
+    // 2026-06-07 (CodeRabbit PR #80 J): tightened selector + exact count.
+    // Previously `span[style*='helix']` would also match unrelated tooltip
+    // children with "helix" anywhere in style; now we filter to the actual
+    // residue spans (the cursor-default ones that SequenceTrack emits per
+    // residue) and assert all 10 carry the helix colour.
+    const residueSpans = container.querySelectorAll<HTMLSpanElement>("span.cursor-default");
+    expect(residueSpans).toHaveLength(10);
+    residueSpans.forEach((span) => {
+      expect(span.style.color).toContain("hsl(var(--helix))");
+    });
   });
 
   it("residue outside any fragment falls back to per-residue argmax", () => {
-    // Helix fragment covers 1-5 only. Residue at 1-indexed:8 has ssPrediction "E"
-    // and no fragment owns it — should render beta colour from the fallback path.
+    // Helix fragment covers 1-5 only. Residues at 1-indexed:8-10 have
+    // ssPrediction "E" and no fragment owns them — should render beta colour
+    // from the fallback path.
     const p = makePeptide({
       sequence: "AAAAAAEEEE",
       length: 10,
@@ -105,10 +112,15 @@ describe("SequenceTrack legend", () => {
       },
     });
     const { container } = render(<SequenceTrack peptide={p} />);
-    // Beta colour uses `hsl(var(--beta))` via the style attribute — at least
-    // one residue should pick this up via the fallback path.
-    const betaSpans = container.querySelectorAll("span[style*='beta']");
-    expect(betaSpans.length).toBeGreaterThanOrEqual(1);
+    // 2026-06-07 (CodeRabbit PR #80 K): tightened selector + exact count.
+    // Three E residues at indices 7-9 must be coloured beta via the
+    // ssPrediction fallback path; anything else means the fallback misfired.
+    const residueSpans = container.querySelectorAll<HTMLSpanElement>("span.cursor-default");
+    expect(residueSpans).toHaveLength(10);
+    const betaResidues = Array.from(residueSpans).filter((span) =>
+      span.style.color.includes("hsl(var(--beta))")
+    );
+    expect(betaResidues).toHaveLength(3);
   });
 
   // Q.2 — parity test against the canonical s4predHelixPercent.
@@ -134,8 +146,26 @@ describe("SequenceTrack legend", () => {
           // Deliberately mostly-coil ssPrediction — proves the legend does
           // NOT re-compute from this array (it would render ~5%, not 30).
           ssPrediction: [
-            "C", "C", "C", "C", "C", "C", "C", "C", "C", "H",
-            "C", "C", "C", "C", "C", "C", "C", "C", "C", "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "H",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
+            "C",
           ],
         },
       });

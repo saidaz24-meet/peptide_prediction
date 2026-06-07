@@ -143,7 +143,16 @@ def _evaluate_against_truth(
     that need a different experimental condition to form fibrils. Report
     sensitivity / specificity but do NOT make absolute claims.
     """
-    df = run_output["result"]["df"]
+    # 2026-06-07 (CodeRabbit PR #80 I): validate run_output shape before nested
+    # access. If upload_service.process_dataframe changes return format, surface
+    # a clear error here instead of crashing on KeyError several frames down.
+    result_block = run_output.get("result")
+    if not isinstance(result_block, dict) or "df" not in result_block:
+        raise ValueError(
+            f"upload_service.process_dataframe returned unexpected shape; "
+            f"expected `result.df`, got keys={list(run_output.keys())}"
+        )
+    df = result_block["df"]
     truth_by_id = {row["id"]: row["ff_truth"] for row in cohort}
 
     tp = fp = tn = fn = 0
@@ -224,6 +233,19 @@ def main() -> int:
 
     cohorts_to_run = []
     if args.cohort in ("ragonis-bachar", "all"):
+        # 2026-06-07 (CodeRabbit PR #80 H): the cohort defined in the literal
+        # above only has the 14 positive ffAMPs from Ragonis-Bachar 2022 Table 1.
+        # The 12 tested-and-negative samples from Supplementary Table 2 still
+        # need to be sourced. Until then, this evaluation will report
+        # TN=0, FP=0, specificity=None, which is meaningless. Surface a loud
+        # warning so any partial result is treated as incomplete.
+        n_negatives = sum(1 for r in RAGONIS_BACHAR_2022_COHORT if not r["ff_truth"])
+        if n_negatives == 0:
+            logging.warning(
+                "Ragonis-Bachar cohort missing the 12 negative-class samples "
+                "from Supplementary Table 2 — TN, FP, specificity, PPV will be "
+                "uninformative. Treat any partial output as an incomplete run."
+            )
         cohorts_to_run.append(("ragonis-bachar-2022", RAGONIS_BACHAR_2022_COHORT))
     if args.cohort in ("staphylococcus", "all"):
         # TODO: load Staphylococcus 2023 cohort from
@@ -242,8 +264,15 @@ def main() -> int:
             logging.info("[%s] wrote cohort definition to %s", cohort_name, outpath)
             continue
 
-        run_output = _run_pipeline(rows, cohort_name)
-        evaluation = _evaluate_against_truth(run_output, rows)
+        # 2026-06-07 (CodeRabbit PR #80 D): protect ~45 min of pipeline work
+        # from a single uncaught exception. On failure, log the traceback and
+        # continue to the next cohort instead of bombing out the whole run.
+        try:
+            run_output = _run_pipeline(rows, cohort_name)
+            evaluation = _evaluate_against_truth(run_output, rows)
+        except Exception:
+            logging.exception("[%s] pipeline failed — skipping to next cohort", cohort_name)
+            continue
 
         outpath = output_dir / f"{cohort_name}_2026_06_07.json"
         outpath.write_text(

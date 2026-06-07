@@ -104,7 +104,11 @@ export function classifyResidue(
   if (fragmentLookup && fragmentLookup[idx] !== null && fragmentLookup[idx] !== undefined) {
     return fragmentLookup[idx] as SSClass;
   }
-  if (ssPrediction && ssPrediction[idx]) {
+  // 2026-06-07 (CodeRabbit PR #80 B): defensive type guard. ssPrediction is
+  // typed string[] but at runtime the source DataFrame can leak non-string
+  // values (numpy NaN sentinels, undefined cells after column-shape changes).
+  // toUpperCase() on a non-string throws and breaks the whole render.
+  if (ssPrediction && typeof ssPrediction[idx] === "string") {
     const p = ssPrediction[idx].toUpperCase();
     if (p === "H") return "H";
     if (p === "E") return "E";

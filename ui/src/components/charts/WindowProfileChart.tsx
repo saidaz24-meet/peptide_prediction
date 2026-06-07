@@ -238,13 +238,14 @@ export function WindowProfileChart({
         // Prefer Peleg's dedicated `SSW fragments (S4PRED)` column over raw
         // beta segments. Treat an empty SSW array as missing so we still fall
         // back (`??` alone would lock us to []).
-        const sswPrimary = peptide.s4predSswFragments as
-          | [number, number][]
-          | undefined;
+        // 2026-06-07 (CodeRabbit PR #80 L): dropped the `as [number, number][]`
+        // casts — peptide.s4predSswFragments is already typed
+        // `Array<SegmentTuple> | null` (SegmentTuple = [number, number]) so the
+        // cast just masked the null. SegmentTuple matches what helixRanges
+        // accepts; null/undefined are handled by the length check + fallback.
+        const sswPrimary = peptide.s4predSswFragments;
         const sswSrc =
-          sswPrimary && sswPrimary.length > 0
-            ? sswPrimary
-            : (peptide.s4pred?.betaSegments as [number, number][] | undefined);
+          sswPrimary && sswPrimary.length > 0 ? sswPrimary : peptide.s4pred?.betaSegments;
         bands[ch.id] = helixRanges(sswSrc, windowSize);
       }
     }
