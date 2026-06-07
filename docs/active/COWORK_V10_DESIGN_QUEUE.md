@@ -102,10 +102,172 @@
 
 ---
 
+---
+
+## V10-5 — Help page 4-section rewrite (Peleg Drive 2026-06-03)
+
+**Page**: `ui/src/pages/Help.tsx`
+**Driver**: Peleg's Drive comment — current Help has 2 sections (FF-Helix and SSW prediction); she wants 4 explicit sections.
+
+**Peleg's exact text to use verbatim for the four section bodies**:
+
+> **Alpha-helix secondary structure**
+> Determined by s4pred predictions and threshold.
+>
+> **Fibril-forming alpha helix**
+> Determined by the uH threshold. If a peptide is predicted to be helical (as described above) and its uH is higher than the threshold uH, it will be predicted as a potential alpha-helical fibril-forming peptide.
+>
+> **Secondary structure switch**
+> Determined by Tango and/or s4pred. Peptide will be predicted as secondary structure switch if the difference between averaged scores of helicity and extended beta are lower than the maximum gap threshold. Meaning, for these sequences the secondary structure prediction tools were indecisive or predicted scores similar for both secondary structures.
+>
+> **Fibril-forming secondary structure switch**
+> Determined by the hydrophobicity threshold. If a peptide is predicted to be a secondary structure switch (as described above) and its hydrophobicity is higher than the threshold hydrophobicity, it will be predicted as a potential secondary structure switch fibril-forming.
+
+**Design discipline**:
+- Use 4 separate `<section>` blocks with the same visual treatment — each section gets a header (the class name as it appears in the rest of PVL: "Helix", "FF-Helix", "SSW", "FF-SSW") plus a one-line subtitle ("Alpha-helix secondary structure", "Fibril-forming alpha helix", etc.) plus Peleg's body text.
+- Ordering: **Helix → FF-Helix → SSW → FF-SSW**. This mirrors the cohort-comparison ordering on /results and the Q5 symmetry-of-treatment principle Peleg corrected.
+- Each section gets the same colour accent as its corresponding badge on PeptideTable (brown-orange for "No-finding" reference, light green for Helix/SSW, darker green for FF-Helix/FF-SSW — pulled from `index.css` `--ff-helix` / `--ff-ssw` / etc.).
+- No icons inside the section bodies — keep these as scientific definitions, not marketing copy.
+- The existing "Insights you can extract" callout should appear **once** at the top of the Help page, above the 4 sections, not embedded inside them.
+
+**Two open questions blocking final ship** (T1 will confirm with Peleg, do NOT guess):
+1. Should the SSW section reference both **maximum gap threshold** AND **minimum % SS content** thresholds, or only the gap threshold?
+2. For FF-SSW, the body says "hydrophobicity is higher than the threshold hydrophobicity" — confirming the gate is hydrophobicity (not μH). Cowork: render exactly as written; T1 will validate post-Zoom.
+
+**Out of scope for V10-5**:
+- The "FF-Helix %" → "Helix %" column rename (that's V10-6).
+- Insights / use-case copy refresh (that's a separate Wave 2.7 copy task).
+
+**Files**:
+- `ui/src/pages/Help.tsx` only.
+
+**Acceptance**:
+- 4 distinct section blocks, ordering as above, body text verbatim from Peleg.
+- `npx tsc --noEmit` clean.
+- Screen reader: each section heading should announce the class name first ("Helix"), then the long form ("Alpha-helix secondary structure") as the subtitle — so a researcher scanning headings hears the PVL term first.
+- Mobile-responsive at 375px (no horizontal scroll, headings wrap correctly).
+
+---
+
+## V10-6 — "FF-Helix %" → "Helix %" terminology audit
+
+**Driver**: Peleg's Drive answer 2026-06-03 — *"There should be only two terms: Helix and FF-Helix. The % should just be another feature indicating what percentage of the sequence was predicted to be helical and should be treated as a separate variable/parameter."*
+
+**Mission**: every place the UI presents "FF-Helix %" as a feature label, rename to "Helix %" (or "S4PRED helix content" where the longer label fits the layout). The class flag **FF-Helix** stays exactly as it is — this is purely about the percent-value label.
+
+**Search scope** (Cowork should grep these):
+```
+grep -rn "FF-Helix %\|FFHelix %\|ffHelixPercent" ui/src --include="*.tsx" --include="*.ts"
+```
+Known hit list as of 2026-06-03 (verify nothing else exists):
+- `ui/src/components/PeptideTable.tsx` — column header + tooltip text
+- `ui/src/components/charts/AACompositionGrouped.tsx` — grouping labels (only the `% helix` axis, NOT the class names)
+- `ui/src/components/ResultsCharts.tsx` — chart titles + descriptions
+- `ui/src/pages/PeptideDetail.tsx` — the FF-Helix vs Aggregation Max scatter axis label
+- `ui/src/components/PeptideRadarChart.tsx` — radar axis label
+- Smart Candidate Ranking — the weight slider in `ThresholdConfigPanel.tsx` or wherever the metric label "FF-Helix %" appears as a sliding-axis name.
+
+**Rename rules** (apply consistently):
+| Current label | New label |
+|---|---|
+| "FF-Helix %" (as a column/feature header) | "Helix %" |
+| "FF-Helix %" (in a long tooltip body) | "S4PRED helix content" |
+| "FF-Helix" (the class flag/badge) | **NO CHANGE — keep FF-Helix** |
+| `ffHelixPercent` (the data field name) | **NO CHANGE — internal data shape stays** |
+
+**Do NOT rename**:
+- The TypeScript field `ffHelixPercent` (would break the backend contract).
+- The badge text "FF-Helix" on PeptideTable when shown as a class flag (e.g. the green pill that signals "this peptide is an FF-Helix candidate").
+- Any threshold-related code (`MIN_HELIX_PERCENT_CONTENT` etc.).
+- The cohort-comparison chart group label "FF-Helix" (that's the class group, not the percent feature).
+
+**Tooltips**: update the column tooltip so a researcher hovering "Helix %" reads: *"S4PRED helix content — percentage of residues predicted helical by S4PRED. This is a feature, not a class label. The candidate flag is FF-Helix (see column to the right)."* — the parenthetical helps Peleg's "two terms only" framing land.
+
+**Files**:
+- ~5-7 frontend files; no backend changes.
+
+**Acceptance**:
+- `grep -rn "FF-Helix %" ui/src --include="*.tsx"` returns 0 hits (or only the ones inside comments documenting the rename).
+- `npx tsc --noEmit` clean.
+- All 13 vitest specs that touch PeptideTable / Smart Ranking pass.
+- Smoke-test on /results: the Helix-grouping cohort chart still says "FF-Helix" as a group name (it's the class). The Smart Ranking slider that was "FF-Helix %" now says "Helix %".
+
+---
+
+## V10-7 — Landing page quality push (homepage focus)
+
+**Page**: `ui/src/pages/Index.tsx` (or wherever the current home lives).
+
+**Driver**: Said's brief — "MSc student lands here from Google, decides in 8 seconds whether to upload their CSV." Current home is good; it needs to be best-in-class. Discoverability (Peleg PPT Comment 25 + Zoom-prep §3.7) routes through this page first.
+
+**Brief**:
+1. **Hero**: one sentence that answers "what is PVL". Use Peleg's framing — the α-helix → β-sheet switch is the differentiator vs. tools that predict β-sheet propensity directly. Don't lead with "all-in-one"; lead with *what we're uniquely able to predict*.
+2. **Above-the-fold demo**: a 40-second silent demo loop showing a sequence going through Quick Analyze → Results → Peptide Detail. No narration, just smooth playback. Auto-plays on viewport entry, pauses on scroll-away, respects `prefers-reduced-motion`.
+3. **5-surface ecosystem bar**: visible row showing "Web · CLI · pvl-py · MCP · Docker" with one-line value props. Each link routes to the relevant docs page (Wave 2.7 will produce those docs — for now, links can go to GitHub README sections).
+4. **Social-proof bar**: contributor avatars (Said as lead developer, Dr. Peleg Ragonis-Bachar as algorithm collaborator, Dr. Alexander Golubev as scientific advisor) + the DESY / Technion / MIT-license badges.
+5. **Three-card "who is PVL for"** below the demo: researcher (biology team), data scientist (programmatic users), AI engineer (MCP audience). One sentence each.
+6. **Footer CTA**: paired buttons — "Run a quick analysis" (routes to /quick) + "Read the science" (routes to /about or, post-paper, to the JOSS/NAR paper). Both styled to look weighted equally — researcher mode and proof mode.
+
+**Design discipline**:
+- Light-first, no jumpy animations, no auto-playing audio.
+- The hero typography should match the rest of the redesigned PVL — same `text-h1` token, same colour scale.
+- No marketing-speak ("revolutionize", "unleash", "powerful"). Calm scientific tone.
+- Mobile-first: the demo loop must work at 375px (smaller scrubber, same content).
+
+**Out of scope**:
+- The name change (Phase 3.7 of Zoom prep — wait until name decided).
+- A "pricing" section (we are open-source MIT, no SaaS — confirmed in Zoom prep §3.6).
+- An email-capture form (no email gating — confirmed).
+
+**Files**:
+- `ui/src/pages/Index.tsx` + any new components for hero, demo player, ecosystem bar, social proof.
+
+**Acceptance**:
+- Hero loads in <1.5s on 4G; demo loop preloads progressively.
+- All copy approved by T1 before commit.
+- `npx tsc --noEmit` clean.
+- Lighthouse score ≥90 on Performance, Accessibility, Best Practices.
+
+---
+
+## V10-8 — Background design system (cohesive visual ID)
+
+**Driver**: Said's brief — "scientific tool, not decorative noise."
+
+**Mission**: define a 3-token background system that the whole site uses consistently:
+- `bg-canvas` — the default off-white (current `--background`).
+- `bg-elevated` — the panel surface for cards (subtle off-white shift, current `--surface-1`).
+- `bg-deep` — the hero / home-only deep tone, with an optional subtle peptide silhouette pattern.
+
+Plus three optional decorative "scene" tokens used sparingly:
+- `scene-sequence-motif` — faint ribbon-trace SVG, used behind the About page hero.
+- `scene-helix-mesh` — animated helix mesh (CSS-only, paused with `prefers-reduced-motion`), used on /quick when no result is loaded.
+- `scene-aggregate-cluster` — static SVG cluster pattern, used on /results header.
+
+**Design discipline**:
+- Patterns at 5-8% opacity max. They must NOT compete with chart strokes (CHART_COLORS) or with peptide-class badges.
+- All three "scene" tokens are opt-in per page, not global.
+- Light-first; dark-mode variants are required for each.
+- `prefers-reduced-motion` disables `scene-helix-mesh` animation entirely.
+
+**Files**:
+- `ui/src/index.css` (CSS variables).
+- `ui/tailwind.config.ts` (token mapping).
+- Up to 3 new SVG assets in `ui/src/assets/` (peptide motif, helix mesh, aggregate cluster).
+
+**Acceptance**:
+- Three background tokens used consistently on /, /results, /quick, /about, /help, /peptides/:id, /upload, /compare.
+- `npx tsc --noEmit` clean.
+- Visual audit: no chart bar/line ever shares an HSL family with the background pattern below it.
+
+---
+
 ## Trigger conditions
 
-- All four V10-N items wait for the v0.2.0-rc1 push to land + Said's first browser-audit feedback.
-- Pick order when ready: **V10-1 (About page) → V10-2 (DrillDown polish) → V10-3 (scroll animations) → V10-4 (transitions)**.
-- Each is its own atomic Cowork prompt with PROMPT 0 + PRE-FLIGHT v2 framing.
+- **V10-1 → V10-4**: original queue from Wave 2 polish. Pick order: V10-1 (About) → V10-2 (DrillDown) → V10-3 (scroll anims) → V10-4 (transitions).
+- **V10-5 (Help page)**: TRIGGER NOW — Wave 2.6 landed (PR #75), Peleg's exact text is in this doc. Cowork can start as soon as available. T1 paste-checks Peleg's body text post-Zoom (Q-Help confirmations in `PELEG_ZOOM_PREP_2026_06_04.md` §5).
+- **V10-6 ("FF-Helix %" rename)**: TRIGGER NOW — entirely UI-side, no Peleg dependency. Pair with V10-5 so they land in one PR.
+- **V10-7 (Landing page)**: wait for V10-5 + V10-6 to land; this is the bigger visual lift and benefits from the cleaned-up classification language.
+- **V10-8 (Background system)**: bundle with V10-7 since the landing page is where most new backgrounds appear.
 
-T1 writes the V10-N prompts when triggered. Cowork executes one at a time. T1 reviews + commits.
+Each is its own atomic Cowork prompt with PROMPT 0 + PRE-FLIGHT v2 framing. T1 writes the V10-N prompts when triggered. Cowork executes one at a time. T1 reviews + commits.

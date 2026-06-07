@@ -124,18 +124,22 @@ export function DualStructureTrack({ peptide }: DualStructureTrackProps) {
     [peptide.s4pred?.helixSegments]
   );
 
-  // SSW segments: prefer S4PRED SSW, fallback to TANGO beta segments
+  // SSW segments: only Peleg's S4PRED SSW fragments. Fixed 2026-06-04:
+  // dropped the betaSegments fallback that was rendering S4PRED predicted-beta
+  // segments under an "SSW (TANGO)" label — two bugs in one (wrong predictor
+  // attribution AND conceptually wrong, since SSW = indecisive helix/beta,
+  // NOT predicted beta). When a peptide has no real SSW fragments, the SSW
+  // row simply does not render.
   const s4predSswFragments = peptide.s4predSswFragments as
     | Array<[number, number]>
     | null
     | undefined;
-  const sswSegments = useMemo(() => {
-    if (s4predSswFragments?.length) return normalizeSegments(s4predSswFragments);
-    if (peptide.s4pred?.betaSegments?.length) return normalizeSegments(peptide.s4pred.betaSegments);
-    return [];
-  }, [s4predSswFragments, peptide.s4pred?.betaSegments]);
+  const sswSegments = useMemo(
+    () => (s4predSswFragments?.length ? normalizeSegments(s4predSswFragments) : []),
+    [s4predSswFragments]
+  );
 
-  const sswLabel = s4predSswFragments?.length ? "SSW (S4PRED)" : "SSW (TANGO)";
+  const sswLabel = "SSW (S4PRED)";
 
   const hasHelix = helixSegments.length > 0;
   const hasSsw = sswSegments.length > 0;

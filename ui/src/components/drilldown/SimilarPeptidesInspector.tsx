@@ -230,8 +230,11 @@ export function SimilarPeptidesInspector({
             No similar peptides found
           </p>
           <p className="text-sm text-muted-foreground max-w-xs">
-            The vector index may not be populated yet — try running analysis on a
-            dataset first.
+            This usually means the current peptide isn&apos;t in the vector index.
+            The pre-loaded demo dataset is served via a fast-path JSON that
+            skips the backend embedding step — so similarity search only
+            populates results once you upload your own CSV/FASTA or run a
+            UniProt query through the backend.
           </p>
         </div>
       </div>

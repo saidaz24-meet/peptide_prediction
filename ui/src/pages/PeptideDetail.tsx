@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { useDatasetStore } from "@/stores/datasetStore";
-import { SegmentTrack } from "@/components/SegmentTrack";
 import { DualStructureTrack } from "@/components/DualStructureTrack";
 import { ResidueCategoryLegend } from "@/components/ResidueCategoryLegend";
 import { EvidencePanel } from "@/components/EvidencePanel";
@@ -371,17 +370,15 @@ export default function PeptideDetail() {
               </div>
             </div>
 
-            {/* Classification pills — what researchers care about FIRST */}
+            {/* Classification pills — what researchers care about FIRST.
+                Helix %-as-badge removed 2026-06-04: it duplicated the "Helix
+                (X%)" stat already rendered inside the AlphaFold-predicted
+                structure card header below, and conflicted with Peleg's
+                direction that the % is a *feature*, not a class label. The
+                FF-Helix / FF-SSW pills below are class flags (Candidate /
+                No / null) — which is what this row is for. */}
             <div className="flex items-center gap-2 flex-wrap">
               {getSSWBadge()}
-              {typeof peptide.s4predHelixPercent === "number" && (
-                <Badge
-                  variant="outline"
-                  className={`text-xs ${peptide.s4predHelixPercent > 30 ? "border-helix text-helix" : "text-muted-foreground"}`}
-                >
-                  Helix {peptide.s4predHelixPercent.toFixed(1)}%
-                </Badge>
-              )}
               {peptide.ffHelixFlag === 1 ? (
                 <Badge className="bg-green-500/10 text-green-700 dark:text-green-400 border border-green-500/20 text-xs">
                   FF-Helix Candidate
@@ -421,23 +418,12 @@ export default function PeptideDetail() {
               experimental" nature visible up front, not buried in a footnote. */}
           <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl overflow-hidden">
             <CardHeader className="pb-2">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <CardTitle className="text-h3">AlphaFold-predicted structure</CardTitle>
-                {/* F10 (Said decided 2026-05-21, Peleg slide 18): drop the
-                    Beta % and Coil % numerical subcards. The S4PRED
-                    probability curves still render in <S4PredChart/> below —
-                    Peleg's position is "showing the graph is enough". The
-                    segment-based Helix % stays because it's used as a
-                    classification anchor in FIX-013. */}
-                {peptide.s4predHelixPercent != null && (
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <span className="w-2.5 h-2.5 rounded-sm bg-helix inline-block" />
-                      Helix ({peptide.s4predHelixPercent.toFixed(0)}%)
-                    </span>
-                  </div>
-                )}
-              </div>
+              <CardTitle className="text-h3">AlphaFold-predicted structure</CardTitle>
+              {/* Helix-(X%) chip removed 2026-06-04: SequenceTrack's own legend
+                  below this header already renders Helix / Beta / Coil
+                  percentages together as part of the "Predicted Secondary
+                  Structure" row — single source of truth. The card-header
+                  chip duplicated the same number with less context. */}
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Sequence with S4PRED coloring */}
@@ -471,30 +457,12 @@ export default function PeptideDetail() {
                   S4PRED secondary-structure colors above. */}
               <ResidueCategoryLegend />
 
-              {/* Segment tracks — P8 (2026-05-07): SegmentTrack now takes a
-                  `kind` prop so we can render the helix and SSW (structural-
-                  switch) up/down diagrams side-by-side. Both fall back
-                  silently when no fragments exist. */}
-              {peptide.s4pred?.helixSegments?.length ? (
-                <SegmentTrack
-                  sequence={peptide.sequence}
-                  fragments={peptide.s4pred.helixSegments}
-                  kind="helix"
-                />
-              ) : null}
-              {peptide.s4predSswFragments?.length || peptide.s4pred?.betaSegments?.length ? (
-                <SegmentTrack
-                  sequence={peptide.sequence}
-                  fragments={
-                    peptide.s4predSswFragments?.length
-                      ? (peptide.s4predSswFragments as Array<[number, number]>)
-                      : (peptide.s4pred!.betaSegments as Array<[number, number]>)
-                  }
-                  kind="ssw"
-                />
-              ) : null}
-
-              {/* Dual structure tracks (P1+P2): Helix, SSW, FF-Helix with sequence letters */}
+              {/* Track consolidation 2026-06-04: previously this rendered the
+                  SegmentTrack helix + SegmentTrack ssw PLUS the DualStructure-
+                  Track, which produced 4 visible bars showing only 2 unique
+                  pieces of data (helix ≡ S4PRED helix, ssw ≡ SSW track).
+                  DualStructureTrack is the canonical unified visualization;
+                  the SegmentTrack pair has been removed. */}
               <DualStructureTrack peptide={peptide} />
 
               {/* FF classification explanation */}
