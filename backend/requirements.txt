@@ -17,7 +17,7 @@ python-dotenv>=1.2.2,<2.0
 sentry-sdk[fastapi]>=2.60.0,<3.0
 
 # Result caching
-duckdb>=1.5.2,<2.0
+duckdb>=1.5.3,<2.0
 filelock>=3.29.0,<4.0
 
 # Task queue & caching
