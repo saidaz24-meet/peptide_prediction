@@ -65,7 +65,11 @@ export function generateMethodsSVG(
   y += lineHeight + sectionGap;
 
   // Description
-  const versionLabel = options.version ? `v${options.version}` : "v0.1";
+  // 2026-06-08: fallback bumped from "v0.1" to "v0.3" to match current
+  // release. Callers should always pass options.version (via PVL_VERSION
+  // from reproducibilityStore); the fallback only fires when the figure
+  // pack is generated outside an app context (tests / scripts).
+  const versionLabel = options.version ? `v${options.version}` : "v0.3";
   const descLines = [
     `Analysis performed using PVL (Peptide Visual Lab) ${versionLabel}.`,
     `${peptideCount} peptide${peptideCount !== 1 ? "s" : ""} analyzed.`,

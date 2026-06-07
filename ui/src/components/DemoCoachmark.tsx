@@ -13,13 +13,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import {
-  Joyride,
-  STATUS,
-  type EventData,
-  type Step,
-  type TooltipRenderProps,
-} from "react-joyride";
+import { Joyride, STATUS, type EventData, type Step, type TooltipRenderProps } from "react-joyride";
 import * as Sentry from "@sentry/react";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -33,7 +27,7 @@ const ALL_STEPS: Step[] = [
     target: "#kpi-cards",
     title: "Dataset Overview",
     content:
-      "KPI cards summarize classification breakdown — FF-Helix %, SSW predictions, mean hydrophobicity. Click any card to filter the table.",
+      "Four symmetric KPI cards show the dataset breakdown across Peleg's classes — Helix · FF-Helix · SSW · FF-SSW. Click any card to filter the table to that class.",
     skipBeacon: true,
   },
   {
@@ -111,10 +105,7 @@ function PVLTooltip({
 
         {/* Footer */}
         <div className="flex items-center justify-between">
-          <span
-            className="text-xs text-muted-foreground/70"
-            data-testid="coachmark-progress"
-          >
+          <span className="text-xs text-muted-foreground/70" data-testid="coachmark-progress">
             Step {index + 1} of {size}
           </span>
 
@@ -180,17 +171,14 @@ export function DemoCoachmark({ run, onComplete }: DemoCoachmarkProps) {
       if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
         try {
           Sentry.setTag("coachmark_completed", "true");
-          Sentry.setTag(
-            "coachmark_outcome",
-            status === STATUS.FINISHED ? "finished" : "skipped",
-          );
+          Sentry.setTag("coachmark_outcome", status === STATUS.FINISHED ? "finished" : "skipped");
         } catch {
           // Sentry may be uninitialized in dev/tests
         }
         onComplete();
       }
     },
-    [onComplete],
+    [onComplete]
   );
 
   if (!run || steps.length === 0) return null;

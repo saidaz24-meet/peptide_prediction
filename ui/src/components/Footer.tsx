@@ -35,22 +35,33 @@ const COLUMNS = [
         to: "https://github.com/saidaz24-meet/peptide_prediction",
         internal: false,
       },
-      { label: "Report Issue", to: "https://github.com/saidaz24-meet/peptide_prediction/issues", internal: false },
+      {
+        label: "Report Issue",
+        to: "https://github.com/saidaz24-meet/peptide_prediction/issues",
+        internal: false,
+      },
       { label: "About", to: "/about", internal: true },
     ],
   },
   {
     title: "Citation",
     links: [
-      { label: "DOI (coming soon)", to: "#", internal: true, disabled: true },
+      // 2026-06-08: DOI flips to a real Zenodo URL the moment v0.3.0 ships.
+      // JOSS link flips to the published paper URL once accepted. Both stay
+      // disabled placeholders until then.
+      { label: "DOI (mints on release)", to: "#", internal: true, disabled: true },
       { label: "BibTeX", to: "#cite", internal: true },
-      { label: "JOSS Paper (planned)", to: "#", internal: true, disabled: true },
+      { label: "JOSS Paper (in submission)", to: "#", internal: true, disabled: true },
     ],
   },
   {
     title: "Legal",
     links: [
-      { label: "MIT License", to: "https://github.com/saidaz24-meet/peptide_prediction/blob/main/LICENSE", internal: false },
+      {
+        label: "MIT License",
+        to: "https://github.com/saidaz24-meet/peptide_prediction/blob/main/LICENSE",
+        internal: false,
+      },
       { label: "Privacy Policy", to: "/about#privacy", internal: true },
     ],
   },
@@ -85,7 +96,7 @@ export function Footer({ className }: FooterProps) {
     <footer
       className={cn(
         "relative z-10 border-t border-border/40 bg-card/50 backdrop-blur-sm",
-        className,
+        className
       )}
       data-testid="pvl-footer"
     >
@@ -94,9 +105,7 @@ export function Footer({ className }: FooterProps) {
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-8 sm:gap-12 mb-12">
           {COLUMNS.map((col) => (
             <div key={col.title}>
-              <h3 className="text-sm font-semibold text-foreground mb-4">
-                {col.title}
-              </h3>
+              <h3 className="text-sm font-semibold text-foreground mb-4">{col.title}</h3>
               <ul className="space-y-2.5">
                 {col.links.map((link) => (
                   <li key={link.label}>
@@ -134,9 +143,7 @@ export function Footer({ className }: FooterProps) {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             {/* Built by */}
             <div className="text-xs text-muted-foreground/60">
-              <span className="font-medium text-muted-foreground">
-                Peptide Visual Lab
-              </span>
+              <span className="font-medium text-muted-foreground">Peptide Visual Lab</span>
               {" · "}
               Built by{" "}
               {TEAM.map((person, i) => (

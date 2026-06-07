@@ -505,7 +505,9 @@ export default function Results() {
                         title: "PVL Figure Pack",
                         permalinkURL:
                           typeof window !== "undefined" ? window.location.href : undefined,
-                        version: "0.1.0",
+                        // 2026-06-08: was hardcoded "0.1.0"; uses PVL_VERSION
+                        // (already imported above).
+                        version: PVL_VERSION,
                       };
                       const [panels, coverSvg] = await Promise.all([
                         generateFigurePack(options),
@@ -736,26 +738,26 @@ export default function Results() {
                   {/* Row 1: Preset buttons */}
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-medium mr-1">Presets:</span>
-                    {(
-                      ["fibril", "equal", "amyloid", "helix", "switch"] as RankingPreset[]
-                    ).map((p) => (
-                      <Button
-                        key={p}
-                        variant={preset === p ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => applyPreset(p)}
-                      >
-                        {p === "fibril"
-                          ? "Fibril-Formation"
-                          : p === "equal"
-                            ? "Equal"
-                            : p === "amyloid"
-                              ? "Fibril-formation Focus"
-                              : p === "helix"
-                                ? "Helix Focus"
-                                : "Switch Focus"}
-                      </Button>
-                    ))}
+                    {(["fibril", "equal", "amyloid", "helix", "switch"] as RankingPreset[]).map(
+                      (p) => (
+                        <Button
+                          key={p}
+                          variant={preset === p ? "default" : "outline"}
+                          size="sm"
+                          onClick={() => applyPreset(p)}
+                        >
+                          {p === "fibril"
+                            ? "Fibril-Formation"
+                            : p === "equal"
+                              ? "Equal"
+                              : p === "amyloid"
+                                ? "Fibril-formation Focus"
+                                : p === "helix"
+                                  ? "Helix Focus"
+                                  : "Switch Focus"}
+                        </Button>
+                      )
+                    )}
                     {preset === "custom" && (
                       <Badge variant="secondary" className="text-xs">
                         Custom

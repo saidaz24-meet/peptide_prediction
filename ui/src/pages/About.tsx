@@ -97,29 +97,47 @@ export default function About() {
             <h1 className="text-5xl sm:text-7xl font-bold tracking-tight text-foreground">
               Peptide Visual Lab
             </h1>
-            <p className="mt-3 text-lg text-muted-foreground">
-              DESY &middot; Landau Group
-            </p>
+            <p className="mt-3 text-lg text-muted-foreground">DESY &middot; Landau Group</p>
           </section>
 
           {/* Content sections — wider container (max-w-5xl, was max-w-4xl) */}
           <div className="max-w-5xl mx-auto px-6 sm:px-12 pb-20 space-y-8">
-            {/* Purpose */}
+            {/* Purpose — 2026-06-08: rewritten for publish-readiness (was
+                "Internal, non-public application"). PVL is now headed for
+                Zenodo + bio.tools + JOSS submission. */}
             <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardHeader>
-                <CardTitle>Purpose</CardTitle>
-                <CardDescription>Internal, non-public application</CardDescription>
+                <CardTitle>About PVL</CardTitle>
+                <CardDescription>
+                  Open-source peptide aggregation + structure prediction platform
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-sm text-muted-foreground">
                 <p>
-                  Explore peptide properties and fibril-forming predictions. Upload UniProt exports
-                  (TSV/CSV/XLSX), compute hydrophobicity, charge, μH, and visualize TANGO/S4PRED
-                  outputs when available.
+                  PVL is a research instrument that implements{" "}
+                  <a
+                    href="https://doi.org/10.1021/acs.biomac.2c00582"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="text-primary hover:underline"
+                  >
+                    Ragonis-Bachar et al. 2022
+                  </a>
+                  's four-category peptide classification (Helix · FF-Helix · SSW · FF-SSW),
+                  combined with TANGO aggregation propensity, S4PRED secondary structure prediction,
+                  an AlphaFold 3D structure overlay, and reproducibility-as-permalink.
+                </p>
+                <p>
+                  Upload UniProt exports (TSV/CSV/XLSX), paste a single sequence, or query UniProt
+                  directly. Every analysis becomes a citation-stable URL that regenerates the same
+                  view for a paper reviewer.
                 </p>
               </CardContent>
             </Card>
 
-            {/* Credits — extended with Peleg per ADR-014 (2026-05-08). */}
+            {/* Credits — author order matches CITATION.cff + README:
+                Ragonis-Bachar (algorithms) → Azaizah (software) → Golubev (advisor)
+                → Landau (corresponding). 2026-06-08 update. */}
             <Card
               className="shadow-soft border-[hsl(var(--border))] rounded-xl"
               data-testid="about-credits"
@@ -131,11 +149,37 @@ export default function About() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4 text-sm">
+                <div data-testid="credit-peleg">
+                  <p className="font-semibold text-foreground">Dr. Peleg Ragonis-Bachar</p>
+                  <p className="text-xs text-muted-foreground/80">
+                    Technion — Department of Biology
+                  </p>
+                  <p className="text-muted-foreground">
+                    Scientific lead — four-category classification algorithm, threshold definitions,
+                    validation cohort, scientific review across every release.
+                  </p>
+                  <p className="mt-1">
+                    <a
+                      href="https://orcid.org/0000-0002-0979-8165"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      aria-label="Peleg Ragonis-Bachar ORCID profile"
+                      data-testid="peleg-orcid"
+                    >
+                      ORCID 0000-0002-0979-8165
+                    </a>
+                  </p>
+                </div>
+
                 <div data-testid="credit-said">
                   <p className="font-semibold text-foreground">Said Azaizah</p>
+                  <p className="text-xs text-muted-foreground/80">
+                    Massachusetts Institute of Technology + DESY
+                  </p>
                   <p className="text-muted-foreground">
-                    Lead developer · full-stack architect · all platform code, design, and
-                    deployment.
+                    Lead developer — backend, frontend, ecosystem (web · Python · CLI · MCP ·
+                    self-host), CI/CD, observability, deployment.
                   </p>
                   <p className="mt-1">
                     <a
@@ -151,29 +195,43 @@ export default function About() {
                   </p>
                 </div>
 
-                <div data-testid="credit-peleg">
-                  <p className="font-semibold text-foreground">Dr. Peleg Ragonis-Bachar</p>
-                  <p className="text-xs text-muted-foreground/80">Technion</p>
+                <div data-testid="credit-alex">
+                  <p className="font-semibold text-foreground">Dr. Aleksandr Golubev</p>
+                  <p className="text-xs text-muted-foreground/80">DESY + Technion</p>
                   <p className="text-muted-foreground">
-                    Scientific algorithms — FF-Helix, FF-SSW classification, threshold definitions,
-                    and the Staphylococcus 2023 benchmark dataset.
+                    Scientific advisor — research direction, lab adoption, DESY infrastructure
+                    access.
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground/70">ORCID — pending</p>
                 </div>
 
-                <div data-testid="credit-alex">
-                  <p className="font-semibold text-foreground">Dr. Aleksandr Golubev</p>
-                  <p className="text-xs text-muted-foreground/80">DESY</p>
-                  <p className="text-muted-foreground">
-                    Scientific advisor · project management · research direction and lab adoption.
+                <div data-testid="credit-landau">
+                  <p className="font-semibold text-foreground">Prof. Meytal Landau</p>
+                  <p className="text-xs text-muted-foreground/80">
+                    Technion + EMBL Hamburg + Centre for Structural Systems Biology
                   </p>
-                  <p className="mt-1 text-xs text-muted-foreground/70">ORCID — pending</p>
+                  <p className="text-muted-foreground">
+                    Corresponding author — lab PI, structural biology direction, paper
+                    correspondence.
+                  </p>
+                  <p className="mt-1">
+                    <a
+                      href="https://orcid.org/0000-0002-1743-3430"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                      aria-label="Meytal Landau ORCID profile"
+                      data-testid="landau-orcid"
+                    >
+                      ORCID 0000-0002-1743-3430
+                    </a>
+                  </p>
                 </div>
 
                 <p className="pt-2 text-xs text-muted-foreground/80 border-t border-border/40">
-                  <b>Predictor providers:</b> TANGO (Fernandez-Escamilla et al., 2004) and S4PRED
-                  (Moffat et al., 2022). See the README's Acknowledgements block for the full
-                  reference list.
+                  <b>External predictors:</b> TANGO (Fernandez-Escamilla et al., 2004), S4PRED
+                  (Moffat et al., 2022), AlphaFold (Jumper et al., 2021), Mol* (Sehnal et al.,
+                  2021). See the README's Acknowledgements block for the full reference list.
                 </p>
               </CardContent>
             </Card>
@@ -181,25 +239,38 @@ export default function About() {
             {/* Dataset attribution — Staphylococcus 2023 benchmark (ADR-014) */}
             <DatasetCreditCard />
 
-            {/* Key Features */}
+            {/* Key Features — refreshed 2026-06-08 for v0.3.0 publish-ready release. */}
             <Card className="shadow-soft border-[hsl(var(--border))] rounded-xl">
               <CardHeader>
                 <CardTitle>Key Features</CardTitle>
+                <CardDescription>
+                  Five surfaces — web · Python package · CLI · MCP server · Docker self-host
+                </CardDescription>
               </CardHeader>
               <CardContent className="grid md:grid-cols-2 gap-3 text-sm">
                 <ul className="list-disc pl-5 space-y-1">
-                  <li>Flexible upload with QC (+ rejected rows export)</li>
-                  <li>Hydrophobicity, Charge, μH; SSW & Helix prediction</li>
-                  <li>Database visualizations + correlation matrix</li>
-                  <li>Sliding-window profiles with helix overlays</li>
-                  <li>Helical wheel projection (HeliQuest colors)</li>
+                  <li>Peleg's four-category classification: Helix · FF-Helix · SSW · FF-SSW</li>
+                  <li>
+                    Dataset-derived fibril-formation thresholds (μH-positive mean for FF-Helix,
+                    hydrophobicity-positive mean for FF-SSW)
+                  </li>
+                  <li>Gap-smoothed segment finder for helix and SSW fragments</li>
+                  <li>TANGO aggregation + S4PRED secondary structure overlays</li>
+                  <li>Per-residue colouring derived from her fragment columns</li>
+                  <li>UniProt query → analysis pipeline in one step</li>
+                  <li>AlphaFold 3D structure overlay via Mol*</li>
                 </ul>
                 <ul className="list-disc pl-5 space-y-1">
-                  <li>Smart ranking & Top-N shortlist</li>
-                  <li>CSV, PDF, and FASTA export (single + bulk)</li>
-                  <li>UniProt & AlphaFold quick links</li>
-                  <li>Per-residue S4PRED coloring & probability curves</li>
-                  <li>Citable via CITATION.cff (CFF 1.2.0)</li>
+                  <li>Reproducibility-as-permalink (every analysis is a citable URL)</li>
+                  <li>Symmetric 4-card KPI overview with click-to-filter</li>
+                  <li>
+                    Candidate Ranking with Fibril-Formation Focus preset (defaults to Peleg's
+                    weights)
+                  </li>
+                  <li>Correlation matrix with TANGO + FF-flag binary targets</li>
+                  <li>PDF report + CSV + FASTA export (single + bulk)</li>
+                  <li>MCP server — use PVL from Claude Desktop, Cursor, Continue</li>
+                  <li>Citable via CITATION.cff + Zenodo DOI per release</li>
                 </ul>
               </CardContent>
             </Card>

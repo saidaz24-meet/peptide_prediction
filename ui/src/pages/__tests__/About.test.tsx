@@ -51,12 +51,15 @@ describe("About page — credits & dataset card", () => {
     expect(screen.getByTestId("about-credits")).toBeInTheDocument();
   });
 
-  it("credits Said Azaizah with lead-developer / full-stack role (never 'Founder' — feedback_said_credit_phrasing.md)", () => {
+  it("credits Said Azaizah with lead-developer role (never 'Founder' — feedback_said_credit_phrasing.md)", () => {
     renderAbout();
     const block = screen.getByTestId("credit-said");
     expect(block).toHaveTextContent("Said Azaizah");
     expect(block).toHaveTextContent(/Lead developer/);
-    expect(block).toHaveTextContent(/full-stack/);
+    // 2026-06-08: contribution scope rewritten — five surfaces (web, Python,
+    // CLI, MCP, self-host) replace the prior "full-stack architect" phrasing.
+    expect(block).toHaveTextContent(/backend/);
+    expect(block).toHaveTextContent(/frontend/);
     // Guard: 'Founder' must NEVER appear in Said's credit block.
     expect(block.textContent ?? "").not.toMatch(/\bFounder\b/);
   });
@@ -66,8 +69,26 @@ describe("About page — credits & dataset card", () => {
     const block = screen.getByTestId("credit-peleg");
     expect(block).toHaveTextContent("Dr. Peleg Ragonis-Bachar");
     expect(block).toHaveTextContent("Technion");
-    expect(block).toHaveTextContent(/FF-Helix/);
-    expect(block).toHaveTextContent(/Staphylococcus 2023/);
+    // 2026-06-08: Peleg's credit broadened to her actual contribution scope —
+    // the four-category classification algorithm + threshold definitions +
+    // validation cohort + scientific review across every release. Was
+    // narrowly "FF-Helix, FF-SSW, Staphylococcus 2023".
+    expect(block).toHaveTextContent(/four-category classification/);
+    expect(block).toHaveTextContent(/validation cohort/);
+  });
+
+  it("credits Prof. Meytal Landau as corresponding author (added 2026-06-08)", () => {
+    renderAbout();
+    const block = screen.getByTestId("credit-landau");
+    expect(block).toHaveTextContent("Prof. Meytal Landau");
+    expect(block).toHaveTextContent(/Corresponding author/);
+    expect(block).toHaveTextContent(/0000-0002-1743-3430/);
+  });
+
+  it("Peleg's ORCID now points to her real ORCID (was 'pending')", () => {
+    renderAbout();
+    const link = screen.getByTestId("peleg-orcid");
+    expect(link).toHaveAttribute("href", "https://orcid.org/0000-0002-0979-8165");
   });
 
   it("credits Dr. Aleksandr Golubev (DESY) as scientific advisor", () => {

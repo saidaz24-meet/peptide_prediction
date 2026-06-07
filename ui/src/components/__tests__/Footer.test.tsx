@@ -44,9 +44,9 @@ describe("Footer", () => {
 
   it("renders citation links", () => {
     renderFooter();
-    expect(screen.getByText("DOI (coming soon)")).toBeInTheDocument();
+    expect(screen.getByText("DOI (mints on release)")).toBeInTheDocument();
     expect(screen.getByText("BibTeX")).toBeInTheDocument();
-    expect(screen.getByText("JOSS Paper (planned)")).toBeInTheDocument();
+    expect(screen.getByText("JOSS Paper (in submission)")).toBeInTheDocument();
   });
 
   it("renders legal links", () => {
@@ -71,7 +71,7 @@ describe("Footer", () => {
 
   it("disabled links are not clickable", () => {
     renderFooter();
-    const doiEl = screen.getByText("DOI (coming soon)");
+    const doiEl = screen.getByText("DOI (mints on release)");
     expect(doiEl.tagName.toLowerCase()).toBe("span");
     expect(doiEl).toHaveClass("cursor-default");
   });

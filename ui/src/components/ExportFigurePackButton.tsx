@@ -10,6 +10,7 @@ import { FileDown, Loader2 } from "lucide-react";
 import type { Peptide } from "@/types/peptide";
 import { useThresholdStore } from "@/stores/thresholdStore";
 import { useDatasetStore } from "@/stores/datasetStore";
+import { PVL_VERSION } from "@/stores/reproducibilityStore";
 import {
   generateFigurePack,
   generateCoverPage,
@@ -48,7 +49,10 @@ export function ExportFigurePackButton({
         // hash via the permalink system, so this single string regenerates
         // the same view for a paper reviewer.
         permalinkURL: typeof window !== "undefined" ? window.location.href : undefined,
-        version: "0.1.0",
+        // 2026-06-08: was hardcoded "0.1.0"; now reads PVL_VERSION (Vite-injected
+        // from package.json at build time). Figure pack methods panel + CSV
+        // export already use this same source.
+        version: PVL_VERSION,
       };
 
       const [panels, coverSvg] = await Promise.all([

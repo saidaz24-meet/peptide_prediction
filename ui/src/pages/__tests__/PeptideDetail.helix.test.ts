@@ -39,7 +39,14 @@ describe("PeptideDetail canonical-helix-only invariant", () => {
     expect(detailSrc).not.toMatch(/s4predHelixPercent\s*\?\?\s*0\)\.toFixed/);
   });
 
-  it("guards the S4PRED composition legend on s4predHelixPercent != null", () => {
-    expect(detailSrc).toMatch(/peptide\.s4predHelixPercent\s*!=\s*null/);
+  it("guards the S4PRED composition legend on s4predHelixPercent presence", () => {
+    // 2026-06-08: PeptideDetail.tsx hardened the guard from `!= null` to
+    // `typeof === "number"`. Either form satisfies the invariant — the
+    // composition legend must NOT render when s4predHelixPercent is absent.
+    const hasNullGuard = /peptide\.s4predHelixPercent\s*!=\s*null/.test(detailSrc);
+    const hasTypeGuard = /typeof\s+peptide\.s4predHelixPercent\s*===\s*"number"/.test(
+      detailSrc
+    );
+    expect(hasNullGuard || hasTypeGuard).toBe(true);
   });
 });
