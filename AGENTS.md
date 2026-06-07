@@ -14,7 +14,7 @@ PVL is developed by Said Azaizah using a multi-terminal AI-orchestration pattern
 - Writes `TX-INSTRUCTIONS.md` (gitignored) and `docs/active/RESEARCH_BRIEFS/T5_PROMPTS/*.md` specs
 - Commits sub-terminal output after review (atomic logical commits)
 - Updates ADRs in `docs/active/DECISIONS.md`
-- Updates the dispatch state in `docs/active/STATUS.md` after every cycle
+- Updates the dispatch state in `docs/internal/STATUS.md` after every cycle
 - Saves memory feedback in `~/.claude/projects/.../memory/`
 - Proposes workflow upgrades proactively (hooks, slash commands, new memory files) without waiting for permission — opt-out model
 - Makes architectural decisions when evidence supports them; surfaces explicitly when human-touch input needed
@@ -104,7 +104,7 @@ PVL is developed by Said Azaizah using a multi-terminal AI-orchestration pattern
 **Scope**:
 - Reads the full Peleg feedback document end-to-end
 - Translates symptoms into root-cause tasks (per `feedback_root_cause_workflow.md`)
-- Updates `docs/active/PELEG_REVIEW_TASKS.md` and `docs/active/ALEX_BACKLOG.md` if relevant
+- Updates `docs/internal/PELEG_REVIEW_TASKS.md` and `docs/internal/ALEX_BACKLOG.md` if relevant
 
 **Reads**: the feedback artifact + `PELEG_REVIEW_TASKS.md` history.
 
@@ -156,8 +156,8 @@ PVL is developed by Said Azaizah using a multi-terminal AI-orchestration pattern
 
 ## Reference files
 
-- `docs/active/STATUS.md` — current dispatch state + manual test plan + per-readiness work queue
-- `docs/active/MASTER_PUSH_PLAN.md` — 7-wave plan to full-platform vision
+- `docs/internal/STATUS.md` — current dispatch state + manual test plan + per-readiness work queue
+- `docs/internal/MASTER_PUSH_PLAN.md` — 7-wave plan to full-platform vision
 - `docs/active/ROADMAP.md` — Phases A-O detailed tasks
 - `docs/active/DECISIONS.md` — all ADRs
 - `docs/active/RESEARCH_BRIEFS/_INDEX.md` — research brief log

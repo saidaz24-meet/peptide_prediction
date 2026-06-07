@@ -178,10 +178,10 @@ See also: `TECH_PLATFORM_VISION.md` for the longer-form platform thesis and tech
 
 **Date**: 2026-05-12 · **Status**: ACCEPTED · **Authors**: Said + T-RES (RB-004) + T1
 **Context**: PVL uses 4-6 Claude Code terminals (T1 CEO, T2 backend, T3 frontend, T5 research, Cowork visual, T-PEL Peleg-feedback). No committed file legibly described which terminal does what, what's forbidden, and how they coordinate. Said had to invent the multi-terminal pattern, the CEO role, and the T5 distinction — symptom of T1 not proposing infrastructure proactively (`feedback_t1_proactive_workflow_evolution.md`). Without this protocol committed at repo root, a future maintainer or Said-after-MIT-absence cannot rebuild context.
-**Decision**: Adopt **`AGENTS.md`** at project root (committed, public) as the canonical role map. Every terminal reads it at session start. Adopt **`docs/active/STATUS.md`** as the always-up-to-date dispatch dashboard — T1 updates it after every cycle. Per-terminal instructions (`TX-INSTRUCTIONS.md`) stay gitignored — those are working specs, not canonical roles.
+**Decision**: Adopt **`AGENTS.md`** at project root (committed, public) as the canonical role map. Every terminal reads it at session start. Adopt **`docs/internal/STATUS.md`** as the always-up-to-date dispatch dashboard — T1 updates it after every cycle. Per-terminal instructions (`TX-INSTRUCTIONS.md`) stay gitignored — those are working specs, not canonical roles.
 **Reasoning**: AGENTS.md is the legible map; STATUS.md is the live state. Together they let a fresh terminal — or Said after a 3-month gap — re-enter the project without T1 context. Addy Osmani's multi-agent research (RB-004 §3) confirms human-curated AGENTS.md files improve agent success vs AI-written ones. The 3-5 effective-terminal sweet spot matches PVL's persistent set (T1/T2/T3/T5).
 **Implication**: T1 maintains AGENTS.md (proactive review quarterly) + updates STATUS.md after every dispatch. Sub-terminal instructions docs reference AGENTS.md rather than re-declaring roles. Any new terminal role (e.g., future T-OPS for observability) requires an AGENTS.md update first.
-**Evidence**: `AGENTS.md` (this commit), `docs/active/STATUS.md`, RB-004 §3 Domain 3, RB-COWORK-AUDIT.
+**Evidence**: `AGENTS.md` (this commit), `docs/internal/STATUS.md`, RB-004 §3 Domain 3, RB-COWORK-AUDIT.
 
 ---
 

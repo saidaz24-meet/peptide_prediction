@@ -84,14 +84,14 @@ These docs (in `docs/active/`) ARE the project state. T5 reads them all, no exce
 
 **AI-platform context:**
 - `docs/active/ROADMAP.md` Phase G (lines ~704-790) — Alex's G1/G2/G3 vision verbatim
-- `docs/active/ALEX_BACKLOG.md` "AI/LLM Integration" section — AI1/AI2/AI3
-- `docs/active/TECH_PLATFORM_VISION.md` §4 (AI for users / devs / science split)
+- `docs/internal/ALEX_BACKLOG.md` "AI/LLM Integration" section — AI1/AI2/AI3
+- `docs/internal/TECH_PLATFORM_VISION.md` §4 (AI for users / devs / science split)
 - `docs/active/DECISIONS.md` ADR-009 (MCP front door, ACCEPTED), ADR-017 (ESM-2 embedding)
 - `docs/active/RESEARCH_BRIEFS/RB-001_researcher-needs.md` — researcher feature priorities
 - `docs/active/RESEARCH_BRIEFS/RB-002_vector-store-evaluation.md` — LanceDB rationale (RAG-relevant)
 - `mcp_server/README.md` and `mcp_server/pvl_mcp/tools.py` — current MCP tools
 - `docs/active/VECTOR_SEARCH_SPEC.md` — similarity search architecture
-- `docs/active/TOP_CEO_RECOMMENDATIONS.md` — sustainability + funding context
+- `docs/internal/TOP_CEO_RECOMMENDATIONS.md` — sustainability + funding context
 
 **Recent work:**
 - `git log --oneline -30` — last ~30 commits on `wave-2-ai-platform` branch
