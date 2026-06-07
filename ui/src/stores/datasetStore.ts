@@ -305,16 +305,50 @@ export const useDatasetStore = create<DatasetState>()(
           sswValidPeptides.length > 0 ? (sswPositive / sswValidPeptides.length) * 100 : null;
 
         // Helix positive — symmetric to sswPositive per Peleg's symmetry rule.
-        // Counts peptides where S4PRED detected at least one helix segment
-        // (s4predHelixPrediction === 1 in Peleg's main.py:219-220 framing).
-        const helixValidPeptides = peptides.filter((p) => {
-          const v = p.s4predHelixPrediction;
-          if (v === null || v === undefined) return false;
-          return typeof v === "number" && !isNaN(v) && isFinite(v);
-        });
-        const helixPositive = helixValidPeptides.filter(
-          (p) => p.s4predHelixPrediction === 1
-        ).length;
+        //
+        // 2026-06-07 (Said live-VPS report): the prior single-field check on
+        // `s4predHelixPrediction === 1` showed N/A on a 12-peptide dataset that
+        // simultaneously surfaced 25% FF-Helix candidates (impossible unless
+        // some peptides ARE helix-positive — FF-Helix requires Helix base class).
+        // Root cause: `s4predHelixPrediction` wasn't getting populated by the
+        // backend serializer on this code path; only `s4predHelixScore` and
+        // `s4predHelixFragments` reached the frontend.
+        //
+        // Fixed by aligning the check to Peleg's main.py:219-220 framing —
+        // a peptide is helix-positive when her segment finder produced AT
+        // LEAST ONE helix fragment (equivalently: `Helix score (Jpred) != -1`
+        // in her code). We consult the available signals in order of
+        // preference and treat any positive signal as confirmation:
+        //   1. `s4predHelixPrediction === 1` (explicit class flag)
+        //   2. `s4predHelixFragments?.length > 0` (top-level fragment array)
+        //   3. `s4pred?.helixSegments?.length > 0` (nested fragment array)
+        //   4. `s4predHelixScore` is a number != -1 and != 0 (raw score signal)
+        // A peptide is "valid" for the percent denominator if ANY S4PRED
+        // signal is present at all — so we don't divide by 0 when S4PRED
+        // didn't run, but DO count peptides that ran without producing helix.
+        const isHelixPositive = (p: Peptide): boolean => {
+          if (p.s4predHelixPrediction === 1) return true;
+          if (p.s4predHelixFragments && p.s4predHelixFragments.length > 0) return true;
+          if (p.s4pred?.helixSegments && p.s4pred.helixSegments.length > 0) return true;
+          if (
+            typeof p.s4predHelixScore === "number" &&
+            p.s4predHelixScore !== -1 &&
+            p.s4predHelixScore > 0
+          ) {
+            return true;
+          }
+          return false;
+        };
+        const hasS4predSignal = (p: Peptide): boolean => {
+          if (p.s4predHelixPrediction != null) return true;
+          if (p.s4predHelixFragments != null) return true;
+          if (p.s4pred != null) return true;
+          if (p.s4predHelixScore != null) return true;
+          if (p.s4predHelixPercent != null) return true;
+          return false;
+        };
+        const helixValidPeptides = peptides.filter(hasS4predSignal);
+        const helixPositive = helixValidPeptides.filter(isHelixPositive).length;
         const helixPositivePercent =
           helixValidPeptides.length > 0 ? (helixPositive / helixValidPeptides.length) * 100 : null;
 

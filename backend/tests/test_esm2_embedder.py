@@ -27,6 +27,19 @@ os.environ.setdefault("USE_S4PRED", "0")
 transformers = pytest.importorskip("transformers")
 torch = pytest.importorskip("torch")  # noqa: F401 — imported for skip side effect
 
+# 2026-06-08: also skip in CI where HF model downloads are blocked. The runner
+# has transformers + torch installed but cannot reach huggingface.co at test
+# time and has no pre-populated HF cache → all 5 model-loading tests ERROR'd
+# in PR #84 CI. Contract-level tests live in test_vector_store.py with a fake
+# embedder. Set HF_HOME pointing to a populated cache to re-enable locally /
+# on a self-hosted runner.
+if os.environ.get("CI") == "true" and not os.environ.get("HF_HOME"):
+    pytest.skip(
+        "ESM-2 real-model tests skipped in CI without HF_HOME cache. "
+        "Run locally to exercise the real embedder.",
+        allow_module_level=True,
+    )
+
 from config import settings  # noqa: E402
 from services import vector_store  # noqa: E402
 
