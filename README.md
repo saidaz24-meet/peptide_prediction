@@ -1,18 +1,19 @@
 <div align="center">
 
-# 🧬 Peptide Visual Lab
+# Peptide Visual Lab
 
-**The all-in-one peptide aggregation + structure prediction dashboard.**
-Multi-tool consensus · Live 3D overlay · Reproducibility-as-permalink · AI-platform-ready.
+**Single web tool combining aggregation propensity, secondary structure prediction, and fibril-forming helix detection for peptide researchers.**
+
+Built around [Ragonis-Bachar et al. 2022](https://doi.org/10.1021/acs.biomac.2c00582)'s 4-category classification (Helix · FF-Helix · SSW · FF-SSW). Five surfaces: web · Python package · CLI · MCP server · Docker self-host.
 
 [![CI](https://github.com/saidaz24-meet/peptide_prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/saidaz24-meet/peptide_prediction/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
-[![Tests: 887 passing](https://img.shields.io/badge/tests-887%20passing-brightgreen)](#running-tests)
-[![Sentry monitored](https://img.shields.io/badge/Sentry-monitored-blueviolet)](https://sentry.io)
-[![CodeRabbit reviewed](https://img.shields.io/badge/CodeRabbit-AI%20reviewed-orange)](.coderabbit.yaml)
-[![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-7C3AED)](https://www.anthropic.com/claude)
+[![Version](https://img.shields.io/badge/version-v0.3.0-blue.svg)](CITATION.cff)
+[![DOI](https://img.shields.io/badge/DOI-pending-lightgrey.svg)](#citing-pvl)
+[![Status](https://img.shields.io/badge/status-pre--release-orange.svg)](#status)
+[![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-[**Live demo**](https://pvl.example) · [**Self-host**](#self-host-in-3-minutes) · [**API docs**](#api) · [**Contribute**](CONTRIBUTING.md) · [**Cite**](#citing-pvl)
+[**Live instance**](http://94.130.178.182:3000) · [**Self-host**](#self-host-in-3-minutes) · [**API docs**](#api) · [**Contribute**](CONTRIBUTING.md) · [**Cite**](#citing-pvl)
 
 </div>
 
@@ -91,7 +92,7 @@ flowchart TB
     class M,Mcp planned
 ```
 
-The whole architecture is documented in [`docs/active/TECH_PLATFORM_VISION.md`](docs/active/TECH_PLATFORM_VISION.md). Architectural decisions logged in [`docs/active/DECISIONS.md`](docs/active/DECISIONS.md) (12 ADRs).
+Architectural decisions logged in [`docs/active/DECISIONS.md`](docs/active/DECISIONS.md). Internal platform vision in [`docs/internal/TECH_PLATFORM_VISION.md`](docs/internal/TECH_PLATFORM_VISION.md).
 
 ---
 
@@ -244,20 +245,32 @@ All request schemas use Pydantic v2 with `extra="forbid"` — unknown fields fai
 
 ## Documentation
 
+The doc tree splits into three buckets per the project's [clean-push policy](docs/internal/CLEAN_PUSH_POLICY_2026_06_07.md): **active** (publishable architecture + scientific reference), **internal** (process docs kept in repo for the why-trail), and **archive** (frozen historical artifacts).
+
+### Architecture + scientific reference (`docs/active/`)
+
 | Document | What it covers |
 |---|---|
-| [`docs/active/MASTER_PUSH_PLAN.md`](docs/active/MASTER_PUSH_PLAN.md) | The 7-wave path from current state to full-platform vision |
-| [`docs/active/TECH_PLATFORM_VISION.md`](docs/active/TECH_PLATFORM_VISION.md) | Platform thesis · technology radar · AI-platform vision |
-| [`docs/active/DECISIONS.md`](docs/active/DECISIONS.md) | 12 architectural decision records (ADR-001 through ADR-012) |
-| [`docs/active/ROADMAP.md`](docs/active/ROADMAP.md) | Phases A–L plus O / S — every planned feature with effort estimates |
-| [`docs/active/TOP_CEO_RECOMMENDATIONS.md`](docs/active/TOP_CEO_RECOMMENDATIONS.md) | Solo OSS sustainability · funding paths · burnout protocol |
-| [`docs/active/COVERAGE_AUDIT.md`](docs/active/COVERAGE_AUDIT.md) | Every Peleg + Alex feedback item with status |
-| [`docs/active/SENTRY_RUNBOOK.md`](docs/active/SENTRY_RUNBOOK.md) | Observability ops · alert rules · error fingerprints |
-| [`docs/active/ACTIVE_CONTEXT.md`](docs/active/ACTIVE_CONTEXT.md) | Architecture overview · entry points · data flow |
-| [`docs/active/CONTRACTS.md`](docs/active/CONTRACTS.md) | API endpoints · request/response shapes |
-| [`docs/active/TESTING_GUIDE.md`](docs/active/TESTING_GUIDE.md) | Test patterns · golden fixtures · debugging |
-| [`docs/active/DEPLOYMENT.md`](docs/active/DEPLOYMENT.md) | VM + Docker + Caddy step-by-step |
-| [`README_EXPLAINER.md`](README_EXPLAINER.md) | Non-technical biologist-facing A-to-Z guide |
+| [`ACTIVE_CONTEXT.md`](docs/active/ACTIVE_CONTEXT.md) | Architecture overview · entry points · data flow |
+| [`MASTER_DEV_DOC.md`](docs/active/MASTER_DEV_DOC.md) | Consolidated architecture + decisions reference |
+| [`DEVELOPER_REFERENCE.md`](docs/active/DEVELOPER_REFERENCE.md) | Pipeline internals · null semantics · debugging |
+| [`CONTRACTS.md`](docs/active/CONTRACTS.md) | API endpoints · request/response shapes |
+| [`DECISIONS.md`](docs/active/DECISIONS.md) | Architectural decision records (ADRs) |
+| [`ROADMAP.md`](docs/active/ROADMAP.md) | Phases A–L plus O / S — every planned feature with effort estimates |
+| [`KNOWN_ISSUES.md`](docs/active/KNOWN_ISSUES.md) | Honest known-bug list |
+| [`TESTING_GUIDE.md`](docs/active/TESTING_GUIDE.md) | Test patterns · golden fixtures · debugging |
+| [`DEPLOYMENT.md`](docs/active/DEPLOYMENT.md) | VM + Docker + Caddy step-by-step |
+| [`CHANGELOG_PELEG.md`](docs/active/CHANGELOG_PELEG.md) | Scientific changelog reviewed by Peleg Ragonis-Bachar |
+| [`SPECIALS.md`](docs/active/SPECIALS.md) | Special handling rules (Aβ42 etc.) |
+| [`SENTRY_RUNBOOK.md`](docs/active/SENTRY_RUNBOOK.md) | Observability ops · alert rules · error fingerprints |
+| [`MCP_RUNBOOK.md`](docs/active/MCP_RUNBOOK.md) | MCP server install + usage |
+| [`MOL3D_OVERLAY_SPEC.md`](docs/active/MOL3D_OVERLAY_SPEC.md) | Mol* 3D overlay technical spec |
+| [`UNIPROT_ENRICHMENT_SPEC.md`](docs/active/UNIPROT_ENRICHMENT_SPEC.md) | UniProt integration spec |
+| [`VECTOR_SEARCH_SPEC.md`](docs/active/VECTOR_SEARCH_SPEC.md) | LanceDB + ESM-2 vector search architecture |
+| [`ECOSYSTEM_GUIDE.md`](docs/active/ECOSYSTEM_GUIDE.md) | 5-surface reference (web · Python · CLI · MCP · self-host) |
+| [`DESIGN_SYSTEM.md`](docs/active/DESIGN_SYSTEM.md) | Tailwind + shadcn conventions |
+| [`A4_BIO_TOOLS_SUBMISSION.md`](docs/active/A4_BIO_TOOLS_SUBMISSION.md) | bio.tools submission packet |
+| [`A5_ZENODO_RELEASE.md`](docs/active/A5_ZENODO_RELEASE.md) | Zenodo release procedure |
 | [`CONTRIBUTING.md`](CONTRIBUTING.md) | How to contribute · what to expect from a part-time-maintained project |
 
 ---
@@ -303,13 +316,23 @@ peptide_prediction/
 
 ---
 
+## Status
+
+PVL is currently **v0.3.0 pre-release**. The pipeline implements [Dr. Peleg Ragonis-Bachar](https://orcid.org/0000-0002-0979-8165)'s 4-category classification algorithm from [Ragonis-Bachar et al. 2022](https://doi.org/10.1021/acs.biomac.2c00582) (*Biomacromolecules*). Her monthly scientific review is in progress; the Zenodo DOI mints on release tag.
+
+---
+
 ## Citing PVL
+
+If you use PVL in your research, please cite both the **software** and the **underlying algorithm**:
+
+### Software
 
 ```bibtex
 @software{pvl_2026,
-  author    = {Azaizah, Said and Ragonis-Bachar, Peleg and Golubev, Aleksandr},
+  author    = {Ragonis-Bachar, Peleg and Azaizah, Said and Golubev, Aleksandr and Landau, Meytal},
   title     = {Peptide Visual Lab (PVL)},
-  version   = {0.1.0},
+  version   = {0.3.0},
   year      = {2026},
   url       = {https://github.com/saidaz24-meet/peptide_prediction},
   doi       = {10.5281/zenodo.PENDING},
@@ -317,7 +340,21 @@ peptide_prediction/
 }
 ```
 
-The Zenodo DOI is auto-assigned on each GitHub release. The DOI badge will appear here once v0.1.0 ships.
+### Underlying algorithm
+
+```bibtex
+@article{ragonis_bachar_2022,
+  author  = {Ragonis-Bachar, Peleg and Rayan, Bader and Barnea, Eilon and Engelberg, Yizhaq and Upcher, Alexander and Landau, Meytal},
+  title   = {Natural Antimicrobial Peptides Self-assemble as α-Sheet Conformations as Defined by a Linear Motif},
+  journal = {Biomacromolecules},
+  year    = {2022},
+  volume  = {24},
+  pages   = {413--425},
+  doi     = {10.1021/acs.biomac.2c00582}
+}
+```
+
+The Zenodo DOI is auto-assigned on each GitHub release; the badge above updates once v0.3.0 ships.
 
 PVL also exposes a per-analysis citation hook: every analysis URL is copyable + citable via the in-app **Reproducibility Ribbon**. Paste a permalink in your paper to give readers the exact same view you analyzed.
 
@@ -327,22 +364,24 @@ See [`CITATION.cff`](CITATION.cff) for machine-readable citation metadata.
 
 ## Authors
 
+Author order on the software citation reflects scientific contribution. The corresponding author for the published paper will be Prof. Meytal Landau.
+
 <table>
   <tr>
-    <td><strong>Platform + UI</strong></td>
+    <td><strong>Algorithms + scientific lead</strong></td>
     <td>
-      <a href="https://orcid.org/0009-0002-3596-5358">Said Azaizah</a>
-      · Technion + DESY (→ MIT)
+      <a href="https://orcid.org/0000-0002-0979-8165">Dr. Peleg Ragonis-Bachar</a> · Technion (Department of Biology)
       <br/>
-      <em>Builder, designer, AI-platform vision.</em>
+      <em>4-category classification, threshold definitions, scientific review, validation cohort.</em>
     </td>
   </tr>
   <tr>
-    <td><strong>Algorithms + scientific design</strong></td>
+    <td><strong>Software + platform</strong></td>
     <td>
-      <strong>Dr. Peleg Ragonis-Bachar</strong> · Technion
+      <a href="https://orcid.org/0009-0002-3596-5358">Said Azaizah</a>
+      · MIT (incoming) + DESY
       <br/>
-      <em>4-category classification, threshold definitions, scientific review.</em>
+      <em>Lead developer — backend, frontend, ecosystem (5-surface), CI/CD, observability, deployment.</em>
     </td>
   </tr>
   <tr>
@@ -353,6 +392,14 @@ See [`CITATION.cff`](CITATION.cff) for machine-readable citation metadata.
       <em>Research direction, lab adoption, infrastructure.</em>
     </td>
   </tr>
+  <tr>
+    <td><strong>Corresponding author</strong></td>
+    <td>
+      <a href="https://orcid.org/0000-0002-1743-3430">Prof. Meytal Landau</a> · Technion + EMBL Hamburg + Centre for Structural Systems Biology
+      <br/>
+      <em>Lab PI, structural biology direction, paper correspondence.</em>
+    </td>
+  </tr>
 </table>
 
 ---
@@ -361,6 +408,7 @@ See [`CITATION.cff`](CITATION.cff) for machine-readable citation metadata.
 
 PVL stands on the shoulders of these tools and groups. Cite them where appropriate.
 
+- **[Ragonis-Bachar et al. 2022](https://doi.org/10.1021/acs.biomac.2c00582)** — the 4-category classification (Helix · FF-Helix · SSW · FF-SSW) implemented in this tool. *Biomacromolecules* 24, 413–425.
 - **[TANGO](https://tango.switchlab.org/)** — Fernandez-Escamilla et al., *Nat Biotechnol* 22, 1302–1306 (2004)
 - **[S4PRED](https://github.com/psipred/s4pred)** — Moffat et al., *Bioinformatics* 38, 4647–4653 (2022)
 - **[Mol\*](https://molstar.org/)** — RCSB PDB + EBI + ETH consortium
