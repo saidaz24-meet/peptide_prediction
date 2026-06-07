@@ -274,7 +274,7 @@ Thank you for the second pass. The PPT was rigorous and caught real issues we ne
 
 - **Live commit referenced**: `4534033` (post-Wave-2 merge)
 - **Verified by**: Explore agent audit + targeted grep spot-check 2026-05-18
-- **Tracking doc**: `docs/active/PELEG_REVIEW_TASKS.md` (to be created with Round 2 audit table)
+- **Tracking doc**: `docs/internal/PELEG_REVIEW_TASKS.md` (to be created with Round 2 audit table)
 - **Wave 2.5 dispatch**: §2 items become individual T2/T3/Cowork tasks
 - **Co-design items**: §3 D1-D5 need scheduling with Peleg + Alex
 - **Open**: confirm with Said which items he wants to add/remove before sending

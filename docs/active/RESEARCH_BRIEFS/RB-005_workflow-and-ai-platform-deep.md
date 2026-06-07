@@ -471,7 +471,7 @@ Hannah cares about: **audit trail + citation correctness**. She submits a JOSS p
 - `backend/services/vector_store.py` — extend with `papers` table support
 - `docs/active/DECISIONS.md` — append ADR-020 (G2 architecture)
 - `docs/active/ROADMAP.md` — add Wave 3 G2 task breakdown
-- `docs/active/MASTER_PUSH_PLAN.md` — Wave 3 detail update
+- `docs/internal/MASTER_PUSH_PLAN.md` — Wave 3 detail update
 
 **No code shipped in this brief.** All implementation routes through T2/T3/T1 dispatch.
 

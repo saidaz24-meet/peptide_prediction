@@ -240,4 +240,3 @@ cd ui && npm install && npm run dev
 | `docs/active/DEPLOYMENT.md` | VM specs, step-by-step deployment, K8s plan |
 | `docs/active/MASTER_DEV_DOC.md` | Strategic decisions, security, risk register |
 | `docs/active/ROADMAP.md` | Development roadmap and completed work |
-| `README_EXPLAINER.md` | Non-technical A-Z team guide |

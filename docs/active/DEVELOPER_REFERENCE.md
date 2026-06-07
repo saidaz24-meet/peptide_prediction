@@ -678,5 +678,5 @@ Results.tsx
 ---
 
 *For high-level architecture decisions, see `docs/active/MASTER_DEV_DOC.md`.
-For non-technical explanation, see `README_EXPLAINER.md`.
+For non-technical explanation, see the project [README.md](../../README.md).
 For API contracts, see `docs/active/CONTRACTS.md`.*
