@@ -48,10 +48,10 @@ PVL occupies a unique niche: the **only web tool** combining aggregation propens
 | A1 | UniProt cross-links | 2h | DONE | Clickable IDs → uniprot.org |
 | A2 | SVG/PNG export | 4h | DONE | Publication-ready charts + helical wheel |
 | A3 | Example datasets | 3h | DONE | 3 curated sets with "Try example data" |
-| A4 | bio.tools registration | 1h | TODO | Needs live URL |
-| A5 | Zenodo DOI | 1h | TODO | Needs GitHub release |
-| A6 | One-click paper figure pack | 8-12h | TODO | Select N peptides → multi-panel SVG with consistent styling, ready for Nature/Science supplement. Includes radar overlay, sequence comparison, classification matrix, helical wheels. Embeds permalink to reproduce. |
-| A7 | JOSS paper draft + submission | 16-20h | TODO | paper.md + bibliography + author affiliations. Submission triggered by clean GitHub release + Zenodo DOI. |
+| A4 | bio.tools registration | 1h | READY | Submission packet at `A4_BIO_TOOLS_SUBMISSION.md`. Triggered post Peleg signoff. |
+| A5 | Zenodo DOI | 1h | READY | Release packet at `A5_ZENODO_RELEASE.md` + release notes draft at `RELEASE_NOTES_v0.3.0.md`. `gh release create v0.3.0` mints DOI. |
+| A6 | One-click paper figure pack | 8-12h | DONE | `ExportFigurePackButton` + `lib/figurePack.ts` + 4 panel generators ship the HTML bundle with cover + classification + biochem + aggregation + methods. |
+| A7 | JOSS paper draft + submission | 16-20h | DRAFT READY | `paper/paper.md` + `paper/paper.bib` (10 bibliography entries). Submission via https://joss.theoj.org/papers/new post Peleg signoff. |
 
 ---
 

@@ -1,6 +1,6 @@
 # A5 — Zenodo DOI release packet
 
-> Outcome: an immutable DOI for v0.1.0 that bio.tools, JOSS, and the paper supplement can cite.
+> Outcome: an immutable DOI for v0.3.0 that bio.tools, JOSS, and the paper supplement can cite.
 > Estimated time: 15 min (linking Zenodo to GitHub if not done) + 5 min (create release).
 
 ## How Zenodo + GitHub work together
@@ -8,7 +8,7 @@
 Zenodo has a built-in GitHub integration. Once configured:
 
 1. You link the GitHub repo on Zenodo's settings page (one-time).
-2. Every GitHub release tag (e.g. `v0.1.0`) auto-triggers a Zenodo snapshot.
+2. Every GitHub release tag (e.g. `v0.3.0`) auto-triggers a Zenodo snapshot.
 3. Zenodo issues a versioned DOI for that snapshot AND a concept DOI that always points to the latest.
 
 The concept DOI is what we cite in papers ("PVL: DOI 10.5281/zenodo.XXXXXXX") because it doesn't drift when v0.2.0 lands.
@@ -35,7 +35,7 @@ Verify CITATION.cff version matches what you're about to tag:
 ```bash
 grep -E "^version|^date-released" CITATION.cff
 # Expected:
-# version: "0.1.0"
+# version: "0.3.0"
 # date-released: "2026-05-20"   ← update if it's not today
 ```
 
@@ -47,16 +47,16 @@ Using `gh`:
 
 ```bash
 # Create an annotated tag at current main HEAD
-gh release create v0.1.0 \
-  --title "v0.1.0 — Wave 2 + 2.5 (paper-ready baseline)" \
-  --notes-file docs/active/A5_ZENODO_RELEASE.md \
+gh release create v0.3.0 \
+  --title "v0.3.0 — Peleg-aligned algorithm + 5-surface ecosystem" \
+  --notes-file docs/active/RELEASE_NOTES_v0.3.0.md \
   --target main
 
 # Confirm:
-gh release view v0.1.0
+gh release view v0.3.0
 ```
 
-Or via the GitHub web UI: https://github.com/saidaz24-meet/peptide_prediction/releases/new — fill in tag `v0.1.0`, paste the release notes below.
+Or via the GitHub web UI: https://github.com/saidaz24-meet/peptide_prediction/releases/new — fill in tag `v0.3.0`, paste the release notes below.
 
 ### Step 3 — Verify Zenodo picked it up
 
@@ -67,7 +67,7 @@ Wait ~1-2 minutes after the release publishes. Then:
 open "https://zenodo.org/account/records"
 ```
 
-You should see a new `v0.1.0` entry with a freshly minted DOI like `10.5281/zenodo.XXXXXXX`.
+You should see a new `v0.3.0` entry with a freshly minted DOI like `10.5281/zenodo.XXXXXXX`.
 
 ### Step 4 — Wire the DOI back into the repo
 
@@ -75,7 +75,7 @@ Update `CITATION.cff`:
 
 ```yaml
 identifiers:
-  - description: "Zenodo archive DOI (versioned, v0.1.0)"
+  - description: "Zenodo archive DOI (versioned, v0.3.0)"
     type: doi
     value: "10.5281/zenodo.XXXXXXX"   # ← paste actual DOI
   - description: "Zenodo concept DOI (always-latest)"
@@ -93,7 +93,7 @@ Commit the metadata update (don't tag this commit — it lives between releases)
 
 ```bash
 git add CITATION.cff README.md
-git commit -m "docs: wire Zenodo DOI for v0.1.0"
+git commit -m "docs: wire Zenodo DOI for v0.3.0"
 git push
 ```
 
@@ -103,12 +103,12 @@ Once A4 (bio.tools registration) is also done, add the DOI to bio.tools' "Public
 
 ---
 
-## Release notes for v0.1.0
+## Release notes for v0.3.0
 
 Paste the section below into the GitHub release body. Trim as you like.
 
 ```markdown
-# v0.1.0 — Paper-Ready Baseline (Wave 2 + 2.5)
+# v0.3.0 — Paper-Ready Baseline (Wave 2 + 2.5)
 
 The first public release of Peptide Visual Lab. This is the version Peleg + Alex reviewed for the paper.
 
@@ -167,10 +167,10 @@ If you use PVL in your research, please cite:
 ```bibtex
 @software{azaizah2026pvl,
   author       = {Azaizah, Said and Ragonis-Bachar, Peleg and Golubev, Aleksandr},
-  title        = {Peptide Visual Lab (PVL): v0.1.0},
+  title        = {Peptide Visual Lab (PVL): v0.3.0},
   year         = 2026,
   publisher    = {Zenodo},
-  version      = {v0.1.0},
+  version      = {v0.3.0},
   doi          = {10.5281/zenodo.XXXXXXX},
   url          = {https://github.com/saidaz24-meet/peptide_prediction}
 }

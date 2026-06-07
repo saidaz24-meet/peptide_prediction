@@ -110,13 +110,13 @@ python -m pytest tests/test_*_golden.py -v
 
 ## Frontend Tests
 
-**Status**: 77 tests passing via Vitest + jsdom + @testing-library/react.
+**Status**: 633 tests passing via Vitest + jsdom + @testing-library/react (verified 2026-06-08).
 
 ### Run Frontend Tests
 
 ```bash
 cd ui
-npx vitest run          # All tests (77 passing)
+npx vitest run          # All tests (633 passing as of 2026-06-08)
 npx vitest run --watch  # Watch mode
 ```
 
