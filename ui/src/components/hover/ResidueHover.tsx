@@ -13,26 +13,14 @@
  */
 
 import { useMemo } from "react";
-import {
-  HoverCard,
-  HoverCardTrigger,
-  HoverCardContent,
-} from "@/components/ui/hover-card";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "@/components/ui/hover-card";
 import { getResidueInfo, categoryLabel } from "@/lib/aminoAcids";
+import { isPositionInFragments } from "@/lib/fragmentClassification";
 import type { Peptide } from "@/types/peptide";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-/** Check if a 0-indexed position falls within any segment tuple [start, end). */
-function isInSegments(
-  position: number,
-  segments: Array<[number, number]> | null | undefined,
-): boolean {
-  if (!segments) return false;
-  return segments.some(([s, e]) => position >= s && position < e);
-}
 
 /** Format a probability value (0-1) to 2 decimal places. */
 function fmtProb(v: number | undefined | null): string {
@@ -61,13 +49,7 @@ interface ResidueHoverProps {
 // Component
 // ---------------------------------------------------------------------------
 
-export function ResidueHover({
-  aa,
-  position,
-  peptide,
-  children,
-  side = "top",
-}: ResidueHoverProps) {
+export function ResidueHover({ aa, position, peptide, children, side = "top" }: ResidueHoverProps) {
   const info = useMemo(() => getResidueInfo(aa), [aa]);
 
   // Per-residue S4PRED probabilities
@@ -79,24 +61,20 @@ export function ResidueHover({
   // Per-residue TANGO aggregation
   const tangoAgg = peptide.tango?.agg?.[position] ?? null;
 
-  // Segment flags
-  const inHelixSegment = isInSegments(
-    position,
-    peptide.s4pred?.helixSegments ?? null,
-  );
-  const inSswZone = isInSegments(
-    position,
-    peptide.s4pred?.betaSegments ?? null,
-  );
+  // Segment flags — consult Peleg's gap-smoothed fragment columns. SSW falls
+  // back to raw S4PRED beta segments only when the dedicated SSW column is
+  // absent OR empty (an empty array is semantically null but truthy to `??`).
+  const inHelixSegment = isPositionInFragments(position, peptide.s4pred?.helixSegments);
+  const sswPrimary = peptide.s4predSswFragments;
+  const sswSrc = sswPrimary && sswPrimary.length > 0 ? sswPrimary : peptide.s4pred?.betaSegments;
+  const inSswZone = isPositionInFragments(position, sswSrc);
 
   return (
     <HoverCard openDelay={200} closeDelay={0}>
       <HoverCardTrigger asChild>{children}</HoverCardTrigger>
       <HoverCardContent side={side} className="w-64 space-y-2">
         {/* 1. Position */}
-        <div className="text-xs font-medium text-muted-foreground">
-          Position {position + 1}
-        </div>
+        <div className="text-xs font-medium text-muted-foreground">Position {position + 1}</div>
 
         {/* 2. AA identity */}
         <h4 className="text-sm font-semibold leading-tight">
@@ -123,11 +101,7 @@ export function ResidueHover({
           <div className="space-y-0.5">
             <div className="text-xs font-medium text-muted-foreground">
               S4PRED
-              {ssPred && (
-                <span className="ml-1 font-mono">
-                  [{ssPred}]
-                </span>
-              )}
+              {ssPred && <span className="ml-1 font-mono">[{ssPred}]</span>}
             </div>
             <div className="flex items-center gap-2 text-xs font-mono">
               <span>
@@ -152,12 +126,8 @@ export function ResidueHover({
         {/* 5. TANGO aggregation */}
         {tangoAgg !== null && (
           <div className="space-y-0.5">
-            <div className="text-xs font-medium text-muted-foreground">
-              TANGO Aggregation
-            </div>
-            <div className="text-sm font-mono font-bold">
-              {tangoAgg.toFixed(1)}
-            </div>
+            <div className="text-xs font-medium text-muted-foreground">TANGO Aggregation</div>
+            <div className="text-sm font-mono font-bold">{tangoAgg.toFixed(1)}</div>
           </div>
         )}
 

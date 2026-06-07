@@ -47,10 +47,10 @@ export interface OverlayToggle {
 // ── Default overlay colors (from PVL theme tokens) ─────────────────────────
 
 export const OVERLAY_COLORS: Record<OverlayType, string> = {
-  tango: "#ef4444",        // red-500 — TANGO aggregation peaks
+  tango: "#ef4444", // red-500 — TANGO aggregation peaks
   "s4pred-helix": "#a855f7", // purple-500 — S4PRED helix segments
-  "ff-helix": "#22c55e",    // green-500 — FF-Helix candidate regions
-  ssw: "#f59e0b",           // amber-500 — SSW switch zones
+  "ff-helix": "#22c55e", // green-500 — FF-Helix candidate regions
+  ssw: "#f59e0b", // amber-500 — SSW switch zones
 };
 
 export const OVERLAY_TOGGLES: OverlayToggle[] = [
@@ -84,7 +84,7 @@ export const OVERLAY_TOGGLES: OverlayToggle[] = [
 
 /** Normalize PVL's mixed segment types into [start, end) tuples */
 function normalizeSegments(
-  segments: Array<SegmentTuple> | Segment[] | null | undefined,
+  segments: Array<SegmentTuple> | Segment[] | null | undefined
 ): [number, number][] {
   if (!segments || segments.length === 0) return [];
   return segments.map((s) => {
@@ -99,10 +99,7 @@ function normalizeSegments(
  * Extract TANGO aggregation peak ranges.
  * A "peak" is a contiguous run of residues where agg score > threshold.
  */
-export function extractTangoOverlay(
-  peptide: Peptide,
-  aggThreshold = 5.0,
-): StructureOverlay | null {
+export function extractTangoOverlay(peptide: Peptide, aggThreshold = 5.0): StructureOverlay | null {
   const agg = peptide.tango?.agg;
   if (!agg || agg.length === 0) return null;
 
@@ -135,9 +132,7 @@ export function extractTangoOverlay(
 /**
  * Extract S4PRED helix segment ranges.
  */
-export function extractS4predHelixOverlay(
-  peptide: Peptide,
-): StructureOverlay | null {
+export function extractS4predHelixOverlay(peptide: Peptide): StructureOverlay | null {
   const segments = peptide.s4pred?.helixSegments;
   const ranges = normalizeSegments(segments);
   if (ranges.length === 0) return null;
@@ -154,9 +149,7 @@ export function extractS4predHelixOverlay(
 /**
  * Extract FF-Helix candidate region ranges.
  */
-export function extractFFHelixOverlay(
-  peptide: Peptide,
-): StructureOverlay | null {
+export function extractFFHelixOverlay(peptide: Peptide): StructureOverlay | null {
   // FF-Helix is flagged at peptide level; use helix fragments if ffHelixFlag === 1
   if (peptide.ffHelixFlag !== 1) return null;
 
@@ -175,13 +168,18 @@ export function extractFFHelixOverlay(
 
 /**
  * Extract SSW switch zone ranges.
- * Uses S4PRED beta segments (zones where structure switches from helix to beta).
+ *
+ * Source priority (2026-06-07): the dedicated `SSW fragments (S4PRED)` column
+ * (gap-smoothed by Peleg's `get_secondary_structure_segments`) wins over the
+ * raw S4PRED beta segments — they describe different things, and the SSW
+ * column is the canonical "where is this peptide a switch zone" answer.
  */
-export function extractSSWOverlay(
-  peptide: Peptide,
-): StructureOverlay | null {
-  // SSW zones come from S4PRED beta segments (helix↔beta transition zones)
-  const segments = peptide.s4pred?.betaSegments;
+export function extractSSWOverlay(peptide: Peptide): StructureOverlay | null {
+  // `??` alone would lock us to s4predSswFragments when it's an empty array
+  // (which is null-shaped semantically but truthy to ??). Treat empty as missing.
+  const sswPrimary = peptide.s4predSswFragments;
+  const segments =
+    sswPrimary && sswPrimary.length > 0 ? sswPrimary : peptide.s4pred?.betaSegments;
   const ranges = normalizeSegments(segments);
   if (ranges.length === 0) return null;
 
@@ -200,10 +198,7 @@ export function extractSSWOverlay(
  * Build the default set of overlays for a given peptide.
  * Returns only overlays that have data (no empty ranges).
  */
-export function buildDefaultOverlays(
-  peptide: Peptide,
-  aggThreshold = 5.0,
-): StructureOverlay[] {
+export function buildDefaultOverlays(peptide: Peptide, aggThreshold = 5.0): StructureOverlay[] {
   return [
     extractTangoOverlay(peptide, aggThreshold),
     extractS4predHelixOverlay(peptide),
@@ -216,9 +211,7 @@ export function buildDefaultOverlays(
  * Convert 0-indexed PVL ranges to 1-indexed Mol* auth_seq_id ranges.
  * Mol* uses 1-based residue numbering for PDB/mmCIF structures.
  */
-export function toMolstarRanges(
-  ranges: [number, number][],
-): [number, number][] {
+export function toMolstarRanges(ranges: [number, number][]): [number, number][] {
   return ranges.map(([s, e]) => [s + 1, e]);
   // Note: [start, end) in PVL → [start+1, end] in Mol* (inclusive on both ends)
   // The Mol* selection helper handles the exact semantics.

@@ -165,6 +165,30 @@ describe("molstarOverlays", () => {
       expect(overlay!.type).toBe("ssw");
       expect(overlay!.ranges).toEqual([[5, 9]]);
     });
+
+    // 2026-06-07 — SSW-source fix. When the peptide carries the dedicated
+    // s4predSswFragments column (Peleg's gap-smoothed `SSW fragments (S4PRED)`),
+    // it MUST win over raw S4PRED beta segments. The columns describe different
+    // things — SSW fragments are the canonical switch-zone answer.
+    it("prefers s4predSswFragments over raw betaSegments", () => {
+      const p = makePeptide({
+        s4predSswFragments: [[2, 6]],
+        s4pred: { betaSegments: [[10, 14]] },
+      });
+      const overlay = extractSSWOverlay(p);
+      expect(overlay).not.toBeNull();
+      expect(overlay!.ranges).toEqual([[2, 6]]);
+    });
+
+    it("falls back to betaSegments when s4predSswFragments is empty", () => {
+      const p = makePeptide({
+        s4predSswFragments: [],
+        s4pred: { betaSegments: [[10, 14]] },
+      });
+      const overlay = extractSSWOverlay(p);
+      expect(overlay).not.toBeNull();
+      expect(overlay!.ranges).toEqual([[10, 14]]);
+    });
   });
 
   describe("buildDefaultOverlays", () => {
@@ -206,7 +230,15 @@ describe("molstarOverlays", () => {
   describe("toMolstarRanges", () => {
     it("converts 0-indexed to 1-indexed ranges", () => {
       expect(toMolstarRanges([[0, 5]])).toEqual([[1, 5]]);
-      expect(toMolstarRanges([[3, 10], [12, 14]])).toEqual([[4, 10], [13, 14]]);
+      expect(
+        toMolstarRanges([
+          [3, 10],
+          [12, 14],
+        ])
+      ).toEqual([
+        [4, 10],
+        [13, 14],
+      ]);
     });
 
     it("handles empty array", () => {

@@ -14,8 +14,20 @@ import type { Peptide } from "@/types/peptide";
 
 vi.mock("@/components/ui/hover-card", () => ({
   HoverCard: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  HoverCardTrigger: ({ children }: { children: React.ReactNode; asChild?: boolean; className?: string }) => <div>{children}</div>,
-  HoverCardContent: ({ children }: { children: React.ReactNode; side?: string; className?: string }) => <div data-testid="hover-content">{children}</div>,
+  HoverCardTrigger: ({
+    children,
+  }: {
+    children: React.ReactNode;
+    asChild?: boolean;
+    className?: string;
+  }) => <div>{children}</div>,
+  HoverCardContent: ({
+    children,
+  }: {
+    children: React.ReactNode;
+    side?: string;
+    className?: string;
+  }) => <div data-testid="hover-content">{children}</div>,
 }));
 
 // ---------------------------------------------------------------------------
@@ -44,7 +56,7 @@ describe("ResidueHover", () => {
     render(
       <ResidueHover aa="A" position={0} peptide={peptide}>
         <span data-testid="residue">A</span>
-      </ResidueHover>,
+      </ResidueHover>
     );
     expect(screen.getByTestId("residue")).toBeInTheDocument();
     expect(screen.getByTestId("residue")).toHaveTextContent("A");
@@ -55,7 +67,7 @@ describe("ResidueHover", () => {
     render(
       <ResidueHover aa="L" position={2} peptide={peptide}>
         <span data-testid="residue">L</span>
-      </ResidueHover>,
+      </ResidueHover>
     );
 
     // With mocked HoverCard, content renders inline
@@ -70,7 +82,7 @@ describe("ResidueHover", () => {
     const { container } = render(
       <ResidueHover aa="K" position={1} peptide={peptide}>
         <span>K</span>
-      </ResidueHover>,
+      </ResidueHover>
     );
     // Should render without errors
     expect(container).toBeTruthy();
@@ -81,7 +93,7 @@ describe("ResidueHover", () => {
     const { container } = render(
       <ResidueHover aa="X" position={1} peptide={peptide}>
         <span>X</span>
-      </ResidueHover>,
+      </ResidueHover>
     );
     expect(container).toBeTruthy();
   });
@@ -93,7 +105,10 @@ describe("ResidueHover", () => {
         pE: [0.05, 0.8, 0.02],
         pC: [0.08, 0.08, 0.03],
         ssPrediction: ["H", "E", "H"],
-        helixSegments: [[0, 1], [2, 3]],
+        helixSegments: [
+          [0, 1],
+          [2, 3],
+        ],
         betaSegments: [[1, 2]],
       },
     });
@@ -101,7 +116,7 @@ describe("ResidueHover", () => {
     render(
       <ResidueHover aa="A" position={0} peptide={peptide}>
         <span data-testid="residue">A</span>
-      </ResidueHover>,
+      </ResidueHover>
     );
 
     // With mocked HoverCard, content renders inline
@@ -120,10 +135,35 @@ describe("ResidueHover", () => {
     render(
       <ResidueHover aa="A" position={0} peptide={peptide}>
         <span data-testid="residue">A</span>
-      </ResidueHover>,
+      </ResidueHover>
     );
 
     expect(screen.getByText("12.5")).toBeInTheDocument();
     expect(screen.getByText("TANGO Aggregation")).toBeInTheDocument();
+  });
+
+  // 2026-06-07 — SSW-source fix. The SSW-zone yes/no flag must consult
+  // s4predSswFragments (the dedicated `SSW fragments (S4PRED)` column) and
+  // ONLY fall back to s4pred.betaSegments when the dedicated column is empty.
+  // A residue covered by s4predSswFragments but absent from betaSegments must
+  // still render as inSswZone=true.
+  it("reads SSW zone membership from s4predSswFragments first", () => {
+    const peptide = makePeptide({
+      // No raw beta segments — only the dedicated SSW column.
+      s4predSswFragments: [[3, 5]],
+      s4pred: { betaSegments: [] },
+    });
+
+    render(
+      <ResidueHover aa="L" position={2} peptide={peptide}>
+        <span data-testid="residue">L</span>
+      </ResidueHover>
+    );
+
+    // Position 2 (0-indexed) is residue 3 (1-indexed) — covered by SSW [3,5].
+    // The hover card renders a ✓ next to "In SSW switch zone?" when true.
+    const content = screen.getByTestId("hover-content").textContent ?? "";
+    const sswMatch = content.match(/In SSW switch zone\?\s*([✓✗])/);
+    expect(sswMatch?.[1]).toBe("✓");
   });
 });

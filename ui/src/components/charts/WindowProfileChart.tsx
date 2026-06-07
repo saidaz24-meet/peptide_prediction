@@ -152,8 +152,20 @@ export const DEFAULT_PVL_CHANNELS: WindowChannel[] = [
 ];
 
 export const DEFAULT_REFERENCE_LINES = [
-  { yAxis: "left" as const, value: 0, label: "Neutral", color: "hsl(var(--muted-foreground))", dash: "4 2" },
-  { yAxis: "right" as const, value: 5, label: "Agg prone", color: "hsl(var(--ff-ssw, 0 84% 60%))", dash: "4 2" },
+  {
+    yAxis: "left" as const,
+    value: 0,
+    label: "Neutral",
+    color: "hsl(var(--muted-foreground))",
+    dash: "4 2",
+  },
+  {
+    yAxis: "right" as const,
+    value: 5,
+    label: "Agg prone",
+    color: "hsl(var(--ff-ssw, 0 84% 60%))",
+    dash: "4 2",
+  },
 ];
 
 // ── Component ──────────────────────────────────────────────────────────────
@@ -170,9 +182,7 @@ export function WindowProfileChart({
   // Live aggregation threshold from the threshold store. Drives both the
   // reference line position and the agg-peak scatter cutoff so the chart
   // stays in sync with whatever preset / custom value the user picks.
-  const tangoAggregationThreshold = useThresholdStore(
-    (s) => s.active.tangoAggregationThreshold,
-  );
+  const tangoAggregationThreshold = useThresholdStore((s) => s.active.tangoAggregationThreshold);
 
   // Discrete zoom: domain on the residue axis. Default = full sequence.
   // (B.1: drag-to-zoom was removed per Said's request — discrete in/out/reset
@@ -190,7 +200,7 @@ export function WindowProfileChart({
   // Build profile data
   const profilePoints = useMemo(
     () => buildProfilePoints(peptide.sequence, windowSize),
-    [peptide.sequence, windowSize],
+    [peptide.sequence, windowSize]
   );
 
   // Enrich with TANGO agg per-residue
@@ -204,8 +214,7 @@ export function WindowProfileChart({
       return {
         ...pt,
         agg: aggVal,
-        aggPeak:
-          aggVal !== undefined && aggVal > tangoAggregationThreshold ? aggVal : undefined,
+        aggPeak: aggVal !== undefined && aggVal > tangoAggregationThreshold ? aggVal : undefined,
       };
     });
   }, [profilePoints, tangoAgg, windowSize, tangoAggregationThreshold]);
@@ -218,18 +227,25 @@ export function WindowProfileChart({
       if (ch.source === "s4predHelix") {
         bands[ch.id] = helixRanges(
           peptide.s4pred?.helixSegments as [number, number][] | undefined,
-          windowSize,
+          windowSize
         );
       } else if (ch.source === "ffHelix") {
         bands[ch.id] = helixRanges(
           peptide.ffHelixFragments as [number, number][] | undefined,
-          windowSize,
+          windowSize
         );
       } else if (ch.source === "sswZone") {
-        bands[ch.id] = helixRanges(
-          peptide.s4pred?.betaSegments as [number, number][] | undefined,
-          windowSize,
-        );
+        // Prefer Peleg's dedicated `SSW fragments (S4PRED)` column over raw
+        // beta segments. Treat an empty SSW array as missing so we still fall
+        // back (`??` alone would lock us to []).
+        const sswPrimary = peptide.s4predSswFragments as
+          | [number, number][]
+          | undefined;
+        const sswSrc =
+          sswPrimary && sswPrimary.length > 0
+            ? sswPrimary
+            : (peptide.s4pred?.betaSegments as [number, number][] | undefined);
+        bands[ch.id] = helixRanges(sswSrc, windowSize);
       }
     }
     return bands;
@@ -237,7 +253,7 @@ export function WindowProfileChart({
 
   // Check which axes are needed
   const hasRightAxis = channels.some(
-    (ch) => ch.type === "line" && ch.yAxis === "right" && !hiddenChannels.has(ch.id),
+    (ch) => ch.type === "line" && ch.yAxis === "right" && !hiddenChannels.has(ch.id)
   );
   const hasTangoData = tangoAgg && tangoAgg.length > 0;
 
@@ -302,20 +318,21 @@ export function WindowProfileChart({
   // Map metric → dataKey
   const metricToDataKey = (metric: string) => {
     switch (metric) {
-      case "hydrophobicity": return "H";
-      case "muH": return "muH";
-      case "tango": return "agg";
-      default: return metric;
+      case "hydrophobicity":
+        return "H";
+      case "muH":
+        return "muH";
+      case "tango":
+        return "agg";
+      default:
+        return metric;
     }
   };
 
   return (
     <div className="space-y-3" data-testid="window-profile-chart">
       {/* Legend with toggles */}
-      <div
-        className="flex flex-wrap gap-2"
-        data-testid="channel-legend"
-      >
+      <div className="flex flex-wrap gap-2" data-testid="channel-legend">
         {channels.map((ch) => {
           const isHidden = hiddenChannels.has(ch.id);
           // Skip TANGO-dependent channels when no data
@@ -343,7 +360,13 @@ export function WindowProfileChart({
                   style={{
                     backgroundColor: ch.color,
                     opacity: isHidden ? 0.3 : 1,
-                    ...(ch.strokeDash ? { borderTop: `2px dashed ${ch.color}`, height: 0, backgroundColor: "transparent" } : {}),
+                    ...(ch.strokeDash
+                      ? {
+                          borderTop: `2px dashed ${ch.color}`,
+                          height: 0,
+                          backgroundColor: "transparent",
+                        }
+                      : {}),
                   }}
                 />
               )}
@@ -548,7 +571,6 @@ export function WindowProfileChart({
                 />
               );
             })}
-
           </ComposedChart>
         </ResponsiveContainer>
       </div>

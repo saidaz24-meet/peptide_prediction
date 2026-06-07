@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Badge } from "@/components/ui/badge";
+import {
+  buildFragmentClassification,
+  classifyResidue,
+  type SSClass,
+} from "@/lib/fragmentClassification";
 import type { Peptide } from "@/types/peptide";
 
 interface SequenceTrackProps {
   peptide: Peptide;
 }
-
-type SSClass = "H" | "E" | "C";
 
 const SS_COLORS: Record<SSClass, string> = {
   H: "hsl(var(--helix))",
@@ -27,32 +30,6 @@ const SS_LABELS: Record<SSClass, string> = {
   C: "Coil",
 };
 
-function classifyResidue(
-  idx: number,
-  ssPrediction?: string[],
-  pH?: number[],
-  pE?: number[],
-  pC?: number[]
-): SSClass {
-  // Prefer explicit prediction string
-  if (ssPrediction && ssPrediction[idx]) {
-    const p = ssPrediction[idx].toUpperCase();
-    if (p === "H") return "H";
-    if (p === "E") return "E";
-    return "C";
-  }
-  // Fallback: use max probability
-  if (pH && pE && pC && pH[idx] != null && pE[idx] != null && pC[idx] != null) {
-    const h = pH[idx],
-      e = pE[idx],
-      c = pC[idx];
-    if (h >= e && h >= c) return "H";
-    if (e >= h && e >= c) return "E";
-    return "C";
-  }
-  return "C";
-}
-
 /** Position markers for the ruler (every 10 residues) */
 function useRulerMarks(len: number) {
   return useMemo(() => {
@@ -68,15 +45,27 @@ export function SequenceTrack({ peptide }: SequenceTrackProps) {
   const marks = useRulerMarks(len);
   const [hoveredIdx, setHoveredIdx] = useState<number | null>(null);
 
-  const hasS4pred = Boolean(s4pred?.ssPrediction?.length || s4pred?.pH?.length);
+  // Peleg's gap-smoothed fragment columns (canonical source for residue colour).
+  // When any fragment data is present we treat it as authoritative; raw per-residue
+  // S4PRED data only fills gaps the fragment columns leave unowned.
+  const fragmentLookup = useMemo(() => {
+    const helixFrags = (s4pred?.helixSegments ?? null) as Array<[number, number]> | null;
+    const betaFrags = (s4pred?.betaSegments ?? null) as Array<[number, number]> | null;
+    const sswFrags = (peptide.s4predSswFragments ?? null) as Array<[number, number]> | null;
+    if (!helixFrags?.length && !betaFrags?.length && !sswFrags?.length) return null;
+    return buildFragmentClassification(len, helixFrags, betaFrags, sswFrags);
+  }, [len, s4pred?.helixSegments, s4pred?.betaSegments, peptide.s4predSswFragments]);
 
-  // Pre-compute classification for every residue (used only for residue coloring)
+  const hasS4pred = Boolean(s4pred?.ssPrediction?.length || s4pred?.pH?.length || fragmentLookup);
+
+  // Pre-compute classification for every residue (used only for residue coloring).
+  // Hierarchy: fragment ranges (Peleg-gap-smoothed) → raw per-residue label → argmax.
   const classifications = useMemo(() => {
     if (!hasS4pred) return null;
     return Array.from({ length: len }, (_, i) =>
-      classifyResidue(i, s4pred?.ssPrediction, s4pred?.pH, s4pred?.pE, s4pred?.pC)
+      classifyResidue(i, fragmentLookup, s4pred?.ssPrediction, s4pred?.pH, s4pred?.pE, s4pred?.pC)
     );
-  }, [hasS4pred, len, s4pred]);
+  }, [hasS4pred, len, s4pred, fragmentLookup]);
 
   // Peleg HELIX_PERCENTAGE_AUDIT (fix #3): legend percentages must come from the
   // canonical fields (peptide.s4predHelixPercent / peptide.betaPercent), not from
