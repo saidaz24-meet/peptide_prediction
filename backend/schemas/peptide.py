@@ -124,6 +124,11 @@ class PeptideSchema(BaseModel):
     tango_agg_curve: Optional[List[float]] = Field(None, alias="Tango Aggregation curve")
     tango_beta_curve: Optional[List[float]] = Field(None, alias="Tango Beta curve")
     tango_helix_curve: Optional[List[float]] = Field(None, alias="Tango Helix curve")
+    # TANGO-side SSW segment coordinates ([[start, end], ...]). The TANGO
+    # binary writes these into the DataFrame column "SSW fragments"; this
+    # field surfaces them to the UI so the SSW (TANGO) sequence track can
+    # render real coordinates instead of a faked placeholder.
+    tango_ssw_fragments: Optional[List[Any]] = Field(None, alias="SSW fragments")
 
     @field_validator(
         "ssw_score",
@@ -165,6 +170,27 @@ class PeptideSchema(BaseModel):
             except (ValueError, TypeError):
                 return None
         return v
+
+    @field_validator(
+        "tango_ssw_fragments",
+        mode="before",
+    )
+    @classmethod
+    def coerce_ssw_fragments(cls, v: Any) -> Optional[List[Any]]:
+        """Coerce TANGO's '-' sentinel and other non-list shapes to None.
+
+        ``backend/tango.py`` writes the literal string ``"-"`` into the
+        ``SSW fragments`` column when no SSW segment was parsed; the schema
+        expects either a list or null, so we normalise here.
+        """
+        if v is None:
+            return None
+        if isinstance(v, float) and (math.isnan(v) or not math.isfinite(v)):
+            return None
+        if isinstance(v, list):
+            return v
+        # TANGO sentinel ("-") and any unexpected scalar → null.
+        return None
 
     @field_validator(
         "ssw_prediction",

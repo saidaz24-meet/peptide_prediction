@@ -105,6 +105,15 @@ class PeptideRow(BaseModel):
         None,
         description="SSW beta percentage (from 'ssw_beta_percentage' field, alias: 'SSW beta percentage')",
     )
+    # TANGO-side SSW segment coordinates ([[start, end], ...]). Produced by
+    # backend/tango.py and carried verbatim from the DataFrame column
+    # "SSW fragments". Drives the SSW (TANGO) sequence track in the UI,
+    # which previously rendered a faked placeholder because the field was
+    # never surfaced to the API response. Added 2026-06-07.
+    tangoSswFragments: Optional[List[List[int]]] = Field(
+        None,
+        description="TANGO SSW segment coordinates [[start, end], ...] (alias: 'SSW fragments')",
+    )
 
     # Canonical TANGO summary fields (derived from parsed curves)
     # These provide a single source of truth for UI display, avoiding need to check extras
@@ -269,6 +278,7 @@ class PeptideRow(BaseModel):
             "sswDiff",
             "sswHelixPercentage",
             "sswBetaPercentage",
+            "tangoSswFragments",
             "tangoAggMax",
             "tangoBetaMax",
             "tangoHelixMax",

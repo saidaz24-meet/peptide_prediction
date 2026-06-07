@@ -306,6 +306,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
             "tangoAggCurve",  # camelCase versions (post-normalization)
             "sswFragments",
             "tangoFragments",
+            "tangoSswFragments",
         ]
         for field in tango_fields:
             if field in result:
@@ -332,6 +333,7 @@ def _convert_fake_defaults_to_null(row_dict: dict, provider_status: PeptideProvi
             "sswBetaPct": [-1],
             "sswFragments": [-1, None, "", "-", []],
             "tangoFragments": [-1, None, "", "-", []],
+            "tangoSswFragments": [-1, None, "", "-", []],
         }
         for field, fake_values in tango_fake_defaults.items():
             if field in result:

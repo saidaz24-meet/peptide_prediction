@@ -3,8 +3,9 @@ DataFrame utility functions for data processing.
 """
 
 import io
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
+import numpy as np
 import pandas as pd
 from fastapi import HTTPException
 
@@ -88,11 +89,127 @@ def ensure_computed_cols(df: pd.DataFrame) -> None:
                 df[c] = None  # Use None instead of -1 for missing data
 
 
+def compute_dataset_ff_thresholds(database: pd.DataFrame) -> Dict[str, Any]:
+    """Dataset-derived FF thresholds, matching Peleg ``main.py:147-150``.
+
+    Computes the per-batch mean of two POSITIVE-class metrics:
+
+    * ``ssw_avg_H``    — mean ``Hydrophobicity`` over rows where either TANGO
+      or S4PRED called SSW positive (== 1). Mirrors
+      ``database[database["SSW prediction"] != -1]["Hydrophobicity"].mean()``
+      from her ``perform_fibril_formation_prediction`` step.
+    * ``helix_avg_uH`` — mean helix-segment μH over rows where the S4PRED
+      helix predictor was positive (``!= -1``). Mirrors her
+      ``database[database["Helix score (Jpred)"] != -1]["Helix (Jpred) uH"].mean()``
+      (we substitute S4PRED for Jpred).
+
+    Single-sequence runs (``len(database) <= 1``) degenerate to the trivial
+    single-row mean — in that case every SSW-positive row would trivially
+    clear its own per-row mean, so we fall back to the documented Peleg
+    single-sequence constants (``PELEG_DEFAULT_HYDRO_THRESHOLD`` = 0.417,
+    ``PELEG_DEFAULT_HELIX_UH_THRESHOLD`` = 0.388) and mark
+    ``single_sequence_fallback`` so the UI can surface that the threshold
+    was a fallback, not a dataset mean.
+
+    Returns:
+        dict with keys:
+            - ``ssw_avg_H``: float — hydrophobicity threshold used for FF-SSW
+            - ``helix_avg_uH``: float — μH threshold used for FF-Helix
+            - ``n_ssw_positive``: int — rows used to compute ``ssw_avg_H``
+            - ``n_helix_positive``: int — rows used to compute ``helix_avg_uH``
+            - ``single_sequence_fallback``: bool — True when Peleg constants
+              were substituted in place of a dataset mean.
+    """
+    n_rows = len(database)
+    fallback_ssw = float(settings.PELEG_DEFAULT_HYDRO_THRESHOLD)
+    fallback_helix = float(settings.PELEG_DEFAULT_HELIX_UH_THRESHOLD)
+
+    if n_rows == 0:
+        return {
+            "ssw_avg_H": fallback_ssw,
+            "helix_avg_uH": fallback_helix,
+            "n_ssw_positive": 0,
+            "n_helix_positive": 0,
+            "single_sequence_fallback": True,
+        }
+
+    tango_col = "SSW prediction"
+    s4pred_ssw_col = "SSW prediction (S4PRED)"
+    tango_series = (
+        pd.to_numeric(database[tango_col], errors="coerce")
+        if tango_col in database.columns
+        else pd.Series(np.nan, index=database.index)
+    )
+    s4pred_ssw_series = (
+        pd.to_numeric(database[s4pred_ssw_col], errors="coerce")
+        if s4pred_ssw_col in database.columns
+        else pd.Series(np.nan, index=database.index)
+    )
+    ssw_pos_mask = (tango_series == 1) | (s4pred_ssw_series == 1)
+    n_ssw_positive = int(ssw_pos_mask.sum())
+
+    # Resolve helix prediction + uH columns (S4PRED-first, Jpred-fallback).
+    helix_pred_col: Optional[str] = None
+    helix_uh_col: Optional[str] = None
+    if "Helix prediction (S4PRED)" in database.columns:
+        helix_pred_col = "Helix prediction (S4PRED)"
+        if "Helix (s4pred) uH" in database.columns:
+            helix_uh_col = "Helix (s4pred) uH"
+        elif "Helix (Jpred) uH" in database.columns:
+            helix_uh_col = "Helix (Jpred) uH"
+    elif "Helix score (Jpred)" in database.columns:
+        helix_pred_col = "Helix score (Jpred)"
+        if "Helix (Jpred) uH" in database.columns:
+            helix_uh_col = "Helix (Jpred) uH"
+
+    if helix_pred_col is not None:
+        helix_pred_series = pd.to_numeric(database[helix_pred_col], errors="coerce")
+        helix_pos_mask = helix_pred_series.notna() & (helix_pred_series != -1)
+    else:
+        helix_pos_mask = pd.Series(False, index=database.index)
+    n_helix_positive = int(helix_pos_mask.sum())
+
+    # Single-sequence degenerates: mean over 1 positive row equals that row,
+    # so the FF gate would trivially pass — substitute Peleg constants instead.
+    if n_rows <= 1:
+        return {
+            "ssw_avg_H": fallback_ssw,
+            "helix_avg_uH": fallback_helix,
+            "n_ssw_positive": n_ssw_positive,
+            "n_helix_positive": n_helix_positive,
+            "single_sequence_fallback": True,
+        }
+
+    if n_ssw_positive > 0 and "Hydrophobicity" in database.columns:
+        ssw_avg_H_raw = pd.to_numeric(
+            database.loc[ssw_pos_mask, "Hydrophobicity"], errors="coerce"
+        ).mean()
+        ssw_avg_H = float(ssw_avg_H_raw) if pd.notna(ssw_avg_H_raw) else fallback_ssw
+    else:
+        ssw_avg_H = fallback_ssw
+
+    if n_helix_positive > 0 and helix_uh_col is not None and helix_uh_col in database.columns:
+        helix_avg_uH_raw = pd.to_numeric(
+            database.loc[helix_pos_mask, helix_uh_col], errors="coerce"
+        ).mean()
+        helix_avg_uH = float(helix_avg_uH_raw) if pd.notna(helix_avg_uH_raw) else fallback_helix
+    else:
+        helix_avg_uH = fallback_helix
+
+    return {
+        "ssw_avg_H": ssw_avg_H,
+        "helix_avg_uH": helix_avg_uH,
+        "n_ssw_positive": n_ssw_positive,
+        "n_helix_positive": n_helix_positive,
+        "single_sequence_fallback": False,
+    }
+
+
 def apply_ff_flags(
     df: pd.DataFrame,
     resolved_thresholds: Optional[Dict[str, float]] = None,
     threshold_mode: str = "default",
-) -> Dict[str, float]:
+) -> Dict[str, Any]:
     """
     Apply fibril-forming (FF) flags and scores based on computed metrics.
 
@@ -132,6 +249,21 @@ def apply_ff_flags(
     if "Beta full length uH" not in df.columns and "Sequence" in df.columns:
         _compute_beta_uh(df)
 
+    # --- Ensure S4PRED helix-segment uH is present BEFORE thresholds run ---
+    # ``compute_dataset_ff_thresholds`` reads ``Helix (s4pred) uH``; the legacy
+    # inline path used to materialize it lazily inside the FF-Helix block.
+    # Hoisting it here lets the new helper see the same data the inline
+    # block would have seen, so single-vs-batch produces identical answers.
+    if "Helix prediction (S4PRED)" in df.columns and "Helix (s4pred) uH" not in df.columns:
+        _compute_helix_uh(df, "Helix fragments (S4PRED)", "Helix (s4pred) uH")
+
+    # --- Peleg main.py:147-150 — dataset-derived FF thresholds ---
+    # In default mode these drive both FF-SSW and FF-Helix gates. In
+    # custom/recommended mode they are still computed for the meta payload
+    # but the per-row gates use the user-supplied overrides.
+    ff_thresholds = compute_dataset_ff_thresholds(df)
+    fallback_active = bool(ff_thresholds["single_sequence_fallback"])
+
     # --- FF-SSW flag and score (Peleg FIX-001 categories 3 + 4) ---
     # Category 3 (SSW)    = TANGO OR S4PRED says ssw=1 (Peleg: must be OR, not AND).
     # Category 4 (FF-SSW) = SSW AND hydrophobicity >= hydrophobicity-threshold.
@@ -140,8 +272,6 @@ def apply_ff_flags(
     has_tango_ssw_col = tango_ssw_col in df.columns
     has_s4pred_ssw_col = s4pred_ssw_col in df.columns
     ssw_hydro_threshold = float("nan")
-
-    import numpy as np
 
     if has_tango_ssw_col or has_s4pred_ssw_col:
         tango_series = (
@@ -161,21 +291,11 @@ def apply_ff_flags(
         ssw_pos_mask = (tango_series == 1) | (s4pred_ssw_series == 1)
         ssw_data_mask = tango_series.notna() | s4pred_ssw_series.notna()
 
-        # Data-average hydrophobicity over rows the unified SSW called positive.
-        if ssw_pos_mask.any() and "Hydrophobicity" in df.columns:
-            data_avg_H = pd.to_numeric(
-                df.loc[ssw_pos_mask, "Hydrophobicity"], errors="coerce"
-            ).mean()
-        else:
-            data_avg_H = float("nan")
-
-        # Choose threshold: custom overrides data-average, Peleg constant on NaN
+        # Choose threshold: custom overrides dataset-derived Peleg mean.
         if use_custom and "hydroCutoff" in resolved_thresholds:
             ssw_hydro_threshold = float(resolved_thresholds["hydroCutoff"])
-        elif pd.notna(data_avg_H):
-            ssw_hydro_threshold = data_avg_H
         else:
-            ssw_hydro_threshold = settings.PELEG_DEFAULT_HYDRO_THRESHOLD
+            ssw_hydro_threshold = float(ff_thresholds["ssw_avg_H"])
 
         hydro_col = "Hydrophobicity"
         hydro_series = (
@@ -240,7 +360,8 @@ def apply_ff_flags(
     # Check for S4PRED helix data
     if "Helix prediction (S4PRED)" in df.columns:
         helix_pred_col = "Helix prediction (S4PRED)"
-        # Compute S4PRED helix uH if not already present
+        # Compute S4PRED helix uH if not already present (defensive — hoisted
+        # call earlier in this function normally covers it).
         if "Helix (s4pred) uH" not in df.columns:
             _compute_helix_uh(df, "Helix fragments (S4PRED)", "Helix (s4pred) uH")
         helix_uh_col = "Helix (s4pred) uH"
@@ -251,21 +372,11 @@ def apply_ff_flags(
         helix_score_col = "Helix score (Jpred)" if "Helix score (Jpred)" in df.columns else None
 
     if helix_pred_col and helix_uh_col and helix_uh_col in df.columns:
-        # Compute data-average uH (always, for reference)
-        valid_helix_mask = df[helix_pred_col].notna() & (df[helix_pred_col] != -1)
-        valid_uh_mask = valid_helix_mask & df[helix_uh_col].notna()
-        if valid_uh_mask.any():
-            data_avg_uH = pd.to_numeric(df.loc[valid_uh_mask, helix_uh_col], errors="coerce").mean()
-        else:
-            data_avg_uH = float("nan")
-
-        # Choose threshold: custom overrides data-average, reference fallback for NaN
+        # Choose threshold: custom overrides dataset-derived Peleg mean.
         if use_custom and "muHCutoff" in resolved_thresholds:
             helix_uH_threshold = float(resolved_thresholds["muHCutoff"])
-        elif pd.notna(data_avg_uH):
-            helix_uH_threshold = data_avg_uH
         else:
-            helix_uH_threshold = settings.PELEG_DEFAULT_HELIX_UH_THRESHOLD
+            helix_uH_threshold = float(ff_thresholds["helix_avg_uH"])
 
         pred_series = pd.to_numeric(df[helix_pred_col], errors="coerce")
         uh_series = pd.to_numeric(df[helix_uh_col], errors="coerce")
@@ -279,7 +390,6 @@ def apply_ff_flags(
             & uh_series.notna()
             & (uh_series >= helix_uH_threshold)
         )
-        import numpy as np
 
         flags_arr = np.where(is_helix_candidate, 1, np.where(has_helix_data, -1, None))
         ff_helix_flags = [int(v) if v is not None else None for v in flags_arr]
@@ -301,12 +411,25 @@ def apply_ff_flags(
         df["FF-Helix score"] = None
 
     return {
-        "ssw_hydro_threshold": ssw_hydro_threshold
-        if pd.notna(ssw_hydro_threshold)
-        else settings.PELEG_DEFAULT_HYDRO_THRESHOLD,
-        "helix_uH_threshold": helix_uH_threshold
-        if pd.notna(helix_uH_threshold)
-        else settings.PELEG_DEFAULT_HELIX_UH_THRESHOLD,
+        "ssw_hydro_threshold": (
+            ssw_hydro_threshold
+            if pd.notna(ssw_hydro_threshold)
+            else settings.PELEG_DEFAULT_HYDRO_THRESHOLD
+        ),
+        "helix_uH_threshold": (
+            helix_uH_threshold
+            if pd.notna(helix_uH_threshold)
+            else settings.PELEG_DEFAULT_HELIX_UH_THRESHOLD
+        ),
+        # Peleg main.py:147-150 provenance — surfaced verbatim into
+        # Meta.thresholds (camelCase to match the rest of the API contract)
+        # so the UI can render "FF threshold derived from N=23 helix-positive
+        # peptides, μH = 0.42" honestly. New additive keys — never rename.
+        "sswAvgHUsed": float(ff_thresholds["ssw_avg_H"]),
+        "helixAvgUhUsed": float(ff_thresholds["helix_avg_uH"]),
+        "nSswPositive": int(ff_thresholds["n_ssw_positive"]),
+        "nHelixPositive": int(ff_thresholds["n_helix_positive"]),
+        "singleSequenceFallback": bool(fallback_active),
     }
 
 
