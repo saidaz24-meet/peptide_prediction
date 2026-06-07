@@ -35,7 +35,7 @@
 | ISSUE-015 | **P1** | SSW self-referential threshold | `backend/tango.py`, `backend/s4pred.py` | MEDIUM | — | ✅ FIXED |
 | ISSUE-016 | **P1** | S4PRED availability check case sensitivity | `backend/server.py` | HIGH | — | ✅ FIXED |
 | ISSUE-017 | **P1** | Non-standard amino acid crashes | `backend/biochem_calculation.py` | MEDIUM | `test_nonstandard_aa.py` | ✅ FIXED |
-| ISSUE-024 | **P1** | No notification on non-standard AA substitutions | `backend/auxiliary.py`, UI | MEDIUM | — | 🟡 OPEN |
+| ISSUE-024 | **P1** | No notification on non-standard AA substitutions | `backend/auxiliary.py`, UI | MEDIUM | — | ✅ FIXED (verified 2026-06-07): backend `get_corrected_sequence_with_notes` populates `sequenceNotes` + `originalSequence`; UI surfaces in PeptideTable (per-row ⚠), PeptideViewer (warning banner with original-sequence reveal), QuickAnalyze (inline alert), and Results aggregate banner |
 | ISSUE-025 | **P0** | Backend test failures: `test_trace_id.py` (2 tests) | `backend/tests/test_trace_id.py` | LOW | already exists | ✅ FIXED — 7/7 tests pass (verified 2026-05-19); doc was stale |
 | ISSUE-026 | **P0** | Frontend type errors: 8 in stores (Zustand storage drift + Meta↔DatasetMetadata) | `ui/src/stores/datasetStore.ts`, `ui/src/stores/jobStore.ts` | LOW | tsc clean | ✅ FIXED — store errors gone; 2 unrelated Cowork V10-3 leftovers (UniProtQueryInput AnalysisProgress props + MetricDetail chart data narrowing) cleaned up 2026-05-19. `npx tsc --noEmit` clean. |
 | ISSUE-027 | **P1** | `crypto.randomUUID is not a function` on Safari at `/quick` and `/database-search` (HTTP, older Safari) | `ui/src/components/UniProtQueryInput.tsx`, `ui/src/pages/Upload.tsx` | MEDIUM | jsdom test | 🟠 OPEN (Wave A) |
