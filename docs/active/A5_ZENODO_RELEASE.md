@@ -105,10 +105,15 @@ Once A4 (bio.tools registration) is also done, add the DOI to bio.tools' "Public
 
 ## Release notes for v0.3.0
 
-Paste the section below into the GitHub release body. Trim as you like.
+The canonical release notes live in [`RELEASE_NOTES_v0.3.0.md`](RELEASE_NOTES_v0.3.0.md). Use that file as the `--notes-file` arg in step 2 above; both the `scripts/publish_v0_3_0.sh` script and the `gh release create` invocation already do this.
+
+The block below is the LEGACY draft from when this packet was first written (PVL v0.1.0 era). Kept for the why-trail; do NOT paste into the v0.3.0 release.
+
+<details>
+<summary>Legacy v0.1.0 draft — historical only</summary>
 
 ```markdown
-# v0.3.0 — Paper-Ready Baseline (Wave 2 + 2.5)
+# v0.1.0 — Paper-Ready Baseline (Wave 2 + 2.5)
 
 The first public release of Peptide Visual Lab. This is the version Peleg + Alex reviewed for the paper.
 
@@ -189,16 +194,18 @@ MIT. See `LICENSE`.
 
 ```
 
+</details>
+
 ---
 
 ## Blockers (resolve before tagging)
 
-1. ⚠️ **Same LICENSE blocker as A4** — Zenodo will record whatever license the repo declares at tag time. If the repo's effective license is non-commercial DESY-only, the DOI metadata will say so and we can't cite it as MIT in bio.tools or JOSS. Resolve first.
+1. ✅ **LICENSE** — MIT shipped on main.
 
-2. ⚠️ **Decide on version number** — `0.1.0` per CITATION.cff and ROADMAP. If you want to release as `1.0.0` (signalling "production"), update CITATION.cff before tagging. My recommendation: stick with `0.1.0` — JOSS reviewers may push back on a `1.0.0` claim before peer review.
+2. ✅ **Version** — 0.3.0 per CITATION.cff. (Was 0.1.0 in the original draft; bumped twice through Waves 2.5 → 2.6 → 2.7.)
 
-3. ✅ **Wave 2 + 2.5 on main** — done.
-4. ✅ **Tests green** — verified 2026-05-20.
+3. ✅ **Code on main** — Waves 2 → 2.7 complete.
+4. ✅ **Tests green** — 633/633 frontend + 619/619 backend verified 2026-06-08.
 
 ---
 

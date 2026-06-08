@@ -55,12 +55,7 @@ function CopyButton({ text }: { text: string }) {
   }, [text]);
 
   return (
-    <Button
-      variant="outline"
-      size="sm"
-      onClick={handleCopy}
-      className="gap-1.5"
-    >
+    <Button variant="outline" size="sm" onClick={handleCopy} className="gap-1.5">
       {copied ? (
         <>
           <Check className="h-3.5 w-3.5" />
@@ -78,23 +73,10 @@ function CopyButton({ text }: { text: string }) {
 
 // ── Component ──────────────────────────────────────────────────────────────
 
-export function CitationDialog({
-  open,
-  onOpenChange,
-  params,
-}: CitationDialogProps) {
-  const plain = useMemo(
-    () => (params ? generatePlainCitation(params) : ""),
-    [params],
-  );
-  const bibtex = useMemo(
-    () => (params ? generateBibTeX(params) : ""),
-    [params],
-  );
-  const ris = useMemo(
-    () => (params ? generateRIS(params) : ""),
-    [params],
-  );
+export function CitationDialog({ open, onOpenChange, params }: CitationDialogProps) {
+  const plain = useMemo(() => (params ? generatePlainCitation(params) : ""), [params]);
+  const bibtex = useMemo(() => (params ? generateBibTeX(params) : ""), [params]);
+  const ris = useMemo(() => (params ? generateRIS(params) : ""), [params]);
 
   if (!params) return null;
 
@@ -149,9 +131,12 @@ export function CitationDialog({
           </TabsContent>
         </Tabs>
 
-        {/* DOI placeholder */}
+        {/* 2026-06-08: Zenodo DOI mints at `gh release create v0.3.0` time;
+            scripts/publish_v0_3_0.sh patches CITATION.cff + README with the
+            real value. This placeholder UI line stays until the first release
+            ships, after which the dialog can surface PVL_VERSION-aware DOIs. */}
         <p className="mt-2 text-[10px] text-muted-foreground/60">
-          DOI: pending Zenodo integration (10.5281/zenodo.XXXXX)
+          DOI: mints on first release; see CITATION.cff
         </p>
       </DialogContent>
     </Dialog>
