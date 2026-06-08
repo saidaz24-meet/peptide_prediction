@@ -1,0 +1,145 @@
+# Peptide Visual Lab — Release tagging + Sentry release automation
+#
+# Fires when a new GitHub release is created (or republished). For each release:
+#
+# 1. Determine the version string from the release tag (e.g. v0.3.0 → 0.3.0)
+# 2. Verify CITATION.cff version field matches the tag
+# 3. Build the frontend with the release tag baked in so PVL_VERSION reflects it
+# 4. Upload Sentry release records + source maps for both projects
+#    (pvl_backend + pvl_frontend) so stack traces map to the actual commit
+# 5. Set release commits via sentry-cli set-commits --auto (uses the GitHub
+#    integration to figure out the commit range automatically)
+# 6. Finalize the Sentry release so it appears in the dashboard
+#
+# Required secrets:
+#   - SENTRY_AUTH_TOKEN   internal Sentry auth token with scopes:
+#                         project:read, project:write, release:write,
+#                         release:read. Get one at:
+#                         sentry.io → User Settings → Auth Tokens → New Token
+#
+# Optional secrets:
+#   - (none — everything else is hardcoded to the desycssb org since that's
+#     fixed for the foreseeable future)
+#
+# This workflow does NOT push to the live VPS; the existing deploy.yml
+# handles that on main push. It runs IN ADDITION TO the deploy.
+
+name: Release
+
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to process (e.g. v0.3.0)"
+        required: true
+        type: string
+
+env:
+  SENTRY_ORG: desycssb
+  SENTRY_URL: https://de.sentry.io/
+
+jobs:
+  sentry-release:
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' || github.event.inputs.tag != '' }}
+
+    steps:
+      - name: Resolve release tag
+        id: tag
+        run: |
+          if [ -n "${{ github.event.release.tag_name }}" ]; then
+            TAG="${{ github.event.release.tag_name }}"
+          else
+            TAG="${{ github.event.inputs.tag }}"
+          fi
+          VERSION="${TAG#v}"  # strip leading 'v'
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "release_name=pvl@${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Resolved tag=${TAG} version=${VERSION}"
+
+      - name: Checkout at release tag
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.tag }}
+          fetch-depth: 0  # full history for set-commits --auto
+
+      - name: Verify CITATION.cff matches release tag
+        run: |
+          set -e
+          CFF_VERSION=$(grep -E '^version:' CITATION.cff | awk '{print $2}' | tr -d '"')
+          TAG_VERSION="${{ steps.tag.outputs.version }}"
+          if [ "$CFF_VERSION" != "$TAG_VERSION" ]; then
+            echo "ERROR: CITATION.cff version ($CFF_VERSION) does not match release tag ($TAG_VERSION)."
+            echo "Update CITATION.cff version field before tagging."
+            exit 1
+          fi
+          echo "OK: CITATION.cff version matches release tag."
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd ui && npm ci
+
+      - name: Build frontend with release tag
+        env:
+          VITE_BUILD_SHA: ${{ github.sha }}
+          # Sentry Vite plugin reads SENTRY_AUTH_TOKEN from env and uses it to
+          # auto-create the Sentry release + upload source maps as part of the
+          # build. Setting NODE_ENV=production triggers the production code path
+          # in vite.config.ts which gates the plugin on this token.
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          NODE_ENV: production
+        run: |
+          cd ui
+          # Pin the version into package.json so __APP_VERSION__ embeds the
+          # release version not whatever is on disk in main.
+          npm version --no-git-tag-version "${{ steps.tag.outputs.version }}"
+          npm run build
+
+      - name: Install sentry-cli
+        run: |
+          curl -sL https://sentry.io/get-cli/ | bash
+
+      - name: Sentry release — backend project
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          set -e
+          RELEASE="${{ steps.tag.outputs.release_name }}"
+
+          # idempotent: 'new' won't fail if release already exists
+          sentry-cli releases new "$RELEASE" --project pvl_backend
+          sentry-cli releases set-commits "$RELEASE" --auto || \
+            echo "WARN: set-commits --auto did not complete (GitHub integration not configured?); continuing."
+          sentry-cli releases finalize "$RELEASE" --project pvl_backend
+
+      - name: Sentry release — frontend project (source maps already uploaded by Vite plugin)
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          set -e
+          RELEASE="${{ steps.tag.outputs.release_name }}"
+
+          # The Sentry Vite plugin in ui/vite.config.ts already created the
+          # release + uploaded source maps during the build step above. Here
+          # we just attach commit metadata + finalize for the frontend project.
+          sentry-cli releases set-commits "$RELEASE" --auto --project pvl_frontend || true
+          sentry-cli releases finalize "$RELEASE" --project pvl_frontend
+
+      - name: Summary
+        run: |
+          echo "## Sentry Release Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release**: ${{ steps.tag.outputs.release_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Tag**: ${{ steps.tag.outputs.tag }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Org**: $SENTRY_ORG" >> $GITHUB_STEP_SUMMARY
+          echo "- **Projects**: pvl_backend + pvl_frontend" >> $GITHUB_STEP_SUMMARY
+          echo "- **View**: https://desycssb.sentry.io/releases/${{ steps.tag.outputs.release_name }}/" >> $GITHUB_STEP_SUMMARY
