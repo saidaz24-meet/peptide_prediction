@@ -213,9 +213,18 @@ sed -i.bak "s|10\.5281/zenodo\.PENDING|$ZENODO_DOI|g" CITATION.cff
 rm -f CITATION.cff.bak
 green "  ✓ Patched CITATION.cff"
 
-# README: replace the DOI badge placeholder + the bibtex DOI
+# README: replace the BibTeX DOI placeholder
 sed -i.bak "s|10\.5281/zenodo\.PENDING|$ZENODO_DOI|g" README.md
-sed -i.bak "s|DOI--pending|DOI--$(echo "$ZENODO_DOI" | sed 's|/|%2F|g' | sed 's|\.|%2E|g')|g" README.md
+
+# README: replace the "mints on release" shields.io badge with the official
+# Zenodo badge that's the canonical OSS pattern. The DOI-BADGE-MARKER
+# HTML comment below the badge identifies the line for sed (preserves the
+# comment on the next line so future re-runs find the marker again).
+PLACEHOLDER_BADGE='\[\!\[DOI\](https://img\.shields\.io/badge/DOI-mints%20on%20release-lightgrey\.svg)\](#citing-pvl)'
+ZENODO_BADGE="[![DOI](https://zenodo.org/badge/DOI/${ZENODO_DOI}.svg)](https://doi.org/${ZENODO_DOI})"
+# escape pipes/ampersands for sed replacement string
+ZENODO_BADGE_SED=$(printf '%s' "$ZENODO_BADGE" | sed 's|[/&]|\\&|g')
+sed -i.bak -E "s|${PLACEHOLDER_BADGE}|${ZENODO_BADGE_SED}|" README.md
 rm -f README.md.bak
 green "  ✓ Patched README.md"
 

@@ -9,7 +9,9 @@ Built around [Ragonis-Bachar et al. 2022](https://doi.org/10.1021/acs.biomac.2c0
 [![CI](https://github.com/saidaz24-meet/peptide_prediction/actions/workflows/ci.yml/badge.svg)](https://github.com/saidaz24-meet/peptide_prediction/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Version](https://img.shields.io/badge/version-v0.3.0-blue.svg)](CITATION.cff)
-[![DOI](https://img.shields.io/badge/DOI-pending-lightgrey.svg)](#citing-pvl)
+[![DOI](https://img.shields.io/badge/DOI-mints%20on%20release-lightgrey.svg)](#citing-pvl)
+<!-- DOI-BADGE-MARKER: scripts/publish_v0_3_0.sh patches the line above on release -->
+
 [![Status](https://img.shields.io/badge/status-pre--release-orange.svg)](#status)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
