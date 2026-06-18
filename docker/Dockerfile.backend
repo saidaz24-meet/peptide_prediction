@@ -97,7 +97,14 @@ ENV PYTHONUNBUFFERED=1 \
     S4PRED_MODEL_PATH=/opt/tools/s4pred/models \
     # Provider flags (safe defaults — both enabled for production)
     USE_TANGO=1 \
-    USE_S4PRED=1
+    USE_S4PRED=1 \
+    # PERF-2026-06-18: pin numeric thread pools to 1. See backend/_perf_init.py
+    # for the why (S4PRED ensemble × OMP defaults = 100+ threads on 4 cores).
+    OMP_NUM_THREADS=1 \
+    MKL_NUM_THREADS=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    VECLIB_MAXIMUM_THREADS=1 \
+    NUMEXPR_NUM_THREADS=1
 
 # Switch to non-root user
 USER ${APP_USER}

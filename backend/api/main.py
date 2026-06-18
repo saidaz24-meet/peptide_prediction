@@ -2,6 +2,11 @@
 Main FastAPI application setup and router registration.
 """
 
+# PERF-2026-06-18: must be the FIRST local import — pins OMP / MKL / OpenBLAS
+# thread counts BEFORE torch / numpy / scipy load via any downstream import.
+# See `backend/_perf_init.py` for the why.
+import _perf_init  # noqa: F401
+
 import asyncio
 import concurrent.futures
 import logging

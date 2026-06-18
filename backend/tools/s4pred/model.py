@@ -7,10 +7,32 @@ Original Author: Lewis Moffat (Github: limitloss)
 """
 
 import os
+
+# PERF-2026-06-18: PyTorch / OpenMP / MKL / OpenBLAS all default their thread
+# counts to os.cpu_count(). With 5 BiLSTM ensemble × default intra-op (= 4 on
+# CX33) × N thread-pool slots × M uvicorn workers, we end up with 100+ threads
+# fighting 4 cores — context-switch + cache-thrash makes prod 22× slower than
+# a Mac terminal run. Pin to 1 BEFORE torch is imported so the OMP runtime
+# sees the env var at first call.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("VECLIB_MAXIMUM_THREADS", "1")
+os.environ.setdefault("NUMEXPR_NUM_THREADS", "1")
+
 from typing import Dict, List, Optional, Tuple
 
 import torch
 import numpy as np
+
+# Belt-and-braces: even if the env var was set late, force torch's view too.
+try:
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
+except RuntimeError:
+    # set_num_interop_threads must be called before any parallel work;
+    # if it has already started, the env vars above + set_num_threads still help.
+    pass
 
 from .network import S4PRED
 from .utilities import sequence_to_input
