@@ -202,7 +202,10 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
       titleKey: "helix",
       title: (
         <>
-          % <Abbr title="α-Helix prediction">Helix</Abbr>
+          %{" "}
+          <Abbr title="α-Helix — S4PRED detected at least one helical segment in the sequence.">
+            Helix
+          </Abbr>
         </>
       ),
       value: formatPercent(stats.helixPositivePercent),
@@ -231,7 +234,10 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
       titleKey: "ff-helix",
       title: (
         <>
-          % <Abbr title="Fibril-Forming Helix">FF-Helix</Abbr>
+          %{" "}
+          <Abbr title="Fibril-Forming Helix — a Helix-positive peptide whose hydrophobic moment (µH) exceeds the threshold. Subset of Helix.">
+            FF-Helix
+          </Abbr>
         </>
       ),
       value: formatPercent(stats.ffHelixCandidatePercent),
@@ -256,7 +262,10 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
       titleKey: "ssw",
       title: (
         <>
-          % <Abbr title="Secondary Structure Switch">SSW</Abbr>
+          %{" "}
+          <Abbr title="Secondary Structure Switch — at least one residue scores helix by S4PRED AND β-aggregation by TANGO. A switching position.">
+            SSW
+          </Abbr>
         </>
       ),
       value: tangoAvailable ? formatPercent(stats.sswPositivePercent) : "N/A",
@@ -282,7 +291,10 @@ export function ResultsKpis({ stats, meta, allPeptides }: ResultsKpisProps) {
       titleKey: "ff-ssw",
       title: (
         <>
-          % <Abbr title="Fibril-Forming Secondary Structure Switch">FF-SSW</Abbr>
+          %{" "}
+          <Abbr title="Fibril-Forming SSW — an SSW-positive peptide whose hydrophobicity exceeds the threshold. Subset of SSW.">
+            FF-SSW
+          </Abbr>
         </>
       ),
       value: tangoAvailable ? formatPercent(stats.ffSswCandidatePercent) : "N/A",

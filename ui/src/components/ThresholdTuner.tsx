@@ -24,10 +24,14 @@ interface ThresholdTunerProps {
   peptides: Peptide[];
 }
 
+// B14 (Peleg 2026-06-18 PDF2): preset chip labels aligned with Peleg's
+// preferred terminology. "Original" → "Peleg default" makes the provenance
+// explicit; "Exploratory" → "Lenient" matches the symmetric strict/lenient
+// framing in the paper.
 const PRESET_LABELS: Record<ThresholdPreset, string> = {
-  original: "Original",
+  original: "Peleg default",
   strict: "Strict",
-  exploratory: "Exploratory",
+  exploratory: "Lenient",
   custom: "Custom",
 };
 
