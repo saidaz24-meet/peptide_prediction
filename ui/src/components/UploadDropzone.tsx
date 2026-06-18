@@ -220,7 +220,7 @@ export function UploadDropzone({ onFileSelected, onFileProcessed }: UploadDropzo
 
             {!isProcessing && (
               <div className="text-xs text-muted-foreground/70 space-y-0.5">
-                <p>CSV, TSV, Excel (.xlsx), FASTA</p>
+                <p>CSV · TSV · XLSX · FASTA</p>
                 <p>
                   Up to 50 MB &middot; Required column:{" "}
                   <code className="bg-muted px-1 py-0.5 rounded text-[11px]">Sequence</code>

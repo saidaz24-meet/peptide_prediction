@@ -447,7 +447,7 @@ export default function Upload() {
               Upload & Process Dataset
             </h1>
             <p className="text-body text-muted-foreground mb-4 hidden md:block">
-              Upload your peptide CSV/TSV/XLSX — columns are auto-detected.
+              Upload your peptide CSV · TSV · XLSX · FASTA — columns are auto-detected.
             </p>
 
             {/* Step indicator — clean pill style */}
@@ -495,11 +495,14 @@ export default function Upload() {
                     <div className="flex gap-2 justify-center flex-wrap">
                       {[
                         {
+                          label: "Fibril-forming peptides (118)",
+                          file: "/example/peleg_118_fibril_forming.csv",
+                        },
+                        {
                           label: "Antimicrobial Peptides (12)",
                           file: "/example/antimicrobial_peptides.csv",
                         },
                         { label: "Amyloid Peptides (9)", file: "/example/amyloid_peptides.csv" },
-                        { label: "Venom Peptides (16)", file: "/example/peptide_data.csv" },
                       ].map((ex) => (
                         <Button
                           key={ex.file}
@@ -724,10 +727,11 @@ export default function Upload() {
                           const lengths = rawData.rows
                             .map((r) => String(pickSeq(r)).length)
                             .filter((l) => l > 0);
-                          const short = lengths.filter((l) => l < 15).length;
-                          const long = lengths.filter((l) => l > 40).length;
+                          const short = lengths.filter((l) => l < 4).length;
+                          const medium = lengths.filter((l) => l > 40 && l <= 80).length;
+                          const long = lengths.filter((l) => l > 80).length;
                           const total = lengths.length;
-                          const hasWarnings = short > 0 || long > 0;
+                          const hasWarnings = short > 0 || medium > 0 || long > 0;
                           if (!hasWarnings) return null;
                           return (
                             <Alert>
@@ -735,17 +739,22 @@ export default function Upload() {
                               <AlertDescription>
                                 <div className="text-sm space-y-1">
                                   {short > 0 && (
-                                    <p title="The minimum-length floor is an empirical default; citation pending.">
-                                      {short}/{total} sequences too short (&lt;15 aa) — S4PRED works
-                                      best on sequences ≥15 aa.
+                                    <p>
+                                      {short}/{total} sequences too short (&lt;4 aa) — outside the
+                                      pipeline's default range of 4-40 aa.
+                                    </p>
+                                  )}
+                                  {medium > 0 && (
+                                    <p>
+                                      {medium}/{total} sequences exceed the 40-aa default range —
+                                      results may be less reliable but the pipeline will still run.
                                     </p>
                                   )}
                                   {long > 0 && (
                                     <p>
-                                      {long}/{total} sequences exceed the 40-aa pipeline limit —
-                                      above 40 aa the secondary-structure prediction becomes a
-                                      surface-vs-structure problem and the FF-Helix / SSW logic
-                                      loses meaning. Those rows will be skipped.
+                                      {long}/{total} sequences exceed 80 aa — TANGO accuracy
+                                      degrades and S4PRED was trained for full proteins. Those
+                                      rows will be skipped.
                                     </p>
                                   )}
                                 </div>

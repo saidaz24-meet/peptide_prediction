@@ -177,11 +177,13 @@ export default function QuickAnalyze() {
   const confirmLeave = useCallback(() => {
     setShowLeaveDialog(false);
     setPeptide(null); // Clear results so guard is deactivated
-    if (pendingNavPath) {
-      navigate(pendingNavPath);
-      setPendingNavPath(null);
-    }
-  }, [pendingNavPath, navigate]);
+    // PELEG-A3 (2026-06-18 PDF1 p24): Leave Anyway routes to home, not to the
+    // intended destination. Peleg landed on stale batch results (Phylloseptin-O2)
+    // from a previous session — the persisted datasetStore made "/results" point
+    // to nothing relevant. Going home avoids the trap.
+    setPendingNavPath(null);
+    navigate("/");
+  }, [navigate]);
 
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,7 +253,7 @@ export default function QuickAnalyze() {
               <AlertDialogTitle className="text-h3">Leave Quick Analyze?</AlertDialogTitle>
             </div>
             <AlertDialogDescription className="text-small text-muted-foreground">
-              Your prediction results will be lost. This analysis hasn't been saved to a dataset.
+              Your prediction results will be lost. Are you sure?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="gap-2 sm:gap-2">
@@ -291,7 +293,7 @@ export default function QuickAnalyze() {
             className="inline-flex items-center text-small text-muted-foreground hover:text-foreground transition-colors"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
-            Back to Batch Results
+            Back to batch results
           </button>
         )}
 
@@ -324,7 +326,7 @@ export default function QuickAnalyze() {
                     id="entry"
                     value={entry}
                     onChange={(e) => setEntry(e.target.value)}
-                    placeholder="e.g. Amyloid-beta"
+                    placeholder="e.g. Uperin 3.5"
                   />
                 </div>
               </div>
@@ -341,7 +343,7 @@ export default function QuickAnalyze() {
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-xs text-muted-foreground">Try an example:</span>
                 {[
-                  { label: "Amyloid-β(25-35)", seq: "GSNKGAIIGLM", entry: "Amyloid-beta(25-35)" },
+                  { label: "Uperin 3.5", seq: "GVGDLIRKAVSVIKNIV", entry: "Uperin 3.5" },
                   {
                     label: "LL-37",
                     seq: "LLGDFFRKSKEKIGKEFKRIVQRIKDFLRNLVPRTES",

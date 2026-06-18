@@ -1,12 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
-import {
-  Upload,
-  Zap,
-  ArrowRight,
-  Github,
-} from "lucide-react";
+import { Upload, Zap, ArrowRight, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ConstellationBackground } from "@/components/ConstellationBackground";
 import { BgDotGrid } from "@/components/BgDotGrid";
@@ -24,13 +19,26 @@ import { Footer } from "@/components/Footer";
 import { AnimateIn, AnimateInChild } from "@/components/AnimateIn";
 import { smoothEase } from "@/lib/animations";
 
-// ── Mock data: Amyloid-beta 1-42 ──────────────────────────────
-const HERO_SEQUENCE = "DAEFRHDSGYEVHHQKLVFFAEDVGSNKGAIIGLMVGGVVIA";
+// ── Mock data: Uperin 3.5 (UniProt P82042) — short AMP+fibril dual peptide ──
+const HERO_SEQUENCE = "GVGDLIRKAVSVIKNIV";
 const HERO_SS: ("H" | "E" | "C")[] = [
-  "C","C","C","C","C","C","C","C","C","C","C","C",
-  "H","H","H","H","H","H","H","H","H","H",
-  "C","C","C","C","C","C","C",
-  "E","E","E","E","E","E","E","E","E","E","E","E","E",
+  "C",
+  "C",
+  "H",
+  "H",
+  "H",
+  "H",
+  "H",
+  "H",
+  "H",
+  "H",
+  "H",
+  "H",
+  "H",
+  "H",
+  "H",
+  "C",
+  "C",
 ];
 
 const SS_COLORS: Record<string, string> = {
@@ -117,8 +125,6 @@ function HeroSequenceTrack({
   );
 }
 
-
-
 // ══════════════════════════════════════════════════════════════
 // MAIN PAGE
 // ══════════════════════════════════════════════════════════════
@@ -167,12 +173,18 @@ const Index = () => {
             Peptide Visual Lab
           </motion.h1>
 
-          <motion.p variants={heroChild} className="text-body text-muted-foreground max-w-2xl mx-auto mb-8">
-            Multi-algorithm prediction and visualization for peptide aggregation,
-            structural switching, and fibril formation. One paste, full profile.
+          <motion.p
+            variants={heroChild}
+            className="text-body text-muted-foreground max-w-2xl mx-auto mb-8"
+          >
+            Multi-algorithm prediction and visualization for peptide secondary structure switching
+            and fibril formation. One paste, full profile.
           </motion.p>
 
-          <motion.div variants={heroChild} className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-3">
+          <motion.div
+            variants={heroChild}
+            className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4 mb-3"
+          >
             <Link to="/upload" className="w-full sm:w-auto">
               <Button size="lg" className="w-full sm:w-auto text-base px-8 py-6 btn-press">
                 <Upload className="w-4 h-4 mr-2" />
@@ -216,7 +228,9 @@ const Index = () => {
               {!done && <span className="animate-pulse text-primary">|</span>}
             </div>
             <div className="mb-3">
-              <span className="text-caption text-muted-foreground mb-2 block">Structure Prediction</span>
+              <span className="text-caption text-muted-foreground mb-2 block">
+                Structure Prediction
+              </span>
               <HeroSequenceTrack sequence={HERO_SEQUENCE} ss={HERO_SS} revealed={revealedCount} />
             </div>
             <div className="flex gap-4 mt-2">
@@ -225,7 +239,10 @@ const Index = () => {
                 { label: "Sheet", color: "bg-[hsl(var(--beta))]" },
                 { label: "Coil", color: "bg-[hsl(var(--coil))]" },
               ].map(({ label, color }) => (
-                <span key={label} className="flex items-center gap-1.5 text-small text-muted-foreground">
+                <span
+                  key={label}
+                  className="flex items-center gap-1.5 text-small text-muted-foreground"
+                >
                   <span className={`w-2 h-2 rounded-full ${color}`} />
                   {label}
                 </span>
@@ -335,7 +352,9 @@ const Index = () => {
           <AnimateInChild>
             <div className="flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-small text-muted-foreground">
               <span className="flex items-center gap-1.5">
-                <span className="px-2 py-0.5 rounded bg-[hsl(var(--surface-2))] font-mono text-[10px]">MIT</span>
+                <span className="px-2 py-0.5 rounded bg-[hsl(var(--surface-2))] font-mono text-[10px]">
+                  MIT
+                </span>
                 Licensed
               </span>
               <a

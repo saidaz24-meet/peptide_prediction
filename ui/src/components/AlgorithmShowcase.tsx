@@ -4,11 +4,13 @@ import { motion, AnimatePresence, LayoutGroup } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { smoothEase } from "@/lib/animations";
 
-interface AlgorithmShowcaseProps { className?: string }
+interface AlgorithmShowcaseProps {
+  className?: string;
+}
 
 /* ── Mini Viz: S4PRED colored residue blocks ── */
 const SEQ = "KLVFFAEDVGSNKGAIIGLM";
-const SS  = "HHHHHEEEECCCEEEEEEEE";
+const SS = "HHHHHEEEECCCEEEEEEEE";
 const SS_VAR: Record<string, string> = { H: "--helix", E: "--beta", C: "--coil" };
 
 function S4PredViz() {
@@ -29,9 +31,21 @@ function S4PredViz() {
         ))}
       </div>
       <div className="flex gap-3 mt-3">
-        {([["Helix", "--helix"], ["Sheet", "--beta"], ["Coil", "--coil"]] as const).map(([l, v]) => (
-          <span key={l} className="flex items-center gap-1 text-[0.6rem] text-[hsl(var(--muted-foreground))]">
-            <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: `hsl(var(${v}))` }} />
+        {(
+          [
+            ["Helix", "--helix"],
+            ["Sheet", "--beta"],
+            ["Coil", "--coil"],
+          ] as const
+        ).map(([l, v]) => (
+          <span
+            key={l}
+            className="flex items-center gap-1 text-[0.6rem] text-[hsl(var(--muted-foreground))]"
+          >
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: `hsl(var(${v}))` }}
+            />
             {l}
           </span>
         ))}
@@ -44,12 +58,17 @@ function S4PredViz() {
 const AGG = [8, 12, 15, 45, 72, 88, 95, 65, 30, 15, 10, 8, 12, 20, 55, 78, 42, 18, 10, 5];
 
 function TangoViz() {
-  const W = 280, H = 100, P = 8, max = 100;
+  const W = 280,
+    H = 100,
+    P = 8,
+    max = 100;
   const pts = AGG.map((v, i) => ({
     x: P + (i / (AGG.length - 1)) * (W - P * 2),
     y: P + (1 - v / max) * (H - P * 2),
   }));
-  const line = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(" ");
+  const line = pts
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(" ");
   const area = `${line} L${pts[pts.length - 1].x.toFixed(1)},${H} L${pts[0].x.toFixed(1)},${H} Z`;
   const refY = P + (1 - 50 / max) * (H - P * 2);
   const peak = pts.reduce((a, b) => (a.y < b.y ? a : b));
@@ -66,11 +85,43 @@ function TangoViz() {
             <stop offset="100%" stopColor="hsl(0 84% 60%)" stopOpacity="0.02" />
           </linearGradient>
         </defs>
-        <line x1={P} y1={refY} x2={W - P} y2={refY} stroke="hsl(var(--muted-foreground))" strokeWidth="0.8" strokeDasharray="4 3" opacity="0.4" />
-        <text x={W - P - 1} y={refY - 3} textAnchor="end" className="fill-[hsl(var(--muted-foreground))]" fontSize="8" opacity="0.5">threshold</text>
+        <line
+          x1={P}
+          y1={refY}
+          x2={W - P}
+          y2={refY}
+          stroke="hsl(var(--muted-foreground))"
+          strokeWidth="0.8"
+          strokeDasharray="4 3"
+          opacity="0.4"
+        />
+        <text
+          x={W - P - 1}
+          y={refY - 3}
+          textAnchor="end"
+          className="fill-[hsl(var(--muted-foreground))]"
+          fontSize="8"
+          opacity="0.5"
+        >
+          threshold
+        </text>
         <path d={area} fill="url(#algo-agg-fill)" />
-        <path d={line} fill="none" stroke="hsl(0 84% 60%)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={peak.x} cy={peak.y} r="3" fill="hsl(0 84% 60%)" stroke="hsl(var(--card))" strokeWidth="1.5" />
+        <path
+          d={line}
+          fill="none"
+          stroke="hsl(0 84% 60%)"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        <circle
+          cx={peak.x}
+          cy={peak.y}
+          r="3"
+          fill="hsl(0 84% 60%)"
+          stroke="hsl(var(--card))"
+          strokeWidth="1.5"
+        />
       </svg>
     </div>
   );
@@ -78,18 +129,43 @@ function TangoViz() {
 
 /* ── Mini Viz: FF-Helix percentage ring ── */
 function FFHelixViz() {
-  const pct = 78, r = 40, circ = 2 * Math.PI * r;
+  const pct = 78,
+    r = 40,
+    circ = 2 * Math.PI * r;
   return (
     <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] p-4 flex flex-col items-center">
       <svg width="120" height="120" viewBox="0 0 120 120" className="mb-3">
         <circle cx="60" cy="60" r={r} fill="none" stroke="hsl(var(--border))" strokeWidth="8" />
         <circle
-          cx="60" cy="60" r={r} fill="none" stroke="hsl(270 70% 60%)" strokeWidth="8"
+          cx="60"
+          cy="60"
+          r={r}
+          fill="none"
+          stroke="hsl(270 70% 60%)"
+          strokeWidth="8"
           strokeDasharray={`${(pct / 100) * circ} ${circ}`}
-          strokeLinecap="round" transform="rotate(-90 60 60)"
+          strokeLinecap="round"
+          transform="rotate(-90 60 60)"
         />
-        <text x="60" y="56" textAnchor="middle" className="fill-[hsl(var(--foreground))]" fontSize="22" fontWeight="700">{pct}%</text>
-        <text x="60" y="72" textAnchor="middle" className="fill-[hsl(var(--muted-foreground))]" fontSize="9">FF-Helix</text>
+        <text
+          x="60"
+          y="56"
+          textAnchor="middle"
+          className="fill-[hsl(var(--foreground))]"
+          fontSize="22"
+          fontWeight="700"
+        >
+          {pct}%
+        </text>
+        <text
+          x="60"
+          y="72"
+          textAnchor="middle"
+          className="fill-[hsl(var(--muted-foreground))]"
+          fontSize="9"
+        >
+          FF-Helix
+        </text>
       </svg>
       <div className="flex items-center gap-2 text-xs text-[hsl(var(--muted-foreground))]">
         <span className="h-2 w-6 rounded-full bg-purple-500/30" />
@@ -110,7 +186,9 @@ function UniProtViz() {
   return (
     <div className="rounded-lg border border-[hsl(var(--border))] bg-[hsl(var(--surface-1))] p-4">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-sm font-semibold text-[hsl(var(--foreground))] font-mono">P80154</span>
+        <span className="text-sm font-semibold text-[hsl(var(--foreground))] font-mono">
+          P80154
+        </span>
         <span className="text-xs text-[hsl(var(--muted-foreground))]">· Staphylococcus aureus</span>
       </div>
       <div className="h-px bg-[hsl(var(--border)/0.5)] mb-3" />
@@ -127,45 +205,83 @@ function UniProtViz() {
 }
 
 /* ── Tab data ── */
-interface Tab { id: string; name: string; accentBg: string; accentText: string; title: string; desc: string; points: string[]; viz: React.ReactNode }
+interface Tab {
+  id: string;
+  name: string;
+  accentBg: string;
+  accentText: string;
+  title: string;
+  desc: string;
+  points: string[];
+  viz: React.ReactNode;
+}
 
 const TABS: Tab[] = [
   {
-    id: "s4pred", name: "S4PRED", accentBg: "bg-blue-500", accentText: "text-blue-500",
+    id: "s4pred",
+    name: "S4PRED",
+    accentBg: "bg-blue-500",
+    accentText: "text-blue-500",
     title: "Secondary Structure Prediction",
-    desc: "S4PRED predicts three-state secondary structure (helix, beta-sheet, coil) at single-residue resolution from a single sequence. Trained on a non-redundant set of high-resolution crystal structures.",
-    points: ["Three-state prediction: helix (H), sheet (E), coil (C)", "Single-residue resolution with confidence scores", "No sequence alignment or MSA required"],
+    desc: "PVL integrates S4PRED secondary structure prediction with TANGO aggregation propensity and internal hydrophobicity thresholds. Fibril-formation potential is calculated by combining the secondary structure prediction with hydrophobicity and hydrophobic moment.",
+    points: [
+      "Helix",
+      "Secondary structure switch (SSW)",
+      "Fibril-forming helix (FF-Helix)",
+      "Fibril-forming secondary structure switch (FF-SSW)",
+    ],
     viz: <S4PredViz />,
   },
   {
-    id: "tango", name: "TANGO", accentBg: "bg-red-500", accentText: "text-red-500",
+    id: "tango",
+    name: "TANGO",
+    accentBg: "bg-red-500",
+    accentText: "text-red-500",
     title: "Aggregation Propensity",
     desc: "TANGO predicts cross-beta aggregation propensity using a statistical mechanics model. It identifies aggregation-prone regions (APRs) that may drive amyloid fibril formation.",
-    points: ["Per-residue aggregation scoring (0–100 scale)", "Identifies aggregation-prone regions (APRs)", "Based on statistical mechanics of beta-sheet formation"],
+    points: [
+      "Per-residue aggregation scoring (0–100 scale)",
+      "Identifies aggregation-prone regions (APRs)",
+      "Based on statistical mechanics of beta-sheet formation",
+    ],
     viz: <TangoViz />,
   },
   {
-    id: "ffhelix", name: "FF-Helix", accentBg: "bg-purple-500", accentText: "text-purple-500",
+    id: "ffhelix",
+    name: "FF-Helix",
+    accentBg: "bg-purple-500",
+    accentText: "text-purple-500",
     title: "Fibril-Forming Helix Detection",
     desc: "FF-Helix identifies helical regions with fibril-forming potential by combining secondary structure prediction, hydrophobic moment analysis, and amphipathic helix scoring.",
-    points: ["Combines structure, hydrophobicity, and amphipathicity", "Detects helices that may convert to cross-beta fibrils", "Based on Hamodrakas 2007 methodology"],
+    points: [
+      "Combines structure, hydrophobicity, and amphipathicity",
+      "Detects helices that may convert to cross-beta fibrils",
+      "Based on Hamodrakas 2007 methodology",
+    ],
     viz: <FFHelixViz />,
   },
   {
-    id: "uniprot", name: "UniProt", accentBg: "bg-teal-500", accentText: "text-teal-500",
+    id: "uniprot",
+    name: "UniProt",
+    accentBg: "bg-teal-500",
+    accentText: "text-teal-500",
     title: "Database Enrichment",
     desc: "Automatic UniProt lookup enriches your peptides with known annotations — function, subcellular location, disease associations, and cross-references to PDB structures.",
-    points: ["Automatic sequence matching against UniProt", "Protein function and disease annotations", "Cross-references to PDB, Pfam, InterPro"],
+    points: [
+      "Automatic sequence matching against UniProt",
+      "Protein function and disease annotations",
+      "Cross-references to PDB, Pfam, InterPro",
+    ],
     viz: <UniProtViz />,
   },
 ];
 
 /* ── Tab accent colors for the animated underline ── */
 const ACCENT_COLORS: Record<string, string> = {
-  s4pred: "rgb(59, 130, 246)",   // blue-500
-  tango: "rgb(239, 68, 68)",     // red-500
-  ffhelix: "rgb(168, 85, 247)",  // purple-500
-  uniprot: "rgb(20, 184, 166)",  // teal-500
+  s4pred: "rgb(59, 130, 246)", // blue-500
+  tango: "rgb(239, 68, 68)", // red-500
+  ffhelix: "rgb(168, 85, 247)", // purple-500
+  uniprot: "rgb(20, 184, 166)", // teal-500
 };
 
 /* ── Main Component ── */
@@ -194,7 +310,9 @@ export function AlgorithmShowcase({ className }: AlgorithmShowcaseProps) {
               onClick={() => setActive(tab.id)}
               className={cn(
                 "px-5 py-3 text-sm font-medium transition-colors relative whitespace-nowrap",
-                active === tab.id ? "text-[hsl(var(--foreground))]" : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]",
+                active === tab.id
+                  ? "text-[hsl(var(--foreground))]"
+                  : "text-[hsl(var(--muted-foreground))] hover:text-[hsl(var(--foreground))]"
               )}
             >
               {tab.name}
@@ -223,8 +341,12 @@ export function AlgorithmShowcase({ className }: AlgorithmShowcaseProps) {
         >
           {/* Text side */}
           <div>
-            <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-[hsl(var(--foreground))] mb-3">{current.title}</h3>
-            <p className="text-[hsl(var(--muted-foreground))] leading-relaxed mb-5">{current.desc}</p>
+            <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-[hsl(var(--foreground))] mb-3">
+              {current.title}
+            </h3>
+            <p className="text-[hsl(var(--muted-foreground))] leading-relaxed mb-5">
+              {current.desc}
+            </p>
             <ul className="space-y-2">
               {current.points.map((p, i) => (
                 <motion.li
@@ -234,7 +356,9 @@ export function AlgorithmShowcase({ className }: AlgorithmShowcaseProps) {
                   transition={{ delay: 0.1 + i * 0.08, duration: 0.3, ease: smoothEase }}
                   className="flex items-start gap-2 text-sm text-[hsl(var(--foreground))]"
                 >
-                  <div className={cn("mt-1.5 h-1.5 w-1.5 rounded-full shrink-0", current.accentBg)} />
+                  <div
+                    className={cn("mt-1.5 h-1.5 w-1.5 rounded-full shrink-0", current.accentBg)}
+                  />
                   {p}
                 </motion.li>
               ))}

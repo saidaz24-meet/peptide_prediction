@@ -94,14 +94,6 @@ export const DEFAULT_PVL_METRICS: BiochemMetric[] = [
     getValue: (p) => p.charge,
     getMean: (s) => s.meanCharge,
   },
-  {
-    id: "s4predHelix",
-    label: "S4PRED helix",
-    unit: "%",
-    displayMode: "stat-card",
-    getValue: (p) => p.s4predHelixPercent,
-    getMean: (s) => s.meanS4predHelixPercent,
-  },
 ];
 
 // ── Percentile computation ──

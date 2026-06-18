@@ -6,7 +6,9 @@ import { CheckCircle2, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { smoothEase } from "@/lib/animations";
 
-interface UseCaseSectionProps { className?: string }
+interface UseCaseSectionProps {
+  className?: string;
+}
 
 /* ── Theme hook ── */
 function useIsDark() {
@@ -40,7 +42,8 @@ const CASES: UseCase[] = [
     accent: "text-blue-500",
     label: "Batch Analysis",
     title: "Analyze Peptide Datasets at Scale",
-    description: "Upload hundreds of peptides via CSV. Every sequence gets the full prediction workflow — secondary structure, aggregation scoring, fibril-forming helix detection — ranked and ready to filter.",
+    description:
+      "Upload hundreds of peptides via CSV. Every sequence receives the full workflow: secondary structure prediction, biochemical calculations, and fibril formation potential, with thresholds determined according to the given database.",
     bullets: [
       "CSV batch upload with automatic validation",
       "Multi-algorithm prediction workflow in parallel",
@@ -57,7 +60,8 @@ const CASES: UseCase[] = [
     accent: "text-purple-500",
     label: "Deep Dive",
     title: "Explore Every Structural Property",
-    description: "Click any peptide for a full structural profile — helical wheel projections, per-residue charts, hydrophobic moment vectors, and secondary structure tracks. All interactive.",
+    description:
+      "Click any peptide for a full structural profile — helical wheel projections, per-residue charts, hydrophobic moment vectors, and secondary structure tracks. All interactive.",
     bullets: [
       "Edmundson helical wheel with amphipathic moment",
       "Per-residue aggregation and structure overlay",
@@ -74,7 +78,8 @@ const CASES: UseCase[] = [
     accent: "text-teal-500",
     label: "3D Visualization",
     title: "See Your Peptide in Three Dimensions",
-    description: "AlphaFold integration predicts 3D structure directly from sequence. View the result in an interactive Mol* viewer with pLDDT confidence coloring — no external tools needed.",
+    description:
+      "AlphaFold integration predicts 3D structure directly from sequence. View the result in an interactive Mol* viewer with pLDDT confidence coloring — no external tools needed.",
     bullets: [
       "AlphaFold structure prediction from sequence",
       "Interactive Mol* 3D viewer embedded in the page",
@@ -90,7 +95,17 @@ const CASES: UseCase[] = [
 ];
 
 /* ── Browser Chrome Frame ── */
-function BrowserFrame({ src, alt, url, tiltDeg }: { src: string; alt: string; url: string; tiltDeg: number }) {
+function BrowserFrame({
+  src,
+  alt,
+  url,
+  tiltDeg,
+}: {
+  src: string;
+  alt: string;
+  url: string;
+  tiltDeg: number;
+}) {
   return (
     <div className="relative group" style={{ perspective: "1200px" }}>
       <div
@@ -99,7 +114,7 @@ function BrowserFrame({ src, alt, url, tiltDeg }: { src: string; alt: string; ur
           "shadow-[0_8px_30px_rgba(0,0,0,0.08)]",
           "transition-all duration-500 ease-out",
           "group-hover:shadow-[0_20px_50px_rgba(0,0,0,0.15),0_0_40px_hsl(var(--primary)/0.08)]",
-          "group-hover:border-[hsl(var(--border-hover))]",
+          "group-hover:border-[hsl(var(--border-hover))]"
         )}
         style={{ transform: `rotateY(${tiltDeg}deg)` }}
       >
@@ -107,7 +122,9 @@ function BrowserFrame({ src, alt, url, tiltDeg }: { src: string; alt: string; ur
           <span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--destructive)/0.4)]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--warning)/0.4)]" />
           <span className="h-2.5 w-2.5 rounded-full bg-[hsl(var(--success)/0.4)]" />
-          <span className="ml-3 text-[0.6rem] text-[hsl(var(--faint))] font-mono truncate">{url}</span>
+          <span className="ml-3 text-[0.6rem] text-[hsl(var(--faint))] font-mono truncate">
+            {url}
+          </span>
         </div>
         <img src={src} alt={alt} className="w-full h-auto" loading="lazy" />
       </div>
@@ -165,7 +182,13 @@ function TextBlock({ c }: { c: UseCase }) {
         animate={inView ? { opacity: 1, y: 0 } : {}}
         transition={{ duration: 0.4, delay: 0.55, ease: smoothEase }}
       >
-        <Link to={c.link} className={cn("inline-flex items-center gap-1.5 text-sm font-semibold hover:underline", c.accent)}>
+        <Link
+          to={c.link}
+          className={cn(
+            "inline-flex items-center gap-1.5 text-sm font-semibold hover:underline",
+            c.accent
+          )}
+        >
           {c.cta}
           <ArrowRight className="h-3.5 w-3.5" />
         </Link>
@@ -196,7 +219,7 @@ export function UseCaseSection({ className }: UseCaseSectionProps) {
               <div
                 className={cn(
                   "max-w-6xl mx-auto px-4 sm:px-6 grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center",
-                  reversed && "lg:[direction:rtl]",
+                  reversed && "lg:[direction:rtl]"
                 )}
               >
                 <div className={reversed ? "lg:[direction:ltr]" : undefined}>

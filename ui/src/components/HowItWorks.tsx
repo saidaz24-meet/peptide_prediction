@@ -3,13 +3,6 @@
  *
  * Each card: icon, step label, title, 1-sentence description.
  * Designed for the "How it works" section below the hero.
- *
- * Steps (Peleg 2026-06-07 — step 2 split):
- * 1.  Paste / upload sequences (CSV, FASTA, UniProt query)
- * 2a. Run S4PRED + TANGO + biochem in parallel — raw inputs only
- * 2b. Apply dataset-derived gates to classify FF candidates (downstream of 2a)
- * 3.  Interactive dashboard: classifications, distributions, 3D overlay, drill-down
- * 4.  Export figure pack or copy permalink for your paper
  */
 
 import {
@@ -38,41 +31,40 @@ const STEPS = [
     tooltip: null as string | null,
   },
   {
-    step: "2a",
+    step: "2",
     icon: Cpu,
     title: "Run Predictors",
     description:
-      "S4PRED secondary structure, TANGO aggregation, and biochemical metrics run in parallel — raw inputs only.",
+      "S4PRED secondary structure, TANGO aggregation, and biochemical metrics run for every sequence.",
     accent: "from-purple-500/20 to-purple-500/5",
     iconBg: "bg-purple-500/10",
     iconColor: "text-purple-500",
     tooltip: null,
   },
   {
-    step: "2b",
+    step: "3",
     icon: Filter,
-    title: "Classify FF Candidates",
+    title: "Classify Fibril-formation candidates",
     description:
-      "Apply dataset-derived gates (μH for FF-Helix, hydrophobicity for FF-SSW) over the 2a outputs. Downstream of the raw predictors, not parallel to them.",
+      "Apply dataset-derived thresholds to flag Helix, SSW, FF-Helix, and FF-SSW peptides.",
     accent: "from-fuchsia-500/20 to-fuchsia-500/5",
     iconBg: "bg-fuchsia-500/10",
     iconColor: "text-fuchsia-500",
-    tooltip:
-      "Thresholds derive from the dataset mean of the class-positive metric (e.g. mean μH over helix-positive rows), not from a fixed constant.",
+    tooltip: null,
   },
   {
-    step: "3",
+    step: "4",
     icon: BarChart3,
     title: "Interactive Dashboard",
     description:
-      "Classification sets, distribution charts, correlation matrices, 3D structure overlay, and per-residue drill-down.",
+      "Classification analysis, distribution charts, correlation matrices, 3D structure overlay, and per-residue drill-down.",
     accent: "from-green-500/20 to-green-500/5",
     iconBg: "bg-green-500/10",
     iconColor: "text-green-500",
     tooltip: null,
   },
   {
-    step: "4",
+    step: "5",
     icon: FileDown,
     title: "Export & Cite",
     description:

@@ -63,11 +63,12 @@ describe("BiochemComparison", () => {
         metrics={DEFAULT_PVL_METRICS}
       />
     );
-    // Should show all 4 default metrics (hydrophobicity, muH, charge, s4predHelix)
+    // Q10 (Peleg 2026-06-18): S4PRED helix% is not a biochemical trait —
+    // dropped from the biochem block. The block now shows 3 metrics.
     expect(container.textContent).toContain("Hydrophobicity");
     expect(container.textContent).toContain("Hydrophobic moment");
     expect(container.textContent).toContain("Charge");
-    expect(container.textContent).toContain("S4PRED helix");
+    expect(container.textContent).not.toContain("S4PRED helix");
   });
 
   it("shows database mean values", () => {

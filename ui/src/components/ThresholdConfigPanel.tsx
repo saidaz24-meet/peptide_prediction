@@ -18,7 +18,7 @@
  * under "Advanced (TANGO aggregation)" — Peleg flagged these for discussion,
  * not deletion.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, ChevronDown, ChevronRight, Info } from "lucide-react";
 import {
   Select,
@@ -36,11 +36,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export interface CustomThresholds {
   // Group 1: General secondary structure
@@ -139,6 +135,30 @@ function ThresholdInput({
   readOnly: boolean;
   onChange: (v: number) => void;
 }) {
+  // Local string buffer so partial inputs like "0." or "" don't get round-tripped
+  // through parseFloat and snapped back. Commit on blur or valid full number.
+  // PELEG-A2 (2026-06-18): Peleg PDF1 p17 — typed input was being eaten.
+  const [draft, setDraft] = useState<string>(String(value));
+
+  useEffect(() => {
+    setDraft(String(value));
+  }, [value]);
+
+  const commit = (raw: string) => {
+    const trimmed = raw.trim();
+    if (trimmed === "" || trimmed === "-" || trimmed === ".") {
+      setDraft(String(defaultValue));
+      onChange(defaultValue);
+      return;
+    }
+    const parsed = parseFloat(trimmed);
+    if (Number.isNaN(parsed)) {
+      setDraft(String(value));
+      return;
+    }
+    onChange(parsed);
+  };
+
   return (
     <div className="flex items-center gap-3 py-2">
       <div className="flex items-center min-w-0 flex-1">
@@ -165,8 +185,13 @@ function ThresholdInput({
             min={min}
             max={max}
             className="w-24 h-8 text-sm font-mono text-right"
-            value={value}
-            onChange={(e) => onChange(parseFloat(e.target.value) || defaultValue)}
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              const parsed = parseFloat(e.target.value);
+              if (!Number.isNaN(parsed)) onChange(parsed);
+            }}
+            onBlur={(e) => commit(e.target.value)}
           />
         )}
       </div>
@@ -290,7 +315,7 @@ function ThresholdFields({
           step="0.01"
           min="0"
           max="1"
-          description="The minimal average reliability score of α-helical prediction by S4PRED."
+          description="The minimal average reliability score of α-helical prediction by S4PRED. To make secondary structure prediction more strict, this number should be closer to 1. Value range 0-1."
           readOnly={isReadOnly}
           onChange={(v) => update("minS4predHelixScore", v)}
         />
@@ -302,7 +327,7 @@ function ThresholdFields({
           step="1"
           min="0"
           max="100"
-          description="Minimum percentage of residues predicted to be helical so that the sequence will be defined as helical."
+          description="Minimum percentage of residues predicted to be helical so that the sequence will be defined as helical. To make secondary structure prediction more strict, this number should be closer to 100. Value range 0-100."
           readOnly={isReadOnly}
           onChange={(v) => update("minHelixPercentContent", v)}
         />
@@ -318,7 +343,7 @@ function ThresholdFields({
           step="0.01"
           min="0"
           max="1"
-          description="The maximal difference between α-helix and β prediction scores by S4PRED. To increase the potential for secondary structure, this value should be lower."
+          description="The maximal difference between α-helix and β prediction scores by S4PRED. To increase the potential for secondary structure, this value should be lower. Value range 0-1. Note: in batch mode, this value is determined automatically according to the input database."
           readOnly={isReadOnly}
           onChange={(v) => update("s4predMaxHelixBetaDiff", v)}
         />
@@ -330,7 +355,7 @@ function ThresholdFields({
           step="0.1"
           min="0"
           max="100"
-          description="The maximal difference between α-helix and β prediction scores by TANGO. To increase the potential for secondary structure, this value should be lower."
+          description="The maximal difference between α-helix and β prediction scores by TANGO. To increase the potential for secondary structure, this value should be lower. Value range 0-100. Note: in batch mode, this value is determined automatically according to the input database."
           readOnly={isReadOnly}
           onChange={(v) => update("tangoMaxHelixBetaDiff", v)}
         />
@@ -352,13 +377,13 @@ function ThresholdFields({
       <ThresholdSection title="Fibril-formation thresholds">
         <ThresholdInput
           id="muH"
-          label="uH (Hydrophobic moment)"
+          label="Hydrophobic moment (µH)"
           value={t.muHCutoff}
           defaultValue={d.muHCutoff}
           step="0.01"
           min="0"
           max="3.26"
-          description="Minimum hydrophobic moment to predict fibril formation potential of α-helical fibrils. To perform a more strict prediction, this value should be higher. Value range 0 to 3.26"
+          description="Minimum hydrophobic moment to predict fibril formation potential of α-helical fibrils. To perform a more strict prediction, this value should be higher. Value range 0 to 3.26. Hydrophobic parameters by Fauchère, J. and Pliska, V. 1983."
           readOnly={isReadOnly}
           onChange={(v) => update("muHCutoff", v)}
         />
@@ -370,23 +395,9 @@ function ThresholdFields({
           step="0.01"
           min="-1.01"
           max="2.25"
-          description="Minimum hydrophobicity to predict fibril formation potential of secondary structure switch fibrils. To perform a more strict prediction, this value should be higher. Value range -1.01 to 2.25"
+          description="Minimum hydrophobicity to predict fibril formation potential of secondary structure switch fibrils. To perform a more strict prediction, this value should be higher. Value range -1.01 to 2.25. Hydrophobic parameters by Fauchère, J. and Pliska, V. 1983."
           readOnly={isReadOnly}
           onChange={(v) => update("hydroCutoff", v)}
-        />
-        {/* PELEG-Q6-PARTIAL: TANGO aggregation threshold made configurable per
-            Said 2026-05-06; awaiting Peleg's citation in the Wave C email. */}
-        <ThresholdInput
-          id="tango-aggregation-threshold"
-          label="TANGO aggregation threshold"
-          value={t.tangoAggregationThreshold}
-          defaultValue={d.tangoAggregationThreshold}
-          step="0.5"
-          min="0"
-          max="50"
-          description="TANGO score above which a residue is considered aggregation-prone. Default = 5; pending citation. Editable until validated."
-          readOnly={isReadOnly}
-          onChange={(v) => update("tangoAggregationThreshold", v)}
         />
       </ThresholdSection>
 

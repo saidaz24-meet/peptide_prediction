@@ -2,7 +2,9 @@
 import { Code2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface TrustSectionProps { className?: string }
+interface TrustSectionProps {
+  className?: string;
+}
 
 const INSTITUTIONS = [
   { name: "DESY", location: "Hamburg, Germany" },
@@ -36,9 +38,9 @@ export function TrustSection({ className }: TrustSectionProps) {
           </svg>
 
           <blockquote className="text-xl sm:text-2xl font-medium text-white leading-relaxed mb-8">
-            "PVL replaced three separate tools in our peptide aggregation workflow.
-            One upload, complete structural profile — secondary structure, aggregation
-            propensity, and fibril-forming helix detection in a single view."
+            "PVL is the first tool to predict secondary structure switching, the first to flag
+            fibril-formation potential for non-beta structures, and it ties database analysis and
+            visualization together under one roof."
           </blockquote>
 
           <div className="flex items-center gap-3">
@@ -56,7 +58,10 @@ export function TrustSection({ className }: TrustSectionProps) {
       {/* Institution row */}
       <div className="flex flex-wrap items-center justify-center gap-8 sm:gap-12 mt-12 max-w-3xl mx-auto">
         {INSTITUTIONS.map((inst) => (
-          <div key={inst.name} className="flex flex-col items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity">
+          <div
+            key={inst.name}
+            className="flex flex-col items-center gap-1.5 opacity-60 hover:opacity-100 transition-opacity"
+          >
             {"isOSS" in inst && inst.isOSS ? (
               <span className="flex items-center gap-1.5 text-lg font-semibold tracking-tight text-[hsl(var(--foreground))]">
                 <Code2 className="h-4 w-4" />

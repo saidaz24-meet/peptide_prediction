@@ -65,7 +65,7 @@ function formatNumber(n: number, digits = 2): string {
 function isThresholdModified(
   key: ThresholdKey,
   active: ResolvedThresholds,
-  original: ResolvedThresholds,
+  original: ResolvedThresholds
 ): boolean {
   return active[key] !== original[key];
 }
@@ -99,9 +99,7 @@ function ThresholdRow({ row }: { row: Row }) {
     <motion.li
       className="group/row relative flex items-baseline justify-between gap-2 rounded-md px-2 py-1.5 text-xs transition-colors"
       animate={{
-        backgroundColor: flash
-          ? "hsl(var(--warning) / 0.12)"
-          : "hsl(0 0% 0% / 0)",
+        backgroundColor: flash ? "hsl(var(--warning) / 0.12)" : "hsl(0 0% 0% / 0)",
       }}
       transition={{ duration: flash ? 0.15 : 1.2, ease: "easeOut" }}
     >
@@ -115,10 +113,7 @@ function ThresholdRow({ row }: { row: Row }) {
               aria-label={`${row.label} info`}
             />
           </TooltipTrigger>
-          <TooltipContent
-            side="top"
-            className="max-w-[260px] text-xs leading-relaxed"
-          >
+          <TooltipContent side="top" className="max-w-[260px] text-xs leading-relaxed">
             {row.hint}
           </TooltipContent>
         </UITooltip>
@@ -227,9 +222,9 @@ export function ActiveThresholdsPanel() {
         rows: [
           {
             key: "muHCutoff" as ThresholdKey,
-            label: "uH (hydrophobic moment)",
+            label: "Hydrophobic moment (µH)",
             value: formatNumber(active.muHCutoff, 2),
-            hint: "Minimum uH for FF-Helix classification (range 0-3.26).",
+            hint: "Minimum µH for FF-Helix classification (range 0-3.26). Hydrophobic parameters by Fauchère & Pliska 1983.",
             isModified: isThresholdModified("muHCutoff", active, original),
           },
           {
@@ -242,13 +237,13 @@ export function ActiveThresholdsPanel() {
         ],
       },
     ],
-    [active, original],
+    [active, original]
   );
 
   /** Count how many individual thresholds differ from the original/server values */
   const modifiedCount = useMemo(
     () => groups.reduce((sum, g) => sum + g.rows.filter((r) => r.isModified).length, 0),
-    [groups],
+    [groups]
   );
 
   return (
@@ -270,9 +265,7 @@ export function ActiveThresholdsPanel() {
                 </span>
               )}
             </div>
-            <p className="text-xs text-muted-foreground/70">
-              Adjust in the Thresholds panel below
-            </p>
+            <p className="text-xs text-muted-foreground/70">Adjust in the Thresholds panel below</p>
           </div>
         </div>
 

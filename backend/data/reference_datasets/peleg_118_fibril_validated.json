@@ -1,0 +1,1786 @@
+{
+  "dataset_id": "peleg_118_fibril_validated",
+  "title": "Peleg-118 — Experimentally validated fibril-forming peptides (≤40 aa)",
+  "curator": "Dr. Peleg Ragonis-Bachar (Technion)",
+  "source_file": "Experementaly_validated_Fibril_forming_Proteins_Less_than_or_Equal_to_40aa.xlsx",
+  "ingested_at": "2026-06-18",
+  "pvl_version": "v0.3.0",
+  "schema_version": "1",
+  "n_peptides": 118,
+  "sources": [
+    "UniProt General",
+    "AmyPro",
+    "Literature",
+    "UniProt AMPs"
+  ],
+  "categories": [
+    "FF",
+    "AF-AMP",
+    "Pathogenic amyloid",
+    "Functional amyloid",
+    "Uniprot AMPs",
+    "UniProt General"
+  ],
+  "role": "Positive-control reference set for FF-Helix + FF-SSW recall benchmarks. Cited in the PVL paper.",
+  "peptides": [
+    {
+      "id": "peleg118_001",
+      "name": "Phosphoribulokinase, 41 kDa subunit",
+      "uniprot_id": "P25934",
+      "organism": "Monoraphidium minutum",
+      "pubmed": null,
+      "original_database": "UniProt General",
+      "antimicrobial": false,
+      "general_category": "UniProt General",
+      "fibril_formation_reference": null,
+      "sequence": "ADEKXVVIGLAADSG",
+      "length": 15
+    },
+    {
+      "id": "peleg118_002",
+      "name": "Human α-defensin 6, HD6",
+      "uniprot_id": "Q01524",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "22722251",
+        "27151743",
+        "25158166"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": true,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": null,
+      "sequence": "AFTCHCRRSCYSTEYSYGTCTVMGINHRFCCL",
+      "length": 32
+    },
+    {
+      "id": "peleg118_003",
+      "name": "Pleurocidin-like peptide GcSc4C5",
+      "uniprot_id": "Q7SZH0 (22-47)",
+      "organism": "Glyptocephalus cynoglossus",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "AGWGSIFKHIFKAGKFIHGAIQAHND",
+      "length": 26
+    },
+    {
+      "id": "peleg118_004",
+      "name": "Dermaseptin-4",
+      "uniprot_id": "P84924",
+      "organism": "Phyllomedusa tarsius (Brownbelly leaf frog)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "ALWKDILKNAGKAALNEINQIVQ",
+      "length": 23
+    },
+    {
+      "id": "peleg118_005",
+      "name": "Thaumatin-like protein",
+      "uniprot_id": "P83959",
+      "organism": "Phaseolus vulgaris (Kidney bean) (French bean)",
+      "pubmed": [
+        "10486265"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "ANFEIVNNCPYTVWAAASPGGGRRLDRGQT",
+      "length": 30
+    },
+    {
+      "id": "peleg118_006",
+      "name": "Toxin Cm38",
+      "uniprot_id": "P0DTB8",
+      "organism": "Centruroides margaritatus (Central American bark Scorpion)",
+      "pubmed": [
+        "25633390"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "ARDGYIVDEKGCKFACFIN",
+      "length": 19
+    },
+    {
+      "id": "peleg118_007",
+      "name": "Defensin-like protein 1 C-terminal peptide, C65A_C74A_C76A",
+      "uniprot_id": "P69241",
+      "organism": "Raphanus sativus",
+      "pubmed": [
+        "23665069"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "ARHGSANYVFPAHKAIAYF",
+      "length": 19
+    },
+    {
+      "id": "peleg118_008",
+      "name": "Ocellatin-5",
+      "uniprot_id": "not found",
+      "organism": "Leptodactylus ocellatus (Argus frog) (Leptodactylus macrosternum)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "AVLDILKDVGKGLLSHFMEKV",
+      "length": 21
+    },
+    {
+      "id": "peleg118_009",
+      "name": "Calcitonin",
+      "uniprot_id": "P01258",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "12095997",
+        "17468747",
+        "23395606"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Pathogenic amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "CGNLSTCMLGTYTQDFNKFHTFPQTAIGVGAP",
+      "length": 32
+    },
+    {
+      "id": "peleg118_010",
+      "name": "Urocortin",
+      "uniprot_id": "P55090",
+      "organism": "Rattus norvegicus",
+      "pubmed": [
+        "19541956"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "DDPPLSIDLTFHLLRTLLELARTQSQRERAEQNRIIFDSV",
+      "length": 40
+    },
+    {
+      "id": "peleg118_011",
+      "name": "Beta-defensin 1 (BNBD-1) (BNDB-1)",
+      "uniprot_id": "P46159",
+      "organism": "Bos taurus (Bovine)",
+      "pubmed": [
+        "8454635"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "DFASCHTNGGICLPNRCPGHMIQIGICFRPRVKCCRSW",
+      "length": 38
+    },
+    {
+      "id": "peleg118_012",
+      "name": "Diptericin",
+      "uniprot_id": "Q9TWW2",
+      "organism": "Sarcophaga peregrina (Flesh fly) (Boettcherisca peregrina)",
+      "pubmed": [
+        "1445217"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "DLHIPPPDNKINWPQLSGGGGGSPKTGYDININAQQK",
+      "length": 37
+    },
+    {
+      "id": "peleg118_013",
+      "name": "Antifungal protein 4 (CW-4)",
+      "uniprot_id": "P83138",
+      "organism": "Malva parviflora (Little mallow) (Cheeseweed mallow)",
+      "pubmed": [
+        "11302747"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "DRQIDMEEQQLEKLNKQDRXPGLRYAAKQQMXTXRMG",
+      "length": 37
+    },
+    {
+      "id": "peleg118_014",
+      "name": "Ice-structuring protein A",
+      "uniprot_id": "P04002",
+      "organism": "Pseudopleuronectes americanus",
+      "pubmed": [
+        "12524307"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "DTASDAAAAAALTAANAKAAAELTAANAAAAAAATAR",
+      "length": 37
+    },
+    {
+      "id": "peleg118_015",
+      "name": "momorcochin-S",
+      "uniprot_id": "P20655",
+      "organism": "Momordica cochinchinensis (Spiny bitter cucumber)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "DVTFSLLGANTKSYAAFITNFRKDVASEKK",
+      "length": 30
+    },
+    {
+      "id": "peleg118_016",
+      "name": "ADan peptide",
+      "uniprot_id": "Q9Y287",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "10781099"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Pathogenic amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "EASNCFAIRHFENKFAVETLICFNLFLNSQEKHY",
+      "length": 34
+    },
+    {
+      "id": "peleg118_017",
+      "name": "ABri peptide",
+      "uniprot_id": "Q9Y287",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "10391242",
+        "10818498"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Pathogenic amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "EASNCFAIRHFENKFAVETLICSRTVKKNIIEEN",
+      "length": 34
+    },
+    {
+      "id": "peleg118_018",
+      "name": "Brevinin-1OKc",
+      "uniprot_id": "C0HL10",
+      "organism": "Nidirana okinavana (Kampira Falls frog) (Babina okinavana)",
+      "pubmed": [
+        "15629529"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "FFGSIIGALAKGLPSLISLIKK",
+      "length": 22
+    },
+    {
+      "id": "peleg118_019",
+      "name": "Lung Surfactant",
+      "uniprot_id": "P11686",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "9865947",
+        "10618493",
+        "12844270"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Pathogenic amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "FGIPCCPVHLKRLLIVVVVVVLIVVVIVGALLMGL",
+      "length": 35
+    },
+    {
+      "id": "peleg118_020",
+      "name": "Conolysin-Mt1 (Moonwalker peptide) [Cleaved into: Conolysin-Mt2]",
+      "uniprot_id": "P0C8S6",
+      "organism": "Conus mustelinus (Weasel cone)",
+      "pubmed": [
+        "17927208"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "FHPSLWVLIPQYIQLIRKILKSG",
+      "length": 23
+    },
+    {
+      "id": "peleg118_021",
+      "name": "Grammistin Pp 2a",
+      "uniprot_id": "P69843",
+      "organism": "Pogonoperca punctata (Clown grouper) (Grammistes punctatus)",
+      "pubmed": [
+        "15777955"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "FIGGIISLIKKLF",
+      "length": 13
+    },
+    {
+      "id": "peleg118_022",
+      "name": "Chrysophsin-3",
+      "uniprot_id": "P83547",
+      "organism": "Pagrus major (Red sea bream) (Chrysophrys major)",
+      "pubmed": [
+        "12581207"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "FIGLLISAGKAIHDLIRRRH",
+      "length": 20
+    },
+    {
+      "id": "peleg118_023",
+      "name": "Ll-37(17-29)- FK13",
+      "uniprot_id": "P49913",
+      "organism": "Homo sapiens - synthetic construct",
+      "pubmed": [
+        "32753597"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "32753597",
+      "sequence": "FKRIVQRIKDFLR",
+      "length": 13
+    },
+    {
+      "id": "peleg118_024",
+      "name": "Temporin-1ITa",
+      "uniprot_id": "C0HL49",
+      "organism": "Rana italica (Italian stream frog) (Rana graeca italica)",
+      "pubmed": [
+        "28699258"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "FLGAIAQALTSLLGKL",
+      "length": 16
+    },
+    {
+      "id": "peleg118_025",
+      "name": "Brevinin-1DYe",
+      "uniprot_id": "P0C5X0",
+      "organism": "Rana dybowskii (Dybovsky's frog) (Korean brown frog)",
+      "pubmed": [
+        "17688900"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "FLIGMTQGLICLITRKC",
+      "length": 17
+    },
+    {
+      "id": "peleg118_026",
+      "name": "Vespid chemotactic peptide 5g (VCP 5g)",
+      "uniprot_id": "P0C1M3",
+      "organism": "Vespa magnifica (Hornet)",
+      "pubmed": [
+        "16330062"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "FLIIRRPIVLGLL",
+      "length": 13
+    },
+    {
+      "id": "peleg118_027",
+      "name": "Cyanophlyctin",
+      "uniprot_id": "C0HJB8",
+      "organism": "Euphlyctis cyanophlyctis",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "FLNALKNFAKTAGKRLKSLLN",
+      "length": 21
+    },
+    {
+      "id": "peleg118_028",
+      "name": "Vespid-CP 5e",
+      "uniprot_id": "P0C1M1",
+      "organism": "Vespa magnifica (Hornet)",
+      "pubmed": [
+        "16330062"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "FLPIIAKLLGGLL",
+      "length": 13
+    },
+    {
+      "id": "peleg118_029",
+      "name": "Brevinin-1SE",
+      "uniprot_id": "P85056",
+      "organism": "Lithobates sevosus (Dusky gopher frog) (Rana sevosa)",
+      "pubmed": [
+        "16386333"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "FLPLVRGAAKLIPSVVCAISKRC",
+      "length": 23
+    },
+    {
+      "id": "peleg118_030",
+      "name": "Phylloseptin-O2 (PLS-O2) (Phylloseptin-5) (PS-5)",
+      "uniprot_id": "P84570",
+      "organism": "Pithecopus oreades (Orange-legged leaf frog) (Phyllomedusa oreades)",
+      "pubmed": [
+        "15752569; 18644413"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "FLSLIPHAINAVSAIAKHS",
+      "length": 19
+    },
+    {
+      "id": "peleg118_031",
+      "name": "Phylloseptin-2.1TR",
+      "uniprot_id": "C0HLD7",
+      "organism": "Phyllomedusa trinitatis (Trinidad leaf frog)",
+      "pubmed": [
+        "29980138; 30734396"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "FLSLIPHIATGIAALAKHL",
+      "length": 19
+    },
+    {
+      "id": "peleg118_032",
+      "name": "Obestatin",
+      "uniprot_id": "Q9UBU3",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "19541956"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "FNAPFDVGIKLSGVQYQQHSQAL",
+      "length": 23
+    },
+    {
+      "id": "peleg118_033",
+      "name": "Urocortin-3",
+      "uniprot_id": "Q969E3",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "19541956"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "FTLSLDVPTNIMNLLFNIAKAKNLRAQAAANAHLMAQI",
+      "length": 38
+    },
+    {
+      "id": "peleg118_034",
+      "name": "Temporin-1Cea",
+      "uniprot_id": "B8QP36 (46-64)",
+      "organism": "Rana chensinensis",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "FVDLKKIANIINSIFGK",
+      "length": 17
+    },
+    {
+      "id": "peleg118_035",
+      "name": "Insulin Chain B",
+      "uniprot_id": "P01308",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "6337294",
+        "17468747",
+        "19864624"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Pathogenic amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "FVNQHLCGSHLVEALYLVCGERGFFYTPKT",
+      "length": 30
+    },
+    {
+      "id": "peleg118_036",
+      "name": "Temporin-L",
+      "uniprot_id": "P57104",
+      "organism": "Rana temporaria",
+      "pubmed": [
+        "16997872"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "16997872",
+      "sequence": "FVQWFSKFLGRIL",
+      "length": 13
+    },
+    {
+      "id": "peleg118_037",
+      "name": "Plantaricin J",
+      "uniprot_id": "P71461 (31-55)",
+      "organism": "Lactobacillus plantarum",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "GAWKNFWSSLRKGFYDGEAGRAIRR",
+      "length": 25
+    },
+    {
+      "id": "peleg118_038",
+      "name": "Chitinase (EC 3.2.1.14)",
+      "uniprot_id": "P86977",
+      "organism": "Streptomyces violaceusniger",
+      "pubmed": [
+        "22915152"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GDGTGPGPGP",
+      "length": 10
+    },
+    {
+      "id": "peleg118_039",
+      "name": "Cupiennin-1",
+      "uniprot_id": "P83619",
+      "organism": "Cupiennius salei",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "GFGALFKFLAKKVAKTVAKQAAKQGAKYVVNKQME",
+      "length": 35
+    },
+    {
+      "id": "peleg118_040",
+      "name": "Defensin",
+      "uniprot_id": "P80154",
+      "organism": "Aeshna cyanea (Southern hawker dragonfly) (Libellula cyanea)",
+      "pubmed": [
+        "1425705"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GFGCPLDQMQCHRHCQTITGRSGGYCSGPLKLTCTCYR",
+      "length": 38
+    },
+    {
+      "id": "peleg118_041",
+      "name": "Ascaphin-7M",
+      "uniprot_id": "not found",
+      "organism": "A. montanus (North America inland frog)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "GFKDWIKSAAKKLIKTVASNIANQ",
+      "length": 24
+    },
+    {
+      "id": "peleg118_042",
+      "name": "Frenatin-4",
+      "uniprot_id": "P82023",
+      "organism": "Litoria infrafrenata (Giant tree frog) (White-lipped tree frog)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "GFLDKLKKGASDFANALVNSIKGT",
+      "length": 24
+    },
+    {
+      "id": "peleg118_043",
+      "name": "Osmin",
+      "uniprot_id": "P0CD70",
+      "organism": "Osmia rufa (Red mason bee)",
+      "pubmed": [
+        "19109988"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "GFLSALKKYLPIVLKHV",
+      "length": 17
+    },
+    {
+      "id": "peleg118_044",
+      "name": "Ascaphin-1",
+      "uniprot_id": "P0CJ25",
+      "organism": "Ascaphus truei (Coastal tailed frog)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "GFRDVLKGAAKAFVKTVAGHIAN",
+      "length": 23
+    },
+    {
+      "id": "peleg118_045",
+      "name": "Defensin D7 (Antimicrobial peptide D7) (So-D7)",
+      "uniprot_id": "P81573",
+      "organism": "Spinacia oleracea (Spinach)",
+      "pubmed": [
+        "9762899"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GIFSSRKCKTPSKTFKGYCTRDSNCDTSCRYEGYPAGD",
+      "length": 38
+    },
+    {
+      "id": "peleg118_046",
+      "name": "Melittin",
+      "uniprot_id": "P01501 (44-69), P59262 (44-69), P68407 (44-69), P68408 (44-69), P68409 (44-69), Q8LW54 (51-76), I3RJI9 (44-69), Q95Z19 (41-66)",
+      "organism": "Apis mellifera (Honeybee), Vespula maculifrons (Eastern yellow jacket) (Wasp), Apis cerana cerana (Oriental honeybee), Vespa magnifica (Hornet), Apis cerana (Indian honeybee), Vespa velutina nigrithorax (Hornet), Apis mellifera carnica (Carniolan honeybee), Polistes sp. (Golden paper wasp), ?Phyllomedusa sauvagei",
+      "pubmed": [
+        "30833557"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "30833557",
+      "sequence": "GIGAVLKVLTTGLPALISWIKRKRQQ",
+      "length": 26
+    },
+    {
+      "id": "peleg118_047",
+      "name": "Pelophylaxin-2",
+      "uniprot_id": "Q2WCN7",
+      "organism": "Pelophylax plancyi fukienensis (Fukien gold-striped pond frog)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "GILLNTLKGAAKNVAGVLLDKLKCKITGGC",
+      "length": 30
+    },
+    {
+      "id": "peleg118_048",
+      "name": "Pseudin-4",
+      "uniprot_id": "P83191",
+      "organism": "Pseudis paradoxa (Paradoxical frog)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "GINTLKKVIQGLHEVIKLVSNHA",
+      "length": 23
+    },
+    {
+      "id": "peleg118_049",
+      "name": "Insulin Chain A",
+      "uniprot_id": "P01308",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "6337294",
+        "17468747"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Pathogenic amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "GIVEQCCTSICSLYQLENYCN",
+      "length": 21
+    },
+    {
+      "id": "peleg118_050",
+      "name": "Brevinin-2Va",
+      "uniprot_id": "not found",
+      "organism": "Rana virgatipes (Ranidae) (Aquarana)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "GIWDTLKNVGKAVLGKVLENV",
+      "length": 21
+    },
+    {
+      "id": "peleg118_051",
+      "name": "M-poneritoxin-Ng1d (M-PONTX-Ng1d) (Poneratoxin) (Ponericin-W4)",
+      "uniprot_id": "P82426",
+      "organism": "Neoponera goeldii (Ponerine ant) (Pachycondyla goeldii)",
+      "pubmed": [
+        "11279030; 26805882"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GIWGTALKWGVKLLPKLVGMAQTKKQ",
+      "length": 26
+    },
+    {
+      "id": "peleg118_052",
+      "name": "Deserticolin-1",
+      "uniprot_id": "P86136",
+      "organism": "Crinia deserticola (Desert froglet)",
+      "pubmed": [
+        "18601958"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GLADFLNKAVGKVVDFVKS",
+      "length": 19
+    },
+    {
+      "id": "peleg118_053",
+      "name": "Aurein 1.2",
+      "uniprot_id": "P82387",
+      "organism": "Ranoidea raniformis (Southern bell frog) (Litoria raniformis)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "GLFDIIKKIAESF",
+      "length": 13
+    },
+    {
+      "id": "peleg118_054",
+      "name": "Citropin-1.3",
+      "uniprot_id": "P81846",
+      "organism": "Litoria citropaAnimalia",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "GLFDIIKKVASVIGGL",
+      "length": 16
+    },
+    {
+      "id": "peleg118_055",
+      "name": "Aurein-3.3",
+      "uniprot_id": "P82396",
+      "organism": "Litoria raniformis Animalia",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "GLFDIVKKIAGHIVSSI",
+      "length": 17
+    },
+    {
+      "id": "peleg118_056",
+      "name": "Brevinin-2skb",
+      "uniprot_id": "Not found",
+      "organism": "Rana sakuraii [Japanese brown frog]",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "GLFNVFKKVGKNVLKNVAGSLMDNLKCKVSGEC",
+      "length": 33
+    },
+    {
+      "id": "peleg118_057",
+      "name": "Alyteserin-1a",
+      "uniprot_id": "P0DQW2",
+      "organism": "Alytes obstetricans (Common midwife toad) (Bufo obstetricans)",
+      "pubmed": [
+        "19463738"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GLKDIFKAGLGSLVKGIAAHVAN",
+      "length": 23
+    },
+    {
+      "id": "peleg118_058",
+      "name": "Alyteserin-1d",
+      "uniprot_id": "P0DQW4",
+      "organism": "Alytes obstetricans (European midwife toad)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "GLKDIFKAGLGSLVKNIAAHVAN",
+      "length": 23
+    },
+    {
+      "id": "peleg118_059",
+      "name": "Dahlein-5.6",
+      "uniprot_id": "P84272",
+      "organism": "Ranoidea dahlii (Dahl's aquatic frog) (Litoria dahlii)",
+      "pubmed": [
+        "11555873"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "GLLASLGKVFGGYLAEKLKPK",
+      "length": 21
+    },
+    {
+      "id": "peleg118_060",
+      "name": "Ranatuerin-2B",
+      "uniprot_id": "P82840",
+      "organism": "Lithobates berlandieri (Rio Grande leopard frog) (Rana berlandieri)",
+      "pubmed": [
+        "10651828"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GLLDTIKGVAKTVAASMLDKLKCKISGC",
+      "length": 28
+    },
+    {
+      "id": "peleg118_061",
+      "name": "Dermaseptin S9, Preprodermaseptin S9, DRS S9",
+      "uniprot_id": "Q1EN15",
+      "organism": "Phyllomedusa sauvagei (Sauvage's leaf frog), Phyllomedusa sauvagei",
+      "pubmed": [
+        "18637027",
+        "24146759",
+        "18637027",
+        "16401077",
+        "18637027",
+        "18929530",
+        "24146759"
+      ],
+      "original_database": "Literature, AmyPro",
+      "antimicrobial": true,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "18637027",
+      "sequence": "GLRSKIWLWVLLMIWQESNKFKKM",
+      "length": 24
+    },
+    {
+      "id": "peleg118_062",
+      "name": "Caerin-3.3",
+      "uniprot_id": "P56240",
+      "organism": "Ranoidea caerulea (Green tree frog) (Litoria caerulea)",
+      "pubmed": [
+        "nan"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GLWEKIKEKANELVSGIVEGVK",
+      "length": 22
+    },
+    {
+      "id": "peleg118_063",
+      "name": "Dermaseptin-DI1 (DRS-DI1) (Dermadistinctin-K) (DD-K)",
+      "uniprot_id": "P83638",
+      "organism": "Phyllomedusa distincta (Monkey frog)",
+      "pubmed": [
+        "10477123; 12379643; 17409003; 17442605; 18644413; 19289046"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GLWSKIKAAGKEAAKAAAKAAGKAALNAVSEAV",
+      "length": 33
+    },
+    {
+      "id": "peleg118_064",
+      "name": "Peptide PGLa-BM3",
+      "uniprot_id": "C0HKL9",
+      "organism": "Xenopus boumbaensis (Mawa clawed frog)",
+      "pubmed": [
+        "25849343"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GMASTAGSVLGKLAKAVAIGAL",
+      "length": 22
+    },
+    {
+      "id": "peleg118_065",
+      "name": "Dermaseptin-DA4 (DRS-DA4)",
+      "uniprot_id": "P0DTD5",
+      "organism": "Agalychnis dacnicolor (Giant Mexican leaf frog) (Pachymedusa dacnicolor)",
+      "pubmed": [
+        "19843179"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GMWSKIKNAGKAAKAAAKAAGKAALGAVSEAM",
+      "length": 32
+    },
+    {
+      "id": "peleg118_066",
+      "name": "Bacteriocin BacGR",
+      "uniprot_id": "B3EWP5",
+      "organism": "Lacticaseibacillus paracasei (Lactobacillus paracasei)",
+      "pubmed": [
+        "nan"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GNVAELTEVR",
+      "length": 10
+    },
+    {
+      "id": "peleg118_067",
+      "name": "Antimicrobial peptide 4 (XT-4)",
+      "uniprot_id": "P84384",
+      "organism": "Xenopus tropicalis (Western clawed frog) (Silurana tropicalis)",
+      "pubmed": [
+        "11738090"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GVFLDALKKFAKGGMNAVLNPK",
+      "length": 22
+    },
+    {
+      "id": "peleg118_068",
+      "name": "Uperine-3.5 antimicrobial peptide",
+      "uniprot_id": "P82042",
+      "organism": "Uperoleia mjobergii",
+      "pubmed": [
+        "26676975"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": true,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": null,
+      "sequence": "GVGDLIRKAVSVIKNIV",
+      "length": 17
+    },
+    {
+      "id": "peleg118_069",
+      "name": "Ocellatin-LB1",
+      "uniprot_id": "C0HKF1",
+      "organism": "Leptodactylus labyrinthicus (Labyrinth frog)",
+      "pubmed": [
+        "28115922; 29596881"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GVVDILKGAAKDIAGHLASKVM",
+      "length": 22
+    },
+    {
+      "id": "peleg118_070",
+      "name": "Xenoposin precursor fragment BM1 (XPF-BM1),Xenoposin precursor fragment R1 (XPF-R1)",
+      "uniprot_id": "C0HKM0,C0HKP5",
+      "organism": "Xenopus boumbaensis (Mawa clawed frog),Xenopus ruwenzoriensis (Uganda clawed frog)",
+      "pubmed": [
+        "25849343",
+        "27290612"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "GWASKIGQTLGKMAKVGLHELIQPK",
+      "length": 25
+    },
+    {
+      "id": "peleg118_071",
+      "name": "Glucagon-like peptide 2",
+      "uniprot_id": "P01275",
+      "organism": "Home sapiens",
+      "pubmed": [
+        "19541956"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "HADGSFSDEMNTILDNLAARDFINWLIQTKITD",
+      "length": 33
+    },
+    {
+      "id": "peleg118_072",
+      "name": "Glucagon-like peptide 1",
+      "uniprot_id": "P01275",
+      "organism": "Home sapiens",
+      "pubmed": [
+        "19541956"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "HDEFERHAEGTFTSDVSSYLEGQAAKEFIAWLVKGRG",
+      "length": 37
+    },
+    {
+      "id": "peleg118_073",
+      "name": "Glucagon",
+      "uniprot_id": "P01275",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "18339765"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "HSQGTFTSDYSKYLDSRRAQDFVQWLMNT",
+      "length": 29
+    },
+    {
+      "id": "peleg118_074",
+      "name": "Riparin-2.1",
+      "uniprot_id": "P86127",
+      "organism": "Crinia riparia (Streambank froglet) (Flinders Ranges froglet)",
+      "pubmed": [
+        "16470724; 18601958"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "IIEKLVNTALGLLSGL",
+      "length": 16
+    },
+    {
+      "id": "peleg118_075",
+      "name": "Bombinin-H1/H3",
+      "uniprot_id": "P82282",
+      "organism": "Bombina variegata (Yellow-bellied toad)",
+      "pubmed": [
+        "8223491"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "IIGPVLGMVGSALGGLLKKIG",
+      "length": 21
+    },
+    {
+      "id": "peleg118_076",
+      "name": "Maximin-Ht (Maximin-7)",
+      "uniprot_id": "P83086",
+      "organism": "Bombina maxima (Giant fire-bellied toad) (Chinese red belly toad)",
+      "pubmed": [
+        "nan"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "ILGPVLGLVGNALGGLIKNE",
+      "length": 20
+    },
+    {
+      "id": "peleg118_077",
+      "name": "Agelaia-CP",
+      "uniprot_id": "P69437",
+      "organism": "Agelaia pallipes pallipes (Neotropical social wasp)",
+      "pubmed": [
+        "15052574; 15225564; 23836163"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "ILGTILGLLKGL",
+      "length": 12
+    },
+    {
+      "id": "peleg118_078",
+      "name": "Polybia-CP",
+      "uniprot_id": "P0C1R0",
+      "organism": "Polybia paulista (Neotropical social wasp) (Swarm-founding polistine wasp)",
+      "pubmed": [
+        "16129513; 21745529; 22450985; 23836163; 30534613; 32360153"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "ILGTILGLLKSL",
+      "length": 12
+    },
+    {
+      "id": "peleg118_079",
+      "name": "Dominulin-B",
+      "uniprot_id": "P0C1M7",
+      "organism": "Polistes dominula (European paper wasp) (Vespa dominula)",
+      "pubmed": [
+        "16446098"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "INWKKIAEIGKQVLSAL",
+      "length": 17
+    },
+    {
+      "id": "peleg118_080",
+      "name": "Mastoparan PDD-B",
+      "uniprot_id": "P0DRA6",
+      "organism": "Polistes dorsalis (Paper wasp)",
+      "pubmed": [
+        "18375018"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "INWLKLGKKILGAL",
+      "length": 14
+    },
+    {
+      "id": "peleg118_081",
+      "name": "Trypsin",
+      "uniprot_id": "P35050",
+      "organism": "Penaeus monodon",
+      "pubmed": null,
+      "original_database": "UniProt General",
+      "antimicrobial": false,
+      "general_category": "UniProt General",
+      "fibril_formation_reference": null,
+      "sequence": "IVGGTAVTPGEFPYQLSFQDSIEGVESHFCGG",
+      "length": 32
+    },
+    {
+      "id": "peleg118_082",
+      "name": "IAPP, Amylin",
+      "uniprot_id": "P10997",
+      "organism": "Homo sapiens",
+      "pubmed": [
+        "11445568",
+        "11327784",
+        "12367525",
+        "10940238",
+        "10600392",
+        "10656810",
+        "17468747",
+        "2195544",
+        "24245879",
+        "20698575"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": true,
+      "general_category": "Pathogenic amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "KCNTATCATQRLANFLVHSSNNFGAILSSTNVGSNTY",
+      "length": 37
+    },
+    {
+      "id": "peleg118_083",
+      "name": "Plantaricin A",
+      "uniprot_id": "Q27XH9 (23-48), P80214 (23-48), I6WB56 (23-48), I6TYV4 (23-48), C1KBG0 (23-48), A0AAW3FSE8 (23-48), A0A837P902 (23-48), A0A1E1GJF4 (23-48)",
+      "organism": "Lactiplantibacillus plantarum (Lactobacillus plantarum), Lactiplantibacillus plantarum (strain ATCC BAA-793 / NCIMB 8826 / WCFS1) (Lactobacillus plantarum), Lactiplantibacillus plantarum subsp. plantarum, Lactiplantibacillus paraplantarum, Lactiplantibacillus plantarum (Lactobacillus plantarum), Lactiplantibacillus plantarum CMPG5300, Lactiplantibacillus plantarum WJL, Lactiplantibacillus plantarum subsp. plantarum",
+      "pubmed": [
+        "16806056"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "16806056",
+      "sequence": "KSSAYSLQMGATAIKQVKKLFKKWGW",
+      "length": 26
+    },
+    {
+      "id": "peleg118_084",
+      "name": "Probable bradykinin-potentiating peptide (BPP) (Probable antimicrobial peptide)",
+      "uniprot_id": "P0DQU4",
+      "organism": "Tityus metuendus (Scorpion)",
+      "pubmed": [
+        "29337221"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "KVLAPAEEAPAEAPAAAE",
+      "length": 18
+    },
+    {
+      "id": "peleg118_085",
+      "name": "Bombinin H4",
+      "uniprot_id": "P82284  (1-20)",
+      "organism": "Bombina variegata",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "LIGPVLGLVGSALGGLLKKI",
+      "length": 20
+    },
+    {
+      "id": "peleg118_086",
+      "name": "gLL-37",
+      "uniprot_id": "Q1KLY3",
+      "organism": "Gorilla gorilla gorilla",
+      "pubmed": [
+        "32753597"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "32753597",
+      "sequence": "LLGDFFRKAKEKIGKESKRIVQRIKDFLRNLVPRTES",
+      "length": 37
+    },
+    {
+      "id": "peleg118_087",
+      "name": "Cathelicidin (LL37)",
+      "uniprot_id": "P49913 (134-170), J3KNB4 (137-173), Q1KLX1 (134-170), A0A6D2XCK7 (137-173), A0A384NPR0 (134-170), A0A2R9CDL0 (137-173), A0A2J8PA57 (137-173)",
+      "organism": "Homo sapiens (Human), Pan troglodytes (Chimpanzee), Pan paniscus (Pygmy chimpanzee) (Bonobo)",
+      "pubmed": [
+        "29133814"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "29133814",
+      "sequence": "LLGDFFRKSKEKIGKEFKRIVQRIKDFLRNLVPRTES",
+      "length": 37
+    },
+    {
+      "id": "peleg118_088",
+      "name": "Temporin-1Tb",
+      "uniprot_id": "P79874 (45-59)",
+      "organism": "Rana temporaria (European common frog)",
+      "pubmed": [
+        "16997872"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "16997872",
+      "sequence": "LLPIVGNLLKSLL",
+      "length": 13
+    },
+    {
+      "id": "peleg118_089",
+      "name": "Temporin-1Tk (TK) (Temporin-K)",
+      "uniprot_id": "P56923",
+      "organism": "Rana temporaria (European common frog)",
+      "pubmed": [
+        "9022710; 34235566"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "LLPNLLKSLL",
+      "length": 10
+    },
+    {
+      "id": "peleg118_090",
+      "name": "Eumenitin",
+      "uniprot_id": "P0C931",
+      "organism": "Eumenes rubronotatus (Solitary wasp)",
+      "pubmed": [
+        "11006592; 16762455; 18206199"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "LNLKGIFKKVASLLT",
+      "length": 15
+    },
+    {
+      "id": "peleg118_091",
+      "name": "Panurgin 1",
+      "uniprot_id": "C0HL84",
+      "organism": "Panurgus calcaratus (Solitary bee)",
+      "pubmed": [
+        "23483218"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "LNWGAILKHIIK",
+      "length": 12
+    },
+    {
+      "id": "peleg118_092",
+      "name": "delta-hemolysin",
+      "uniprot_id": "Q5HMY6",
+      "organism": "Staphylococcus epidermidis",
+      "pubmed": null,
+      "original_database": "Landau FF-AMPs",
+      "antimicrobial": true,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": null,
+      "sequence": "MAADIISTIGDLVKWIIDTVNKFKK",
+      "length": 25
+    },
+    {
+      "id": "peleg118_093",
+      "name": "PSMa4",
+      "uniprot_id": "P0C819",
+      "organism": "Staphylococcus aureus",
+      "pubmed": [
+        "30158633"
+      ],
+      "original_database": "Landau FF-AMPs",
+      "antimicrobial": true,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "MAIVGTIIKIIKAIIDIFAK",
+      "length": 20
+    },
+    {
+      "id": "peleg118_094",
+      "name": "Hemolysin H2U",
+      "uniprot_id": "P85223",
+      "organism": "Staphylococcus cohnii subsp. urealyticus",
+      "pubmed": [
+        "18752624"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Ragonis-Bachar, Stati, Gustavsson]",
+      "sequence": "MDFIIDIIKKIVGLFTGK",
+      "length": 18
+    },
+    {
+      "id": "peleg118_095",
+      "name": "PSMa3",
+      "uniprot_id": "P0C809",
+      "organism": "Staphylococcus aureus",
+      "pubmed": [
+        "28232575",
+        "31918959"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": "28232575, 31918959",
+      "sequence": "MEFVAKLFKFFKDLLGKFLGNN",
+      "length": 22
+    },
+    {
+      "id": "peleg118_096",
+      "name": "Phenol-soluble modulin A1",
+      "uniprot_id": "A8Z0V1",
+      "organism": "Staphylococcus aureus",
+      "pubmed": [
+        "22685403",
+        "26365835"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "MGIIAGIIKVIKSLIEQFTGK",
+      "length": 21
+    },
+    {
+      "id": "peleg118_097",
+      "name": "3-hydroxypropionic acid resistance peptide",
+      "uniprot_id": "U3PVA8",
+      "organism": "Escherichia coli",
+      "pubmed": null,
+      "original_database": "Landau FF-AMPs",
+      "antimicrobial": true,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": null,
+      "sequence": "MKPALRDFIAIVQERLASVTA",
+      "length": 21
+    },
+    {
+      "id": "peleg118_098",
+      "name": "thr operon leader peptide",
+      "uniprot_id": "A6T4E1",
+      "organism": "Klebsiella pneumoniae",
+      "pubmed": null,
+      "original_database": "Landau FF-AMPs",
+      "antimicrobial": true,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": null,
+      "sequence": "MNRIGMITTIITTTITTGNGAG",
+      "length": 22
+    },
+    {
+      "id": "peleg118_099",
+      "name": "Accessory gene regulator D amphipathic leader sequence, N-AgrD",
+      "uniprot_id": "Q53643",
+      "organism": "Staphylococcus aureus",
+      "pubmed": [
+        "24980969"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "MNTLFNLFFDFITGILKNIGNIAA",
+      "length": 24
+    },
+    {
+      "id": "peleg118_100",
+      "name": "sex pheromone inhibitor determinant",
+      "uniprot_id": "P24803",
+      "organism": "Enterococcus faecalis",
+      "pubmed": null,
+      "original_database": "Landau FF-AMPs",
+      "antimicrobial": true,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": null,
+      "sequence": "MSKRAMKKIIPLITLFVVTLVG",
+      "length": 22
+    },
+    {
+      "id": "peleg118_101",
+      "name": "Ribosome-inactivating protein luffacylin (EC 3.2.2.22) (rRNA N-glycosidase)",
+      "uniprot_id": "P84073",
+      "organism": "Luffa aegyptiaca (Sponge gourd) (Luffa cylindrica)",
+      "pubmed": [
+        "12126727"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "PRGSPRTEYEAARR",
+      "length": 14
+    },
+    {
+      "id": "peleg118_102",
+      "name": "Sauvagin",
+      "uniprot_id": "P01144",
+      "organism": "Phyllomedusa sauvagei",
+      "pubmed": [
+        "19541956"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "QGPPISIDLSLELLRKMIEIEKQEKEKQQAANNRLLLDTI",
+      "length": 40
+    },
+    {
+      "id": "peleg118_103",
+      "name": "Protegrin-1 antimicrobial peptide",
+      "uniprot_id": "P32194",
+      "organism": "Sus scrofa",
+      "pubmed": [
+        "21463591"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": true,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": null,
+      "sequence": "RGGRLCYCRRRFCVCVGR",
+      "length": 18
+    },
+    {
+      "id": "peleg118_104",
+      "name": "Cecropin-C",
+      "uniprot_id": "Q8MUF3 (24-58)",
+      "organism": "Anopheles gambiae Animalia",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "RRFKKFLKKVEGAGRRVANAAQKGLPLAAGVKGLV",
+      "length": 35
+    },
+    {
+      "id": "peleg118_105",
+      "name": "Plantaricin-K",
+      "uniprot_id": "P71460  (26-57)",
+      "organism": "Lactobacillus plantarum",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "RRSRKNGIGYAIGYAFGAVERAVLGGSRDYNK",
+      "length": 32
+    },
+    {
+      "id": "peleg118_106",
+      "name": "Pleurocidin-like peptide WFX",
+      "uniprot_id": "Q7T053  (23-43)",
+      "organism": "Pseudopleuronectes americanus (Winter flounder) (Pleuronectes americanus)",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "RSTEDIIKSISGGGFLNAMNA",
+      "length": 21
+    },
+    {
+      "id": "peleg118_107",
+      "name": "Cecropin-A",
+      "uniprot_id": "P83413",
+      "organism": "Heliothis virescens (Tobacco budworm moth)",
+      "pubmed": [
+        "nan"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "RWKVFKKIEKVGRNIRDGVIKAAPAIEVLGQAKAL",
+      "length": 35
+    },
+    {
+      "id": "peleg118_108",
+      "name": "Hyphancin-3F",
+      "uniprot_id": "P50722 (27-61)",
+      "organism": "Hyphantria cunea (Fall webworm moth)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "RWKVFKKIEKVGRNIRDGVIKAGPAIAVVGQAKAL",
+      "length": 35
+    },
+    {
+      "id": "peleg118_109",
+      "name": "Putative antimicrobial protein 3 (Cm-p2)",
+      "uniprot_id": "B3EWI8",
+      "organism": "Cenchritis muricatus (Beaded periwinkle)",
+      "pubmed": [
+        "22210491"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "SESILIVHQQQSRSSGS",
+      "length": 17
+    },
+    {
+      "id": "peleg118_110",
+      "name": "Dolabellanin-B2",
+      "uniprot_id": "P83376",
+      "organism": "Dolabella auricularia",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "SHQDCYEALHKCMASHSKPFSCSMKFHMCLQQQ",
+      "length": 33
+    },
+    {
+      "id": "peleg118_111",
+      "name": "Equinatoxin-1''",
+      "uniprot_id": "P0C1H1",
+      "organism": "Actinia equina",
+      "pubmed": null,
+      "original_database": "UniProt General",
+      "antimicrobial": false,
+      "general_category": "UniProt General",
+      "fibril_formation_reference": null,
+      "sequence": "SVAVAGAVIEGATLTFNVLQ",
+      "length": 20
+    },
+    {
+      "id": "peleg118_112",
+      "name": "Cn-AMP2",
+      "uniprot_id": "P86706",
+      "organism": "Cocos nucifera",
+      "pubmed": [
+        "27028204",
+        "25234689"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": true,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": null,
+      "sequence": "TESYFVFSVGM",
+      "length": 11
+    },
+    {
+      "id": "peleg118_113",
+      "name": "Bacteriocin lactococcin MMFII",
+      "uniprot_id": "P83002",
+      "organism": "Lactococcus lactis subsp. lactis (Streptococcus lactis)",
+      "pubmed": [
+        "11728715; 11708769"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "TSYGNGVHCNKSKCWIDVSELETYKAGTVSNPKDILW",
+      "length": 37
+    },
+    {
+      "id": "peleg118_114",
+      "name": "Major cell-surface adhesin PAc, P1",
+      "uniprot_id": "P11657",
+      "organism": "Streptococcus mutans",
+      "pubmed": [
+        "23082034"
+      ],
+      "original_database": "AmyPro",
+      "antimicrobial": false,
+      "general_category": "Functional amyloid",
+      "fibril_formation_reference": null,
+      "sequence": "TYETEKPLKPAPVAPNYEKEPTPPTRTPDQAEPNKPTPPT",
+      "length": 40
+    },
+    {
+      "id": "peleg118_115",
+      "name": "Lasioglossin LL-I",
+      "uniprot_id": "C0HK42",
+      "organism": "Lasioglossum laticeps (Bee)",
+      "pubmed": [
+        "35947777"
+      ],
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "35947777",
+      "sequence": "VNWKKVLGKIIKVAK",
+      "length": 15
+    },
+    {
+      "id": "peleg118_116",
+      "name": "N-acetylmuramoyl-L-alanine amidase L2 (EC 3.5.1.28)",
+      "uniprot_id": "P85143",
+      "organism": "Lysobacter sp",
+      "pubmed": [
+        "nan"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "XNVVFLNXPXPQW",
+      "length": 13
+    },
+    {
+      "id": "peleg118_117",
+      "name": "Salmocidin-1",
+      "uniprot_id": "P81369",
+      "organism": "Oncorhynchus mykiss (Rainbow trout) (Salmo gairdneri)",
+      "pubmed": [
+        "nan"
+      ],
+      "original_database": "UniProt AMPs",
+      "antimicrobial": true,
+      "general_category": "Uniprot AMPs",
+      "fibril_formation_reference": null,
+      "sequence": "XXSVPAFGHYLPAXP",
+      "length": 15
+    },
+    {
+      "id": "peleg118_118",
+      "name": "PlnA-22 (Bacteriocin)",
+      "uniprot_id": "P80214 (27-48), C1KBG0 (27-48)",
+      "organism": "Lactobacillus plantarum (Gram-positive bacteria)",
+      "pubmed": null,
+      "original_database": "Literature",
+      "antimicrobial": false,
+      "general_category": "FF,AF-AMP",
+      "fibril_formation_reference": "[Itay&?]",
+      "sequence": "YSLQMGATAIKQVKKLFKKWGW",
+      "length": 22
+    }
+  ]
+}
