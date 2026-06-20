@@ -173,6 +173,8 @@ class TraceIdMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(self, request: Request, call_next):
+        import time as _t
+
         trace_id = request.headers.get("X-Trace-Id") or str(uuid.uuid4())
         set_trace_id(trace_id)
         request.state.trace_id = trace_id
@@ -192,30 +194,40 @@ class TraceIdMiddleware(BaseHTTPMiddleware):
             },
         )
 
+        t0 = _t.perf_counter()
         try:
             response = await call_next(request)
             response.headers["X-Trace-Id"] = trace_id
 
+            # PERF-2026-06-21: request-level wall time so we can pair the
+            # per-stage timings emitted by services.perf_logger with the
+            # full end-to-end number a client would see.
+            elapsed_ms = round((_t.perf_counter() - t0) * 1000, 2)
+            response.headers["X-Elapsed-Ms"] = str(elapsed_ms)
+
             log_info(
                 "request_end",
-                f"{request.method} {request.url.path} {response.status_code}",
+                f"{request.method} {request.url.path} {response.status_code} {elapsed_ms}ms",
                 **{
                     "method": request.method,
                     "path": request.url.path,
                     "status_code": response.status_code,
                     "stage": "request",
+                    "elapsed_ms": elapsed_ms,
                 },
             )
             return response
         except Exception as e:
+            elapsed_ms = round((_t.perf_counter() - t0) * 1000, 2)
             log_error(
                 "request_error",
-                f"{request.method} {request.url.path} failed: {e}",
+                f"{request.method} {request.url.path} failed after {elapsed_ms}ms: {e}",
                 **{
                     "method": request.method,
                     "path": request.url.path,
                     "error": str(e),
                     "stage": "request",
+                    "elapsed_ms": elapsed_ms,
                 },
             )
             sentry_sdk.capture_exception(e, level="error")

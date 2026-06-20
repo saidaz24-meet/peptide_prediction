@@ -26,6 +26,7 @@ from services.dataframe_utils import (
     fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
 )
 from services.logger import get_trace_id, log_info, log_warning
+from services.perf_logger import timed
 from services.normalize import (
     finalize_ff_fields,
     normalize_rows_for_ui,
@@ -207,10 +208,13 @@ def process_single_sequence(
     # Extract sequence and entry for downstream processing
     seq = df.iloc[0]["Sequence"]
     entry_id = df.iloc[0]["Entry"]
+    seq_len = len(seq) if isinstance(seq, str) else 0
+    _perf_ctx = {"entry": str(entry_id), "seq_len": seq_len}
 
     # --- Cache lookup ---
-    ck = _cache_key(seq, threshold_config_requested)
-    cached = get_cached(ck)
+    with timed("cache_lookup", **_perf_ctx):
+        ck = _cache_key(seq, threshold_config_requested)
+        cached = get_cached(ck)
     if cached is not None:
         log_info("cache_hit", f"Returning cached result for {entry_id}", sequence_len=len(seq))
         # Refresh per-request fields so traceId in meta matches the current request
@@ -221,66 +225,78 @@ def process_single_sequence(
         return cached
 
     # Compute FF-Helix %
-    ensure_ff_cols(df)
-    ensure_computed_cols(df)
+    with timed("ff_cols", **_perf_ctx):
+        ensure_ff_cols(df)
+        ensure_computed_cols(df)
 
     # Run TANGO if enabled
     if settings.USE_TANGO:
-        _run_tango_for_single_sequence(df, entry_id, seq)
+        with timed("tango", **_perf_ctx):
+            _run_tango_for_single_sequence(df, entry_id, seq)
 
     # Secondary structure prediction
-    _run_s4pred_provider(df)
+    with timed("s4pred", **_perf_ctx):
+        _run_s4pred_provider(df)
 
     # Compute biochemical features
-    calc_biochem(df)
+    with timed("biochem", **_perf_ctx):
+        calc_biochem(df)
 
     # Resolve thresholds BEFORE apply_ff_flags so user thresholds are wired in
-    resolved_thresholds = resolve_thresholds(threshold_config_requested, df)
-    threshold_mode = (threshold_config_requested or {}).get("mode", "default")
-    ff_thresholds_used = apply_ff_flags(
-        df, resolved_thresholds=resolved_thresholds, threshold_mode=threshold_mode
-    )
+    with timed("thresholds", **_perf_ctx):
+        resolved_thresholds = resolve_thresholds(threshold_config_requested, df)
+        threshold_mode = (threshold_config_requested or {}).get("mode", "default")
+        ff_thresholds_used = apply_ff_flags(
+            df, resolved_thresholds=resolved_thresholds, threshold_mode=threshold_mode
+        )
 
-    _finalize_ui_aliases(df)
-    finalize_ff_fields(df)
+    with timed("finalize", **_perf_ctx):
+        _finalize_ui_aliases(df)
+        finalize_ff_fields(df)
 
     # Normalize single row for UI
-    row_data = normalize_rows_for_ui(
-        df, is_single_row=True, tango_enabled=settings.USE_TANGO, s4pred_enabled=settings.USE_S4PRED
-    )
+    with timed("normalize", **_perf_ctx):
+        row_data = normalize_rows_for_ui(
+            df,
+            is_single_row=True,
+            tango_enabled=settings.USE_TANGO,
+            s4pred_enabled=settings.USE_S4PRED,
+        )
 
     # Compute provider status
-    tango_ran = settings.USE_TANGO and "SSW prediction" in df.columns
-    ssw_val = df.iloc[0].get("SSW prediction") if tango_ran else None
-    ssw_hits = (
-        1
-        if tango_ran
-        and ssw_val is not None
-        and not (isinstance(ssw_val, float) and pd.isna(ssw_val))
-        else 0
-    )
-    s4pred_ran = settings.USE_S4PRED and "Helix prediction (S4PRED)" in df.columns
+    with timed("provider_status", **_perf_ctx):
+        tango_ran = settings.USE_TANGO and "SSW prediction" in df.columns
+        ssw_val = df.iloc[0].get("SSW prediction") if tango_ran else None
+        ssw_hits = (
+            1
+            if tango_ran
+            and ssw_val is not None
+            and not (isinstance(ssw_val, float) and pd.isna(ssw_val))
+            else 0
+        )
+        s4pred_ran = settings.USE_S4PRED and "Helix prediction (S4PRED)" in df.columns
 
-    provider_status_meta = _build_provider_status_meta(ssw_hits, tango_ran, s4pred_ran)
+        provider_status_meta = _build_provider_status_meta(ssw_hits, tango_ran, s4pred_ran)
 
     # Compute reproducibility primitives
-    repro_run_id, trace_id, inputs_hash, config_hash, provider_status_summary = (
-        _compute_reproducibility_primitives(entry_id, seq, ssw_hits)
-    )
+    with timed("reproducibility", **_perf_ctx):
+        repro_run_id, trace_id, inputs_hash, config_hash, provider_status_summary = (
+            _compute_reproducibility_primitives(entry_id, seq, ssw_hits)
+        )
 
-    # Wave 2 §G / ADR-013 — FAIR provenance stamp. Single-sequence runs have
-    # no batch dataset id, so we omit datasetId entirely (helper drops None).
-    from services.run_metadata import build_run_metadata as _build_run_metadata
+        # Wave 2 §G / ADR-013 — FAIR provenance stamp. Single-sequence runs have
+        # no batch dataset id, so we omit datasetId entirely (helper drops None).
+        from services.run_metadata import build_run_metadata as _build_run_metadata
 
-    _merged_thresholds = {**resolved_thresholds, **ff_thresholds_used}
-    _run_metadata = _build_run_metadata(
-        sequence_source=sequence_source,
-        thresholds=_merged_thresholds,
-        use_tango=settings.USE_TANGO,
-        use_s4pred=settings.USE_S4PRED,
-        dataset_id=None,
-        permalink=permalink,
-    )
+        _merged_thresholds = {**resolved_thresholds, **ff_thresholds_used}
+        _run_metadata = _build_run_metadata(
+            sequence_source=sequence_source,
+            thresholds=_merged_thresholds,
+            use_tango=settings.USE_TANGO,
+            use_s4pred=settings.USE_S4PRED,
+            dataset_id=None,
+            permalink=permalink,
+        )
 
     # Build complete meta structure
     meta_dict = ensure_trace_id_in_meta(
@@ -305,23 +321,25 @@ def process_single_sequence(
 
     # ISSUE-018: Validate response through Pydantic model
     # This ensures the response matches the PredictResponse schema
-    try:
-        validated_meta = Meta.model_validate(meta_dict)
-        validated_row = PeptideRow.model_validate(row_data)
+    with timed("validate_response", **_perf_ctx):
+        try:
+            validated_meta = Meta.model_validate(meta_dict)
+            validated_row = PeptideRow.model_validate(row_data)
 
-        response = PredictResponse(row=validated_row, meta=validated_meta)
-        result = response.model_dump(exclude_none=True)
-    except Exception as e:
-        # Graceful fallback: log warning and return unvalidated dict
-        log_warning("response_validation_failed", f"PredictResponse validation failed: {e}")
-        result = {
-            "row": row_data,
-            "meta": meta_dict,
-        }
+            response = PredictResponse(row=validated_row, meta=validated_meta)
+            result = response.model_dump(exclude_none=True)
+        except Exception as e:
+            # Graceful fallback: log warning and return unvalidated dict
+            log_warning("response_validation_failed", f"PredictResponse validation failed: {e}")
+            result = {
+                "row": row_data,
+                "meta": meta_dict,
+            }
 
     # --- Cache store ---
-    set_cached(ck, seq, result)
-    log_info("cache_store", f"Cached result for {entry_id}", sequence_len=len(seq))
+    with timed("cache_store", **_perf_ctx):
+        set_cached(ck, seq, result)
+        log_info("cache_store", f"Cached result for {entry_id}", sequence_len=len(seq))
 
     # Wave 2 §D: best-effort vector indexing of the analyzed peptide. Failures
     # are swallowed by vector_store so the predict response is never affected.
@@ -333,11 +351,12 @@ def process_single_sequence(
     # batch this dominated the predict latency. The indexing is observability
     # infrastructure (see vector_store module docstring), not part of the API
     # contract, so it belongs off the hot path.
-    try:
-        from services import vector_store
+    with timed("vector_index_submit", **_perf_ctx):
+        try:
+            from services import vector_store
 
-        vector_store.submit_index_background(row_data)
-    except Exception as _exc:  # pragma: no cover — defensive
-        log_warning("vector_index_predict_swallow", f"Indexing swallowed: {_exc}")
+            vector_store.submit_index_background(row_data)
+        except Exception as _exc:  # pragma: no cover — defensive
+            log_warning("vector_index_predict_swallow", f"Indexing swallowed: {_exc}")
 
     return result
