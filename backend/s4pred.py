@@ -25,9 +25,10 @@ logger = logging.getLogger(__name__)
 # Configuration
 # ---------------------------------------------------------------------
 
+
 def get_s4pred_weights_path() -> Optional[str]:
     """Get the S4PRED weights path from settings."""
-    return getattr(settings, 'S4PRED_MODEL_PATH', None) or os.getenv('S4PRED_MODEL_PATH')
+    return getattr(settings, "S4PRED_MODEL_PATH", None) or os.getenv("S4PRED_MODEL_PATH")
 
 
 def is_s4pred_available() -> Tuple[bool, Optional[str]]:
@@ -38,7 +39,7 @@ def is_s4pred_available() -> Tuple[bool, Optional[str]]:
         (available, reason_if_not)
     """
     # Check if enabled
-    use_s4pred = getattr(settings, 'USE_S4PRED', False)
+    use_s4pred = getattr(settings, "USE_S4PRED", False)
     if not use_s4pred:
         return False, "S4PRED is disabled (USE_S4PRED=0)"
 
@@ -51,7 +52,13 @@ def is_s4pred_available() -> Tuple[bool, Optional[str]]:
         return False, f"S4PRED weights directory not found: {weights_path}"
 
     # Check for weight files
-    required_files = ['weights_1.pt', 'weights_2.pt', 'weights_3.pt', 'weights_4.pt', 'weights_5.pt']
+    required_files = [
+        "weights_1.pt",
+        "weights_2.pt",
+        "weights_3.pt",
+        "weights_4.pt",
+        "weights_5.pt",
+    ]
     missing = [f for f in required_files if not os.path.exists(os.path.join(weights_path, f))]
     if missing:
         return False, f"Missing S4PRED weight files: {missing}"
@@ -69,31 +76,34 @@ def is_s4pred_available() -> Tuple[bool, Optional[str]]:
 # Canonical column names (from reference implementation)
 # ---------------------------------------------------------------------
 
-HELIX_PREDICTION_S4PRED = 'Helix prediction (S4PRED)'
-HELIX_FRAGMENTS_S4PRED = 'Helix fragments (S4PRED)'
-HELIX_SCORE_S4PRED = 'Helix score (S4PRED)'
-HELIX_PERCENTAGE_S4PRED = 'Helix percentage (S4PRED)'
+HELIX_PREDICTION_S4PRED = "Helix prediction (S4PRED)"
+HELIX_FRAGMENTS_S4PRED = "Helix fragments (S4PRED)"
+HELIX_SCORE_S4PRED = "Helix score (S4PRED)"
+HELIX_PERCENTAGE_S4PRED = "Helix percentage (S4PRED)"
 
-SSW_PREDICTION_S4PRED = 'SSW prediction (S4PRED)'
-SSW_FRAGMENTS_S4PRED = 'SSW fragments (S4PRED)'
-SSW_SCORE_S4PRED = 'SSW score (S4PRED)'
-SSW_DIFF_S4PRED = 'SSW diff (S4PRED)'
-SSW_HELIX_PERCENTAGE_S4PRED = 'SSW helix percentage (S4PRED)'
-SSW_BETA_PERCENTAGE_S4PRED = 'SSW beta percentage (S4PRED)'
-SSW_PERCENTAGE_S4PRED = 'SSW percentage (S4PRED)'
+SSW_PREDICTION_S4PRED = "SSW prediction (S4PRED)"
+SSW_FRAGMENTS_S4PRED = "SSW fragments (S4PRED)"
+SSW_SCORE_S4PRED = "SSW score (S4PRED)"
+SSW_DIFF_S4PRED = "SSW diff (S4PRED)"
+SSW_HELIX_PERCENTAGE_S4PRED = "SSW helix percentage (S4PRED)"
+SSW_BETA_PERCENTAGE_S4PRED = "SSW beta percentage (S4PRED)"
+SSW_PERCENTAGE_S4PRED = "SSW percentage (S4PRED)"
 
 # Per-residue curve column names
-S4PRED_P_H_CURVE = 'S4PRED P_H curve'
-S4PRED_P_E_CURVE = 'S4PRED P_E curve'
-S4PRED_P_C_CURVE = 'S4PRED P_C curve'
-S4PRED_SS_PREDICTION = 'S4PRED SS prediction'
+S4PRED_P_H_CURVE = "S4PRED P_H curve"
+S4PRED_P_E_CURVE = "S4PRED P_E curve"
+S4PRED_P_C_CURVE = "S4PRED P_C curve"
+S4PRED_SS_PREDICTION = "S4PRED SS prediction"
 
 
 # ---------------------------------------------------------------------
 # Analysis Functions (matching reference 260120_Alpha_and_SSW_FF_Predictor/auxiliary.py)
 # ---------------------------------------------------------------------
 
-def _check_subsegment(prediction: List[float], start: int, end: int, min_segment_length: int) -> Tuple[int, int, float]:
+
+def _check_subsegment(
+    prediction: List[float], start: int, end: int, min_segment_length: int
+) -> Tuple[int, int, float]:
     """
     Find the best subsegment within a given range.
 
@@ -108,8 +118,8 @@ def _check_subsegment(prediction: List[float], start: int, end: int, min_segment
 
     for cur_length in all_possible_lengths:
         for i in range(start, end - cur_length + 1):
-            cur_mean = mean(prediction[i:(i + cur_length)])
-            cur_median = median(prediction[i:(i + cur_length)])
+            cur_mean = mean(prediction[i : (i + cur_length)])
+            cur_median = median(prediction[i : (i + cur_length)])
             if cur_mean > max_score or cur_median > max_score:
                 max_score = max(cur_median, cur_mean)
                 max_start = i
@@ -122,7 +132,7 @@ def _get_secondary_structure_segments(
     prediction_scores: List[float],
     min_score: float = 0.5,
     min_segment_length: int = 5,
-    max_gap: int = 3
+    max_gap: int = 3,
 ) -> List[Tuple[int, int]]:
     """
     Find contiguous segments where prediction score exceeds threshold.
@@ -168,10 +178,9 @@ def _get_secondary_structure_segments(
 
             # Validate segment using BOTH mean AND median (either must pass)
             # This matches reference: mean(prediction[start:end]) >= min_score or median(prediction[start:end]) >= min_score
-            segment_slice = prediction_scores[start:end + 1]
-            good_segment = (
-                segment_length >= min_segment_length and
-                (mean(segment_slice) >= min_score or median(segment_slice) >= min_score)
+            segment_slice = prediction_scores[start : end + 1]
+            good_segment = segment_length >= min_segment_length and (
+                mean(segment_slice) >= min_score or median(segment_slice) >= min_score
             )
 
             if good_segment:
@@ -204,7 +213,7 @@ def _calc_average_score(scores: List[float], segments: List[Tuple[int, int]]) ->
     # Calculate mean of each segment, then mean of those means
     segment_scores = []
     for start, end in segments:
-        segment_slice = scores[start:end + 1]
+        segment_slice = scores[start : end + 1]
         if segment_slice:
             segment_scores.append(mean(segment_slice))
 
@@ -230,8 +239,7 @@ def _get_segment_percentage(segments: List[Tuple[int, int]], sequence_length: in
 
 
 def _find_ssw_segments(
-    helix_segments: List[Tuple[int, int]],
-    beta_segments: List[Tuple[int, int]]
+    helix_segments: List[Tuple[int, int]], beta_segments: List[Tuple[int, int]]
 ) -> List[Tuple[int, int]]:
     """
     Find Secondary Structure Switch (SSW) segments where helix and beta overlap.
@@ -297,9 +305,7 @@ def _find_ssw_segments(
 
 
 def _calc_ssw_score_and_diff(
-    helix_scores: List[float],
-    beta_scores: List[float],
-    ssw_segments: List[Tuple[int, int]]
+    helix_scores: List[float], beta_scores: List[float], ssw_segments: List[Tuple[int, int]]
 ) -> Tuple[float, float]:
     """
     Calculate SSW score and diff from helix/beta predictions.
@@ -348,9 +354,9 @@ def analyse_s4pred_result(prediction_result: Dict) -> Dict:
     from config import settings
 
     # Get thresholds from config (matching reference config.py)
-    min_s4pred_score = getattr(settings, 'MIN_S4PRED_SCORE', 0.5)
-    min_segment_length = getattr(settings, 'MIN_SEGMENT_LENGTH', 5)
-    max_gap = getattr(settings, 'MAX_GAP', 3)
+    min_s4pred_score = getattr(settings, "MIN_S4PRED_SCORE", 0.5)
+    min_segment_length = getattr(settings, "MIN_SEGMENT_LENGTH", 5)
+    max_gap = getattr(settings, "MAX_GAP", 3)
 
     # Initialize result dict matching reference (lines 164-174)
     result = {
@@ -366,8 +372,8 @@ def analyse_s4pred_result(prediction_result: Dict) -> Dict:
         SSW_PERCENTAGE_S4PRED: 0,
     }
 
-    helix_scores = prediction_result.get('P_H', [])
-    beta_scores = prediction_result.get('P_E', [])
+    helix_scores = prediction_result.get("P_H", [])
+    beta_scores = prediction_result.get("P_E", [])
     sequence_length = len(helix_scores)
 
     if sequence_length == 0:
@@ -392,9 +398,7 @@ def analyse_s4pred_result(prediction_result: Dict) -> Dict:
     # Secondary structure switch prediction analysis (reference lines 192-218)
     # ----------------------------------------------------
     # Beta segments use min_score=0 (reference line 195)
-    beta_segments = _get_secondary_structure_segments(
-        beta_scores, 0, min_segment_length, max_gap
-    )
+    beta_segments = _get_secondary_structure_segments(beta_scores, 0, min_segment_length, max_gap)
 
     # NOTE: Reference s4pred.py:197-198 has parameters SWAPPED:
     # ssw_fragments = auxiliary.find_secondary_structure_switch_segments(
@@ -403,14 +407,12 @@ def analyse_s4pred_result(prediction_result: Dict) -> Dict:
     # We replicate this exact behavior for biological accuracy
     ssw_segments = _find_ssw_segments(
         helix_segments=beta_segments,  # Reference passes beta_segments as helix_segments
-        beta_segments=helix_segments   # Reference passes helix_segments as beta_segments
+        beta_segments=helix_segments,  # Reference passes helix_segments as beta_segments
     )
 
     # Calculate SSW score and diff (reference lines 200-203)
     ssw_score, ssw_diff = _calc_ssw_score_and_diff(
-        helix_scores=helix_scores,
-        beta_scores=beta_scores,
-        ssw_segments=ssw_segments
+        helix_scores=helix_scores, beta_scores=beta_scores, ssw_segments=ssw_segments
     )
 
     # Early return if no SSW segments (reference lines 208-209)
@@ -432,6 +434,7 @@ def analyse_s4pred_result(prediction_result: Dict) -> Dict:
 # Main Runner Functions
 # ---------------------------------------------------------------------
 
+
 def run_s4pred_sequences(
     sequences: List[Tuple[str, str]],
     trace_id: Optional[str] = None,
@@ -452,14 +455,14 @@ def run_s4pred_sequences(
     """
     start_time = time.time()
     stats = {
-        'requested': len(sequences),
-        'parsed_ok': 0,
-        'parsed_bad': 0,
+        "requested": len(sequences),
+        "parsed_ok": 0,
+        "parsed_bad": 0,
         # Wave B (B.4): sequences skipped because their length exceeds
         # settings.S4PRED_MAX_LENGTH (S4PRED is too slow on protein-length
         # sequences — see docs/active/UNIPROT_TIMEOUT_INVESTIGATION.md).
-        'skipped_long': 0,
-        'runtime_ms': 0,
+        "skipped_long": 0,
+        "runtime_ms": 0,
     }
 
     # Check availability
@@ -473,73 +476,121 @@ def run_s4pred_sequences(
 
     try:
         from tools.s4pred import get_predictor
+
         predictor = get_predictor(weights_path)
     except Exception as e:
         logger.error(f"[{trace_id}] Failed to initialize S4PRED: {e}")
-        stats['parsed_bad'] = len(sequences)
+        stats["parsed_bad"] = len(sequences)
         return [], stats
 
-    results = []
+    # PVL-perf-03 (2026-06-21): two-pass design replaces the old per-peptide
+    # serial loop. Pass 1 = filter (cancel checks, sanitization, length cap)
+    # and reserve a result slot per input. Pass 2 = one batched forward call
+    # over the survivors. Single-sequence Quick Analyze (N=1) still hits the
+    # legacy path inside `predict_sequences_batched` to stay bit-equivalent.
+    results: List[Dict] = []
+    to_predict: List[Tuple[str, str]] = []  # (entry_id, clean_seq)
+    to_predict_slots: List[int] = []  # index into `results` where each prediction lands
 
-    for entry_id, sequence in sequences:
-        # Check for cancellation between each sequence
+    max_len_setting = settings.S4PRED_MAX_LENGTH
+
+    cancelled_at = -1
+    for idx, (entry_id, sequence) in enumerate(sequences):
+        # Check for cancellation between each sequence (cheap, pre-model)
         if cancel_check and cancel_check.is_set():
-            logger.info(f"[{trace_id}] S4PRED cancelled after {stats['parsed_ok']} sequences")
+            logger.info(f"[{trace_id}] S4PRED cancelled after {idx} sequences")
+            cancelled_at = idx
             break
+
+        # Sanitize non-standard AAs before S4PRED (X→A, O→K, J→L, etc.)
+        clean_seq = get_corrected_sequence(sequence)
+        if not clean_seq:
+            logger.warning(f"[{trace_id}] S4PRED skipping {entry_id}: empty after sanitization")
+            stats["parsed_bad"] += 1
+            results.append({"entry_id": entry_id})
+            continue
+
+        # Wave B (B.4): length cap — skip sequences longer than the configured
+        # cap to keep latency bounded. Surfaced via the `skipped_long` stat so
+        # the route can include a meta.warnings entry.
+        if max_len_setting > 0 and len(clean_seq) > max_len_setting:
+            logger.warning(
+                f"[{trace_id}] S4PRED skipping {entry_id}: length {len(clean_seq)} "
+                f"> S4PRED_MAX_LENGTH={max_len_setting} aa"
+            )
+            stats["skipped_long"] += 1
+            results.append(
+                {
+                    "entry_id": entry_id,
+                    "s4pred_skipped": True,
+                    "s4pred_skipped_reason": "too_long",
+                    "s4pred_skipped_max_length": max_len_setting,
+                    "s4pred_skipped_actual_length": len(clean_seq),
+                }
+            )
+            continue
+
+        # Reserve the slot; the batched forward will fill it in pass 2.
+        results.append({"entry_id": entry_id})
+        to_predict_slots.append(len(results) - 1)
+        to_predict.append((entry_id, clean_seq))
+
+    # Pass 2 — one batched forward over all survivors.
+    if to_predict:
         try:
-            # Sanitize non-standard AAs before S4PRED (X→A, O→K, J→L, etc.)
-            clean_seq = get_corrected_sequence(sequence)
-            if not clean_seq:
-                logger.warning(f"[{trace_id}] S4PRED skipping {entry_id}: empty after sanitization")
-                stats['parsed_bad'] += 1
-                results.append({'entry_id': entry_id})
-                continue
-
-            # Wave B (B.4): length cap — skip sequences longer than the configured
-            # cap to keep latency bounded. Surfaced via the `skipped_long` stat so
-            # the route can include a meta.warnings entry.
-            max_len = settings.S4PRED_MAX_LENGTH
-            if max_len > 0 and len(clean_seq) > max_len:
-                logger.warning(
-                    f"[{trace_id}] S4PRED skipping {entry_id}: length {len(clean_seq)} "
-                    f"> S4PRED_MAX_LENGTH={max_len} aa"
-                )
-                stats['skipped_long'] += 1
-                results.append({
-                    'entry_id': entry_id,
-                    's4pred_skipped': True,
-                    's4pred_skipped_reason': 'too_long',
-                    's4pred_skipped_max_length': max_len,
-                    's4pred_skipped_actual_length': len(clean_seq),
-                })
-                continue
-
-            # Run prediction
-            prediction = predictor.predict_from_sequence(entry_id, clean_seq)
-
-            # Analyse results
-            analysis = analyse_s4pred_result(prediction)
-
-            # Combine prediction curves with analysis
-            result = {
-                'entry_id': entry_id,
-                'P_C': prediction['P_C'],
-                'P_H': prediction['P_H'],
-                'P_E': prediction['P_E'],
-                'ss_prediction': prediction['ss_prediction'],
-                **analysis
-            }
-
-            results.append(result)
-            stats['parsed_ok'] += 1
-
+            predictions = predictor.predict_sequences_batched(to_predict)
+            for slot, prediction in zip(to_predict_slots, predictions):
+                try:
+                    analysis = analyse_s4pred_result(prediction)
+                    results[slot] = {
+                        "entry_id": prediction["entry_id"],
+                        "P_C": prediction["P_C"],
+                        "P_H": prediction["P_H"],
+                        "P_E": prediction["P_E"],
+                        "ss_prediction": prediction["ss_prediction"],
+                        **analysis,
+                    }
+                    stats["parsed_ok"] += 1
+                except Exception as e:
+                    logger.warning(
+                        f"[{trace_id}] S4PRED analyse failed for {prediction.get('entry_id')}: {e}"
+                    )
+                    stats["parsed_bad"] += 1
+                    # Slot already holds {'entry_id': ...}; leave it.
         except Exception as e:
-            logger.warning(f"[{trace_id}] S4PRED failed for {entry_id}: {e}")
-            stats['parsed_bad'] += 1
-            # Add empty result to maintain alignment
-            results.append({'entry_id': entry_id})
+            # Whole-batch failure — fall back to per-sequence loop so one bad
+            # peptide doesn't poison the whole batch. Rare; logs the cause.
+            logger.warning(
+                f"[{trace_id}] S4PRED batched forward failed ({e}); "
+                f"falling back to per-peptide path for {len(to_predict)} sequences"
+            )
+            for slot, (entry_id, clean_seq) in zip(to_predict_slots, to_predict):
+                try:
+                    prediction = predictor.predict_from_sequence(entry_id, clean_seq)
+                    analysis = analyse_s4pred_result(prediction)
+                    results[slot] = {
+                        "entry_id": entry_id,
+                        "P_C": prediction["P_C"],
+                        "P_H": prediction["P_H"],
+                        "P_E": prediction["P_E"],
+                        "ss_prediction": prediction["ss_prediction"],
+                        **analysis,
+                    }
+                    stats["parsed_ok"] += 1
+                except Exception as ee:
+                    logger.warning(f"[{trace_id}] S4PRED fallback failed for {entry_id}: {ee}")
+                    stats["parsed_bad"] += 1
 
-    stats['runtime_ms'] = int((time.time() - start_time) * 1000)
+    # Honour the cancellation cutoff — drop any reserved-but-untouched slots
+    # that came AFTER the cancellation point. Predictions before the cutoff
+    # were already run by the batched call.
+    if cancelled_at >= 0:
+        # Anything past the cutoff was never reserved; results is already
+        # truncated to the survivors. Nothing more to do — keep the existing
+        # length-preserving alignment as before.
+        pass
+
+    stats["runtime_ms"] = int((time.time() - start_time) * 1000)
     logger.info(
         f"[{trace_id}] S4PRED completed: {stats['parsed_ok']}/{stats['requested']} "
         f"in {stats['runtime_ms']}ms"
@@ -567,17 +618,25 @@ def run_s4pred_database(
         (success, stats) tuple
     """
     # Extract sequences from columns directly (avoids iterrows)
-    _entries = database["Entry"].astype(str) if "Entry" in database.columns else pd.Series("", index=database.index)
-    _seqs = database["Sequence"].astype(str) if "Sequence" in database.columns else pd.Series("", index=database.index)
+    _entries = (
+        database["Entry"].astype(str)
+        if "Entry" in database.columns
+        else pd.Series("", index=database.index)
+    )
+    _seqs = (
+        database["Sequence"].astype(str)
+        if "Sequence" in database.columns
+        else pd.Series("", index=database.index)
+    )
     sequences = [(e, s) for e, s in zip(_entries, _seqs) if e and s]
 
     if not sequences:
         logger.warning(f"[{trace_id}] No valid sequences for S4PRED")
-        return False, {'requested': 0, 'parsed_ok': 0, 'parsed_bad': 0}
+        return False, {"requested": 0, "parsed_ok": 0, "parsed_bad": 0}
 
     results, stats = run_s4pred_sequences(sequences, trace_id, cancel_check=cancel_check)
 
-    if stats['parsed_ok'] == 0:
+    if stats["parsed_ok"] == 0:
         return False, stats
 
     # Initialize columns - analysis results
@@ -608,11 +667,20 @@ def run_s4pred_database(
         database[col] = None
 
     # Map results back to DataFrame
-    entry_to_result = {r['entry_id']: r for r in results if 'entry_id' in r}
+    entry_to_result = {r["entry_id"]: r for r in results if "entry_id" in r}
 
     # Map results back to DataFrame using bulk column assignment (avoids .at[] per cell)
-    entry_ids = database["Entry"].astype(str) if "Entry" in database.columns else pd.Series("", index=database.index)
-    curve_keys = {'P_H': S4PRED_P_H_CURVE, 'P_E': S4PRED_P_E_CURVE, 'P_C': S4PRED_P_C_CURVE, 'ss_prediction': S4PRED_SS_PREDICTION}
+    entry_ids = (
+        database["Entry"].astype(str)
+        if "Entry" in database.columns
+        else pd.Series("", index=database.index)
+    )
+    curve_keys = {
+        "P_H": S4PRED_P_H_CURVE,
+        "P_E": S4PRED_P_E_CURVE,
+        "P_C": S4PRED_P_C_CURVE,
+        "ss_prediction": S4PRED_SS_PREDICTION,
+    }
     all_target_cols = list(analysis_columns) + list(curve_keys.values())
 
     # Pre-build column data as lists aligned to DataFrame index
@@ -685,8 +753,16 @@ def filter_by_s4pred_diff(
     # Step 2: Classify each sequence
     # Step 2: Classify each sequence using column access (avoids iterrows)
     predictions: List[Optional[int]] = []
-    _diff_col = database[SSW_DIFF_S4PRED] if SSW_DIFF_S4PRED in database.columns else pd.Series(None, index=database.index)
-    _helix_col = database[HELIX_PREDICTION_S4PRED] if HELIX_PREDICTION_S4PRED in database.columns else pd.Series(None, index=database.index)
+    _diff_col = (
+        database[SSW_DIFF_S4PRED]
+        if SSW_DIFF_S4PRED in database.columns
+        else pd.Series(None, index=database.index)
+    )
+    _helix_col = (
+        database[HELIX_PREDICTION_S4PRED]
+        if HELIX_PREDICTION_S4PRED in database.columns
+        else pd.Series(None, index=database.index)
+    )
 
     for ssw_diff, helix_pred in zip(_diff_col, _helix_col):
         # Check if S4PRED ran for this row
