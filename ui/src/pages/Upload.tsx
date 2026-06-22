@@ -443,11 +443,9 @@ export default function Upload() {
         >
           {/* Header & progress */}
           <div className="mb-6">
-            <h1 className="text-h1 text-foreground mb-1 page-header-title">
-              Upload & Process Dataset
-            </h1>
+            <h1 className="text-h1 text-foreground mb-1 page-header-title">Start Analysis</h1>
             <p className="text-body text-muted-foreground mb-4 hidden md:block">
-              Upload your peptide CSV · TSV · XLSX · FASTA — columns are auto-detected.
+              Batch upload. CSV · TSV · XLSX · FASTA — up to 5,000 peptides per run.
             </p>
 
             {/* Step indicator — clean pill style */}
@@ -753,8 +751,8 @@ export default function Upload() {
                                   {long > 0 && (
                                     <p>
                                       {long}/{total} sequences exceed 80 aa — TANGO accuracy
-                                      degrades and S4PRED was trained for full proteins. Those
-                                      rows will be skipped.
+                                      degrades and S4PRED was trained for full proteins. Those rows
+                                      will be skipped.
                                     </p>
                                   )}
                                 </div>

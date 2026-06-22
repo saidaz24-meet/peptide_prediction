@@ -300,7 +300,7 @@ export default function QuickAnalyze() {
         <div>
           <h1 className="text-h1 text-foreground page-header-title">Quick Analyze</h1>
           <p className="text-body text-muted-foreground mt-1 hidden md:block">
-            Paste a single peptide sequence for instant prediction.
+            Single sequence. Full prediction profile in seconds.
           </p>
         </div>
 

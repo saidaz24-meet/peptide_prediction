@@ -11,15 +11,20 @@ export default function AppFooter() {
           <span className="text-xs font-medium">Peptide Visual Lab</span>
         </div>
 
-        {/* Credits */}
+        {/* Credits — D6 (Peleg 2026-06-18): canonical role phrasing per
+            feedback_credits_roles + feedback_said_credit_phrasing memories.
+            "Lead developer" not "Built by"; Peleg = algorithms & review;
+            Alex = scientific advisor. Affiliations on the same line. */}
         <div className="text-center text-[11px] text-muted-foreground leading-relaxed space-y-0.5">
           <p>
-            Built by <span className="font-medium text-foreground/80">Said Azaizah</span>
-            {" · "}Algorithms by <span className="font-medium text-foreground/80">Dr. Peleg Ragonis-Bachar</span>
+            Lead developer: <span className="font-medium text-foreground/80">Said Azaizah</span>
+            {" · "}Algorithms &amp; review:{" "}
+            <span className="font-medium text-foreground/80">Dr. Peleg Ragonis-Bachar</span>
           </p>
           <p>
-            Scientific advisor: <span className="font-medium text-foreground/80">Dr. Aleksandr Golubev</span>
-            {" · "}Technion & DESY
+            Scientific advisor:{" "}
+            <span className="font-medium text-foreground/80">Dr. Aleksandr Golubev</span>
+            {" · "}Technion · DESY CSSB Hamburg
           </p>
         </div>
 

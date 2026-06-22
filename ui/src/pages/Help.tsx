@@ -454,6 +454,25 @@ export default function Help() {
                 </p>
               </div>
               <Separator />
+              {/* D4 (Peleg 2026-06-18): explain why PVL has no standalone
+                  "aggregation" class. TANGO score is an INPUT to the
+                  Helix / SSW / FF-Helix / FF-SSW classification, not an
+                  endpoint of its own. Surfaces the design decision Peleg
+                  asked for. */}
+              <div className="space-y-2">
+                <h4 className="font-medium">Why no "aggregation" class?</h4>
+                <p className="text-sm text-muted-foreground">
+                  TANGO predicts <strong>aggregation propensity</strong>, not fibril formation.
+                  Aggregation is one input to PVL's classification, alongside S4PRED secondary
+                  structure and biochemical features. PVL exposes four endpoints — Helix,
+                  Fibril-forming helix (FF-Helix), Secondary structure switch (SSW), and
+                  Fibril-forming SSW (FF-SSW) — because these are the categories that have
+                  experimental support in the literature. A peptide with a high TANGO score but no
+                  helix/SSW signal is not, on its own, a fibril candidate. The aggregation curve is
+                  shown on every peptide for context, but it is not a classification output.
+                </p>
+              </div>
+              <Separator />
               {/* E1/E2/E3 (Peleg 2026-06-18): primary scientific references for
                   the metrics PVL surfaces. Bibliographic entries kept short so
                   the Help page stays scannable. */}
