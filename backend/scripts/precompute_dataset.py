@@ -35,14 +35,12 @@ HERE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(HERE))
 
 # Pin numeric thread counts BEFORE torch / numpy import.
-import _perf_init  # noqa: F401
-
 import pandas as pd  # noqa: E402
 
+import _perf_init  # noqa: F401, E402
 from services.dataframe_utils import require_cols  # noqa: E402
 from services.normalize import normalize_cols  # noqa: E402
 from services.upload_service import process_upload_dataframe  # noqa: E402
-
 
 # ── Dataset registry ──────────────────────────────────────────────────────
 

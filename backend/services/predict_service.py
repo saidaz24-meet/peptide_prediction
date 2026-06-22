@@ -26,7 +26,6 @@ from services.dataframe_utils import (
     fill_percent_from_tango_if_missing as _fill_percent_from_tango_if_missing,
 )
 from services.logger import get_trace_id, log_info, log_warning
-from services.perf_logger import timed
 from services.normalize import (
     finalize_ff_fields,
     normalize_rows_for_ui,
@@ -34,6 +33,7 @@ from services.normalize import (
 from services.normalize import (
     finalize_ui_aliases as _finalize_ui_aliases,
 )
+from services.perf_logger import timed
 from services.provider_status_builder import build_provider_meta
 from services.result_cache import cache_key as _cache_key
 from services.result_cache import get_cached, set_cached

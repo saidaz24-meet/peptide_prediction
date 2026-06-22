@@ -27,7 +27,6 @@ from __future__ import annotations
 
 import os
 import time
-from typing import Optional
 
 from config import settings
 from services.logger import log_info, log_warning

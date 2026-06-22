@@ -5,8 +5,6 @@ Main FastAPI application setup and router registration.
 # PERF-2026-06-18: must be the FIRST local import — pins OMP / MKL / OpenBLAS
 # thread counts BEFORE torch / numpy / scipy load via any downstream import.
 # See `backend/_perf_init.py` for the why.
-import _perf_init  # noqa: F401
-
 import asyncio
 import concurrent.futures
 import logging
@@ -22,6 +20,8 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from sentry_sdk.integrations.logging import LoggingIntegration
 from starlette.middleware.base import BaseHTTPMiddleware
 
+import _perf_init  # noqa: F401, E402
+
 # Import routers
 from api.routes import (
     cohorts,
@@ -36,7 +36,7 @@ from api.routes import (
     upload,
 )
 from config import settings
-from services.logger import get_logger, log_error, log_info, log_warning, set_trace_id
+from services.logger import get_logger, log_error, log_info, set_trace_id
 
 # ---------------------------------------------------------------------------
 # Sentry before_send filter (V6-1)
@@ -155,8 +155,8 @@ app = FastAPI(title="Peptide Prediction Service")
 # This REPLACES the old async fire-and-forget _warmup_s4pred startup
 # hook, which raced with first-request handling and didn't help with
 # the per-worker RAM problem.
-from _app_preload import check_tango_binary_at_boot as _check_tango_binary_at_boot
-from _app_preload import preload_models as _preload_models
+from _app_preload import check_tango_binary_at_boot as _check_tango_binary_at_boot  # noqa: E402
+from _app_preload import preload_models as _preload_models  # noqa: E402
 
 _preload_models()
 _check_tango_binary_at_boot()
