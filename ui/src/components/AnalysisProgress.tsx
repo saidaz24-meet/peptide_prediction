@@ -57,13 +57,31 @@ export function AnalysisProgress() {
   // Estimate remaining from percent (avoid division by zero)
   const remaining = percent > 0 ? (elapsed / (percent / 100)) * ((100 - percent) / 100) : 0;
 
+  // B8 (Peleg 2026-06-18 PDF2): show "X of N peptides" so users see
+  // movement at the row level, not just percent. For batches of 5,000
+  // a few-percent gap can look frozen; the counter ticking gives the
+  // psychologically-needed sign of life. Estimate from percent.
+  const processedCount =
+    activeJob.peptideCount > 0
+      ? Math.min(activeJob.peptideCount, Math.floor((percent / 100) * activeJob.peptideCount))
+      : 0;
+
   return (
     <div className="mt-4 space-y-2" data-testid="analysis-progress">
       <div className="flex items-center gap-2">
         <Loader2 className="h-4 w-4 animate-spin text-primary shrink-0" />
         <span className="text-sm text-foreground">
-          Analyzing {activeJob.peptideCount.toLocaleString()} peptide
-          {activeJob.peptideCount !== 1 ? "s" : ""}
+          {activeJob.peptideCount > 1 ? (
+            <>
+              Analyzing{" "}
+              <span className="tabular-nums font-medium">
+                {processedCount.toLocaleString()} / {activeJob.peptideCount.toLocaleString()}
+              </span>{" "}
+              peptides
+            </>
+          ) : (
+            <>Analyzing {activeJob.peptideCount.toLocaleString()} peptide</>
+          )}
         </span>
         <span className="text-xs text-muted-foreground ml-auto tabular-nums">
           {formatTime(elapsed)} elapsed

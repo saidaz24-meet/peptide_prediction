@@ -644,6 +644,10 @@ def _build_response(
             "requested": result["s4pred_stats"].get("requested", 0),
             "parsed_ok": result["s4pred_stats"].get("parsed_ok", 0),
             "parsed_bad": result["s4pred_stats"].get("parsed_bad", 0),
+            # B9 (Peleg 2026-06-18 PDF2): surface skipped-because-too-long
+            # separately so the UI can distinguish a real failure from a
+            # length-filter skip. run_s4pred_sequences already tracks this.
+            "skipped_long": result["s4pred_stats"].get("skipped_long", 0),
         }
         if request.run_s4pred
         else None,

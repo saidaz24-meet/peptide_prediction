@@ -19,18 +19,29 @@ import {
   type ComparisonMetric,
 } from "@/components/charts/ClassificationComparison";
 
+// B9 (Peleg 2026-06-18 PDF2): expand provider stats shape to surface the
+// "skipped because too long" count separately from generic failures.
+// The S4PRED runner already tracks `skipped_long` in its stats dict; we just
+// need to read it on the UI side if the backend passes it through.
+interface ProviderStats {
+  requested: number;
+  parsed_ok: number;
+  parsed_bad: number;
+  skipped_long?: number;
+}
+
 interface ResultsChartsProps {
   peptides: Peptide[];
   providerStatus?: {
     tango?: {
       status: string;
       reason?: string | null;
-      stats?: { requested: number; parsed_ok: number; parsed_bad: number };
+      stats?: ProviderStats;
     };
     s4pred?: {
       status: string;
       reason?: string | null;
-      stats?: { requested: number; parsed_ok: number; parsed_bad: number };
+      stats?: ProviderStats;
     };
   };
   thresholds?: ResolvedThresholds;
@@ -345,11 +356,36 @@ export function ResultsCharts({ peptides, providerStatus }: ResultsChartsProps) 
                   <p className="text-xs text-muted-foreground">{provider.reason}</p>
                 )}
                 {provider.stats && (
-                  <div className="text-xs text-muted-foreground flex gap-3">
-                    <span>Req: {provider.stats.requested}</span>
-                    <span className="text-green-600">OK: {provider.stats.parsed_ok}</span>
+                  // B9 (Peleg 2026-06-18 PDF2): distinguish FAILED (provider
+                  // errored on this peptide) from SKIPPED (length filter — the
+                  // peptide was longer than S4PRED_MAX_LENGTH and never
+                  // attempted). Different icon, different color, different
+                  // tooltip so the user knows whether to retry vs trim.
+                  <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                    <span title="Number of peptides submitted to this provider">
+                      Req: {provider.stats.requested}
+                    </span>
+                    <span
+                      className="text-green-600"
+                      title="Provider ran successfully and produced output"
+                    >
+                      ✓ OK: {provider.stats.parsed_ok}
+                    </span>
                     {provider.stats.parsed_bad > 0 && (
-                      <span className="text-red-600">Fail: {provider.stats.parsed_bad}</span>
+                      <span
+                        className="text-red-600"
+                        title="Provider was invoked but produced no usable output (TANGO Fortran error, S4PRED inference exception, etc.)"
+                      >
+                        ✗ Failed: {provider.stats.parsed_bad}
+                      </span>
+                    )}
+                    {(provider.stats.skipped_long ?? 0) > 0 && (
+                      <span
+                        className="text-amber-600"
+                        title="Peptide length exceeded the provider's configured maximum (S4PRED_MAX_LENGTH, default 40 aa). The provider was never called — trim or split the sequence to retry."
+                      >
+                        ⏭ Skipped (too long): {provider.stats.skipped_long}
+                      </span>
                     )}
                   </div>
                 )}
