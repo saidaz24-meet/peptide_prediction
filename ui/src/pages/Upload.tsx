@@ -735,27 +735,36 @@ export default function Upload() {
                             <Alert>
                               <AlertTriangle className="h-4 w-4" />
                               <AlertDescription>
-                                <div className="text-sm space-y-1">
+                                {/* F9 (Peleg Wave 2.5): scannable warning lines.
+                                    Bold the count + range so the eye picks them
+                                    up first; one short reason after the dash. */}
+                                <ul className="text-sm space-y-1 list-disc list-outside ml-5">
                                   {short > 0 && (
-                                    <p>
-                                      {short}/{total} sequences too short (&lt;4 aa) — outside the
-                                      pipeline's default range of 4-40 aa.
-                                    </p>
+                                    <li>
+                                      <strong>
+                                        {short}/{total}
+                                      </strong>{" "}
+                                      shorter than 4 aa — too short for the pipeline.
+                                    </li>
                                   )}
                                   {medium > 0 && (
-                                    <p>
-                                      {medium}/{total} sequences exceed the 40-aa default range —
-                                      results may be less reliable but the pipeline will still run.
-                                    </p>
+                                    <li>
+                                      <strong>
+                                        {medium}/{total}
+                                      </strong>{" "}
+                                      longer than 40 aa — will run, but results less reliable.
+                                    </li>
                                   )}
                                   {long > 0 && (
-                                    <p>
-                                      {long}/{total} sequences exceed 80 aa — TANGO accuracy
-                                      degrades and S4PRED was trained for full proteins. Those rows
-                                      will be skipped.
-                                    </p>
+                                    <li>
+                                      <strong>
+                                        {long}/{total}
+                                      </strong>{" "}
+                                      longer than 80 aa — <strong>will be skipped</strong> (outside
+                                      TANGO + S4PRED design range).
+                                    </li>
                                   )}
-                                </div>
+                                </ul>
                               </AlertDescription>
                             </Alert>
                           );

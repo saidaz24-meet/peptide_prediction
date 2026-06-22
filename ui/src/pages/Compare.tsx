@@ -553,8 +553,29 @@ export default function Compare() {
                         angle={-45}
                         textAnchor="end"
                         height={60}
+                        label={{
+                          value: "Hydrophobicity bin",
+                          position: "insideBottom",
+                          offset: -8,
+                          style: { fontSize: 11, fill: "hsl(var(--muted-foreground))" },
+                        }}
                       />
-                      <YAxis allowDecimals={false} />
+                      {/* F4 (Peleg Wave 2.5): every distribution chart gets
+                          a Y-axis title. Was bare. */}
+                      <YAxis
+                        allowDecimals={false}
+                        label={{
+                          value: "Number of peptides",
+                          angle: -90,
+                          position: "insideLeft",
+                          offset: 10,
+                          style: {
+                            textAnchor: "middle",
+                            fontSize: 11,
+                            fill: "hsl(var(--muted-foreground))",
+                          },
+                        }}
+                      />
                       <Tooltip />
                       <Legend />
                       <Bar dataKey="A" name="Database A" fill={COHORT_A_COLOR} opacity={0.7} />
@@ -586,8 +607,27 @@ export default function Compare() {
                         angle={-45}
                         textAnchor="end"
                         height={60}
+                        label={{
+                          value: "Length (amino acids)",
+                          position: "insideBottom",
+                          offset: -8,
+                          style: { fontSize: 11, fill: "hsl(var(--muted-foreground))" },
+                        }}
                       />
-                      <YAxis allowDecimals={false} />
+                      <YAxis
+                        allowDecimals={false}
+                        label={{
+                          value: "Number of peptides",
+                          angle: -90,
+                          position: "insideLeft",
+                          offset: 10,
+                          style: {
+                            textAnchor: "middle",
+                            fontSize: 11,
+                            fill: "hsl(var(--muted-foreground))",
+                          },
+                        }}
+                      />
                       <Tooltip />
                       <Legend />
                       <Bar dataKey="A" name="Database A" fill={COHORT_A_COLOR} opacity={0.7} />
