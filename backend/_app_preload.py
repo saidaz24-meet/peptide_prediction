@@ -107,3 +107,106 @@ def _running_under_pytest() -> bool:
     Belt-and-braces against tests that forget to set ``USE_S4PRED=0``.
     """
     return "PYTEST_CURRENT_TEST" in os.environ or "pytest" in os.environ.get("_", "")
+
+
+def check_tango_binary_at_boot() -> None:
+    """PVL-perf-05: boot-time sanity check for the TANGO binary.
+
+    T4's 2026-06-18 perf report found ``tangoHasData: false`` on Hetzner
+    prod despite ``USE_TANGO=1``. Root cause: the TANGO binary checked
+    into the repo at ``backend/Tango/bin/tango`` is a macOS Mach-O
+    executable. Linux containers can't run Mach-O — exec returns
+    ENOEXEC, which the route handler swallows (because TANGO failures
+    are tolerated; we don't want one bad peptide to kill the whole
+    batch). Result: the whole SSW / FF-SSW classification silently
+    degrades to FF-Helix-only.
+
+    Make this LOUD at boot. Log an error every time a Linux container
+    starts with a Mach-O TANGO binary, so it shows up in Sentry and in
+    container start-up logs. A real fix needs a Linux x86_64 binary
+    placed at ``backend/Tango/bin/tango_linux_x86_64`` (or wherever
+    TANGO_BINARY_PATH points). The TANGO source isn't in this repo
+    for licensing reasons — Said has the binary in his TANGO 2.0
+    download from http://tango.crg.es/.
+    """
+    if not settings.USE_TANGO:
+        return
+
+    bin_path = os.environ.get("TANGO_BINARY_PATH")
+    if not bin_path:
+        log_warning(
+            "tango_binary_check",
+            "USE_TANGO=1 but TANGO_BINARY_PATH is unset — TANGO will not run.",
+        )
+        return
+
+    if not os.path.isfile(bin_path):
+        log_warning(
+            "tango_binary_check",
+            f"USE_TANGO=1 but TANGO binary not found at {bin_path}. "
+            "TANGO will be skipped; SSW classification degraded.",
+            bin_path=bin_path,
+        )
+        return
+
+    if not os.access(bin_path, os.X_OK):
+        log_warning(
+            "tango_binary_check",
+            f"TANGO binary not executable: {bin_path}. Run "
+            f"`chmod +x {bin_path}` inside the container.",
+            bin_path=bin_path,
+        )
+        return
+
+    # Read the first few bytes to detect the architecture. Mach-O magic
+    # bytes are 0xCFFAEDFE (64-bit LE) or 0xFEEDFACF (64-bit BE); Linux
+    # ELF magic is 0x7F 'E' 'L' 'F'.
+    try:
+        with open(bin_path, "rb") as f:
+            head = f.read(4)
+    except OSError as e:
+        log_warning(
+            "tango_binary_check",
+            f"Cannot read TANGO binary header: {e}",
+            bin_path=bin_path,
+        )
+        return
+
+    import platform
+
+    system = platform.system()  # 'Linux' / 'Darwin' / 'Windows'
+    is_macho = head[:4] in (b"\xcf\xfa\xed\xfe", b"\xfe\xed\xfa\xcf", b"\xca\xfe\xba\xbe")
+    is_elf = head[:4] == b"\x7fELF"
+
+    if system == "Linux" and is_macho:
+        log_warning(
+            "tango_binary_check",
+            "CRITICAL: TANGO binary at "
+            f"{bin_path} is a Mach-O (macOS) executable but the host is "
+            "Linux. exec() will return ENOEXEC and TANGO predictions will "
+            "silently fail. Drop a Linux x86_64 binary at "
+            "backend/Tango/bin/tango_linux_x86_64 (or wherever "
+            "TANGO_BINARY_PATH points) and rebuild the image.",
+            bin_path=bin_path,
+            host_system=system,
+        )
+        return
+
+    if system == "Darwin" and is_elf:
+        log_warning(
+            "tango_binary_check",
+            f"TANGO binary at {bin_path} is ELF (Linux) but the host is macOS. TANGO will fail.",
+            bin_path=bin_path,
+            host_system=system,
+        )
+        return
+
+    log_info(
+        "tango_binary_ok",
+        f"TANGO binary at {bin_path} is a {'Mach-O' if is_macho else ('ELF' if is_elf else 'unknown')} "
+        f"executable; host is {system}.",
+        bin_path=bin_path,
+        host_system=system,
+        is_elf=is_elf,
+        is_macho=is_macho,
+    )

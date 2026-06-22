@@ -155,9 +155,11 @@ app = FastAPI(title="Peptide Prediction Service")
 # This REPLACES the old async fire-and-forget _warmup_s4pred startup
 # hook, which raced with first-request handling and didn't help with
 # the per-worker RAM problem.
+from _app_preload import check_tango_binary_at_boot as _check_tango_binary_at_boot
 from _app_preload import preload_models as _preload_models
 
 _preload_models()
+_check_tango_binary_at_boot()
 
 
 # Add exception handler to capture HTTPExceptions to Sentry
