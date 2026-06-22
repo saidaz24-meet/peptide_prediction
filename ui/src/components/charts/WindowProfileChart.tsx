@@ -141,6 +141,18 @@ export const DEFAULT_PVL_CHANNELS: WindowChannel[] = [
     color: "hsl(var(--ff-helix, 142 71% 45%))",
     opacity: 0.2,
   },
+  // B17 (Peleg 2026-06-18 PDF2): SSW residue zone band so the
+  // "switching positions" are visible in the sliding-window profile
+  // alongside Helix / FF-Helix bands. Color matches the Mol* SSW
+  // overlay (#E040FB magenta — ChSeq chameleon-sequence convention).
+  {
+    type: "segment-band",
+    id: "sswZone",
+    label: "SSW zone",
+    source: "sswZone",
+    color: "#E040FB",
+    opacity: 0.22,
+  },
   {
     type: "point-markers",
     id: "aggPeaks",
