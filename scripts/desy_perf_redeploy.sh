@@ -18,10 +18,17 @@ set -euo pipefail
 PVL_DIR=${PVL_DIR:-/opt/pvl}
 cd "$PVL_DIR"
 
-echo "=== 1. Ensure PVL_PERF_LOGS=1 in .env.deploy ==="
+echo "=== 1. Ensure PVL_PERF_LOGS=1 + correct TANGO_BINARY_PATH in .env.deploy ==="
 grep -q '^PVL_PERF_LOGS=' .env.deploy 2>/dev/null \
   || echo "PVL_PERF_LOGS=1" >> .env.deploy
-grep PVL_PERF_LOGS .env.deploy
+
+# PVL-perf-05: point TANGO at the volume-mounted Linux ELF binary, NOT the
+# Mach-O macOS binary baked into the image at /app/Tango/bin/tango.
+# Re-writing in place to be idempotent.
+sed -i '/^TANGO_BINARY_PATH=/d' .env.deploy 2>/dev/null || true
+echo "TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64" >> .env.deploy
+
+grep -E 'PVL_PERF_LOGS|TANGO_BINARY_PATH' .env.deploy
 
 echo
 echo "=== 2. Remove old pvl-backend-test container (if any) ==="

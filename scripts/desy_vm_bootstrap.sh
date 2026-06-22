@@ -97,7 +97,9 @@ log "5/8 .env.deploy"
 cat > "$PVL_DIR/.env.deploy" <<'ENV'
 USE_TANGO=1
 USE_S4PRED=1
-TANGO_BINARY_PATH=/app/Tango/bin/tango
+# /opt/tools is volume-mounted from $PVL_DIR/tools (see docker-compose.base.yml).
+# tools/tango/bin/tango_linux_x86_64 is the Linux ELF binary force-added to git.
+TANGO_BINARY_PATH=/opt/tools/tango/bin/tango_linux_x86_64
 S4PRED_MODEL_PATH=/opt/tools/s4pred/models
 ENVIRONMENT=production
 CELERY_ENABLED=0
