@@ -373,11 +373,15 @@ function ThresholdFields({
         />
       </ThresholdSection>
 
-      {/* ── Group 4: Fibril-formation thresholds ── */}
+      {/* ── Group 4: Fibril-formation thresholds ──
+          F2 (Peleg Wave 2.5 2026-06-22): every threshold in this group is a
+          CUTOFF — the value the metric must clear for a peptide to qualify.
+          Label them as such so users don't confuse them with measured values
+          or display thresholds. */}
       <ThresholdSection title="Fibril-formation thresholds">
         <ThresholdInput
           id="muH"
-          label="Hydrophobic moment (µH)"
+          label="Hydrophobic moment (µH) — Cutoff"
           value={t.muHCutoff}
           defaultValue={d.muHCutoff}
           step="0.01"
@@ -389,7 +393,7 @@ function ThresholdFields({
         />
         <ThresholdInput
           id="hydrophobicity"
-          label="Hydrophobicity"
+          label="Hydrophobicity — Cutoff"
           value={t.hydroCutoff}
           defaultValue={d.hydroCutoff}
           step="0.01"

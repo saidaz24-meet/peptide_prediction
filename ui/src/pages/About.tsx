@@ -156,7 +156,7 @@ export default function About() {
                   </p>
                   <p className="text-muted-foreground">
                     Scientific lead — four-category classification algorithm, threshold definitions,
-                    validation cohort, scientific review across every release.
+                    validation database, scientific review across every release.
                   </p>
                   <p className="mt-1">
                     <a

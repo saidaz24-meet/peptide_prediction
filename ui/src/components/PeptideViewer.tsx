@@ -104,7 +104,7 @@ export function PeptideViewer({ peptide: p }: PeptideViewerProps) {
                     <TooltipContent side="bottom" className="max-w-[260px]">
                       <p className="text-xs leading-relaxed">
                         Computed using literature-default thresholds (μH &gt; 0.5, hydrophobicity
-                        &gt; 0.5). Upload a cohort dataset for data-derived thresholds.
+                        &gt; 0.5). Upload a database for data-derived thresholds.
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -122,7 +122,7 @@ export function PeptideViewer({ peptide: p }: PeptideViewerProps) {
                     <TooltipContent side="bottom" className="max-w-[260px]">
                       <p className="text-xs leading-relaxed">
                         Computed using literature-default thresholds (μH &gt; 0.5, hydrophobicity
-                        &gt; 0.5). Upload a cohort dataset for data-derived thresholds.
+                        &gt; 0.5). Upload a database for data-derived thresholds.
                       </p>
                     </TooltipContent>
                   </Tooltip>

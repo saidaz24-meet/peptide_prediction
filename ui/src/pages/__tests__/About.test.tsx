@@ -16,9 +16,7 @@ vi.mock("framer-motion", () => ({
 
 // V10-1: About now uses WaveBackground instead of BgDotGrid
 vi.mock("@/components/WaveBackground", () => ({
-  WaveBackground: (props: any) => (
-    <div data-testid="wave-background" {...props} />
-  ),
+  WaveBackground: (props: any) => <div data-testid="wave-background" {...props} />,
 }));
 
 vi.mock("@/components/AppFooter", () => ({
@@ -27,9 +25,7 @@ vi.mock("@/components/AppFooter", () => ({
 }));
 
 vi.mock("@sentry/react", async () => {
-  const actual = await vi.importActual<typeof import("@sentry/react")>(
-    "@sentry/react",
-  );
+  const actual = await vi.importActual<typeof import("@sentry/react")>("@sentry/react");
   return {
     ...actual,
     captureException: vi.fn(),
@@ -41,7 +37,7 @@ function renderAbout() {
   return render(
     <MemoryRouter>
       <About />
-    </MemoryRouter>,
+    </MemoryRouter>
   );
 }
 
@@ -71,10 +67,11 @@ describe("About page — credits & dataset card", () => {
     expect(block).toHaveTextContent("Technion");
     // 2026-06-08: Peleg's credit broadened to her actual contribution scope —
     // the four-category classification algorithm + threshold definitions +
-    // validation cohort + scientific review across every release. Was
+    // validation database + scientific review across every release. Was
     // narrowly "FF-Helix, FF-SSW, Staphylococcus 2023".
+    // F1 (Peleg Wave 2.5 2026-06-22): "cohort" → "database" terminology shift.
     expect(block).toHaveTextContent(/four-category classification/);
-    expect(block).toHaveTextContent(/validation cohort/);
+    expect(block).toHaveTextContent(/validation database/);
   });
 
   it("credits Prof. Meytal Landau as corresponding author (added 2026-06-08)", () => {
@@ -102,10 +99,7 @@ describe("About page — credits & dataset card", () => {
   it("links Said's ORCID to orcid.org/0009-0002-3596-5358", () => {
     renderAbout();
     const link = screen.getByTestId("said-orcid");
-    expect(link).toHaveAttribute(
-      "href",
-      "https://orcid.org/0009-0002-3596-5358",
-    );
+    expect(link).toHaveAttribute("href", "https://orcid.org/0009-0002-3596-5358");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noreferrer noopener");
   });

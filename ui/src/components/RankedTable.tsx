@@ -102,7 +102,20 @@ export function RankedTable({ peptides, rankings, topN, activeMetrics }: RankedT
       ...activeMetrics.map((metric) =>
         columnHelper.accessor((r) => r.ranking.metricPercentiles[metric], {
           id: metric,
-          header: METRIC_LABELS[metric],
+          // F11 (Peleg Wave 2.5): per-metric cells show PERCENTILE RANK
+          // (0-100 within this database), not the raw metric value. The
+          // composite column header already says "Score (0-100)"; do the
+          // same for each metric column so users don't mistake the cells
+          // for raw S4PRED helix percent / TANGO peak / etc.
+          header: () => (
+            <span
+              className="cursor-help underline decoration-dotted underline-offset-2"
+              title={`Percentile rank for ${METRIC_LABELS[metric]} within this database (0-100). Higher = the peptide is more extreme on this metric relative to the others. Click the column to sort.`}
+            >
+              {METRIC_LABELS[metric]}{" "}
+              <span className="text-muted-foreground/70 font-normal">(pctile)</span>
+            </span>
+          ),
           cell: (info) => {
             const score = info.getValue();
             if (score == null) {

@@ -222,14 +222,16 @@ export function ActiveThresholdsPanel() {
         rows: [
           {
             key: "muHCutoff" as ThresholdKey,
-            label: "Hydrophobic moment (µH)",
+            // F2 (Peleg Wave 2.5): "Cutoff" suffix to disambiguate from
+            // the measured µH value shown elsewhere in the dashboard.
+            label: "Hydrophobic moment (µH) — Cutoff",
             value: formatNumber(active.muHCutoff, 2),
             hint: "Minimum µH for FF-Helix classification (range 0-3.26). Hydrophobic parameters by Fauchère & Pliska 1983.",
             isModified: isThresholdModified("muHCutoff", active, original),
           },
           {
             key: "hydroCutoff" as ThresholdKey,
-            label: "Hydrophobicity",
+            label: "Hydrophobicity — Cutoff",
             value: formatNumber(active.hydroCutoff, 2),
             hint: "Minimum hydrophobicity for FF-SSW classification (range -1.01-2.25).",
             isModified: isThresholdModified("hydroCutoff", active, original),
