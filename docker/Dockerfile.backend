@@ -120,17 +120,25 @@ EXPOSE ${PORT}
 ENTRYPOINT ["/usr/bin/tini", "--"]
 
 # Run with Gunicorn + Uvicorn workers (production)
-# Gunicorn manages process lifecycle (fork, restart, signals)
-# Uvicorn workers handle async I/O within each process
-# --max-requests prevents slow memory leaks in long-running workers
+# Gunicorn manages process lifecycle (fork, restart, signals).
+# Uvicorn workers handle async I/O within each process.
+# --preload (PERF-2026-06-22): load the app + S4PRED ensemble ONCE in
+#   the master process before forking workers. Workers inherit the
+#   ~500 MB of model weights via Linux copy-on-write — zero per-worker
+#   cold-start latency AND zero duplicated RAM. Trade-off: code changes
+#   require a full container restart, not just a SIGHUP. Acceptable for
+#   our deploy cadence.
+# --max-requests disabled (was 1000): worker recycling forced a cold
+#   model reload every 1000 requests on each worker; with --preload the
+#   model is shared and recycling provides no memory-leak benefit
+#   that would offset that.
 CMD ["gunicorn", "api.main:app", \
+     "--preload", \
      "--bind", "0.0.0.0:8000", \
      "--workers", "2", \
      "--worker-class", "uvicorn.workers.UvicornWorker", \
      "--timeout", "120", \
      "--graceful-timeout", "60", \
-     "--max-requests", "1000", \
-     "--max-requests-jitter", "50", \
      "--access-logfile", "-", \
      "--error-logfile", "-"]
 

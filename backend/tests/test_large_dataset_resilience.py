@@ -207,17 +207,37 @@ def test_meta_accepts_warnings_list_and_none():
 # ---------------------------------------------------------------------------
 
 
-def test_s4pred_warmup_hook_registered():
-    """The startup hook must be registered on the FastAPI app. We can't
-    easily assert that the warm-up RUNS in a unit test (pytest detection
-    skips it on purpose), but we can pin that the hook exists so a stray
-    refactor doesn't silently drop it.
+def test_s4pred_preload_path_exists():
+    """The S4PRED ensemble must be pre-loadable at import time so the
+    first user request doesn't pay the cold-load cost.
+
+    PERF-2026-06-22 replaced the old async fire-and-forget ``_warmup_s4pred``
+    startup hook (which raced with the first request and duplicated RAM
+    per gunicorn worker) with module-level ``_preload_models()`` invoked at
+    ``api.main`` import. Combined with gunicorn ``--preload``, this loads
+    once in the master process and workers inherit the weights via
+    copy-on-write.
+
+    This test pins the preload path so a stray refactor doesn't silently
+    re-introduce the cold-load + per-worker duplication problem.
     """
-    handlers = []
-    if hasattr(app, "router") and hasattr(app.router, "on_startup"):
-        handlers = list(app.router.on_startup)
-    handler_names = {getattr(h, "__name__", "") for h in handlers}
-    # The hook is named ``_warmup_s4pred`` in api/main.py.
-    assert "_warmup_s4pred" in handler_names, (
-        f"S4PRED warm-up hook not registered; found handlers: {sorted(handler_names)}"
+    # The preload module must exist and expose a callable preload_models().
+    import _app_preload  # noqa: F401
+
+    assert callable(getattr(_app_preload, "preload_models", None)), (
+        "_app_preload.preload_models() must exist — this is the eager-load "
+        "entry point invoked at api.main import time."
+    )
+
+    # The api.main module must call preload_models() at module top, not
+    # via on_event("startup"). Grep the source to enforce this — startup
+    # hooks run AFTER fork in each gunicorn worker, defeating --preload.
+    import inspect
+
+    import api.main as _main
+
+    src = inspect.getsource(_main)
+    assert "_preload_models()" in src, (
+        "api/main.py must invoke _preload_models() at module level so "
+        "gunicorn --preload runs it in the master process before forking."
     )
