@@ -35,6 +35,17 @@ echo "=== 2. Remove old pvl-backend-test container (if any) ==="
 docker rm -f pvl-backend-test 2>/dev/null || true
 
 echo
+echo "=== 2.5. Rebuild pvl-backend:latest image from current source ==="
+# Without this step, `docker run pvl-backend:latest` below uses whatever stale
+# image existed before — meaning `git pull` brings new code to /opt/pvl but
+# none of it ever runs. Bake the new code in. ~30 s on a warm builder cache,
+# ~3 min from scratch.
+docker build \
+  --tag pvl-backend:latest \
+  --file "$PVL_DIR/docker/Dockerfile.backend" \
+  "$PVL_DIR"
+
+echo
 echo "=== 3. Start backend container ==="
 docker run -d \
   --name pvl-backend-test \
