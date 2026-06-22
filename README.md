@@ -33,6 +33,18 @@ PVL is the only peptide-prediction tool that puts every analysis in one dashboar
 | 🤖 **AI-platform-ready** — designed for MCP, Python package, CLI, and embeddable widget | Web-only, no API, no integration story |
 | 🆓 **Open source · MIT · runs on your laptop** — `docker compose up` and your data never leaves your machine | Closed-source, paid, or hosted-only |
 
+### Performance
+
+PVL is built for interactivity — every part of the pipeline is measured and tuned to disappear behind the result.
+
+| Operation | Cold | Warm | Notes |
+|---|---|---|---|
+| **Quick Analyze** (single 17-aa peptide) | ~420 ms | ~6 ms | Cache hit on identical sequence + thresholds |
+| **Batch** (118 peptides, Peleg-validated set, ≤40 aa) | ~9 s | — | Includes batched-forward S4PRED ensemble |
+| Single S4PRED forward (5-BiLSTM ensemble) | ~334 ms | — | Padded-batch path for N≥2; ~4× faster than per-peptide |
+
+Measured 2026-06-22 on a fresh DESY VM (Hetzner CX33-class, 4 vCPU, container-bound). Per-stage timings are available via `PVL_PERF_LOGS=1`; see [`docs/internal/PERF_TRACE_RECIPE_2026_06_21.md`](docs/internal/PERF_TRACE_RECIPE_2026_06_21.md).
+
 ---
 
 ## Screenshots
