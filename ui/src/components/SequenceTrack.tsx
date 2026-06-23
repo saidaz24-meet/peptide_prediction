@@ -84,17 +84,21 @@ export function SequenceTrack({ peptide, hideTitle = false }: SequenceTrackProps
   const pipelineClasses = useMemo((): PipelineClass[] | null => {
     if (!hasS4pred) return null;
 
+    // 2026-06-23 regression fix: SSW MUST come from peptide.s4predSswFragments
+    // only. A prior version fell back to s4pred.betaSegments when sswFragments
+    // was empty — but raw S4PRED β predictions are not SSW positions. The
+    // fallback mis-classified 100%-helix peptides as 93% SSW (LKLLKLLLKLLLKLL:
+    // KPI said helix coverage 100% + SSW ✗, but legend showed SSW 93%).
+    // Without sswFragments, no residue may be SSW.
     const helixSegs = (s4pred?.helixSegments ?? null) as Array<[number, number]> | null;
-    const sswPrimary = (peptide.s4predSswFragments ?? null) as Array<[number, number]> | null;
-    const betaSegs = (s4pred?.betaSegments ?? null) as Array<[number, number]> | null;
-    const sswSource = sswPrimary && sswPrimary.length > 0 ? sswPrimary : betaSegs;
+    const sswFrags = (peptide.s4predSswFragments ?? null) as Array<[number, number]> | null;
 
     return Array.from({ length: len }, (_, i): PipelineClass => {
-      if (isPositionInFragments(i, sswSource)) return "ssw";
+      if (isPositionInFragments(i, sswFrags)) return "ssw";
       if (isPositionInFragments(i, helixSegs)) return "helix";
       return "coiled-coil";
     });
-  }, [hasS4pred, len, s4pred?.helixSegments, s4pred?.betaSegments, peptide.s4predSswFragments]);
+  }, [hasS4pred, len, s4pred?.helixSegments, peptide.s4predSswFragments]);
 
   // Legend % computed from pipeline classification (not canonical s4predHelixPercent,
   // which is raw S4PRED — the legend must match what the colors actually show).

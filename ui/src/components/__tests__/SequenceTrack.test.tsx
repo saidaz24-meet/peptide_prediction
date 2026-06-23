@@ -106,7 +106,10 @@ describe("SequenceTrack — Q7 pipeline 3-class coloring", () => {
     });
   });
 
-  it("falls back to s4pred.betaSegments when s4predSswFragments is absent", () => {
+  it("does NOT fall back to betaSegments for SSW — only s4predSswFragments counts", () => {
+    // 2026-06-23 regression test: raw S4PRED beta predictions are NOT SSW.
+    // A peptide where S4PRED says "all beta" but the pipeline did not flag
+    // any SSW fragment must show 0% SSW in the legend.
     const p = makePeptide({
       sequence: "AAAAAAAAAA",
       length: 10,
@@ -114,14 +117,13 @@ describe("SequenceTrack — Q7 pipeline 3-class coloring", () => {
         ssPrediction: ["E", "E", "E", "E", "E", "E", "E", "E", "E", "E"],
         betaSegments: [[1, 10]],
       },
-      // s4predSswFragments intentionally not set
+      s4predSswFragments: null,
     });
     const { container } = render(<SequenceTrack peptide={p} />);
 
-    const residueSpans = container.querySelectorAll<HTMLSpanElement>("span.cursor-default");
-    residueSpans.forEach((span) => {
-      expect(span.style.color).toBe("rgb(224, 64, 251)");
-    });
+    const text = container.textContent ?? "";
+    expect(text).toMatch(/SSW\s*\(0%\)/);
+    expect(text).toMatch(/Coiled-coil\s*\(100%\)/);
   });
 
   it("legend % matches pipeline classification (not canonical s4predHelixPercent)", () => {
