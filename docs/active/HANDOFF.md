@@ -202,6 +202,9 @@ When in doubt about a scientific decision: ask Peleg. When in doubt about infras
 
 Order is rough priority. None of these is blocking publication; all are real upgrades.
 
+### Tier 1 — export surfaces (highest user-facing visibility)
+- **Shortlist PDF + per-peptide reports + figure pack redesign.** Said flagged 2026-06-29 that the current shortlist PDF is "basic" and only emits 10 rows (the rank slider's default). Full brief at `docs/active/EXPORT_REDESIGN_BRIEF.md` — 4 tiers in priority order. Start with §3 Tier 1 (Shortlist PDF) — single-file edit at `ui/src/lib/report.ts`, row-count dropdown + provenance footer + legend appendix. ~1 day of work for the highest-visibility user win.
+
 ### Tier 1 — close the science loop
 - **Mol* Phase 2.** The B16 SSW residue overpaint is wired as a Phase-1 stub that dispatches a `pvl:ssw-overpaint` CustomEvent. Install molstar npm, uncomment the Phase-2 block in `ui/src/lib/molstarSswOverpaint.ts`, replace the iframe in `Mol3DViewer.tsx` with a programmatic `PluginContext`. Spec: `docs/active/MOL3D_OVERLAY_SPEC.md`. Unblocks per-residue overlay for all four predictors, not just SSW.
 - **B19 cohort statistics.** Backend Welch's t-test endpoint is built but requires precomputed cohort JSON under `backend/data/precomputed/`. Run `make precompute-datasets` on the VM (Task #123), then wire the "Compare current dataset vs Peleg-118" chip on `/compare` to surface p-values + Cliff's δ next to the existing percentile bars. Spec: `docs/active/CONTRACTS.md` §"Cohort statistics".
