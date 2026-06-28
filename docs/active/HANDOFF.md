@@ -154,22 +154,28 @@ When in doubt about a scientific decision: ask Peleg. When in doubt about infras
 
 ---
 
-## 10. The current state of the work
+## 10. The current state of the work (last verified 2026-06-29)
 
-**Active wave**: closing out v0.3.0 follow-ups from Peleg's 2026-06-08 + 2026-06-15 review decks. See `docs/active/PELEG_NOTES_2026_06_18.md` for the triaged item list and `docs/active/MEETING_2026_06_18.md` for the strategic discussion.
+**Active wave**: Wave 2.8 + Wave 2.9 follow-ups from Peleg's two PDF review decks (2026-06-08 + 2026-06-15) are shipped. Closing out the last polish items + wiring batch UniProt uploads.
 
-**Top priorities**:
-1. **22× perf gap** — local 1 min vs prod 22 min for 1k peptides. Profile pending. (M1)
-2. **Pre-computed datasets** — Peleg-118 / gold / Uperin. (M2)
-3. **Progressive results loading** — SSE-based streaming for big batches. (M3 + M4)
-4. **P0 scientific corrections** — delete TANGO threshold tunable, rename FF-Helix label, switch example sequence. (A1, A3, A4)
+**Shipped since 2026-06-18** (one-line each):
+- Perf: S4PRED batched forward · OMP thread fix · gunicorn `--preload` lifespan · TANGO restore on prod image · stage timers.
+- 4-class system: Q6 KPI strip · Q7 pipeline residue colouring · Q8 hover tooltip · Q9 per-tool chips · Q10 biochem block dedup · Q11 database-tabbed biochem comparison · Q12 TANGO panel rename · Q15 self-contained per-peptide HTML report.
+- Tracks + plots: B10 sort defaults · B11 KPI hover-help · B12 Venn region counts · B13 Venn → table filter · B14 threshold preset chips · B16 Mol* SSW residue overpaint toggle · B17 SSW band in sliding-window profile · B18 cohort-only correlation scope · B19 Welch's t-test backend (see "Pending" below) · B20 Peleg-118 one-click compare chip.
+- Exports: B15 + E4 provenance header on CSV/TSV/XLSX (4-line `# Method = …` prelude).
+- Upload: B8 progress bar + ETA · B9 failed-row UI · B-CONTRACT Pydantic `extra="forbid"` · M3 UniProt accession-list paste flow.
+- Backend: F1–F11 + OQ3/OQ6 terminology + colour fixes from Peleg's review · pre-push hook + CI watcher to silence email noise.
+- Tests: 197 backend pytest functions · 620 frontend vitest calls · all deterministic, no network.
 
-**Blocked**:
-- DESY VM migration — waiting on Alex's SSH access fix.
+**Pending** (small, well-scoped — pick any and ship):
+1. **Task #93** — open GitHub Issues from the triaged Peleg items. Script ready: `scripts/open_peleg_issues.sh`. Set up Project board column flow.
+2. **Task #123 (M2 deployment)** — SSH into DESY VM and run `make precompute-datasets`. Drops `backend/data/precomputed/peleg_118.json` so the B19 Welch's t-test endpoint stops 404-ing. Needs Said's SSH (Alex's access blocker is now cleared per `memory/project_desy_vm_access.md`).
+3. **Task #156** — perf regression diagnosis (Quick Analyze 1 peptide reported at 13s on dev). Curl timing test pending; likely cold-start.
+4. **Browser verification of Wave 2.8/2.9** — single full pass through Quick Analyze · Compare · Peptide Detail · exports. Checklist lives in `docs/internal/STATUS.md`.
 
-**The paper**:
-- Peleg is drafting now.
-- Hand her `PAPER_METHODS_REFERENCE.md` as the source-of-truth Methods section.
+**Blocked**: none (DESY VM SSH now works).
+
+**The paper**: Peleg is drafting. Methods section sourced from `PAPER_METHODS_REFERENCE.md`. The repo's `paper/paper.md` is a JOSS-format draft to submit after Peleg signs off on figures.
 
 ---
 
@@ -189,6 +195,36 @@ When in doubt about a scientific decision: ask Peleg. When in doubt about infras
 - **History**: `docs/archive/`.
 - **MCP servers + AI tooling**: `docs/active/MCP_RUNBOOK.md`.
 - **Sentry runbook**: `docs/active/SENTRY_RUNBOOK.md`.
+
+---
+
+## 13. Make it better — improvement backlog
+
+Order is rough priority. None of these is blocking publication; all are real upgrades.
+
+### Tier 1 — close the science loop
+- **Mol* Phase 2.** The B16 SSW residue overpaint is wired as a Phase-1 stub that dispatches a `pvl:ssw-overpaint` CustomEvent. Install molstar npm, uncomment the Phase-2 block in `ui/src/lib/molstarSswOverpaint.ts`, replace the iframe in `Mol3DViewer.tsx` with a programmatic `PluginContext`. Spec: `docs/active/MOL3D_OVERLAY_SPEC.md`. Unblocks per-residue overlay for all four predictors, not just SSW.
+- **B19 cohort statistics.** Backend Welch's t-test endpoint is built but requires precomputed cohort JSON under `backend/data/precomputed/`. Run `make precompute-datasets` on the VM (Task #123), then wire the "Compare current dataset vs Peleg-118" chip on `/compare` to surface p-values + Cliff's δ next to the existing percentile bars. Spec: `docs/active/CONTRACTS.md` §"Cohort statistics".
+- **Progressive results.** Batch upload currently blocks until the whole pipeline is done. Add SSE streaming to `POST /api/predict/batch` so the table fills row-by-row. Frontend already has the sync-job + progress-bar plumbing (B8); the missing piece is replacing the JSON response with an `EventSource` stream from the backend.
+
+### Tier 2 — make it production-grade
+- **DESY K8s migration.** Currently on Hetzner CX33. DESY VM is bootstrapped (`scripts/desy_vm_bootstrap.sh`) and accessible. Path forward: Docker Compose → Kustomize → DESY K8s namespace. `docs/active/DEPLOYMENT.md` §"K8s plan" has the manifest skeleton. Needs a DNS record + TLS cert from DESY IT.
+- **Async job queue at scale.** Celery + Redis is wired (B1) but the prod containers run sync only. Flip the worker on, route batches > N peptides to the queue, surface progress in the existing `jobStore.ts`. Already 95% done; just needs prod config + smoke test.
+- **Observability.** Sentry is live (DSN in `docs/active/SENTRY_RUNBOOK.md`) but there is no APM, no structured logs, no per-route latency histogram. Add OpenTelemetry traces around the predict pipeline so the 22× perf gap that took two days to bisect is visible in one Grafana panel next time.
+- **Auth + rate limiting.** Public deploy has zero auth. Researchers fine for now; before a public bio.tools listing, add a simple API-key middleware (FastAPI dependency) and an IP-based rate limiter on `/api/predict/batch`. Keep the UI unauth — only gate the API.
+
+### Tier 3 — research velocity
+- **Phase I multi-predictor.** PVL is locked to TANGO + S4PRED. The overlay contract in `ui/src/lib/molstarOverlays.ts` is already forward-compatible (`OverlayType` union); add Waltz, AGGRESCAN3D, or PASTA 2.0 as a provider behind the same shape and PVL becomes the only tool that runs them side-by-side. Each provider takes ~3 days of vendoring + wrapping. Order of likely value: Waltz → AGGRESCAN3D → PASTA.
+- **G2 RAG + PubMed.** Long-running Phase G goal: feed per-peptide UniProt context + relevant abstracts into a side panel so researchers see "what's known about this protein" inline. `docs/active/VECTOR_SEARCH_SPEC.md` has the LanceDB + ESM-2 architecture. Build it as a sidecar service that the frontend hits — don't pollute the predict pipeline.
+- **CLI / Python package.** `pvl-cli` exists as a stub. Promote it to a real installable so the headless predict pipeline is usable from notebooks: `pip install pvl-cli && pvl predict peptides.csv -o results.json`. Reuses the same FastAPI service code; no new science.
+
+### Tier 4 — quality + housekeeping
+- **Test coverage**: backend is 197 functions, frontend 620 — both deterministic. Coverage is uneven: `services/normalize.py` has < 60% line cov; `lib/peptideMapper.ts` has none. Target 80% on both before the JOSS submission.
+- **`server.py` is a 15-line shim.** Delete it. It only exists for legacy import compat that no longer matters.
+- **Doc consolidation.** `docs/active/` is 30+ files. Many are accurate but overlap (MASTER_DEV_DOC vs DEVELOPER_REFERENCE vs ACTIVE_CONTEXT). One pass to merge into 8–10 canonical docs would save every new developer half a day.
+- **CITATION + Zenodo.** Packets are ready (`A4_BIO_TOOLS_SUBMISSION.md`, `A5_ZENODO_RELEASE.md`). Cut `v0.3.0` release tag → Zenodo auto-mints DOI → submit to bio.tools. 1 hour of work for permanent scientific citability.
+
+When you ship anything from this list, delete the entry. The shorter this section gets, the better.
 
 ---
 
