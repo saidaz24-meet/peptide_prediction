@@ -29,7 +29,7 @@ interface ThresholdTunerProps {
 // explicit; "Exploratory" → "Lenient" matches the symmetric strict/lenient
 // framing in the paper.
 const PRESET_LABELS: Record<ThresholdPreset, string> = {
-  original: "Peleg default",
+  original: "Default",
   strict: "Strict",
   exploratory: "Lenient",
   custom: "Custom",

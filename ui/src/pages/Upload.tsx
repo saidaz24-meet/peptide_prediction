@@ -33,11 +33,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { AlertTriangle, Info, FlaskConical, Database, ArrowRight, ListPlus, Loader2 } from "lucide-react";
+import {
+  AlertTriangle,
+  Info,
+  FlaskConical,
+  Database,
+  ArrowRight,
+  ListPlus,
+  Loader2,
+} from "lucide-react";
 import { setNavGuard } from "@/hooks/use-nav-guard";
 import { ThresholdConfigPanel } from "@/components/ThresholdConfigPanel";
 import type { ThresholdConfig } from "@/types/peptide";
-import { UniProtBatchPreview, parseAccessionList, type AccessionEntry } from "@/components/UniProtBatchPreview";
+import {
+  UniProtBatchPreview,
+  parseAccessionList,
+  type AccessionEntry,
+} from "@/components/UniProtBatchPreview";
 import { executeUniProtQuery } from "@/lib/api";
 
 const steps = [
@@ -623,7 +635,9 @@ export default function Upload() {
                           rows={6}
                           value={accessionText}
                           onChange={(e) => handleAccessionTextChange(e.target.value)}
-                          placeholder={"P12345\nQ9UHC3-2\nA0A0K9RCN8\n\nOne accession per line, or comma-separated."}
+                          placeholder={
+                            "P12345\nQ9UHC3-2\nA0A0K9RCN8\n\nOne accession per line, or comma-separated."
+                          }
                           className="w-full rounded-lg border border-[hsl(var(--border))] bg-background px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/30 resize-y"
                           disabled={isSubmittingAccessions}
                         />
@@ -661,133 +675,146 @@ export default function Upload() {
 
                   {/* Existing file upload flow (only when uploadMode === "file") */}
                   {uploadMode === "file" && (
-                  <>
-                  {/* Example datasets */}
-                  <div className="text-center space-y-3">
-                    <p className="text-xs text-muted-foreground">Or try an example dataset:</p>
-                    <div className="flex gap-2 justify-center flex-wrap">
-                      {[
-                        {
-                          label: "Fibril-forming peptides (118)",
-                          file: "/example/peleg_118_fibril_forming.csv",
-                        },
-                        {
-                          label: "Antimicrobial Peptides (12)",
-                          file: "/example/antimicrobial_peptides.csv",
-                        },
-                        { label: "Amyloid Peptides (9)", file: "/example/amyloid_peptides.csv" },
-                      ].map((ex) => (
+                    <>
+                      {/* Example datasets */}
+                      <div className="text-center space-y-3">
+                        <p className="text-xs text-muted-foreground">Or try an example dataset:</p>
+                        <div className="flex gap-2 justify-center flex-wrap">
+                          {[
+                            {
+                              label: "Fibril-forming peptides (118)",
+                              file: "/example/fibril_forming_peptides_118.csv",
+                            },
+                            {
+                              label: "Antimicrobial Peptides (12)",
+                              file: "/example/antimicrobial_peptides.csv",
+                            },
+                            {
+                              label: "Amyloid Peptides (9)",
+                              file: "/example/amyloid_peptides.csv",
+                            },
+                          ].map((ex) => (
+                            <Button
+                              key={ex.file}
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs h-7"
+                              onClick={async () => {
+                                try {
+                                  const resp = await fetch(ex.file);
+                                  if (!resp.ok) {
+                                    toast.error("Failed to load example dataset");
+                                    return;
+                                  }
+                                  const text = await resp.text();
+                                  if (!text.trim()) {
+                                    toast.error("Failed to load example dataset");
+                                    return;
+                                  }
+                                  const blob = new Blob([text], { type: "text/csv" });
+                                  const file = new File(
+                                    [blob],
+                                    ex.file.split("/").pop() || "example.csv",
+                                    { type: "text/csv" }
+                                  );
+                                  handleLocalPreview(file);
+                                } catch {
+                                  toast.error("Failed to load example dataset");
+                                }
+                              }}
+                            >
+                              {ex.label}
+                            </Button>
+                          ))}
+                        </div>
+
+                        {/* Gold Standard Dataset */}
+                        <div className="pt-2 border-t border-[hsl(var(--border))]">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-xs h-8 border-primary/30 text-primary hover:bg-primary/5 hover:border-primary/50"
+                            onClick={async () => {
+                              try {
+                                toast.loading("Loading gold standard dataset...", {
+                                  id: "gold-std",
+                                });
+                                const resp = await fetch("/Final_Staphylococcus_2023_new.xlsx");
+                                if (!resp.ok) {
+                                  toast.error("Failed to load dataset", { id: "gold-std" });
+                                  return;
+                                }
+                                const arrayBuf = await resp.arrayBuffer();
+                                const blob = new Blob([arrayBuf], {
+                                  type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                                });
+                                const file = new File(
+                                  [blob],
+                                  "Final_Staphylococcus_2023_new.xlsx",
+                                  {
+                                    type: blob.type,
+                                  }
+                                );
+                                toast.success("Dataset loaded — 2916 peptides", { id: "gold-std" });
+                                handleLocalPreview(file);
+                              } catch {
+                                toast.error("Failed to load dataset", { id: "gold-std" });
+                              }
+                            }}
+                          >
+                            <FlaskConical className="w-3.5 h-3.5 mr-1.5" />
+                            Gold Standard — Staphylococcus 2023 (2,916 peptides)
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* File Upload Dropzone */}
+                      <UploadDropzone
+                        onFileSelected={(f: File) => handleLocalPreview(f)}
+                        onFileProcessed={() => setCurrentStep(1)}
+                      />
+
+                      {/* Upload guidance */}
+                      <div className="grid sm:grid-cols-3 gap-3 text-xs">
+                        <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
+                          <p className="font-medium text-foreground">Required Column</p>
+                          <p className="text-muted-foreground">
+                            <code className="bg-muted px-1 py-0.5 rounded text-[10px]">
+                              Sequence
+                            </code>{" "}
+                            — amino acid letters (A-Z)
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
+                          <p className="font-medium text-foreground">Optional Columns</p>
+                          <p className="text-muted-foreground">
+                            Entry, Organism, Length, Protein name
+                          </p>
+                        </div>
+                        <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
+                          <p className="font-medium text-foreground">Practical Limits</p>
+                          <p className="text-muted-foreground">
+                            ~500 entries (TANGO on) &middot; ~3000 (TANGO off)
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Cross-link to Database Search */}
+                      <div className="flex items-center justify-between bg-[hsl(var(--surface-1))] rounded-xl px-4 py-3 border border-[hsl(var(--border))]">
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Database className="w-4 h-4 text-primary" />
+                          Looking for proteins? Search UniProt directly.
+                        </div>
                         <Button
-                          key={ex.file}
-                          variant="ghost"
+                          variant="outline"
                           size="sm"
-                          className="text-xs h-7"
-                          onClick={async () => {
-                            try {
-                              const resp = await fetch(ex.file);
-                              if (!resp.ok) {
-                                toast.error("Failed to load example dataset");
-                                return;
-                              }
-                              const text = await resp.text();
-                              if (!text.trim()) {
-                                toast.error("Failed to load example dataset");
-                                return;
-                              }
-                              const blob = new Blob([text], { type: "text/csv" });
-                              const file = new File(
-                                [blob],
-                                ex.file.split("/").pop() || "example.csv",
-                                { type: "text/csv" }
-                              );
-                              handleLocalPreview(file);
-                            } catch {
-                              toast.error("Failed to load example dataset");
-                            }
-                          }}
+                          onClick={() => navigate("/search")}
+                          className="btn-press"
                         >
-                          {ex.label}
+                          Database Search <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
                         </Button>
-                      ))}
-                    </div>
-
-                    {/* Gold Standard Dataset */}
-                    <div className="pt-2 border-t border-[hsl(var(--border))]">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="text-xs h-8 border-primary/30 text-primary hover:bg-primary/5 hover:border-primary/50"
-                        onClick={async () => {
-                          try {
-                            toast.loading("Loading gold standard dataset...", { id: "gold-std" });
-                            const resp = await fetch("/Final_Staphylococcus_2023_new.xlsx");
-                            if (!resp.ok) {
-                              toast.error("Failed to load dataset", { id: "gold-std" });
-                              return;
-                            }
-                            const arrayBuf = await resp.arrayBuffer();
-                            const blob = new Blob([arrayBuf], {
-                              type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                            });
-                            const file = new File([blob], "Final_Staphylococcus_2023_new.xlsx", {
-                              type: blob.type,
-                            });
-                            toast.success("Dataset loaded — 2916 peptides", { id: "gold-std" });
-                            handleLocalPreview(file);
-                          } catch {
-                            toast.error("Failed to load dataset", { id: "gold-std" });
-                          }
-                        }}
-                      >
-                        <FlaskConical className="w-3.5 h-3.5 mr-1.5" />
-                        Gold Standard — Staphylococcus 2023 (2,916 peptides)
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* File Upload Dropzone */}
-                  <UploadDropzone
-                    onFileSelected={(f: File) => handleLocalPreview(f)}
-                    onFileProcessed={() => setCurrentStep(1)}
-                  />
-
-                  {/* Upload guidance */}
-                  <div className="grid sm:grid-cols-3 gap-3 text-xs">
-                    <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
-                      <p className="font-medium text-foreground">Required Column</p>
-                      <p className="text-muted-foreground">
-                        <code className="bg-muted px-1 py-0.5 rounded text-[10px]">Sequence</code> —
-                        amino acid letters (A-Z)
-                      </p>
-                    </div>
-                    <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
-                      <p className="font-medium text-foreground">Optional Columns</p>
-                      <p className="text-muted-foreground">Entry, Organism, Length, Protein name</p>
-                    </div>
-                    <div className="rounded-lg bg-[hsl(var(--surface-1))] border border-[hsl(var(--border))] p-3 space-y-1">
-                      <p className="font-medium text-foreground">Practical Limits</p>
-                      <p className="text-muted-foreground">
-                        ~500 entries (TANGO on) &middot; ~3000 (TANGO off)
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Cross-link to Database Search */}
-                  <div className="flex items-center justify-between bg-[hsl(var(--surface-1))] rounded-xl px-4 py-3 border border-[hsl(var(--border))]">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Database className="w-4 h-4 text-primary" />
-                      Looking for proteins? Search UniProt directly.
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => navigate("/search")}
-                      className="btn-press"
-                    >
-                      Database Search <ArrowRight className="w-3.5 h-3.5 ml-1.5" />
-                    </Button>
-                  </div>
-                  </>
+                      </div>
+                    </>
                   )}
                 </motion.div>
               )}

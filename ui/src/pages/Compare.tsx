@@ -156,23 +156,24 @@ export default function Compare() {
     }
   }, []);
 
-  // B20: one-click Peleg-118 loader — fetches the bundled reference CSV and
-  // runs it through the same upload pipeline as a user-uploaded file.
+  // B20: one-click fibril-forming reference loader — fetches the bundled
+  // reference CSV and runs it through the same upload pipeline as a
+  // user-uploaded file.
   const handleLoadPeleg118 = useCallback(async () => {
     setLoadingPeleg(true);
     setError(null);
     try {
-      const resp = await fetch("/example/peleg_118_fibril_forming.csv");
-      if (!resp.ok) throw new Error(`Failed to fetch Peleg-118 CSV: ${resp.status}`);
+      const resp = await fetch("/example/fibril_forming_peptides_118.csv");
+      if (!resp.ok) throw new Error(`Failed to fetch reference CSV: ${resp.status}`);
       const blob = await resp.blob();
-      const file = new File([blob], "peleg_118_fibril_forming.csv", { type: "text/csv" });
-      setBFilename("Peleg-118 fibril-forming peptides");
+      const file = new File([blob], "fibril_forming_peptides_118.csv", { type: "text/csv" });
+      setBFilename("Fibril-forming peptides (118)");
       const response = await uploadCSV(file);
       const rows = response.rows ?? [];
       const mapped = rows
         .map((r: any, idx: number) => {
           try {
-            return mapApiRowToPeptide(r, `peleg118[${idx}]`);
+            return mapApiRowToPeptide(r, `fibril118[${idx}]`);
           } catch {
             return null;
           }
@@ -180,12 +181,12 @@ export default function Compare() {
         .filter((p: any): p is Peptide => p !== null);
 
       if (mapped.length === 0) {
-        setError("Failed to parse Peleg-118 dataset. Check backend connectivity.");
+        setError("Failed to parse reference dataset. Check backend connectivity.");
       } else {
         setCohortB(mapped);
       }
     } catch (err: any) {
-      setError(err?.message || "Failed to load Peleg-118 reference dataset.");
+      setError(err?.message || "Failed to load fibril-forming reference dataset.");
     } finally {
       setLoadingPeleg(false);
     }
@@ -455,12 +456,12 @@ export default function Compare() {
           onClick={handleLoadPeleg118}
           disabled={loadingPeleg || uploading}
           className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/10 hover:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid="peleg-118-chip"
+          data-testid="fibril-118-chip"
         >
           <Beaker className="h-4 w-4" />
           {loadingPeleg
-            ? "Loading Peleg-118..."
-            : "Compare current dataset vs Peleg-118 fibril-forming peptides →"}
+            ? "Loading reference..."
+            : "Compare current dataset vs fibril-forming peptides (118) →"}
         </button>
       )}
 

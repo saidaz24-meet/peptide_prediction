@@ -204,9 +204,9 @@ export interface ReferenceDatasetConfig {
 
 export const QUICK_ANALYZE_DATASETS: ReferenceDatasetConfig[] = [
   {
-    id: "peleg_118",
+    id: "fibril_118",
     label: "Fibril-forming short peptides",
-    csvUrl: "/example/peleg_118_fibril_forming.csv",
+    csvUrl: "/example/fibril_forming_peptides_118.csv",
   },
   {
     id: "uniprot_short",
