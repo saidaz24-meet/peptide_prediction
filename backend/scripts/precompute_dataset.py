@@ -50,6 +50,16 @@ DATASETS: Dict[str, Dict[str, Any]] = {
         "source": HERE / "data" / "reference_datasets" / "peleg_118_fibril_validated.json",
         "output": HERE / "data" / "precomputed" / "peleg_118.json",
     },
+    # Gold-standard benchmark — the 2,916-peptide Staphylococcus aureus 2023
+    # set the demo flow auto-loads on first visit. Without this precompute the
+    # demo path runs TANGO + S4PRED live on 2,916 sequences (~20 min on a
+    # warm VPS, 30+ min cold). The artifact is also served as
+    # /api/precomputed/gold_standard and surfaced via a Compare-page chip.
+    "gold_standard": {
+        "title": "Gold-standard benchmark — Staphylococcus aureus 2023 (2,916 peptides)",
+        "source": HERE.parent / "ui" / "public" / "Final_Staphylococcus_2023_new.xlsx",
+        "output": HERE / "data" / "precomputed" / "gold_standard.json",
+    },
 }
 
 
@@ -57,11 +67,33 @@ DATASETS: Dict[str, Dict[str, Any]] = {
 
 
 def load_reference(path: Path) -> Tuple[pd.DataFrame, Dict[str, Any]]:
-    """Load a reference dataset JSON and return (DataFrame, meta).
+    """Load a reference dataset and return (DataFrame, meta).
+
+    Supports two input formats — chosen by suffix:
+      - ``.json``  → schema described in
+        ``backend/data/reference_datasets/README.md`` (peptides list with
+        id / sequence / uniprot_id / organism / general_category fields).
+      - ``.xlsx``  → arbitrary Excel with at minimum an ``Entry`` /
+        ``Sequence`` column pair (or any of normalize_cols's synonyms).
 
     The DataFrame has Entry / Sequence / Length columns, matching what
     ``process_upload_dataframe`` expects.
     """
+    suffix = path.suffix.lower()
+
+    if suffix == ".xlsx":
+        df = pd.read_excel(path)
+        df = normalize_cols(df)
+        require_cols(df, ["Entry", "Sequence"])
+        if "Length" not in df.columns:
+            df["Length"] = df["Sequence"].astype(str).str.len()
+        meta = {
+            "source_title": path.stem,
+            "dataset_id": path.stem,
+            "n_peptides": len(df),
+        }
+        return df, meta
+
     with path.open() as f:
         data = json.load(f)
     peptides: List[Dict[str, Any]] = data.get("peptides", [])
