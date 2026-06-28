@@ -46,3 +46,7 @@ torch>=2.12.0,<3.0
 lancedb>=0.30.2,<1.0
 transformers>=4.30,<5.0
 pyarrow>=24.0.0,<25.0
+
+# Rate limiter for /api/predict/batch + /api/uniprot/execute (production hardening).
+# Wave 2.8 close-out — PRODUCTION_LOCKDOWN.md §2.2.
+slowapi>=0.1.9,<1.0

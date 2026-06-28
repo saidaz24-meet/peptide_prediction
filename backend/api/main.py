@@ -141,6 +141,21 @@ else:
 # Create FastAPI app
 app = FastAPI(title="Peptide Prediction Service")
 
+# Rate limiter — PRODUCTION_LOCKDOWN.md §2.2 hardening for the two expensive
+# routes. slowapi attaches a per-IP token bucket; the limit decorators on
+# individual routes (see api/routes/predict.py and uniprot.py) opt in per
+# endpoint. Default key = client IP via get_remote_address. The limiter is
+# exposed as app.state.limiter so routes can grab it from request.app.state.
+from slowapi import Limiter, _rate_limit_exceeded_handler  # noqa: E402
+from slowapi.errors import RateLimitExceeded  # noqa: E402
+from slowapi.middleware import SlowAPIMiddleware  # noqa: E402
+from slowapi.util import get_remote_address  # noqa: E402
+
+limiter = Limiter(key_func=get_remote_address, default_limits=[])
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
+
 
 # PERF-2026-06-22: pre-load the S4PRED 5-model BiLSTM ensemble at import
 # time, before any gunicorn worker forks. With gunicorn's --preload flag

@@ -5,6 +5,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Form, HTTPException, Query, Request
 
+# Rate limiter — attached in api/main.py via app.state.limiter. Imported here so
+# route decorators (@_LIMITER.limit("30/minute")) can reach it. Production
+# hardening per PRODUCTION_LOCKDOWN.md §2.2.
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+
 from schemas.api_models import PredictResponse, RowsResponse
 from services.dataframe_utils import parse_fasta, read_any_table, require_cols
 from services.logger import log_info
@@ -12,6 +18,8 @@ from services.normalize import create_single_sequence_df, normalize_cols
 from services.predict_service import process_single_sequence
 from services.thresholds import parse_threshold_config
 from services.upload_service import UploadProcessingError, process_upload_dataframe
+
+_LIMITER = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -54,6 +62,7 @@ _CSV_CONTENT_TYPES = ("text/csv", "application/csv", "text/tab-separated-values"
 
 
 @router.post("/api/predict/batch", response_model=RowsResponse)
+@_LIMITER.limit("30/minute")
 async def predict_batch(
     request: Request,
     thresholdConfig: Optional[str] = Query(

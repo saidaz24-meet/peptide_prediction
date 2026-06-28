@@ -6,7 +6,13 @@ import asyncio
 import threading
 from typing import Dict, Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
+
+# Rate limiter — see backend/api/main.py for the app-wide attachment. Per-route
+# limits opt in via @_LIMITER.limit(). Production hardening per
+# PRODUCTION_LOCKDOWN.md §2.2.
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 
 from schemas.api_models import RowsResponse
 from schemas.uniprot_query import (
@@ -24,6 +30,8 @@ from services.uniprot_service import (
 from services.uniprot_service import (
     window_protein_sequences as window_sequences_service,
 )
+
+_LIMITER = Limiter(key_func=get_remote_address)
 
 router = APIRouter()
 
@@ -50,8 +58,10 @@ async def window_sequences_endpoint(request: Dict):
 
 
 @router.post("/api/uniprot/execute", response_model=RowsResponse)
+@_LIMITER.limit("30/minute")
 async def execute_uniprot_query(
-    request: UniProtQueryExecuteRequest,
+    request: Request,
+    body: UniProtQueryExecuteRequest,
     cancelToken: Optional[str] = Query(None, description="Token for cancelling this request"),
 ):
     """Execute a UniProt query and return results with full analysis pipeline.
@@ -69,7 +79,7 @@ async def execute_uniprot_query(
         _sync_cancel_events[cancelToken] = cancel_event
 
     try:
-        result = await execute(request, SENTRY_INITIALIZED, cancel_event=cancel_event)
+        result = await execute(body, SENTRY_INITIALIZED, cancel_event=cancel_event)
         if cancel_event.is_set():
             raise asyncio.CancelledError()
         return result
