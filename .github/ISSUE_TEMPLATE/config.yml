@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Read the backlog first
+    url: https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/BACKLOG.md
+    about: Before opening an Issue, check whether it's already tracked in BACKLOG.md or KNOWN_ISSUES.md.
+  - name: Developer handoff doc
+    url: https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/HANDOFF.md
+    about: New to PVL? Read HANDOFF.md before opening Issues — it answers most "how does X work" questions.

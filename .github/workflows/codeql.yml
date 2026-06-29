@@ -1,0 +1,50 @@
+name: CodeQL
+
+# Static analysis for security + quality. Runs on every PR + once a week
+# so we catch issues in dependencies that introduce them after-the-fact.
+#
+# Languages: Python (backend) + TypeScript (frontend).
+#
+# Setup PRODUCTION_LOCKDOWN.md §2.4 — defensive depth on top of CodeRabbit
+# (which is style/correctness, not security). Findings appear under the
+# Security tab.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "23 4 * * 1" # Mondays 04:23 UTC — pick an unusual minute to avoid the public-hour spike
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [python, javascript-typescript]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: ${{ matrix.language }}
+          # default queries + the "security-extended" pack catches more
+          # bioinformatics-relevant patterns (path traversal, SSRF, command
+          # injection in subprocess.run, etc.)
+          queries: security-extended
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:${{ matrix.language }}"
