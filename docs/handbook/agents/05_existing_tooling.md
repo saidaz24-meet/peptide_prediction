@@ -2,12 +2,22 @@
 
 > Audience: an AI agent (Claude / Cowork / Opus) about to "just write a quick script."
 > PVL is solo-maintained. AI tooling is the maintenance hedge (ADR-012): the more
-> work that flows through skills, hooks, and the MCP surface, the less Said has to
+> work that flows through skills, hooks, and the [MCP](../humans/09_glossary.md#m) surface, the less Said has to
 > hand-hold. Before you build anything, check whether it already exists here.
 
 This is a reference page. Skim the tables, then read the decision tree at the
 bottom before adding a new script. Everything below was verified to exist on
 `wave-2.8/peleg-pdf-followups`.
+
+## Contents
+
+- [1. Skills (`.claude/skills/`) — 10 project skills](#1-skills-claudeskills--10-project-skills)
+- [2. Hooks (`.claude/hooks/`) — 6, wired in `settings.json`](#2-hooks-claudehooks--6-wired-in-settingsjson)
+- [3. MCP server (`mcp_server/`, package `pvl-mcp`)](#3-mcp-server-mcp_server-package-pvl-mcp)
+- [4. CLI (`pvl-cli/`, package `pvl-cli`)](#4-cli-pvl-cli-package-pvl-cli)
+- [5. Scripts (`scripts/` = 14, `backend/scripts/` = 6)](#5-scripts-scripts--14-backendscripts--6)
+- [6. Cowork dispatch system (`docs/active/cowork-dispatches/`)](#6-cowork-dispatch-system-docsactivecowork-dispatches)
+- [Before you write a new script — decision tree](#before-you-write-a-new-script--decision-tree)
 
 ---
 
@@ -143,7 +153,7 @@ moved; treat them as starting points, not guaranteed-green. Prefer `make` target
 
 ## 6. Cowork dispatch system (`docs/active/cowork-dispatches/`)
 
-Cowork is the parallel agent worker. Dispatches are paste-ready prompts.
+[Cowork](../humans/09_glossary.md#c) is the parallel agent worker. Dispatches are paste-ready prompts.
 Currently one standing template: **`V11_FINAL_POLISH.md`** — the quality-only
 sweep run before a branch opens a PR to `main` (tests, lint, no new features). It
 carries the mandatory `WORKING DIRECTORY:` header that redirects Cowork into the

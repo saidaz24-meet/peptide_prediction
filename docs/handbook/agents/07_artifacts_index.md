@@ -9,6 +9,19 @@ regenerated if lost**, and **who may overwrite it**. Paths are repo-relative
 unless they start with `/data` (a container path). Deploy specifics live in
 [../humans/06_deploying.md](../humans/06_deploying.md).
 
+## Contents
+
+- [1. TANGO binaries (committed, per-platform)](#1-tango-binaries-committed-per-platform)
+- [2. S4PRED model weights (gitignored, host-cached)](#2-s4pred-model-weights-gitignored-host-cached)
+- [3. Precomputed reference datasets (host-generated, not committed)](#3-precomputed-reference-datasets-host-generated-not-committed)
+- [4. Reference dataset inputs (committed)](#4-reference-dataset-inputs-committed)
+- [5. Example datasets (committed, served to the browser)](#5-example-datasets-committed-served-to-the-browser)
+- [6. Demo dataset (committed)](#6-demo-dataset-committed)
+- [7. Named Docker volumes (runtime state, never in git)](#7-named-docker-volumes-runtime-state-never-in-git)
+- [8. Sentry DSN (secret, never in repo)](#8-sentry-dsn-secret-never-in-repo)
+- [9. Paper + provenance docs (committed)](#9-paper--provenance-docs-committed)
+- [When in doubt](#when-in-doubt)
+
 ---
 
 ## 1. TANGO binaries (committed, per-platform)
@@ -16,7 +29,7 @@ unless they start with `/data` (a container path). Deploy specifics live in
 | | |
 |---|---|
 | **Lives at** | `backend/Tango/bin/tango` (the runtime copy the backend execs; built for the dev host — macOS x86_64 here) and `tools/tango/bin/` which holds all four prebuilt variants: `tango_darwin_x86_64`, `tango_linux_x86_64`, `tango_linux_i386`, `tango_win32.exe`. |
-| **Generated** | Closed-source third-party binary from the TANGO authors. Not built from source in this repo. |
+| **Generated** | Closed-source third-party binary from the [TANGO](../humans/02_the_science.md#2-tango) authors. Not built from source in this repo. |
 | **Regenerated** | Cannot be rebuilt — these are vendored. If lost, restore from git (`backend/Tango/bin/tango`, `tools/tango/bin/tango_linux_x86_64`, and `tango_darwin_x86_64` are all tracked) or re-obtain from the upstream TANGO distribution. The Linux x86_64 variant is the one Docker/VPS uses. |
 | **Overwritten by** | Nobody, routinely. Only a deliberate vendor-binary update. Verify any swap with `make smoke-tango`. |
 
@@ -28,7 +41,7 @@ Note: the prompt's guessed Linux path `tools/tango/bin/tango_linux_x86_64` is
 | | |
 |---|---|
 | **Lives at** | `tools/s4pred/models/weights_1.pt` … `weights_5.pt` (5-model ensemble). |
-| **Generated** | Pretrained checkpoints from the S4PRED project — downloaded, not trained here. |
+| **Generated** | Pretrained checkpoints from the [S4PRED](../humans/02_the_science.md#3-s4pred) project — downloaded, not trained here. |
 | **Regenerated** | **Gitignored** (`.gitignore` line 49: `*.pt`). They will not come back from `git checkout`. Re-fetch from the S4PRED upstream release into `tools/s4pred/models/`. First validation run also lazy-downloads them (see `rerun_validation_2026_06_07.py` prereqs). |
 | **Overwritten by** | The S4PRED installer/downloader only. Never edit by hand. |
 

@@ -2,6 +2,10 @@
 
 *Every acronym and piece of jargon in this handbook, defined in plain English — the page to open mid-meeting when someone says "FF-SSW" and you need a one-line answer. Each entry links to the page that uses it most.*
 
+## Contents
+
+[A](#a) · [B](#b) · [C](#c) · [D](#d) · [E](#e) · [F](#f) · [G](#g) · [H](#h) · [I](#i) · [J](#j) · [K](#k) · [L](#l) · [M](#m) · [N](#n) · [O](#o) · [P](#p) · [Q](#q) · [R](#r) · [S](#s) · [T](#t) · [U](#u) · [V](#v) · [W](#w) · [Z](#z)
+
 ---
 
 ## A

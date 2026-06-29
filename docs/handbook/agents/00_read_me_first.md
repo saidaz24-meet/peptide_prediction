@@ -4,6 +4,17 @@
 >
 > Read this whole page before your first edit. If you only remember one thing: **PVL is a scientific instrument. Correctness beats everything. When unsure, stop and ask a human.**
 
+## Contents
+
+- [0. The commit-identity rule (NON-NEGOTIABLE)](#0-the-commit-identity-rule-non-negotiable)
+- [1. The six architectural principles (from `CLAUDE.md`)](#1-the-six-architectural-principles-from-claudemd)
+- [2. The scientific axioms you must not break](#2-the-scientific-axioms-you-must-not-break)
+- [3. "Before you touch X, do Y" — the matrix](#3-before-you-touch-x-do-y--the-matrix)
+- [4. Scientific changes are not yours to make](#4-scientific-changes-are-not-yours-to-make)
+- [5. The definition of done](#5-the-definition-of-done)
+- [6. Smallest-diff discipline](#6-smallest-diff-discipline)
+- [7. Where to go next](#7-where-to-go-next)
+
 ---
 
 ## 0. The commit-identity rule (NON-NEGOTIABLE)
@@ -43,7 +54,7 @@ These are scientific contracts, enforced in code at the serialization boundary (
 
 In set terms: **FF-Helix ⊆ Helix** and **FF-SSW ⊆ SSW**. A peptide that is `FF-SSW=true` while `SSW=false` is a P0 bug (this exact bug, ISSUE-032, was reported by the scientific lead and is now a permanent regression test). If your change can affect classification, you must re-run `test_axiom_invariants.py` and confirm it stays green.
 
-SSW itself is a canonical **OR**, never an AND: a peptide is SSW-positive if TANGO **or** S4PRED predicts a switch. Full detail in [contracts and invariants](02_contracts_and_invariants.md).
+[SSW](../humans/02_the_science.md#6-ssw) itself is a canonical **OR**, never an AND: a peptide is SSW-positive if TANGO **or** S4PRED predicts a switch. Full detail in [contracts and invariants](02_contracts_and_invariants.md).
 
 ---
 

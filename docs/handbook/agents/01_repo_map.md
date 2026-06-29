@@ -2,6 +2,17 @@
 
 > Audience: an AI agent (Claude / Cowork / Opus) about to make a change. Hot files are flagged with 🔥 — touch carefully. Cold files are flagged with 🧊 — safe to assume nobody read them recently. Protected files are 🛡️ — do not modify without explicit approval.
 
+## Contents
+
+- [Top-level](#top-level)
+- [`backend/` — leaf-level map](#backend--leaf-level-map)
+- [`ui/src/` — leaf-level map](#uisrc--leaf-level-map)
+- [`docs/` — the three buckets](#docs--the-three-buckets)
+- [`scripts/`](#scripts)
+- [`.github/`](#github)
+- [Conventions to know](#conventions-to-know)
+- [How to use this map](#how-to-use-this-map)
+
 ## Top-level
 
 | Path | What | Heat |
@@ -44,7 +55,7 @@
 | `services/thresholds.py` | Threshold preset resolution (original / strict / lenient / custom) | 🔥 |
 | `services/logger.py` | Structured logger that emits to stdout for Docker log collection + Sentry breadcrumbs | 🔥 |
 | `services/trace_helpers.py` | Trace ID generation + propagation | 🔥 |
-| `tango.py` | TANGO binary subprocess + output parser + budget gate | 🛡️ |
+| `tango.py` | [TANGO](../humans/02_the_science.md#2-tango) binary subprocess + output parser + budget gate | 🛡️ |
 | `s4pred.py` | S4PRED ensemble loader + batched forward + output parser | 🛡️ |
 | `auxiliary.py` | FF-Helix scoring + sequence sanitization (non-standard AA → standard with note) | 🔥 |
 | `biochem_calculation.py` | Charge / Hydrophobicity / µH — deterministic, reused by tests + paper | 🛡️ |
@@ -200,4 +211,4 @@ When you're about to change a thing:
 When you're learning the repo:
 1. Read this file.
 2. Pick the lightest 🔥 file in your area and read it end-to-end.
-3. Then pick a 🛡️ file and read it — those tend to teach the most because they're the contract surfaces.
+3. Then pick a 🛡️ file and read it — those tend to teach the most because they're the [contract surfaces](02_contracts_and_invariants.md).

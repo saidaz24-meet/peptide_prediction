@@ -6,11 +6,20 @@ You paste a sequence of amino acids, or upload a spreadsheet of hundreds of them
 
 That's the whole idea. The rest of this page explains why it exists and what makes it different.
 
+## Contents
+
+- [The problem PVL solves](#the-problem-pvl-solves)
+- [What PVL actually does](#what-pvl-actually-does)
+- [The four categories — the heart of PVL](#the-four-categories--the-heart-of-pvl)
+- [What makes PVL different](#what-makes-pvl-different)
+- [What PVL is *not*](#what-pvl-is-not)
+- [Who built it](#who-built-it)
+
 ---
 
 ## The problem PVL solves
 
-A peptide is just a chain of amino acids — the same building blocks proteins are made of, but short. Some peptides are harmless. Some clump together. Some fold into a helix (a spiral); some flip between shapes depending on their environment; some assemble into **amyloid fibrils**. Fibrils matter on both sides of biology: they show up in diseases like Alzheimer's, and they also show up as *functional* structures that organisms build on purpose — including in antimicrobial peptides that kill bacteria.
+A peptide is just a chain of amino acids — the same building blocks proteins are made of, but short. Some peptides are harmless. Some clump together. Some fold into a helix (a spiral); some flip between shapes depending on their environment; some assemble into **[amyloid fibrils](09_glossary.md#a)**. Fibrils matter on both sides of biology: they show up in diseases like Alzheimer's, and they also show up as *functional* structures that organisms build on purpose — including in antimicrobial peptides that kill bacteria.
 
 To study this today, a researcher has to visit several different websites, each running a single algorithm:
 
@@ -29,10 +38,10 @@ PVL is that single place.
 
 Give PVL one or many peptide sequences, and it runs four analyses and combines them:
 
-1. **Aggregation propensity** — using **TANGO**, a well-established algorithm for predicting which stretches of a sequence want to aggregate into β-structure.
-2. **Secondary structure** — using **S4PRED**, a modern neural-network predictor that labels each residue as helix, sheet, or coil.
+1. **Aggregation propensity** — using **[TANGO](02_the_science.md#2-tango)**, a well-established algorithm for predicting which stretches of a sequence want to aggregate into β-structure.
+2. **Secondary structure** — using **[S4PRED](02_the_science.md#3-s4pred)**, a modern neural-network predictor that labels each residue as helix, sheet, or coil.
 3. **Fibril-forming classification** — PVL's own pipeline combines those two signals with biochemistry (charge, hydrophobicity, and the "hydrophobic moment" that measures how lopsided a helix is) to sort each peptide into a small, precise set of categories.
-4. **Biochemistry and structure** — net charge, hydrophobicity, and a live 3D model pulled from the AlphaFold structure database, with the predictions painted directly onto the molecule.
+4. **Biochemistry and structure** — net charge, hydrophobicity, and a live 3D model pulled from the [AlphaFold](02_the_science.md#9-alphafold--mol) structure database, with the predictions painted directly onto the molecule.
 
 The result is a dashboard, not a text file. You can click a region of a chart to filter the table, rank candidates by a weighted blend of signals, drill into any single peptide, and rotate its structure with the predicted helix and switch regions highlighted.
 

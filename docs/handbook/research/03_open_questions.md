@@ -4,6 +4,15 @@
 >
 > Read this alongside [the validation evidence](../research/02_validation_evidence.md) (what we *can* defend with numbers) and [the science page](../humans/02_the_science.md) (what the classifications mean). This page is the inverse: what we cannot yet defend, and who has to decide.
 
+## Contents
+
+- [How to read the OQ ledger](#how-to-read-the-oq-ledger)
+- [The resolved five (recorded for the why-trail)](#the-resolved-five-recorded-for-the-why-trail)
+- [The open three (deferred, non-blocking)](#the-open-three-deferred-non-blocking)
+- [Other open scientific / contract items](#other-open-scientific--contract-items)
+- [Future scientific avenues (Tier 3 — not questions, directions)](#future-scientific-avenues-tier-3--not-questions-directions)
+- [Bottom line](#bottom-line)
+
 ---
 
 ## How to read the OQ ledger
@@ -64,7 +73,7 @@ The overlay draws a horizontal dashed line at y=0.5 whose meaning was never labe
 
 ### Q-FIX-022 — signed charge vs |charge| ⚠ science
 
-**The question:** net charge is currently displayed/handled as an absolute value `|charge|` in at least the Cohort Comparison path, which **loses the sign**. A peptide at net −3 and one at net +3 are biochemically very different; collapsing them to `3` discards information. Peleg's own framing in the production-lockdown note: *"|charge| loses sign — okay to ship or revisit?"*
+**The question:** [net charge](../humans/02_the_science.md#4-biochemistry) is currently displayed/handled as an absolute value `|charge|` in at least the Cohort Comparison path, which **loses the sign**. A peptide at net −3 and one at net +3 are biochemically very different; collapsing them to `3` discards information. Peleg's own framing in the production-lockdown note: *"|charge| loses sign — okay to ship or revisit?"*
 
 - **Source:** `PELEG-Q-FIX-022`, tracked in [`ROADMAP.md`](../../active/ROADMAP.md) Round-2 (Wave 2.7) and the Wave C discussion list (FIX-022, "charge handling: absolute vs signed"). Listed as Peleg co-design item **D6**.
 - **GitHub Issue:** no dedicated Issue filed yet — it lives as a `# PELEG-Q-FIX-022` TODO comment in code and a backlog line.
@@ -84,7 +93,7 @@ The 2026-06-23 revised tally in the Peleg-notes triage shows residual open items
 
 These are not "unresolved bugs" — they are deliberate research directions where the science is sound but unbuilt. From [`BACKLOG.md`](../../active/BACKLOG.md) Tier 3 and [`ROADMAP.md`](../../active/ROADMAP.md) Phases G/I:
 
-- **Phase I — multi-predictor consensus.** Add Waltz → AGGRESCAN3D → PASTA 2.0 side-by-side, producing a per-predictor verdict table with a consensus statement (Galagos-inspired). The overlay contract (`molstarOverlays.ts` `OverlayType` union) is already forward-compatible. **Open question for the field:** how to weight disagreeing predictors honestly — PVL's ranking design rule is *never* a single-predictor verdict. Resolver: dev + Peleg on the weighting scheme; partly a **literature-review** question (which benchmark defines "ground truth").
+- **[Phase I — multi-predictor consensus](../humans/07_extending.md).** Add Waltz → AGGRESCAN3D → PASTA 2.0 side-by-side, producing a per-predictor verdict table with a consensus statement (Galagos-inspired). The overlay contract (`molstarOverlays.ts` `OverlayType` union) is already forward-compatible. **Open question for the field:** how to weight disagreeing predictors honestly — PVL's ranking design rule is *never* a single-predictor verdict. Resolver: dev + Peleg on the weighting scheme; partly a **literature-review** question (which benchmark defines "ground truth").
 - **G2 — RAG + PubMed context.** Per-peptide UniProt context plus retrieved abstracts in a side panel (LanceDB + ESM-2, ADR-016/017; agentic PaperQA2 pattern, ADR-020). **Open question:** the zero-citation-hallucination guarantee — ADR-020 is still **PROPOSED**, pending Peleg's axiom-registry review and Alex's sign-off on hallucination-guard rules. Resolver: Peleg (axioms) + Alex (infra) + literature (PaperQA2 evaluation).
 - **Phase G3 — agentic interpreter.** Long-horizon AI assistant that explains each classification with literature evidence. Pre-requisite: G2. Entirely future; no decision owed yet.
 

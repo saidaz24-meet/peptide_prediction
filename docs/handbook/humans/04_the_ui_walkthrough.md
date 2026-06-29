@@ -10,11 +10,24 @@ PVL is a single-page React app. The landing page (`/`) uses a top navigation bar
 
 Colour means different things in different places — don't over-read it:
 
-- **Per-residue secondary structure** (Sequence Track, S4PRED chart): Helix = **blue**, Beta strand = **orange**, Coil = **grey**.
-- **SSW residue highlight** (Sequence Track, Aggregation Heatmap, Mol* overlay): **magenta `#E040FB`** (chameleon-sequence convention).
-- **Class badges:** FF-Helix = **green**, SSW = **medium blue**, FF-SSW = **dark green** (same family as FF-Helix). FF-SSW is *not* red in the shipped build — the only reds are the TANGO aggregation overlay and the "current peptide" scatter dot.
+- **Per-residue secondary structure** (Sequence Track, [S4PRED](./02_the_science.md#3-s4pred) chart): Helix = **blue**, Beta strand = **orange**, Coil = **grey**.
+- **[SSW](./02_the_science.md#6-ssw) residue highlight** (Sequence Track, Aggregation Heatmap, [Mol*](./02_the_science.md#9-alphafold--mol) overlay): **magenta `#E040FB`** (chameleon-sequence convention).
+- **Class badges:** FF-Helix = **green**, SSW = **medium blue**, FF-SSW = **dark green** (same family as FF-Helix). FF-SSW is *not* red in the shipped build — the only reds are the [TANGO](./02_the_science.md#2-tango) aggregation overlay and the "current peptide" scatter dot.
 
-The four classes are **Helix / FF-Helix / SSW / FF-SSW**. See [`./03_the_pipeline.md`](./03_the_pipeline.md) for how they're computed and [`./05_use_cases.md`](./05_use_cases.md) for task → page-sequence recipes.
+The [four classes](./02_the_science.md#1-the-four-class-system) are **Helix / FF-Helix / SSW / FF-SSW**. See [`./03_the_pipeline.md`](./03_the_pipeline.md) for how they're computed and [`./05_use_cases.md`](./05_use_cases.md) for task → page-sequence recipes.
+
+## Contents
+
+- [1. Landing](#1-landing)
+- [2. Quick Analyze](#2-quick-analyze)
+- [3. Upload](#3-upload)
+- [4. Results dashboard](#4-results-dashboard)
+- [5. PeptideDetail](#5-peptidedetail)
+- [6. Compare (A vs B)](#6-compare-a-vs-b)
+- [7. MetricDetail](#7-metricdetail)
+- [8. About](#8-about)
+- [9. Help](#9-help)
+- [10. NotFound (catch-all)](#10-notfound-catch-all)
 
 ---
 

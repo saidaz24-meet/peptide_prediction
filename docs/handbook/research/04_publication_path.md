@@ -2,6 +2,14 @@
 
 > **For grant writers, lab PIs, and paper authors.** This page explains how PVL becomes a *citable, discoverable, peer-reviewed* scientific artifact — and what you can put in a methods section or a grant once each milestone lands. It is a map, not a how-to; the operator's checklist lives in [`docs/active/PUBLICATION_PATH.md`](../../active/PUBLICATION_PATH.md).
 
+## Contents
+
+- [The five steps](#the-five-steps)
+- [What each step gets you](#what-each-step-gets-you)
+- [What it costs in time](#what-it-costs-in-time)
+- [What you cite once they all land](#what-you-cite-once-they-all-land)
+- [Long-term: keeping the DOI fresh](#long-term-keeping-the-doi-fresh)
+
 ---
 
 ## The five steps
@@ -9,10 +17,10 @@
 The path is sequential — each step depends on the one before it.
 
 1. **Cut a tagged release.** A `v0.3.0` release is tagged on GitHub. This freezes a specific, immutable state of the code as "the version that was published."
-2. **Zenodo mints a DOI.** A standing GitHub↔Zenodo link means the release event automatically deposits a snapshot in Zenodo's CERN-backed archive and issues a Digital Object Identifier within a minute or two — no manual upload.
+2. **[Zenodo](../humans/09_glossary.md#z) mints a DOI.** A standing GitHub↔Zenodo link means the release event automatically deposits a snapshot in Zenodo's CERN-backed archive and issues a Digital Object Identifier within a minute or two — no manual upload.
 3. **Wire the DOI back in.** The minted DOI is written into `CITATION.cff` and the README badge row, so anyone landing on the repo gets the correct citation.
-4. **Register on bio.tools.** PVL is submitted to the ELIXIR bio.tools registry with a structured description, EDAM ontology terms, authors, and license.
-5. **Submit the JOSS paper.** The software paper at [`paper/paper.md`](../../../paper/paper.md) goes to the *Journal of Open Source Software* for open peer review.
+4. **Register on [bio.tools](../humans/09_glossary.md#b).** PVL is submitted to the ELIXIR bio.tools registry with a structured description, EDAM ontology terms, authors, and license.
+5. **Submit the [JOSS](../humans/09_glossary.md#j) paper.** The software paper at [`paper/paper.md`](../../../paper/paper.md) goes to the *Journal of Open Source Software* for open peer review.
 
 ---
 

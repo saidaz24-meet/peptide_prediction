@@ -4,6 +4,21 @@
 
 All commands run from the repo root unless a step says `cd`. The repo root is the directory containing `Makefile`, `backend/`, and `ui/`.
 
+## Contents
+
+- [1. Read the request twice](#1-read-the-request-twice)
+- [2. Locate the file and read its heat marker](#2-locate-the-file-and-read-its-heat-marker)
+- [3. Act on the heat marker](#3-act-on-the-heat-marker)
+- [4. Plan mode for multi-file changes](#4-plan-mode-for-multi-file-changes)
+- [5. Write the failing test FIRST (TDD)](#5-write-the-failing-test-first-tdd)
+- [6. Implement — smallest diff, match the surrounding style](#6-implement--smallest-diff-match-the-surrounding-style)
+- [7. Run the relevant test subset](#7-run-the-relevant-test-subset)
+- [8. Run lint + typecheck](#8-run-lint--typecheck)
+- [9. Run the full suite for anything non-trivial](#9-run-the-full-suite-for-anything-non-trivial)
+- [10. Commit — conventional message, mandatory identity](#10-commit--conventional-message-mandatory-identity)
+- [11. Push and verify CI is green](#11-push-and-verify-ci-is-green)
+- [12. Update the Issue / spec with what shipped](#12-update-the-issue--spec-with-what-shipped)
+
 ---
 
 ## 1. Read the request twice

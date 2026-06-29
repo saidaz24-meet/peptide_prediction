@@ -11,6 +11,15 @@ For how PVL compares to other tools as *software*, see
 see [`../humans/02_the_science.md`](../humans/02_the_science.md). For the gaps
 that remain, see [`03_open_questions.md`](03_open_questions.md).
 
+## Contents
+
+- [1. The Peleg-118 set](#1-the-peleg-118-set)
+- [2. FF-Helix recall on Peleg-118](#2-ff-helix-recall-on-peleg-118)
+- [3. FF-SSW recall on Peleg-118](#3-ff-ssw-recall-on-peleg-118)
+- [4. Staphylococcus 2023 gold-standard benchmark](#4-staphylococcus-2023-gold-standard-benchmark)
+- [5. Cross-tool comparison](#5-cross-tool-comparison)
+- [6. What we can't yet validate](#6-what-we-cant-yet-validate)
+
 ---
 
 ## 1. The Peleg-118 set
@@ -68,7 +77,7 @@ and the pre-computed artifact `backend/data/precomputed/peleg_118.json` is not
 present yet (the `precomputed/` directory is empty).
 
 Because Peleg-118 is an **all-positive** set, the meaningful metric is **recall
-(sensitivity)** — the fraction of the 118 caught by `FF-Helix = 1`. There is no
+(sensitivity)** — the fraction of the 118 caught by [`FF-Helix = 1`](../humans/02_the_science.md#5-ff-helix). There is no
 honest way to state that fraction without running the current pipeline.
 
 > **To be filled** by running the validation pipeline on the current PVL HEAD,
@@ -95,7 +104,7 @@ behaviour.
 ## 3. FF-SSW recall on Peleg-118
 
 **No committed FF-SSW recall number exists for Peleg-118 either.** Same situation
-and same rule as §2. FF-SSW (`SSW base call AND hydrophobicity ≥ threshold`) is
+and same rule as §2. [FF-SSW](../humans/02_the_science.md#7-ff-ssw) (`SSW base call AND hydrophobicity ≥ threshold`) is
 evaluated in the same run by the same script; the per-classifier `FF-SSW`
 sensitivity drops out of the same confusion matrix.
 

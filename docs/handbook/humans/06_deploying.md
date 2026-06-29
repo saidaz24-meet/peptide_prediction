@@ -4,9 +4,17 @@
 
 Every command on this page is quoted verbatim from a real file in the repo, with the source annotated. If a command here differs from what you see in the repo, the repo wins — these scripts evolve.
 
+## Contents
+
+- [What you're deploying](#what-youre-deploying)
+- [Scenario 1 — Single VPS via Docker Compose (the Hetzner pattern, live now)](#scenario-1--single-vps-via-docker-compose-the-hetzner-pattern-live-now)
+- [Scenario 2 — Institutional VM behind a firewall (the DESY pattern)](#scenario-2--institutional-vm-behind-a-firewall-the-desy-pattern)
+- [Scenario 3 — Kubernetes (future, gestural only)](#scenario-3--kubernetes-future-gestural-only)
+- [When something breaks](#when-something-breaks)
+
 ## What you're deploying
 
-PVL backend is **FastAPI + S4PRED (PyTorch CPU, ~800 MB RSS) + a TANGO subprocess**. It is **I/O-bound and memory-bound, not CPU-bound** (`docs/active/DEPLOYMENT.md`). The two predictors are optional at runtime: the system degrades gracefully — without TANGO you lose aggregation, without S4PRED you lose secondary structure, and biochem + FF-Helix still compute. That property is what makes a firewalled VM with no outbound binary download survivable.
+PVL backend is **FastAPI + [S4PRED](02_the_science.md#3-s4pred) (PyTorch CPU, ~800 MB RSS) + a [TANGO](02_the_science.md#2-tango) subprocess**. It is **I/O-bound and memory-bound, not CPU-bound** (`docs/active/DEPLOYMENT.md`). The two predictors are optional at runtime: the system degrades gracefully — without TANGO you lose aggregation, without S4PRED you lose secondary structure, and biochem + FF-Helix still compute. That property is what makes a firewalled VM with no outbound binary download survivable.
 
 The tool assets (S4PRED weights, TANGO binaries) live **outside** the Docker image and are volume-mounted from the host. That keeps the image small and lets you swap binaries without a rebuild.
 
@@ -14,7 +22,7 @@ The tool assets (S4PRED weights, TANGO binaries) live **outside** the Docker ima
 
 ## Scenario 1 — Single VPS via Docker Compose (the Hetzner pattern, live now)
 
-This is what serves the citable public URL today: a Hetzner CX33 at `94.130.178.182:3000`.
+This is what serves the citable public URL today: a [Hetzner](09_glossary.md#h) CX33 at `94.130.178.182:3000`.
 
 ### VM spec
 

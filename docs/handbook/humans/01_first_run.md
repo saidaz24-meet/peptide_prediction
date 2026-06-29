@@ -2,6 +2,18 @@
 
 > 12 minutes start to finish on a clean macOS or Linux box. If you've used Python and Node before, half that.
 
+## Contents
+
+- [What you'll have when you finish](#what-youll-have-when-you-finish)
+- [Pre-flight check (1 min)](#pre-flight-check-1-min)
+- [Clone (10 sec)](#clone-10-sec)
+- [Backend (4 min)](#backend-4-min)
+- [Frontend (3 min)](#frontend-3-min)
+- [Quick smoke test (1 min)](#quick-smoke-test-1-min)
+- [Run the tests](#run-the-tests)
+- [Where to go next](#where-to-go-next)
+- [Troubleshooting](#troubleshooting)
+
 ## What you'll have when you finish
 
 A local PVL instance at <http://localhost:5173> with the example dataset loaded, every panel rendering, and a `make test` you can run against your changes.
@@ -15,7 +27,7 @@ docker --version    # not required for dev, but useful
 git --version       # any modern git
 ```
 
-If `python3` is < 3.11, install via pyenv / asdf / Homebrew. PVL targets 3.11 in CI; older versions silently break the TANGO subprocess path because of `dataclass(slots=True)` usage.
+If `python3` is < 3.11, install via pyenv / asdf / Homebrew. PVL targets 3.11 in CI; older versions silently break the [TANGO](02_the_science.md#2-tango) subprocess path because of `dataclass(slots=True)` usage.
 
 ## Clone (10 sec)
 
@@ -45,7 +57,7 @@ cd backend
 USE_TANGO=1 USE_S4PRED=1 .venv/bin/uvicorn api.main:app --reload --port 8000
 ```
 
-The first start takes ~10 seconds because S4PRED loads 5 PyTorch model weights. Subsequent starts (with `--reload`) reuse them. You should see:
+The first start takes ~10 seconds because [S4PRED](02_the_science.md#3-s4pred) loads 5 PyTorch model weights. Subsequent starts (with `--reload`) reuse them. You should see:
 
 ```
 {"event": "boot", "message": "USE_TANGO=True • USE_S4PRED=True • CELERY=False"}

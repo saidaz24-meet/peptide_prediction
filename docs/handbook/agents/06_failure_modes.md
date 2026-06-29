@@ -9,6 +9,16 @@ fix it, never silence the gate to make it green.** Commits stay authored by
 Related: [contracts & invariants](../agents/02_contracts_and_invariants.md) ·
 [doing a safe change](../agents/03_doing_a_safe_change.md).
 
+## Contents
+
+- [1. CI gate failed (GitHub Actions)](#1-ci-gate-failed-github-actions)
+- [2. Pre-push hook failed (ruff)](#2-pre-push-hook-failed-ruff)
+- [3. CodeRabbit posted Major findings](#3-coderabbit-posted-major-findings)
+- [4. CodeQL flagged a security issue](#4-codeql-flagged-a-security-issue)
+- [5. A test that "shouldn't be related" fails](#5-a-test-that-shouldnt-be-related-fails)
+- [6. The Pydantic contract guard fired](#6-the-pydantic-contract-guard-fired)
+- [Also worth knowing — the Stop test-gate](#also-worth-knowing--the-stop-test-gate)
+
 ---
 
 ## 1. CI gate failed (GitHub Actions)
@@ -88,7 +98,7 @@ fast local signal.
 
 ## 3. CodeRabbit posted Major findings
 
-CodeRabbit (`.coderabbit.yaml`, `chill` profile, `request_changes_workflow:
+[CodeRabbit](../humans/09_glossary.md#c) (`.coderabbit.yaml`, `chill` profile, `request_changes_workflow:
 false`) is an AI pair-reviewer. It does **not** block merge — it advises. Triage
 each finding:
 
@@ -112,7 +122,7 @@ code or escalates.
 
 ## 4. CodeQL flagged a security issue
 
-CodeQL (`.github/workflows/codeql.yml`, `security-extended` queries, Python +
+[CodeQL](../humans/09_glossary.md#c) (`.github/workflows/codeql.yml`, `security-extended` queries, Python +
 TS) is the security gate. Findings land in the repo **Security** tab.
 
 **Escalation path — NEVER silently suppress:**

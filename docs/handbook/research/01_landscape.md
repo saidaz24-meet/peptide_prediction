@@ -4,6 +4,26 @@
 >
 > **Framing for the paper.** The aggregation-prediction field is crowded but *narrow*: almost every established tool answers one question (is this stretch aggregation-prone / amyloidogenic?) through one interface (a single-algorithm web form that emits a static plot or a flat file). PVL's claim to novelty is **not** "a better aggregation score." It is **integration** (multiple analyses in one dashboard), **a different scientific question** (helix and secondary-structure-switch fibril formation, per Ragonis-Bachar et al. 2022[^rb2022], not classic cross-β hexapeptide amyloidogenicity), and **reproducibility + structure visualization** as first-class features. Read the comparisons below with that thesis in mind.
 
+## Contents
+
+- [How to read this](#how-to-read-this)
+- [1. TANGO](#1-tango)
+- [2. Waltz / WALTZ-DB](#2-waltz--waltz-db)
+- [3. AGGRESCAN](#3-aggrescan)
+- [4. AGGRESCAN3D (A3D) 2.0](#4-aggrescan3d-a3d-20)
+- [5. PASTA 2.0](#5-pasta-20)
+- [6. FoldAmyloid](#6-foldamyloid)
+- [7. ZipperDB / the 3D-profile method](#7-zipperdb--the-3d-profile-method)
+- [8. AmylPred2](#8-amylpred2)
+- [9. MetAmyl](#9-metamyl)
+- [10. AggreProt](#10-aggreprot)
+- [11. CORDAX — the most direct modern competitor](#11-cordax--the-most-direct-modern-competitor)
+- [12. The 2021–2026 machine-learning frontier](#12-the-20212026-machine-learning-frontier)
+- [13. Curated databases (the field's ground truth)](#13-curated-databases-the-fields-ground-truth)
+- [Where PVL's own predictors come from](#where-pvls-own-predictors-come-from)
+- [Feature matrix](#feature-matrix)
+- [References](#references)
+
 ---
 
 ## How to read this
@@ -15,7 +35,7 @@ The tools cluster into four groups:
 3. **Consensus / meta predictors** — combine several of the above. *AmylPred2, MetAmyl.*
 4. **Curated databases** (not predictors, but the field's ground truth) — *AmyPro, WALTZ-DB.*
 
-PVL uses **TANGO** as a vendored input and its own **FF-Helix / SSW / FF-SSW** classification on top — so TANGO is both an ancestor and a component, not purely a competitor.
+PVL uses **[TANGO](../humans/02_the_science.md#2-tango)** as a vendored input and its own **[FF-Helix / SSW / FF-SSW](../humans/02_the_science.md#1-the-four-class-system)** classification on top — so TANGO is both an ancestor and a component, not purely a competitor.
 
 ---
 
@@ -136,7 +156,7 @@ These are not competitors; they are the datasets a paper benchmarks against.
 For completeness, PVL's two vendored predictors:
 
 - **TANGO** — see §1 above.
-- **S4PRED** — Moffat, L. & Jones, D. T. "Increasing the accuracy of single-sequence prediction methods using a deep semi-supervised learning framework." *Bioinformatics* **37**(21), 3744–3751 (2021). doi:[10.1093/bioinformatics/btab491](https://doi.org/10.1093/bioinformatics/btab491)[^s4pred] — a single-sequence 3-state secondary-structure predictor (helix/sheet/coil) using a BiLSTM ensemble. (Note: the repo's README acknowledgements and `PAPER_METHODS_REFERENCE.md` cite slightly different S4PRED bibliographic details; this should be reconciled before paper submission — flagged in [open questions](03_open_questions.md).)
+- **[S4PRED](../humans/02_the_science.md#3-s4pred)** — Moffat, L. & Jones, D. T. "Increasing the accuracy of single-sequence prediction methods using a deep semi-supervised learning framework." *Bioinformatics* **37**(21), 3744–3751 (2021). doi:[10.1093/bioinformatics/btab491](https://doi.org/10.1093/bioinformatics/btab491)[^s4pred] — a single-sequence 3-state secondary-structure predictor (helix/sheet/coil) using a BiLSTM ensemble. (Note: the repo's README acknowledgements and `PAPER_METHODS_REFERENCE.md` cite slightly different S4PRED bibliographic details; this should be reconciled before paper submission — flagged in [open questions](03_open_questions.md).)
 
 ---
 

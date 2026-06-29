@@ -14,9 +14,9 @@
 
 1. **`backend/schemas/api_models.py`** — any change to the canonical response schema (keys, types, shape). This is the single source of truth and is contract-protected. Breaks the backend↔UI contract and every downstream consumer. → **Said**.
 
-2. **FF-Helix or FF-SSW thresholds / classification defaults** — editing the numbers or rules behind `helixFlag`, `ffHelixFlag`, `sswPrediction`, `ffSswFlag` (see `apply_ff_flags`). These are Peleg's scientific definitions, not tunable knobs. Changing them silently re-labels every peptide. → **Peleg** (and tell Said, since it touches the data layer).
+2. **[FF-Helix](../humans/02_the_science.md#5-ff-helix) or FF-SSW thresholds / classification defaults** — editing the numbers or rules behind `helixFlag`, `ffHelixFlag`, `sswPrediction`, `ffSswFlag` (see `apply_ff_flags`). These are Peleg's scientific definitions, not tunable knobs. Changing them silently re-labels every peptide. → **Peleg** (and tell Said, since it touches the data layer).
 
-3. **SSW canonical = (TANGO ∪ S4PRED)** — altering the union/intersection logic or which predictors feed the SSW determination. This is a scientific axiom, not an implementation detail. A change here changes what "SSW" means project-wide. → **Peleg**.
+3. **[SSW](../humans/02_the_science.md#6-ssw) canonical = (TANGO ∪ S4PRED)** — altering the union/intersection logic or which predictors feed the SSW determination. This is a scientific axiom, not an implementation detail. A change here changes what "SSW" means project-wide. → **Peleg**.
 
 4. **Adding or modifying an ADR** in `docs/active/DECISIONS.md` — ADRs are load-bearing decisions with named authors (e.g. ADR-001 is "Said + Peleg"). Never add, edit, or reverse one unilaterally. Author it jointly with whoever owns the domain: science ADRs need Peleg, architecture ADRs need Said. → **Said** for the record; co-author per domain.
 

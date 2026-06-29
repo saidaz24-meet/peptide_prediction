@@ -4,11 +4,24 @@
 
 **The one rule that explains half of these:** PVL degrades gracefully. If TANGO or S4PRED can't run, FF-Helix%, charge, hydrophobicity, and μH still compute — so a half-empty result is usually a missing *predictor*, not a broken pipeline. A blank field means **no data** (`null`), never a fake `0`. And `-1` is a real value (e.g. charge `-1.0`), not a sentinel.
 
+## Contents
+
+- [1. Quick Analyze sat on "Analyzing…" for 30+ seconds](#1-quick-analyze-sat-on-analyzing-for-30-seconds)
+- [2. The aggregation heatmap is empty for the bundled example](#2-the-aggregation-heatmap-is-empty-for-the-bundled-example)
+- [3. I uploaded a CSV but the table shows 0 rows](#3-i-uploaded-a-csv-but-the-table-shows-0-rows)
+- [4. Mol* shows "No structure available" for my peptide](#4-mol-shows-no-structure-available-for-my-peptide)
+- [5. I see "Something went wrong" / Minified React error #XXX](#5-i-see-something-went-wrong--minified-react-error-xxx)
+- [6. The DOI badge in the README is grey / says "mints on release"](#6-the-doi-badge-in-the-readme-is-grey--says-mints-on-release)
+- [7. I get a 429 rate limit error](#7-i-get-a-429-rate-limit-error)
+- [8. TANGO output is all zeros for all peptides](#8-tango-output-is-all-zeros-for-all-peptides)
+- [9. S4PRED probabilities sum to >1 or <1 by a lot](#9-s4pred-probabilities-sum-to-1-or-1-by-a-lot)
+- [Still stuck?](#still-stuck)
+
 ---
 
 ## 1. Quick Analyze sat on "Analyzing…" for 30+ seconds
 
-**Cause:** The first request after a server start pays a one-time S4PRED cost — it loads 5 PyTorch BiLSTM model weights into memory before it can predict.
+**Cause:** The first request after a server start pays a one-time [S4PRED](02_the_science.md#3-s4pred) cost — it loads 5 PyTorch BiLSTM model weights into memory before it can predict.
 
 **Fix:** Wait it out once; subsequent requests are fast because the process stays warm. If every request is slow, you're probably running the live pipeline on a large batch instead of the precomputed artifact — confirm the backend logged `boot` and that `--reload` isn't restarting the worker mid-request.
 
@@ -19,7 +32,7 @@
 
 ## 2. The aggregation heatmap is empty for the bundled example
 
-**Cause:** The heatmap is driven by TANGO per-residue curves. It's blank when TANGO didn't run — either `USE_TANGO=0`, or TANGO failed under Apple-Silicon x86 emulation, or the precomputed example artifact was built without the TANGO subprocess.
+**Cause:** The heatmap is driven by [TANGO](02_the_science.md#2-tango) per-residue curves. It's blank when TANGO didn't run — either `USE_TANGO=0`, or TANGO failed under Apple-Silicon x86 emulation, or the precomputed example artifact was built without the TANGO subprocess.
 
 **Fix:** Set `USE_TANGO=1` on a native-Linux/x86 host and re-run. On an Apple-Silicon Mac in Docker, TANGO can't execute under emulation — run the backend natively or regenerate the example artifact with `scripts/precompute_dataset.py`.
 

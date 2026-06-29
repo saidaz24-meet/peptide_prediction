@@ -4,7 +4,16 @@ You already have a real task in front of you. This page maps five common researc
 
 Throughout, routes are written as the live app shows them. The public demo is at **http://94.130.178.182:3000** (this will be replaced by the DESY-hosted URL once that DNS resolves — the routes below stay identical). If you want the unhurried tour of every panel first, read the [UI walkthrough](04_the_ui_walkthrough.md).
 
-One concept underlies all five: **every analysis in PVL is a shareable permalink** that encodes the sequence(s), the thresholds, and the software version. And every peptide is sorted into the four-class system — **Helix**, **FF-Helix** (⊆ Helix), **SSW**, **FF-SSW** (⊆ SSW). Keep both in mind as you read.
+One concept underlies all five: **every analysis in PVL is a shareable permalink** that encodes the sequence(s), the thresholds, and the software version. And every peptide is sorted into the [four-class system](02_the_science.md#1-the-four-class-system) — **Helix**, **FF-Helix** (⊆ Helix), **SSW**, **FF-SSW** (⊆ SSW). Keep both in mind as you read.
+
+## Contents
+
+- [1. "I have a UniProt accession — is it likely to form fibrils?"](#1-i-have-a-uniprot-accession--is-it-likely-to-form-fibrils)
+- [2. "I have a CSV of 500 designed peptides — rank them by aggregation risk + helix candidacy."](#2-i-have-a-csv-of-500-designed-peptides--rank-them-by-aggregation-risk--helix-candidacy)
+- [3. "I have a single sequence and a target structure — does the predicted aggregation overlap with helical regions?"](#3-i-have-a-single-sequence-and-a-target-structure--does-the-predicted-aggregation-overlap-with-helical-regions)
+- [4. "I want to compare two cohorts — my designs vs a published reference."](#4-i-want-to-compare-two-cohorts--my-designs-vs-a-published-reference)
+- [5. "I'm writing a paper and need a citable URL for the analysis."](#5-im-writing-a-paper-and-need-a-citable-url-for-the-analysis)
+- [What we don't yet support](#what-we-dont-yet-support)
 
 ---
 
@@ -27,7 +36,7 @@ One concept underlies all five: **every analysis in PVL is a shareable permalink
 
 ## 2. "I have a CSV of 500 designed peptides — rank them by aggregation risk + helix candidacy."
 
-**The scenario.** Your lab designed a 500-member peptide library and wants to pick the top dozen to synthesize. You need a defensible, reproducible ranking that blends aggregation propensity (TANGO) with helix / FF-Helix candidacy — not a single-algorithm sort that ignores structure.
+**The scenario.** Your lab designed a 500-member peptide library and wants to pick the top dozen to synthesize. You need a defensible, reproducible ranking that blends aggregation propensity ([TANGO](02_the_science.md#2-tango)) with helix / FF-Helix candidacy — not a single-algorithm sort that ignores structure.
 
 **Page sequence:** Upload (`/upload`) → Results (`/results`).
 
@@ -46,7 +55,7 @@ Single-sequence and batch results are guaranteed identical in PVL, so a top cand
 
 ## 3. "I have a single sequence and a target structure — does the predicted aggregation overlap with helical regions?"
 
-**The scenario.** You're studying one peptide and you suspect it's a **secondary-structure switch**: a stretch that S4PRED calls helix but TANGO also flags as aggregation-prone. That overlap is precisely PVL's **SSW** class. You want to see, residue by residue, where the helix and the β-aggregation prediction collide — and where that sits on the 3D fold.
+**The scenario.** You're studying one peptide and you suspect it's a **secondary-structure switch**: a stretch that [S4PRED](02_the_science.md#3-s4pred) calls helix but TANGO also flags as aggregation-prone. That overlap is precisely PVL's **[SSW](02_the_science.md#6-ssw)** class. You want to see, residue by residue, where the helix and the β-aggregation prediction collide — and where that sits on the 3D fold.
 
 **Page sequence:** Quick Analyze (`/quick`) → Results (`/results`) → Peptide Detail (`/peptides/:id`).
 
@@ -70,7 +79,7 @@ Single-sequence and batch results are guaranteed identical in PVL, so a top cand
 **What you touch.**
 1. Upload your cohort at **Upload** (`/upload`) as in case 2.
 2. Go to **Compare** (`/compare`). Click the **one-click compare** chip to load the built-in published reference cohort (the 118-peptide fibril-forming reference set). Your cohort and the reference render side by side.
-3. Read the **percentile bars** for each metric, and — where the precomputed reference is available — the **Welch's t-test** p-value and effect size next to them. The comparison scope is cohort-only, so the statistics describe these two sets, not the whole database.
+3. Read the **percentile bars** for each metric, and — where the precomputed reference is available — the **[Welch's t-test](09_glossary.md#w)** p-value and effect size next to them. The comparison scope is cohort-only, so the statistics describe these two sets, not the whole database.
 
 **Screenshot worth taking:** the Compare view with both cohort distributions overlaid and the p-value / effect-size readout visible for the aggregation metric.
 

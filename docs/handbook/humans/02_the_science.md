@@ -4,6 +4,23 @@
 >
 > For how PVL compares to other tools in the field, see [the landscape survey](../research/01_landscape.md). For where each module lives in the tree, see the [repo map](../agents/01_repo_map.md).
 
+## Contents
+
+- [1. The four-class system — what each class means, what it does NOT mean](#1-the-four-class-system--what-each-class-means-what-it-does-not-mean)
+- [2. TANGO — aggregation propensity](#2-tango--aggregation-propensity)
+- [3. S4PRED — secondary structure prediction](#3-s4pred--secondary-structure-prediction)
+- [4. Biochemistry — Fauchère-Pliska, Eisenberg μH, charge at pH 7.4](#4-biochemistry--fauchère-pliska-eisenberg-μh-charge-at-ph-74)
+- [5. FF-Helix — the first candidacy classifier](#5-ff-helix--the-first-candidacy-classifier)
+- [6. SSW — the structural switch zone](#6-ssw--the-structural-switch-zone)
+- [7. FF-SSW — the second candidacy classifier](#7-ff-ssw--the-second-candidacy-classifier)
+- [8. The axioms (and why they matter)](#8-the-axioms-and-why-they-matter)
+- [9. AlphaFold + Mol* — the 3D overlay](#9-alphafold--mol--the-3d-overlay)
+- [10. UniProt + ChEMBL — peptide metadata](#10-uniprot--chembl--peptide-metadata)
+- [11. The deterministic-output guarantee](#11-the-deterministic-output-guarantee)
+- [12. Known scientific limitations](#12-known-scientific-limitations)
+- [Validation](#validation)
+- [References](#references)
+
 ---
 
 ## 1. The four-class system — what each class means, what it does NOT mean
@@ -125,7 +142,7 @@ You cannot be a fibril-forming-helix candidate without being a helix; you cannot
 1. **By construction** in `apply_ff_flags`: the FF gate is computed from the *same* mask as the base class, so a positive FF flag implies a positive base flag (`dataframe_utils.py:307-322`).
 2. **At the serialization boundary** in `_enforce_ff_axioms` (`backend/services/normalize.py:489-529`): every row is re-checked just before it becomes JSON. If an upstream bug ever emits `ffSswFlag == 1` with `sswPrediction != 1`, the FF flag is forced to `-1` and a structured `ff_*_axiom_violation` warning is logged. **A researcher never sees "FF-SSW candidate" on a peptide the data says is not SSW.**
 
-Why it matters: in a scientific tool, a silently incoherent classification is worse than a loud error. The axiom guard guarantees the contract holds even when upstream code is broken (ADR-001/ADR-003).
+Why it matters: in a scientific tool, a silently incoherent classification is worse than a loud error. The axiom guard guarantees the [contract](../agents/02_contracts_and_invariants.md) holds even when upstream code is broken (ADR-001/ADR-003).
 
 ---
 

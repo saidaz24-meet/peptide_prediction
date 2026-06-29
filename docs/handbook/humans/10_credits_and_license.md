@@ -2,6 +2,14 @@
 
 PVL is a collaboration between a structural-biology lab and a software platform. This page records who built what, how the software is licensed, how to cite it correctly, who funds it, and which tools it stands on. If you publish results produced with PVL, the [citation guidance](#citation-guidance) below is the part you need.
 
+## Contents
+
+- [Authors](#authors)
+- [License](#license)
+- [Citation guidance](#citation-guidance)
+- [Funding](#funding)
+- [Acknowledgements](#acknowledgements)
+
 ---
 
 ## Authors
@@ -114,8 +122,8 @@ PVL is assembled from open-source software and public scientific databases. Wher
 
 **Scientific tools and the papers behind them:**
 
-- **TANGO** — aggregation-propensity prediction. Fernández-Escamilla et al., *Nat Biotechnol* 22, 1302–1306 (2004). <https://tango.switchlab.org/>
-- **S4PRED** — neural secondary-structure prediction (5-model BiLSTM ensemble). Moffat et al., *Bioinformatics* 38, 4647–4653 (2022). <https://github.com/psipred/s4pred>
+- **[TANGO](02_the_science.md#2-tango)** — aggregation-propensity prediction. Fernández-Escamilla et al., *Nat Biotechnol* 22, 1302–1306 (2004). <https://tango.switchlab.org/>
+- **[S4PRED](02_the_science.md#3-s4pred)** — neural secondary-structure prediction (5-model BiLSTM ensemble). Moffat et al., *Bioinformatics* 38, 4647–4653 (2022). <https://github.com/psipred/s4pred>
 - **AlphaFold DB** — predicted 3D structures. Jumper et al. (2021); Varadi et al. (2024). <https://alphafold.ebi.ac.uk/>
 - **Mol\*** — in-browser 3D structure viewer (RCSB PDB · EBI · ETH consortium). <https://molstar.org/>
 - **Hamodrakas (2007)** — secondary-structure/aggregation methodology underpinning the fibril-forming-helix analysis.

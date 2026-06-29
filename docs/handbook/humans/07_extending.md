@@ -4,11 +4,18 @@
 
 Three walkthroughs. Each ends with the one or two ways people actually break things.
 
+## Contents
+
+- [1. Add a new aggregation predictor (Waltz, AGGRESCAN3D, PASTA 2.0)](#1-add-a-new-aggregation-predictor-waltz-aggrescan3d-pasta-20)
+- [2. Add a third reference/comparison cohort](#2-add-a-third-referencecomparison-cohort)
+- [3. Add a new export format (e.g. mmCIF/PNG alongside SVG)](#3-add-a-new-export-format-eg-mmcifpng-alongside-svg)
+- [Before you open a PR](#before-you-open-a-pr)
+
 ---
 
 ## 1. Add a new aggregation predictor (Waltz, AGGRESCAN3D, PASTA 2.0)
 
-This is the **Phase I multi-predictor** track (Tier 3 in the roadmap). The codebase is already pre-wired for it in two places — the trick is finding them.
+This is the **[Phase I multi-predictor](09_glossary.md#p)** track (Tier 3 in the roadmap). The codebase is already pre-wired for it in two places — the trick is finding them.
 
 ### Backend seam — `backend/services/predict_service.py`
 
@@ -17,7 +24,7 @@ The single-sequence path is `process_single_sequence(...)`. Predictors are run b
 - `_run_tango_for_single_sequence(df, entry_id, seq)`
 - `_run_s4pred_provider(df)`
 
-Each is gated by a settings flag read **dynamically** (`settings.USE_TANGO`, `settings.USE_S4PRED` — never cached at import). To add Waltz you:
+Each is gated by a settings flag read **dynamically** (`settings.USE_TANGO`, `settings.USE_S4PRED` — never cached at import). To add [Waltz](../research/01_landscape.md#2-waltz--waltz-db) you:
 
 1. Add `USE_WALTZ` to `backend/config.py` (default off).
 2. Write `backend/waltz.py` with a runner + parser, mirroring `backend/tango.py`'s record-in / DataFrame-out shape.

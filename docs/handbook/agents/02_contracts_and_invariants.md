@@ -2,6 +2,16 @@
 
 > Audience: an AI agent about to change PVL. These seven invariants are load-bearing. They are not style preferences — each one was paid for in a real bug (cited below) or in a scientific-credibility commitment to Peleg. If your change touches one, **stop and ask the user first** (see [04_when_to_ask_humans.md](./04_when_to_ask_humans.md)). For the heat map of every file mentioned here, see [01_repo_map.md](./01_repo_map.md); for the safe-change procedure, see [03_doing_a_safe_change.md](./03_doing_a_safe_change.md); for the science behind the 4 classes, see [../humans/02_the_science.md](../humans/02_the_science.md).
 
+## Contents
+
+- [1. Protected files — the contract surface](#1-protected-files--the-contract-surface)
+- [2. The 4-class axioms — FF ⊆ parent](#2-the-4-class-axioms--ff--parent)
+- [3. The deterministic-output guarantee](#3-the-deterministic-output-guarantee)
+- [4. The single-vs-batch invariant](#4-the-single-vs-batch-invariant)
+- [5. The null-only invariant (with the flag-column exception)](#5-the-null-only-invariant-with-the-flag-column-exception)
+- [6. The frontend `??` (not `||`) rule](#6-the-frontend--not--rule)
+- [7. The commit-identity rule](#7-the-commit-identity-rule)
+
 ---
 
 ## 1. Protected files — the contract surface
@@ -36,7 +46,7 @@
 
 ## 2. The 4-class axioms — FF ⊆ parent
 
-**Invariant.** Two subset axioms anchor the 4-category classification (ADR-001, ADR-003, Peleg P27 canonical):
+**Invariant.** Two subset axioms anchor the [4-category classification](../humans/02_the_science.md#1-the-four-class-system) (ADR-001, ADR-003, Peleg P27 canonical):
 
 ```
 ffSswFlag   == 1  ⇒  sswPrediction          == 1

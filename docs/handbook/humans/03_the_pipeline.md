@@ -2,6 +2,16 @@
 
 > One request, one peptide, every step. Pin this page to your tabs while you're learning the codebase.
 
+## Contents
+
+- [The 30-second version](#the-30-second-version)
+- [The actual ordered stages](#the-actual-ordered-stages)
+- [Where the deterministic guarantee comes from](#where-the-deterministic-guarantee-comes-from)
+- [What the precompute path is (and isn't)](#what-the-precompute-path-is-and-isnt)
+- [When the pipeline returns null](#when-the-pipeline-returns-null)
+- [When you want to verify any of this](#when-you-want-to-verify-any-of-this)
+- [See also](#see-also)
+
 ## The 30-second version
 
 ```
@@ -51,7 +61,7 @@ Default thresholds come from `backend/config.py` (literature-default); per-datab
 The precompute script bypasses this entirely (`force_recompute=True`) because it IS the cache source-of-truth — see [ISSUE-034 fix](../../active/KNOWN_ISSUES.md).
 
 ### 6. TANGO (subprocess, deterministic)
-`backend/tango.py:run_tango_simple(records)` writes each peptide as a one-line input file, spawns the TANGO Fortran binary, parses the output `*.txt` files back into the DataFrame as per-residue arrays:
+`backend/tango.py:run_tango_simple(records)` writes each peptide as a one-line input file, spawns the [TANGO](02_the_science.md#2-tango) Fortran binary, parses the output `*.txt` files back into the DataFrame as per-residue arrays:
 
 - `tangoAggCurve[i]` — % aggregation propensity at residue i
 - `tangoBetaCurve[i]` — % β-strand probability
@@ -67,7 +77,7 @@ These curves drive the aggregation heatmap. Auto-disabled for runs > `MAX_PEPTID
 - `s4predPCCurve[i]` — P(coil)
 - `s4predSsPrediction[i]` — argmax label "H" / "E" / "C"
 
-S4PRED is the **primary helix predictor** (PSIPRED was removed per ADR-006). It also produces `s4predSswFragments` — regions where the predictor sees a structural switch zone.
+[S4PRED](02_the_science.md#3-s4pred) is the **primary helix predictor** (PSIPRED was removed per ADR-006). It also produces `s4predSswFragments` — regions where the predictor sees a structural switch zone.
 
 ### 8. SSW + FF-SSW classifiers
 After TANGO + S4PRED both populate, the SSW classifier (`backend/services/dataframe_utils.py`) computes the canonical mask:
@@ -80,7 +90,7 @@ FF-SSW then applies:
 
 > FF-SSW candidate iff **SSW AND µH ≥ `mu_h_threshold`**.
 
-The axiom `FF-SSW ⊆ SSW` is enforced at the normalize layer — a violation raises in tests and would fail CI.
+The [axiom](02_the_science.md#8-the-axioms) `FF-SSW ⊆ SSW` is enforced at the normalize layer — a violation raises in tests and would fail CI.
 
 ### 9. Normalize for the UI
 `backend/services/normalize.py:normalize_rows_for_ui(df)` converts pandas types → JSON-safe Python:
@@ -108,7 +118,7 @@ This is what the frontend ingests.
 
 ## Where the deterministic guarantee comes from
 
-Same input + same `pvl_version` + same threshold config = byte-identical output. This is the single-vs-batch invariant from `CLAUDE.md`. Test that locks it: `backend/tests/test_single_vs_batch_consistency.py`.
+Same input + same `pvl_version` + same threshold config = byte-identical output. This is the [single-vs-batch invariant](../agents/02_contracts_and_invariants.md) from `CLAUDE.md`. Test that locks it: `backend/tests/test_single_vs_batch_consistency.py`.
 
 What can break it:
 - Mutating any predictor binary or weight file (S4PRED weights are SHA-checked in CI)
