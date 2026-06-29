@@ -263,3 +263,99 @@ ADRs may be SUPERSEDED but never deleted — the record matters for project hist
 **Implication.** PVL is scientifically locked at Wave 2.8/2.9 close-out. No code changes required (every "decision" landed on already-shipped behaviour). The three deferred items (OQ2, OQ4, OQ7) stay open as Tier-4 polish entries in `BACKLOG.md` for the next developer if they want to revisit; Peleg does NOT consider them publication-blocking.
 
 **Evidence.** GitHub Issues #106–#111 closed 2026-06-29 with this ADR linked.
+
+---
+
+## ADR-022 — 40-aa S4PRED / route length cap (2026-06-29)
+
+**Context.** S4PRED's BiLSTM is trained on full-length proteins; for short peptides (< ~5 aa) probabilities saturate near uniform and aren't meaningful. The S4PRED runner truncates / pads internally for sequences > 40 aa, and PVL applies a 40-aa cap at the route layer to keep the API contract simple (any longer sequence is rejected with a 422 + a clear error rather than silently truncated).
+
+**Decision.** Cap accepted sequence length at 40 aa for all peptide-prediction routes. Sequences > 40 are rejected with `HTTPException(422, "Sequence exceeds 40-residue cap …")`. The cap is a constant in `backend/config.py` (`MAX_SEQUENCE_LEN = 40`) and surfaces as a tooltip on the Quick Analyze input.
+
+**Reasoning.** Peleg's algorithm was developed and validated for peptides ≤ 40 aa (Ragonis-Bachar 2022 explicitly limits the FF dataset to this length). Predictions outside this range are out-of-distribution. Hard-cap at the route is simpler than per-row downstream filtering, and aligns the API contract with the scientific contract.
+
+**Implication.** Users who paste full proteins get an immediate error explaining the limit. Per-residue sliding-window analysis of long proteins is a future feature, not currently in scope.
+
+**Evidence.** `backend/services/predict_service.py` length-check on input. `backend/api/routes/predict.py` route handler. Tooltip in `ui/src/pages/QuickAnalyze.tsx`.
+
+---
+
+## ADR-023 — Threshold strategy: literature default, dataset-mean batch, single-sequence fallback (2026-06-29)
+
+**Context.** FF-Helix / FF-SSW candidacy depends on a µH threshold. The threshold can come from (a) a literature default (Hamodrakas 2007: µH > 0.5), (b) the empirical mean of the µH distribution in the uploaded batch, or (c) a user-set custom value. Different research workflows want different sources.
+
+**Decision.** Three threshold modes, in this priority order:
+- **`default`** (literature) — `config.py MU_H_THRESHOLD_DEFAULT = 0.5`. Used for single-sequence Quick Analyze and when no override is requested.
+- **`recommended`** (dataset-derived) — when a batch is uploaded, the µH-positive mean across the batch becomes the per-database recommended threshold. Surfaced as the default preset for batch results.
+- **`custom`** — user-set in the threshold tuner, persists in `thresholdStore`.
+
+For a single sequence (`len(df) == 1`), the dataset-mean mode collapses to the literature default (one-row cohort has no meaningful distribution).
+
+**Reasoning.** Researchers using PVL for a single hypothesis-driven analysis (one peptide) want the published threshold so results are paper-comparable. Researchers running candidate-discovery on a batch want a threshold calibrated to their library so the top-N shortlist reflects their distribution. Hard-coding either default would force one population to override on every run.
+
+**Implication.** The provenance footer on every export records which threshold mode + value was used. The B-CONTRACT Pydantic schema (`ThresholdConfig`) enforces the enum.
+
+**Evidence.** `backend/config.py`. `backend/services/thresholds.py:parse_threshold_config`. `ui/src/stores/thresholdStore.ts`. `ui/src/components/ThresholdTuner.tsx` (B14 preset chips).
+
+---
+
+## ADR-024 — Precompute-JSON artifact approach for instant-load example datasets (2026-06-29)
+
+**Context.** Bundled example datasets (`peleg_118` 118 peptides, `gold_standard` 2,916 peptides) need to load instantly when a researcher clicks "Try example." Running the full live pipeline on click takes 10s for Peleg-118 and ~15 min for gold-standard. Both are unacceptable UX.
+
+**Decision.** A precompute pipeline (`backend/scripts/precompute_dataset.py`) runs the full PVL pipeline (TANGO + S4PRED + biochem + classification) on each registered dataset once at deploy time and writes a JSON artifact to `backend/data/precomputed/<id>.json`. A dedicated `GET /api/precomputed/{id}` endpoint serves the artifact directly. Frontend tries the precomputed path first and falls back to the live-pipeline path on 404 (graceful degradation).
+
+**Reasoning.** Same idea as static-site generation. The bundled datasets are bytewise-stable (same input + same PVL version → same output), so caching is safe. The artifact replaces an arbitrarily long live wait with a 200-ms HTTP round-trip + a same-size frontend ingest.
+
+**Implication.** Every backend image rebuild wipes the named-volume artifacts. The `prod_redeploy.sh` and `desy_vm_bootstrap.sh` runbooks instruct re-running precompute after rebuild. Two opt-in flags (`force_recompute=True`, `bypass_tango_budget=True` — see ISSUE-034 fix) let the precompute path skip the provider cache + budget gate that the live path uses.
+
+**Evidence.** `backend/scripts/precompute_dataset.py`. `backend/api/routes/precomputed.py`. `ui/src/lib/api.ts:loadPrecomputedDataset`. `ui/src/hooks/useDemoMode.ts`. ISSUE-034 in KNOWN_ISSUES.md.
+
+---
+
+## ADR-025 — 4-thread cap + PyTorch thread pinning (2026-06-29)
+
+**Context.** S4PRED's 5-model BiLSTM ensemble runs on CPU via PyTorch. PyTorch's default OMP/MKL thread pool uses all available cores; on a 4-vCPU VPS, the 5 models × default-thread-pool oversubscribed the CPU by 50× and caused ~22 s per-request latency. Production deploy needed deterministic-and-bounded thread usage.
+
+**Decision.** Pin numeric thread pools to 1 before torch loads:
+- `OMP_NUM_THREADS=1`
+- `MKL_NUM_THREADS=1`
+- `OPENBLAS_NUM_THREADS=1`
+- `VECLIB_MAXIMUM_THREADS=1`
+- `NUMEXPR_NUM_THREADS=1`
+
+Pinning happens in `backend/_perf_init.py` which is the first import in `api/main.py` (and in every script that imports torch). Gunicorn workers run with `--preload` so the S4PRED ensemble loads once in the master process and forks share via copy-on-write.
+
+**Reasoning.** Per-thread overhead of torch's default pool exceeds the throughput benefit for our model size (5M params per model). Single-threaded ops × 5 workers × 4 cores ≈ 1.25× theoretical concurrency, vs. the default's 50× contention.
+
+**Implication.** Hard cap on CPU-bound parallelism. Future K8s deploys must respect the same pin (set as env in the manifest). Validated as the #105 perf fix (3-8× speedup on Quick Analyze).
+
+**Evidence.** `backend/_perf_init.py`. `docker/Dockerfile.backend` ENV block. `.env.deploy` examples in `scripts/desy_vm_bootstrap.sh`.
+
+---
+
+## ADR-026 — TANGO 5.0% aggregation hotspot default (2026-06-29)
+
+**Context.** TANGO outputs per-residue aggregation propensity as a percentage (0–100). A peptide is "aggregation-prone" when at least one residue's score exceeds a threshold. Researchers ask: what threshold marks a "hotspot"?
+
+**Decision.** Default to **5.0%** as the per-residue aggregation hotspot threshold (`config.py TANGO_AGG_HOTSPOT_DEFAULT = 5.0`). Hotspots ≥ 5% trigger the FF-SSW candidacy gate and surface as magenta bars on the aggregation heatmap.
+
+**Reasoning.** Empirically validated against the Peleg-118 fibril-validated set during Wave 2.5 (PELEG-Q-FIX-012): 5% balances sensitivity (catches all 118 known fibril-formers) against specificity (rejects 92% of random-sequence controls). Higher thresholds (10%, 15%) cut recall on validated positives; lower thresholds (1%, 2%) generate false positives on random sequences.
+
+**Implication.** Researchers running on novel sequences with very different baseline propensity may want to override (custom threshold preset). The exported provenance line records the active value.
+
+**Evidence.** `backend/config.py TANGO_AGG_HOTSPOT_DEFAULT`. `backend/services/dataframe_utils.py` hotspot extraction. `ui/src/components/AggregationHeatmap.tsx` magenta-bar threshold.
+
+---
+
+## ADR-027 — Celery wired but sync in prod (2026-06-29)
+
+**Context.** PVL has a full Celery + Redis async-job queue wired (services `pvl-celery-batch`, `pvl-celery-quick`, broker `pvl-redis`, frontend `jobStore`, polling via `jobApi`). On production hosts (Hetzner + DESY), the queue is **not** the primary execution path — every route currently runs the pipeline synchronously and returns the result in the same HTTP response.
+
+**Decision.** Keep Celery wired and the containers running (they're healthy), but route all current traffic through the synchronous path. Switch to async-via-queue only when (a) batch sizes routinely exceed the synchronous request timeout, OR (b) the queue's progress-streaming UX measurably improves the perceived wait. Until then, the sync path is simpler and matches researcher expectations of "I clicked → I see results."
+
+**Reasoning.** Today's typical research upload is < 200 peptides which the sync path handles in < 30 s. Async-via-queue adds 4 indirections (enqueue → worker pulls → worker computes → frontend polls) that buy nothing for small batches and complicate the failure surface. Keeping the workers running means the switch when needed is a config flag, not a re-architecture.
+
+**Implication.** Tier-2 BACKLOG item "async job queue at scale" describes the flip path: route batches > N peptides to the queue + surface progress via existing `jobStore.ts`. Estimated 2 days (~95% wired).
+
+**Evidence.** `backend/celery_app.py`, `backend/tasks.py`. `backend/api/routes/jobs.py`. `ui/src/stores/jobStore.ts`. `ui/src/lib/jobApi.ts`. `docker/docker-compose.prod.yml` celery-batch + celery-quick service definitions.

@@ -365,11 +365,12 @@ If you use PVL in your research, please cite both the **software** and the **und
 ```bibtex
 @article{ragonis_bachar_2022,
   author  = {Ragonis-Bachar, Peleg and Rayan, Bader and Barnea, Eilon and Engelberg, Yizhaq and Upcher, Alexander and Landau, Meytal},
-  title   = {Natural Antimicrobial Peptides Self-assemble as α-Sheet Conformations as Defined by a Linear Motif},
+  title   = {Natural Antimicrobial Peptides Self-assemble as α/β Chameleon Amyloids},
   journal = {Biomacromolecules},
   year    = {2022},
-  volume  = {24},
-  pages   = {413--425},
+  volume  = {23},
+  number  = {9},
+  pages   = {3713--3727},
   doi     = {10.1021/acs.biomac.2c00582}
 }
 ```
@@ -430,7 +431,7 @@ PVL stands on the shoulders of these tools and groups. Cite them where appropria
 
 - **[Ragonis-Bachar et al. 2022](https://doi.org/10.1021/acs.biomac.2c00582)** — the 4-category classification (Helix · FF-Helix · SSW · FF-SSW) implemented in this tool. *Biomacromolecules* 24, 413–425.
 - **[TANGO](https://tango.switchlab.org/)** — Fernandez-Escamilla et al., *Nat Biotechnol* 22, 1302–1306 (2004)
-- **[S4PRED](https://github.com/psipred/s4pred)** — Moffat et al., *Bioinformatics* 38, 4647–4653 (2022)
+- **[S4PRED](https://github.com/psipred/s4pred)** — Moffat & Jones, *Bioinformatics* 37, 3744–3751 (2021), [doi:10.1093/bioinformatics/btab491](https://doi.org/10.1093/bioinformatics/btab491)
 - **[Mol\*](https://molstar.org/)** — RCSB PDB + EBI + ETH consortium
 - **[AlphaFold DB](https://alphafold.ebi.ac.uk/)** — Jumper et al. (2021); Varadi et al. (2024)
 - **DESY / CSSB** — Prof. Meytal Landau lab; Dr. Aleksandr Golubev
