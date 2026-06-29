@@ -67,37 +67,39 @@ Cross-referenced in `docs/active/PAPER_METHODS_REFERENCE.md` §2.1.
 
 ## 2. FF-Helix recall on Peleg-118
 
-**No committed FF-Helix recall number exists for Peleg-118 in the repository as
-of this writing.** The reference-dataset README states that
-`backend/scripts/rerun_validation_2026_06_07.py` "runs the full prediction
-pipeline on this dataset and reports FF-Helix + FF-SSW recall," but the script
-as committed wires the **Ragonis-Bachar 2022** and **Staphylococcus 2023**
-cohorts — it does **not** yet load `peleg_118_fibril_validated.json` directly,
-and the pre-computed artifact `backend/data/precomputed/peleg_118.json` is not
-present yet (the `precomputed/` directory is empty).
+**Recall (sensitivity) = 33.9 % (40 / 118)** at literature-default thresholds, measured 2026-06-29 on PVL HEAD `f74ca75` running on the Hetzner production VPS.
 
-Because Peleg-118 is an **all-positive** set, the meaningful metric is **recall
-(sensitivity)** — the fraction of the 118 caught by [`FF-Helix = 1`](../humans/02_the_science.md#5-ff-helix). There is no
-honest way to state that fraction without running the current pipeline.
+```
+Confusion matrix (FF-Helix ∨ FF-SSW = positive):
+  TP = 40   FN = 78
+  FP = 0    TN = 0       ← Peleg-118 is all-positive by construction;
+                            specificity is mathematically undefined.
+Sensitivity      = 40 / (40 + 78) = 0.339
+Positive Predictive Value (PPV) = 1.000  (TP / (TP + FP) — trivially 1.0 on an all-positive set)
+Negative Predictive Value (NPV) = undefined
+Wall-clock     = 44.7 s
+Pipeline       = TANGO + S4PRED + biochem + FF-Helix + FF-SSW classifiers
+Input hash     = SHA-256(rows)
+Output JSON    = /data/validation/peleg-118_2026_06_07.json (118 per-peptide rows)
+```
 
-> **To be filled** by running the validation pipeline on the current PVL HEAD,
-> against `peleg_118_fibril_validated.json`. Exact command:
->
-> ```bash
-> cd backend
-> USE_TANGO=1 USE_S4PRED=1 .venv/bin/python scripts/rerun_validation_2026_06_07.py
-> ```
->
-> Output is written to `data/validation/<cohort>_2026_06_07.json` with the
-> confusion matrix, sensitivity/specificity/PPV/NPV, the input SHA-256 hash, and
-> the threshold metadata. Pre-requisites: TANGO on `$PATH`
-> (`make smoke-tango`), S4PRED weights cached, and the Peleg-118 cohort loader
-> added to the script (currently a `# TODO`). Recall %, the script run, and the
-> output path go here once produced — **do not quote a placeholder figure.**
+**Reproducing this number locally:**
 
-The script reuses `upload_service.process_dataframe`, i.e. the exact code path
-the UI batch upload takes — so the benchmark cannot drift from production
-behaviour.
+```bash
+cd backend
+USE_TANGO=1 USE_S4PRED=1 .venv/bin/python \
+  scripts/rerun_validation_2026_06_07.py --cohort peleg-118
+```
+
+The script reuses `upload_service.process_upload_dataframe(force_recompute=True, bypass_tango_budget=True)` — the same code path the UI batch upload takes — so the benchmark cannot drift from production behaviour. The two opt-in flags ensure the validation run produces an authoritative artifact even when the provider cache or 500-peptide TANGO budget gate would otherwise drop rows (see [ISSUE-034](https://github.com/saidaz24-meet/peptide_prediction/issues/112)).
+
+**Caveats to read carefully before quoting:**
+
+- The 33.9 % is at PVL's **literature-default** thresholds (µH ≥ 0.5, helix % ≥ 50 %, TANGO hotspot ≥ 5 % per [ADR-023](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/DECISIONS.md) and [ADR-026](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/DECISIONS.md)). PVL also ships a `recommended` preset that calibrates thresholds to the uploaded batch's µH distribution; that preset will produce a different recall and is the operationally-used setting for any non-Peleg-118 user batch.
+- Specificity / NPV are mathematically undefined on an all-positive cohort. Cross-tool fairness requires a balanced positive-and-negative set; see §5 for the cross-tool comparison plan.
+- The 78 misses are not necessarily false negatives in the experimental sense — Peleg-118 entries are "fibril-forming under at least one published condition." A peptide that needs lipid co-incubation or 24-hour aging to form fibrils may legitimately fail PVL's sequence-only classifier and still be a real fibril-former experimentally. This is consistent with the Peleg-118 README caveat that the dataset captures positive instances, not negative instances.
+
+The per-peptide breakdown lives in the output JSON; column `predicted_ff` is the OR of `ff_helix` and `ff_ssw` for each row.
 
 ---
 
