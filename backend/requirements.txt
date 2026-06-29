@@ -1,6 +1,6 @@
 # Core web framework
 fastapi>=0.136.1,<1.0
-uvicorn[standard]>=0.46.0,<1.0
+uvicorn[standard]>=0.49.0,<1.0
 gunicorn>=26.0.0,<27.0
 
 # Data processing
