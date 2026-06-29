@@ -24,7 +24,7 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { useDemoStore } from "@/stores/demoStore";
-import { uploadCSV } from "@/lib/api";
+import { uploadCSV, loadPrecomputedDataset } from "@/lib/api";
 import type { DatasetMetadata } from "@/types/peptide";
 
 // ---------------------------------------------------------------------------
@@ -87,7 +87,7 @@ export function useDemoMode(): DemoModeState {
   const [demoError, setDemoError] = useState<string | null>(null);
   const [showFirstVisit, setShowFirstVisit] = useState(false);
   const [isChipDismissed, setIsChipDismissed] = useState(
-    () => lsGet(LS_KEY_CHIP_DISMISSED) === "true",
+    () => lsGet(LS_KEY_CHIP_DISMISSED) === "true"
   );
   const didAttempt = useRef(false);
 
@@ -128,7 +128,30 @@ export function useDemoMode(): DemoModeState {
     };
 
     try {
-      // Strategy A: try pre-processed JSON (instant, no backend needed)
+      // Strategy A: try the /api/precomputed/gold_standard endpoint first
+      // (instant — served by backend from a pre-baked JSON artifact). Falls
+      // through silently on 404 so hosts without the precompute file still
+      // get the slower XLSX path. Hosts get the file by running:
+      //   docker compose exec backend python scripts/precompute_dataset.py gold_standard
+      const precomp = await loadPrecomputedDataset("gold_standard");
+      if (precomp && Array.isArray(precomp.rows) && precomp.rows.length > 0) {
+        ingestBackendRows(precomp.rows, {
+          ...precomp.meta,
+          ...demoMeta,
+        } as DatasetMetadata);
+        lsSet(LS_KEY_ACKNOWLEDGED, "true");
+        setIsDemoLoading(false);
+        useDemoStore.getState().setDemoLoading(false);
+        return;
+      }
+    } catch {
+      // precompute endpoint unavailable — fall through
+    }
+
+    try {
+      // Strategy A2 (legacy): try the static /demo-dataset.json. Kept for
+      // hosts that ship a baked JSON next to the index.html — predates the
+      // /api/precomputed route.
       const jsonRes = await fetch(DEMO_JSON_URL);
       if (jsonRes.ok) {
         const data = await jsonRes.json();
@@ -165,8 +188,7 @@ export function useDemoMode(): DemoModeState {
       } as DatasetMetadata);
       lsSet(LS_KEY_ACKNOWLEDGED, "true");
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Failed to load demo dataset";
+      const message = err instanceof Error ? err.message : "Failed to load demo dataset";
       setDemoError(message);
       console.warn("[useDemoMode] Demo dataset load failed:", message);
     } finally {

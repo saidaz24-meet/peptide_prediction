@@ -1,7 +1,14 @@
 import { useState, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useDropzone } from "react-dropzone";
-import { Upload, ArrowRight, Info, Beaker, AlertTriangle as AlertTriangleIcon } from "lucide-react";
+import {
+  Upload,
+  ArrowRight,
+  Info,
+  Beaker,
+  AlertTriangle as AlertTriangleIcon,
+  ChevronDown,
+} from "lucide-react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -19,6 +26,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useDatasetStore } from "@/stores/datasetStore";
 import { uploadCSV, loadPrecomputedDataset } from "@/lib/api";
 import { mapApiRowToPeptide } from "@/lib/peptideMapper";
@@ -156,30 +169,58 @@ export default function Compare() {
     }
   }, []);
 
-  // B20: one-click fibril-forming reference loader — fetches the bundled
-  // reference CSV and runs it through the same upload pipeline as a
-  // user-uploaded file.
-  const handleLoadPeleg118 = useCallback(async () => {
+  // B20 + 2026-06-29 expansion: one-click reference loaders. Generic loader
+  // dispatches by datasetId — each reference has its own precompute id +
+  // CSV/XLSX fallback path. Falls back gracefully on hosts without the
+  // precompute artifact: the chip still works, just slower.
+  const REFERENCE_DATASETS: Record<
+    string,
+    { label: string; precomputeId: string; fallback?: { url: string; filename: string } }
+  > = {
+    fibril_118: {
+      label: "Fibril-forming peptides (118)",
+      precomputeId: "peleg_118",
+      fallback: {
+        url: "/example/fibril_forming_peptides_118.csv",
+        filename: "fibril_forming_peptides_118.csv",
+      },
+    },
+    gold_standard: {
+      label: "Gold standard — Staphylococcus 2023 (2,916)",
+      precomputeId: "gold_standard",
+      // No CSV fallback for the gold standard — at 2,916 peptides, the XLSX
+      // → live pipeline path takes 20+ minutes which is worse UX than the
+      // explicit "precompute required" error.
+    },
+  };
+
+  const loadReferenceDataset = useCallback(async (datasetKey: keyof typeof REFERENCE_DATASETS) => {
+    const spec = REFERENCE_DATASETS[datasetKey];
     setLoadingPeleg(true);
     setError(null);
-    setBFilename("Fibril-forming peptides (118)");
+    setBFilename(spec.label);
     try {
-      // Try the precomputed path first — instant if `make precompute-datasets`
-      // has been run on the deploy host. Falls back to the live-pipeline path
-      // on 404 so the chip still works on hosts without the artifact.
-      let response = await loadPrecomputedDataset("peleg_118");
-      if (!response) {
-        const resp = await fetch("/example/fibril_forming_peptides_118.csv");
-        if (!resp.ok) throw new Error(`Failed to fetch reference CSV: ${resp.status}`);
+      let response = await loadPrecomputedDataset(spec.precomputeId);
+      if (!response && spec.fallback) {
+        const resp = await fetch(spec.fallback.url);
+        if (!resp.ok) throw new Error(`Failed to fetch reference dataset: ${resp.status}`);
         const blob = await resp.blob();
-        const file = new File([blob], "fibril_forming_peptides_118.csv", { type: "text/csv" });
+        const file = new File([blob], spec.fallback.filename, {
+          type: "text/csv",
+        });
         response = await uploadCSV(file);
+      }
+      if (!response) {
+        throw new Error(
+          `Reference dataset "${spec.label}" is not pre-computed on this host. ` +
+            `Run \`make precompute-datasets ${spec.precomputeId}\` on the deploy host.`
+        );
       }
       const rows = response.rows ?? [];
       const mapped = rows
         .map((r: any, idx: number) => {
           try {
-            return mapApiRowToPeptide(r, `fibril118[${idx}]`);
+            return mapApiRowToPeptide(r, `${datasetKey}[${idx}]`);
           } catch {
             return null;
           }
@@ -192,11 +233,17 @@ export default function Compare() {
         setCohortB(mapped);
       }
     } catch (err: any) {
-      setError(err?.message || "Failed to load fibril-forming reference dataset.");
+      setError(err?.message || `Failed to load ${spec.label} reference dataset.`);
     } finally {
       setLoadingPeleg(false);
     }
   }, []);
+
+  // Backwards compat: existing test references handleLoadPeleg118.
+  const handleLoadPeleg118 = useCallback(
+    () => loadReferenceDataset("fibril_118"),
+    [loadReferenceDataset]
+  );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: (accepted) => {
@@ -452,23 +499,70 @@ export default function Compare() {
         </p>
       </div>
 
-      {/* B20: one-click Peleg-118 chip above the upload zone. The same
-          fibril-forming reference CSV used by Quick Analyze's tabs is loaded
-          through the standard upload pipeline so the analysis path is
-          identical to a user-uploaded comparison file. */}
+      {/* Reference dataset split-button. Left half loads the default (fibril-
+          118). Right chevron opens a menu of every registered reference
+          dataset so researchers can compare against more than one bundled
+          cohort. Both paths route through the precomputed endpoint so loads
+          are instant when the artifact exists, and fall back transparently
+          to the live pipeline (fibril-118 only — the 2,916-peptide gold
+          standard intentionally surfaces an error instead of a 20-minute
+          live run). */}
       {!cohortB && (
-        <button
-          type="button"
-          onClick={handleLoadPeleg118}
-          disabled={loadingPeleg || uploading}
-          className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/10 hover:border-primary/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          data-testid="fibril-118-chip"
+        <div
+          className="inline-flex items-stretch rounded-lg border border-primary/30 bg-primary/5 hover:border-primary/50 transition-colors overflow-hidden"
+          role="group"
+          aria-label="Compare current dataset against a reference"
         >
-          <Beaker className="h-4 w-4" />
-          {loadingPeleg
-            ? "Loading reference..."
-            : "Compare current dataset vs fibril-forming peptides (118) →"}
-        </button>
+          <button
+            type="button"
+            onClick={() => loadReferenceDataset("fibril_118")}
+            disabled={loadingPeleg || uploading}
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-primary hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid="fibril-118-chip"
+          >
+            <Beaker className="h-4 w-4" />
+            {loadingPeleg
+              ? "Loading reference…"
+              : "Compare current dataset vs fibril-forming peptides (118)"}
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                disabled={loadingPeleg || uploading}
+                aria-label="Pick a different reference dataset"
+                className="inline-flex items-center justify-center px-2.5 border-l border-primary/30 text-primary hover:bg-primary/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                data-testid="reference-dataset-menu-trigger"
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-[320px]">
+              <DropdownMenuItem
+                onClick={() => loadReferenceDataset("fibril_118")}
+                className="flex flex-col items-start gap-0.5 cursor-pointer py-2"
+              >
+                <span className="text-sm font-medium">Fibril-forming peptides (118)</span>
+                <span className="text-xs text-muted-foreground">
+                  Experimentally validated short peptides (≤40 aa). Positive set for
+                  fibril-formation recall.
+                </span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => loadReferenceDataset("gold_standard")}
+                className="flex flex-col items-start gap-0.5 cursor-pointer py-2"
+                data-testid="gold-standard-menu-item"
+              >
+                <span className="text-sm font-medium">
+                  Gold standard — Staphylococcus 2023 (2,916)
+                </span>
+                <span className="text-xs text-muted-foreground">
+                  Full Staphylococcus aureus proteome benchmark. Requires precompute on this host.
+                </span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       )}
 
       {!cohortB && (

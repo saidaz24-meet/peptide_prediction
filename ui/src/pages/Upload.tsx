@@ -759,6 +759,28 @@ export default function Upload() {
                                 toast.loading("Loading gold standard dataset...", {
                                   id: "gold-std",
                                 });
+                                // Strategy A: try the precomputed endpoint —
+                                // instant if `make precompute-datasets gold_standard`
+                                // has been run on the deploy host. Skips the
+                                // ~20 min live-pipeline path entirely.
+                                try {
+                                  const precomp = await loadPrecomputedDataset("gold_standard");
+                                  if (precomp && precomp.rows && precomp.rows.length > 0) {
+                                    ingestBackendRows(
+                                      precomp.rows,
+                                      toDatasetMetadata(precomp.meta)
+                                    );
+                                    toast.success(
+                                      `Dataset loaded — ${precomp.rows.length} peptides (instant)`,
+                                      { id: "gold-std" }
+                                    );
+                                    navigate("/results");
+                                    return;
+                                  }
+                                } catch {
+                                  // precompute endpoint not available — fall through to XLSX path
+                                }
+
                                 const resp = await fetch("/Final_Staphylococcus_2023_new.xlsx");
                                 if (!resp.ok) {
                                   toast.error("Failed to load dataset", { id: "gold-std" });
