@@ -57,7 +57,11 @@ DATASETS: Dict[str, Dict[str, Any]] = {
     # /api/precomputed/gold_standard and surfaced via a Compare-page chip.
     "gold_standard": {
         "title": "Gold-standard benchmark — Staphylococcus aureus 2023 (2,916 peptides)",
-        "source": HERE.parent / "ui" / "public" / "Final_Staphylococcus_2023_new.xlsx",
+        # Bundled into backend/data/ rather than ui/public so the script is
+        # self-contained inside the backend container (no cross-image path
+        # dependency). The ui/public copy stays for the legacy XLSX-fetch
+        # fallback path.
+        "source": HERE / "data" / "reference_datasets" / "staphylococcus_2023.xlsx",
         "output": HERE / "data" / "precomputed" / "gold_standard.json",
     },
 }
