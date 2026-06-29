@@ -61,7 +61,7 @@ jobs:
           echo "Resolved tag=${TAG} version=${VERSION}"
 
       - name: Checkout at release tag
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           ref: ${{ steps.tag.outputs.tag }}
           fetch-depth: 0  # full history for set-commits --auto
