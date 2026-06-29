@@ -3,7 +3,7 @@
 > Living status board for the `docs/handbook/` build. Updated at the end of every wave. One commit per wave: `docs(handbook): wave N — <summary>`.
 
 **PVL version covered:** v0.3.0 (main HEAD as of the branch this work sits on, `wave-2.8/peleg-pdf-followups`).
-**Last updated:** end of Wave 1.
+**Last updated:** end of Wave 2 (2026-06-29).
 
 ---
 
@@ -15,9 +15,9 @@ Legend: ✅ written · 🟡 stub/partial · ⬜ not started
 | Page | Status | Notes |
 |------|--------|-------|
 | 00_what_is_pvl.md | ✅ | 5-minute orientation, no jargon. |
-| 01_first_run.md | ⬜ | git clone → UI. Source: HANDOFF §2, README self-host, DEPLOYMENT. |
+| 01_first_run.md | ✅ | 12-min walkthrough — clone, backend venv, frontend dev server, smoke test, troubleshooting. |
 | 02_the_science.md | ⬜ | TANGO/S4PRED/FF-Helix/SSW/FF-SSW with primary citations. Source: PAPER_METHODS_REFERENCE, DECISIONS ADR-001/003, biochem_calculation.py, auxiliary.py. |
-| 03_the_pipeline.md | ⬜ | End-to-end data flow + diagram. Source: ACTIVE_CONTEXT, DEVELOPER_REFERENCE §1–2. |
+| 03_the_pipeline.md | ✅ | 11 ordered stages from HTTP parse → Pydantic response. Includes deterministic guarantee + precompute path + null-state semantics. |
 | 04_the_ui_walkthrough.md | ⬜ | Every page. Source: App.tsx routes, ui/src/pages/, PELEG_NOTES (page-by-page). |
 | 05_use_cases.md | ⬜ | Real research stories. Source: README use cases, MEETING, project_paper_case_studies memory. |
 | 06_deploying.md | ⬜ | VPS / DESY VM / K8s. Source: DEPLOYMENT, docker/. |
@@ -30,7 +30,7 @@ Legend: ✅ written · 🟡 stub/partial · ⬜ not started
 | Page | Status | Notes |
 |------|--------|-------|
 | 00_read_me_first.md | ✅ | Ground rules + commit identity + before-you-touch matrix. |
-| 01_repo_map.md | ⬜ | Every dir + key file, hot/cold marker. Source: repo walk, Key Files tables. |
+| 01_repo_map.md | ✅ | Every directory + key file with 🔥/🛡️/🧊 heat markers. Backend (90+ entries), frontend (50+), docs/three-bucket map, scripts, .github, conventions. |
 | 02_contracts_and_invariants.md | ⬜ | Protected surfaces + axioms. Source: CONTRACTS, api_models.py, ISSUE-032. |
 | 03_doing_a_safe_change.md | ⬜ | Plan→test→diff→verify. Source: CLAUDE.md TDD, HANDOFF §7–8. |
 | 04_when_to_ask_humans.md | ⬜ | Escalation list. Source: feedback memories, safety rules. |
@@ -49,6 +49,11 @@ Legend: ✅ written · 🟡 stub/partial · ⬜ not started
 ---
 
 ## Wave log
+
+### Wave 2 — done (2026-06-29)
+- humans/01_first_run.md — clone → UI in 12 min, with smoke test + troubleshooting matrix.
+- humans/03_the_pipeline.md — end-to-end 11-stage walkthrough including provider cache split, TANGO + S4PRED, normalize, Pydantic envelope. Locks the deterministic-output invariant.
+- agents/01_repo_map.md — every dir + ~140 key files with 🔥/🛡️/🧊 heat markers, edit conventions, "how to use this map" footer.
 
 ### Wave 1 — done
 - Read all 20 ground-truth sources + walked backend (`api/main.py`, routes/, services/) and frontend (`App.tsx`, pages/) entrypoints.

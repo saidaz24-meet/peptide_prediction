@@ -240,3 +240,26 @@ When you (or a future contributor) make a load-bearing decision:
 5. Cross-link from `ROADMAP.md` and `TECH_PLATFORM_VISION.md` where relevant.
 
 ADRs may be SUPERSEDED but never deleted — the record matters for project history.
+
+---
+
+## ADR-021 — Peleg's Wave 2.8/2.9 close-out scientific decisions (2026-06-29)
+
+**Context.** Six open scientific questions (OQ1–OQ8, minus the two already answered in earlier waves) needed Peleg's call before tagging v1.0.0. Filed as GitHub Issues #106–#111 with paste-ready context.
+
+**Decision.** Peleg replied 2026-06-29 with:
+
+| Issue | Question | Decision | Code state |
+|---|---|---|---|
+| #106 (OQ1) | Coiled-coil terminology — 3-state coil vs coiled-coil motif | **Coiled-coil motif.** Pipeline class label uses the motif convention end-to-end. | Already matches. S4PRED's `P(Coil)` chart curve stays as-is (semantically the per-residue 3-state SS probability, not the motif). |
+| #107 (OQ2) | "Rank & Merge" — what does Merge mean to the user | Deferred to next dev. | Current wording retained. |
+| #108 (OQ4) | y=0.5 dashed line in Aggregation-Structure Overlay | Deferred to next dev. | Current line retained. |
+| #109 (OQ5) | SSW residue color in Mol* 3D viewer | **Magenta confirmed.** | Already shipped — `sswColor.ts` SSW_RESIDUE_HEX = `#E040FB` applied across plots, badges, Mol* viewer, sequence track, exports (Wave 2.8). |
+| #110 (OQ7) | Beta % calculation flagged "too aggressive" (F10) | Deferred to next dev. | Current threshold retained. |
+| #111 (OQ8) | "AlphaFold-predicted structure" title — keep or delete | **Delete per 2026-06-18 meeting.** | Already shipped — A8 (`PeptideDetail.tsx:430`, commit 2026-06-23) replaced the title with "Predicted Secondary Structure". |
+
+**Reasoning.** Peleg's verbatim guidance: "*the motif one. make sure its good for researchers. magenta confirmed. delete per meeting. other than that, keep everything as is. its fine. next dev will take care of the specifics.*"
+
+**Implication.** PVL is scientifically locked at Wave 2.8/2.9 close-out. No code changes required (every "decision" landed on already-shipped behaviour). The three deferred items (OQ2, OQ4, OQ7) stay open as Tier-4 polish entries in `BACKLOG.md` for the next developer if they want to revisit; Peleg does NOT consider them publication-blocking.
+
+**Evidence.** GitHub Issues #106–#111 closed 2026-06-29 with this ADR linked.
