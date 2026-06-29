@@ -136,7 +136,7 @@ The [four classes](./02_the_science.md#1-the-four-class-system) are **Helix / FF
 
 **The two most important elements.** (1) The **classification pill row** (SSW / FF-Helix / FF-SSW) directly under the ID — these are the binary class calls a researcher came for; the per-class % is deliberately a *feature*, shown in charts, not a pill. (2) The **"Predicted Secondary Structure" card** with the Sequence Track + dual legend — it ties residue colour to meaning and is the page's scientific anchor.
 
-**What's NOT here.** The 3D card is **Phase 1**: an embedded EBI Mol* viewer (iframe) plus a local "prediction overlay map" residue bar. Programmatic per-residue overpaint/transparency and hover-sync are **Phase 2 — not shipped** (see [`https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/MOL3D_OVERLAY_SPEC.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/MOL3D_OVERLAY_SPEC.md)). The SSW-overpaint toggle is wired but inert until a plugin ref exists.
+**What's NOT here.** The 3D card is **Phase 1**: an embedded EBI Mol* viewer (iframe) plus a local "prediction overlay map" residue bar. Programmatic per-residue overpaint/transparency and hover-sync are **Phase 2 — not shipped** (see [`../../active/MOL3D_OVERLAY_SPEC.md`](../../active/MOL3D_OVERLAY_SPEC.md)). The SSW-overpaint toggle is wired but inert until a plugin ref exists.
 
 **For power users.** UniProt-format IDs become deep links to uniprotkb. "Find Similar" opens a vector-similarity drill-down. The page reads from the persisted store, so a `/peptides/:id` link survives a reload as long as the dataset is still loaded; otherwise you get "Peptide Not Found."
 

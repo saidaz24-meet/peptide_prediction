@@ -25,7 +25,7 @@
 
 **Fix:** Wait it out once; subsequent requests are fast because the process stays warm. If every request is slow, you're probably running the live pipeline on a large batch instead of the precomputed artifact — confirm the backend logged `boot` and that `--reload` isn't restarting the worker mid-request.
 
-- See [`https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md) → ISSUE-033 (the inline ESM-2 embedding that used to add 3–5 s/peptide is fixed; predict no longer waits on it).
+- See [`../../active/KNOWN_ISSUES.md`](../../active/KNOWN_ISSUES.md) → ISSUE-033 (the inline ESM-2 embedding that used to add 3–5 s/peptide is fixed; predict no longer waits on it).
 - Can't fix → [`../agents/06_failure_modes.md`](../agents/06_failure_modes.md).
 
 ---
@@ -36,7 +36,7 @@
 
 **Fix:** Set `USE_TANGO=1` on a native-Linux/x86 host and re-run. On an Apple-Silicon Mac in Docker, TANGO can't execute under emulation — run the backend natively or regenerate the example artifact with `scripts/precompute_dataset.py`.
 
-- See [`https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md) → **ISSUE-034** (precompute silently skipped the TANGO subprocess — fixed with `force_recompute` + `bypass_tango_budget`) and **ISSUE-018** (TANGO fails under Apple-Silicon emulation).
+- See [`../../active/KNOWN_ISSUES.md`](../../active/KNOWN_ISSUES.md) → **ISSUE-034** (precompute silently skipped the TANGO subprocess — fixed with `force_recompute` + `bypass_tango_budget`) and **ISSUE-018** (TANGO fails under Apple-Silicon emulation).
 - Can't fix → [`../agents/06_failure_modes.md`](../agents/06_failure_modes.md).
 
 ---
@@ -47,7 +47,7 @@
 
 **Fix:** Open your file and confirm the header row literally contains `Entry`/`Accession`/`ID` and `Sequence`. Re-export from UniProt with those columns, or rename your headers. Empty files and header-only files are rejected with a 400 explaining exactly that.
 
-- Grounded in [`backend/api/routes/upload.py`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/backend/api/routes/upload.py) (`require_cols(df, ["Entry", "Sequence"])`) and [`https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md) → ISSUE-002 (the `missing required field "id" or "Entry"` mapping bug, fixed).
+- Grounded in [`backend/api/routes/upload.py`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/backend/api/routes/upload.py) (`require_cols(df, ["Entry", "Sequence"])`) and [`../../active/KNOWN_ISSUES.md`](../../active/KNOWN_ISSUES.md) → ISSUE-002 (the `missing required field "id" or "Entry"` mapping bug, fixed).
 - Can't fix → [`../agents/06_failure_modes.md`](../agents/06_failure_modes.md).
 
 ---
@@ -69,7 +69,7 @@
 
 **Fix:** Hard-refresh to pull the latest build. If it persists, open the browser console, read the de-minified component name, and check it against the known crashes below. Serving over HTTPS (or localhost) resolves the `crypto.randomUUID` class of errors.
 
-- See [`https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md) → **ISSUE-023** (`React.Children.only` on `/results`, fixed), **ISSUE-027** (`crypto.randomUUID is not a function` on HTTP/Safari, fixed), **ISSUE-002** (the older "Something went wrong" mapping error, fixed).
+- See [`../../active/KNOWN_ISSUES.md`](../../active/KNOWN_ISSUES.md) → **ISSUE-023** (`React.Children.only` on `/results`, fixed), **ISSUE-027** (`crypto.randomUUID is not a function` on HTTP/Safari, fixed), **ISSUE-002** (the older "Something went wrong" mapping error, fixed).
 - Can't fix → [`../agents/06_failure_modes.md`](../agents/06_failure_modes.md).
 
 ---
@@ -80,7 +80,7 @@
 
 **Fix:** Nothing to fix. The release script (`scripts/publish_v0_3_0.sh`) patches the badge line on tag, guided by the `DOI-BADGE-MARKER` comment in [`README.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/README.md). Until then, cite the underlying algorithm via Ragonis-Bachar et al. 2022.
 
-- See [`https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/DECISIONS.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/DECISIONS.md) and the README "Citing PVL" section. No KNOWN_ISSUES entry — this is expected.
+- See [`../../active/DECISIONS.md`](../../active/DECISIONS.md) and the README "Citing PVL" section. No KNOWN_ISSUES entry — this is expected.
 - Background → [`../agents/06_failure_modes.md`](../agents/06_failure_modes.md).
 
 ---
@@ -102,7 +102,7 @@
 
 **Fix:** Check the backend `boot` log for `USE_TANGO=True`, and check `meta.warnings` for `tango_auto_disabled` (batch > 500) or `tango_not_available`. For a large dataset, raise the budget env var on a host with headroom, or accept that TANGO is off and rely on S4PRED + FF-Helix. On Apple Silicon, run natively.
 
-- Grounded in [`backend/config.py`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/backend/config.py) (`USE_TANGO`, `MAX_PEPTIDES_PER_RUN_WITH_TANGO`) and [`https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md) → **ISSUE-018** (emulation) and **ISSUE-034** (precompute skip).
+- Grounded in [`backend/config.py`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/backend/config.py) (`USE_TANGO`, `MAX_PEPTIDES_PER_RUN_WITH_TANGO`) and [`../../active/KNOWN_ISSUES.md`](../../active/KNOWN_ISSUES.md) → **ISSUE-018** (emulation) and **ISSUE-034** (precompute skip).
 - Can't fix → [`../agents/06_failure_modes.md`](../agents/06_failure_modes.md).
 
 ---
@@ -122,4 +122,4 @@
 
 - For dev-environment basics (ports, venv, TANGO binary not found), see [`01_first_run.md`](01_first_run.md) → Troubleshooting.
 - For the full backend debugging workflow and the agent's diagnostic decision tree, see [`../agents/06_failure_modes.md`](../agents/06_failure_modes.md).
-- If you've confirmed a genuinely new failure, file it against the template at the bottom of [`https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md).
+- If you've confirmed a genuinely new failure, file it against the template at the bottom of [`../../active/KNOWN_ISSUES.md`](../../active/KNOWN_ISSUES.md).

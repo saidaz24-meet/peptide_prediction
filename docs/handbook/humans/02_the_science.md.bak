@@ -1,6 +1,6 @@
 # The science behind PVL
 
-> **Read this first.** PVL (Peptide Visual Lab) is a research instrument, not a feature collection. Every number it shows comes from a published algorithm or a biochemical formula with a citation, run deterministically. This page explains what each predictor does, exactly where in the code it lives, and — just as important — what each result does **not** mean. It is the readable companion to the citation-ready [`PAPER_METHODS_REFERENCE.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/PAPER_METHODS_REFERENCE.md); where the two disagree, the code (cited here by `file:line`) is authoritative and the discrepancy is flagged.
+> **Read this first.** PVL (Peptide Visual Lab) is a research instrument, not a feature collection. Every number it shows comes from a published algorithm or a biochemical formula with a citation, run deterministically. This page explains what each predictor does, exactly where in the code it lives, and — just as important — what each result does **not** mean. It is the readable companion to the citation-ready [`PAPER_METHODS_REFERENCE.md`](../../active/PAPER_METHODS_REFERENCE.md); where the two disagree, the code (cited here by `file:line`) is authoritative and the discrepancy is flagged.
 >
 > For how PVL compares to other tools in the field, see [the landscape survey](../research/01_landscape.md). For where each module lives in the tree, see the [repo map](../agents/01_repo_map.md).
 

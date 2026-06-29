@@ -45,12 +45,12 @@ jobs:
             pymdown-extensions
 
       - name: Build site (verify it compiles before deploy)
-        # NOTE: --strict turns warnings into errors. The handbook has 28
-        # cross-link warnings the Opus build left behind; not fixing those
-        # in this commit because they're cosmetic + traced for Wave 11. Drop
-        # --strict so the deploy proceeds; restore once the cross-links are
-        # all internal handbook anchors.
-        run: mkdocs build --verbose
+        # --strict turns warnings into errors. As of 2026-06-29, the handbook
+        # passes --strict cleanly: all out-of-tree cross-links (to backend/,
+        # ui/, docs/active/, paper/, README.md, CITATION.cff) are rewritten
+        # as absolute GitHub URLs so they don't depend on the docs site
+        # layout. Future broken-link regressions will fail this build.
+        run: mkdocs build --strict --verbose
 
       - name: Deploy to gh-pages
         run: |

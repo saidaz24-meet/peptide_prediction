@@ -58,7 +58,7 @@ Default thresholds come from `backend/config.py` (literature-default); per-datab
 ### 5. Provider cache split
 `backend/services/provider_cache.py:split_cached_uncached` checks a DuckDB cache at `/data/cache/provider_cache.duckdb` keyed by `seq_hash(sequence)`. Rows whose TANGO + S4PRED + biochem are all cached become "hits" and skip the predictor calls. Rows missing any cached predictor become "misses" and continue to the predictors.
 
-The precompute script bypasses this entirely (`force_recompute=True`) because it IS the cache source-of-truth — see [ISSUE-034 fix](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/KNOWN_ISSUES.md).
+The precompute script bypasses this entirely (`force_recompute=True`) because it IS the cache source-of-truth — see [ISSUE-034 fix](../../active/KNOWN_ISSUES.md).
 
 ### 6. TANGO (subprocess, deterministic)
 `backend/tango.py:run_tango_simple(records)` writes each peptide as a one-line input file, spawns the [TANGO](02_the_science.md#2-tango) Fortran binary, parses the output `*.txt` files back into the DataFrame as per-residue arrays:

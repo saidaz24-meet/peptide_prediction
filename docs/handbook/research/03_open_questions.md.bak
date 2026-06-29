@@ -19,9 +19,9 @@
 
 Peleg Ragonis-Bachar's PDF review of 2026-06-18 produced eight open questions (OQ1–OQ8) that needed her scientific call before PVL could be tagged. Six were filed as GitHub Issues #106–#111 with paste-ready context; two (OQ3, OQ6) were resolved by simply shipping the change and never needed a separate Issue.
 
-On **2026-06-29 Peleg replied** (recorded in [`DECISIONS.md` ADR-021](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/DECISIONS.md)). Her verbatim guidance: *"the motif one. make sure its good for researchers. magenta confirmed. delete per meeting. other than that, keep everything as is. its fine. next dev will take care of the specifics."*
+On **2026-06-29 Peleg replied** (recorded in [`DECISIONS.md` ADR-021](../../active/DECISIONS.md)). Her verbatim guidance: *"the motif one. make sure its good for researchers. magenta confirmed. delete per meeting. other than that, keep everything as is. its fine. next dev will take care of the specifics."*
 
-That close-out means: **5 of 8 OQs are resolved, 3 are deferred** (open, but Peleg does *not* consider them publication-blocking). The deferred three live on as Tier-4 polish entries in [`BACKLOG.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/BACKLOG.md).
+That close-out means: **5 of 8 OQs are resolved, 3 are deferred** (open, but Peleg does *not* consider them publication-blocking). The deferred three live on as Tier-4 polish entries in [`BACKLOG.md`](../../active/BACKLOG.md).
 
 | OQ | Question | Issue | Status | Resolver |
 |----|----------|-------|--------|----------|
@@ -75,7 +75,7 @@ The overlay draws a horizontal dashed line at y=0.5 whose meaning was never labe
 
 **The question:** [net charge](../humans/02_the_science.md#4-biochemistry) is currently displayed/handled as an absolute value `|charge|` in at least the Cohort Comparison path, which **loses the sign**. A peptide at net −3 and one at net +3 are biochemically very different; collapsing them to `3` discards information. Peleg's own framing in the production-lockdown note: *"|charge| loses sign — okay to ship or revisit?"*
 
-- **Source:** `PELEG-Q-FIX-022`, tracked in [`ROADMAP.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/ROADMAP.md) Round-2 (Wave 2.7) and the Wave C discussion list (FIX-022, "charge handling: absolute vs signed"). Listed as Peleg co-design item **D6**.
+- **Source:** `PELEG-Q-FIX-022`, tracked in [`ROADMAP.md`](../../active/ROADMAP.md) Round-2 (Wave 2.7) and the Wave C discussion list (FIX-022, "charge handling: absolute vs signed"). Listed as Peleg co-design item **D6**.
 - **GitHub Issue:** no dedicated Issue filed yet — it lives as a `# PELEG-Q-FIX-022` TODO comment in code and a backlog line.
 - **Who resolves:** **Peleg** (whether signed charge is the scientifically correct display) with a small dev change to follow. Until then, `|charge|` ships with this caveat noted.
 
@@ -85,13 +85,13 @@ The 40-aa hard cap is currently *default-skipped* via the S4PRED length cap rath
 
 ### Section tallies still showing "open" in PELEG_NOTES
 
-The 2026-06-23 revised tally in the Peleg-notes triage shows residual open items outside the OQ block — Q-section (3), B-section (4, mostly Cowork-owned chart/stat features like B7 SSE streaming, B16 Mol\* Phase 2, B20), and E4 export header. These are **implementation work, not unresolved science** — they have agreed designs and simply need shipping. Most have since landed (see BACKLOG "Recently shipped"). They are tracked in [`BACKLOG.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/BACKLOG.md) Tiers 1–2, not here.
+The 2026-06-23 revised tally in the Peleg-notes triage shows residual open items outside the OQ block — Q-section (3), B-section (4, mostly Cowork-owned chart/stat features like B7 SSE streaming, B16 Mol\* Phase 2, B20), and E4 export header. These are **implementation work, not unresolved science** — they have agreed designs and simply need shipping. Most have since landed (see BACKLOG "Recently shipped"). They are tracked in [`BACKLOG.md`](../../active/BACKLOG.md) Tiers 1–2, not here.
 
 ---
 
 ## Future scientific avenues (Tier 3 — not questions, directions)
 
-These are not "unresolved bugs" — they are deliberate research directions where the science is sound but unbuilt. From [`BACKLOG.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/BACKLOG.md) Tier 3 and [`ROADMAP.md`](https://github.com/saidaz24-meet/peptide_prediction/blob/main/docs/active/ROADMAP.md) Phases G/I:
+These are not "unresolved bugs" — they are deliberate research directions where the science is sound but unbuilt. From [`BACKLOG.md`](../../active/BACKLOG.md) Tier 3 and [`ROADMAP.md`](../../active/ROADMAP.md) Phases G/I:
 
 - **[Phase I — multi-predictor consensus](../humans/07_extending.md).** Add Waltz → AGGRESCAN3D → PASTA 2.0 side-by-side, producing a per-predictor verdict table with a consensus statement (Galagos-inspired). The overlay contract (`molstarOverlays.ts` `OverlayType` union) is already forward-compatible. **Open question for the field:** how to weight disagreeing predictors honestly — PVL's ranking design rule is *never* a single-predictor verdict. Resolver: dev + Peleg on the weighting scheme; partly a **literature-review** question (which benchmark defines "ground truth").
 - **G2 — RAG + PubMed context.** Per-peptide UniProt context plus retrieved abstracts in a side panel (LanceDB + ESM-2, ADR-016/017; agentic PaperQA2 pattern, ADR-020). **Open question:** the zero-citation-hallucination guarantee — ADR-020 is still **PROPOSED**, pending Peleg's axiom-registry review and Alex's sign-off on hallucination-guard rules. Resolver: Peleg (axioms) + Alex (infra) + literature (PaperQA2 evaluation).
