@@ -1,0 +1,54 @@
+name: Deploy handbook to GitHub Pages
+
+# Builds docs/handbook/ with mkdocs-material and publishes to gh-pages
+# branch. The result is live at https://saidaz24-meet.github.io/peptide_prediction/
+#
+# Trigger: every push to main that touches docs/handbook/ or mkdocs.yml,
+# plus a manual dispatch button for forcing a rebuild.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/handbook/**"
+      - "mkdocs.yml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: "docs-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install mkdocs-material + plugins
+        run: |
+          pip install --upgrade pip
+          pip install \
+            mkdocs-material \
+            mkdocs-material[imaging] \
+            pymdown-extensions
+
+      - name: Build site (verify it compiles before deploy)
+        run: mkdocs build --strict --verbose
+
+      - name: Deploy to gh-pages
+        run: |
+          git config user.name "Said Azaizah"
+          git config user.email "said.azaizah@cssb-hamburg.de"
+          mkdocs gh-deploy --force --no-history --message "docs: deploy handbook ${{ github.sha }}"

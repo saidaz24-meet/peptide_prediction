@@ -1,0 +1,168 @@
+# mkdocs configuration for PVL — material theme, GitHub Pages deploy
+#
+# Local preview:
+#   pip install mkdocs-material
+#   mkdocs serve
+#   # open http://127.0.0.1:8000
+#
+# Deploy to gh-pages (one-shot, after a `pip install mkdocs-material`):
+#   mkdocs gh-deploy --force --message "docs: deploy handbook to GitHub Pages"
+#
+# Or via the .github/workflows/docs.yml workflow on every push to main.
+
+site_name: PVL — Peptide Visual Lab
+site_description: Open-source web platform for peptide aggregation propensity, secondary structure prediction, and fibril-forming candidacy classification. Documentation handbook.
+site_url: https://saidaz24-meet.github.io/peptide_prediction/
+site_author: Said Azaizah
+repo_url: https://github.com/saidaz24-meet/peptide_prediction
+repo_name: saidaz24-meet/peptide_prediction
+edit_uri: edit/main/docs/handbook/
+copyright: >
+  &copy; 2026 Said Azaizah, Peleg Ragonis-Bachar, Aleksandr Golubev, Technion + DESY + MIT.
+  Released under the MIT License.
+
+docs_dir: docs/handbook
+site_dir: site
+
+theme:
+  name: material
+  language: en
+  features:
+    - announce.dismiss
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.tabs.link
+    - content.tooltips
+    - navigation.footer
+    - navigation.indexes
+    - navigation.instant
+    - navigation.instant.prefetch
+    - navigation.path
+    - navigation.sections
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
+
+  palette:
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: deep purple
+      accent: pink
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: deep purple
+      accent: pink
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+  font:
+    text: Inter
+    code: JetBrains Mono
+
+  icon:
+    logo: material/dna
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+
+  favicon: assets/favicon.png
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/saidaz24-meet/peptide_prediction
+      name: PVL on GitHub
+    - icon: fontawesome/solid/flask
+      link: https://bio.tools/pvl
+      name: PVL on bio.tools (after registration)
+  version:
+    provider: mike
+    default: latest
+
+markdown_extensions:
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      title: On this page
+  - tables
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+
+plugins:
+  - search:
+      separator: '[\s​\-_,:!=\[\]()"`/]+|\.(?!\d)|&[lg]t;|(?!\b)(?=[A-Z][a-z])'
+  - tags
+
+nav:
+  - Home: README.md
+  - For Researchers:
+      - What is PVL: humans/00_what_is_pvl.md
+      - First run: humans/01_first_run.md
+      - The science: humans/02_the_science.md
+      - The pipeline: humans/03_the_pipeline.md
+      - UI walkthrough: humans/04_the_ui_walkthrough.md
+      - Use cases: humans/05_use_cases.md
+      - Deploying: humans/06_deploying.md
+      - Extending: humans/07_extending.md
+      - Troubleshooting: humans/08_troubleshooting.md
+      - Glossary: humans/09_glossary.md
+      - Credits & license: humans/10_credits_and_license.md
+  - For Agents:
+      - Read me first: agents/00_read_me_first.md
+      - Repo map: agents/01_repo_map.md
+      - Contracts & invariants: agents/02_contracts_and_invariants.md
+      - Doing a safe change: agents/03_doing_a_safe_change.md
+      - When to ask humans: agents/04_when_to_ask_humans.md
+      - Existing tooling: agents/05_existing_tooling.md
+      - Failure modes: agents/06_failure_modes.md
+      - Artifacts index: agents/07_artifacts_index.md
+  - For Researchers (advanced):
+      - Competitive landscape: research/01_landscape.md
+      - Validation evidence: research/02_validation_evidence.md
+      - Open questions: research/03_open_questions.md
+      - Publication path: research/04_publication_path.md
